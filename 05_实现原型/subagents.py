@@ -354,9 +354,10 @@ class AnswerSolver:
         pass
 
     def run(self, model, question: str, subject: str = "math",
-            grade_level: str = "high_school", learner=None) -> dict:
+            grade_level: str = "high_school", learner=None, history: list = None) -> dict:
         """直接生成完整答案。
 
+        v0.20.5：新增 history 参数——续问（"再求 x^3 的"）时 LLM 需要上文。
         返回：{"answer": str, "mode": "answer"}
         """
         grade_cn = {"middle_school": "初中", "high_school": "高中",
@@ -381,7 +382,13 @@ class AnswerSolver:
             "7. 不确定的地方注明（如'按常规解法'），不编造。"
         )
         user = f"学生的问题：{question}\n{desc_line}请直接给出完整答案。"
-        answer = _safe_chat(model, system, user, max_tokens=1800)
+        # v0.20.5：若有历史（续问），传真 messages
+        if history:
+            from context_bundle import assemble_messages
+            msgs = assemble_messages(history, user)
+            answer = _safe_chat(model, system, messages=msgs, max_tokens=1800)
+        else:
+            answer = _safe_chat(model, system, user, max_tokens=1800)
         if not answer:
             answer = f"（找答案模式生成失败，请重试）\n问题：{question}"
         return {"answer": answer, "mode": "answer"}
