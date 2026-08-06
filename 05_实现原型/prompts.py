@@ -557,14 +557,33 @@ def build_general_chat_user(user_text: str) -> str:
 
 
 def build_presenter_user(subject: str, topic: str, step_type: str = "present",
-                         step_id: int = 1, total_steps: int = 3) -> str:
-    """构建 Presenter 的 user prompt（具体到本次要讲什么）。"""
+                         step_id: int = 1, total_steps: int = 3,
+                         previous_summary: str = "", strategy_name: str = "") -> str:
+    """构建 Presenter 的 user prompt（具体到本次要讲什么）。
+
+    v0.15：携带前文摘要，避免每一步重复讲同一概念。
+    previous_summary：前几步已讲内容的简要总结（LLM 据此讲新内容，不重复）。
+    """
     style = get_style(subject)
     stage_cn = {
-        "present": "讲解", "evaluate": "带练习/提问", "review": "回顾"
+        "present": "讲解", "evaluate": "带练习/提问", "review": "回顾",
+        "question": "提问引导", "guide": "启发引导",
+        "practice": "带练习", "feedback": "反馈矫正",
     }.get(step_type, "讲解")
-    return (
-        f"请给{style['label']}的这节内容做{stage_cn}（第 {step_id}/{total_steps} 步）。\n"
-        f"话题：{topic}\n"
-        f"要求：直接开讲，300 字以内，讲完自然收尾。"
-    )
+    parts = [
+        f"请给{style['label']}的这节内容做{stage_cn}（第 {step_id}/{total_steps} 步）。",
+        f"本步话题：{topic}",
+    ]
+    if strategy_name:
+        parts.append(f"教学策略：{strategy_name}")
+    if previous_summary:
+        # 关键：告诉 LLM 前面已讲过什么，本步必须讲新内容
+        parts.append(
+            f"\n【前面几步已经讲过】\n{previous_summary}\n"
+            f"【要求】上一步已经讲过的内容不要再重复。本步请推进到新的方面："
+            f"如果是第 2 步，深入机制/定义/辨析；如果是第 3 步，给应用/反例/练习或纠错。"
+        )
+    else:
+        parts.append("【要求】这是第 1 步，从最直觉的入口开始。")
+    parts.append("直接开讲，300 字以内，讲完自然收尾。")
+    return "\n".join(parts)
