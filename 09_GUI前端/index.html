@@ -168,6 +168,21 @@ body, .sidebar, .card, .msg-bubble, .topbar, .input-bar, .chat-window {
   transition: background-color .3s ease, color .3s ease, border-color .3s ease;
 }
 
+/* v0.19.25：独立对话类型标签（学习方法/知识库） */
+.mode-tag {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 20px;
+  padding: 2px 10px;
+  margin-bottom: 8px;
+  letter-spacing: .3px;
+}
+.mode-tag + * { margin-top: 4px; }
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   background: var(--bg);
@@ -686,6 +701,8 @@ body {
       <button class="mode-btn active" data-mode="teach">学科教学</button>
       <button class="mode-btn" data-mode="chat">闲聊~</button>
       <button class="mode-btn" data-mode="answer" title="直接给完整答案（论述/计算/证明题）">找答案</button>
+      <button class="mode-btn" data-mode="method" title="问某门课该怎么学、怎么复习、怎么规划">学习方法</button>
+      <button class="mode-btn" data-mode="knowledge" title="查看我的知识库：我收着哪些资料">知识库</button>
     </div>
   </div>
 </header>
@@ -802,8 +819,9 @@ body {
         <option value="chinese">语文（中学）</option>
         <option value="politics">政治</option>
         <option value="law">法学</option>
-        <option value="history">历史学</option>
-        <option value="english">英语</option>
+          <option value="history">历史学</option>
+          <option value="economics">经济学</option>
+          <option value="english">英语</option>
         <option value="french">法语</option>
         <option value="german">德语</option>
         <option value="japanese">日语</option>
@@ -1597,6 +1615,84 @@ async function answerChat(question, subject) {
   }
 }
 
+// v0.19.25：学科学习方法模式——独立对话类型
+async function methodChat(question, subject) {
+  const thinking = addThinking('chat');
+  askBtn.disabled = true;
+  try {
+    const result = await api('/api/method', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        concept: question,
+        subject: subject,
+        grade_level: document.getElementById('grade-select').value,
+        learner_id: STATE.learnerId,
+        nickname: STATE.nickname,
+        self_description: STATE.selfDescription || '',
+      }),
+    });
+    removeThinking(thinking);
+    const pres = (result.presentations && result.presentations[0]) || {};
+    const content = pres.content || '';
+    if (content) {
+      addMsg('paeg', `<div class="mode-tag">学习方法 · ${escapeHtml(result.learner && result.learner.nickname ? '' : '')}${escapeHtml(subjectLabel(subject))}</div>` + content);
+    } else if (result.error) {
+      addMsg('paeg', `出错了：${result.error}`);
+    } else {
+      addMsg('paeg', '（没有返回建议）');
+    }
+  } catch (e) {
+    removeThinking(thinking);
+    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+  } finally {
+    askBtn.disabled = false;
+  }
+}
+
+// v0.19.25：知识库模式——独立对话类型（清点 Library）
+async function knowledgeChat(question) {
+  const thinking = addThinking('chat');
+  askBtn.disabled = true;
+  try {
+    const result = await api('/api/knowledge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        learner_id: STATE.learnerId,
+        nickname: STATE.nickname,
+        grade_level: document.getElementById('grade-select').value,
+        subject: subjectSelect.value,
+      }),
+    });
+    removeThinking(thinking);
+    const pres = (result.presentations && result.presentations[0]) || {};
+    const content = pres.content || '';
+    if (content) {
+      addMsg('paeg', `<div class="mode-tag">知识库</div>` + content);
+    } else if (result.error) {
+      addMsg('paeg', `出错了：${result.error}`);
+    } else {
+      addMsg('paeg', '（知识库为空）');
+    }
+  } catch (e) {
+    removeThinking(thinking);
+    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+  } finally {
+    askBtn.disabled = false;
+  }
+}
+
+// 辅助：学科 key → 中文 label（从 subject-select 读）
+function subjectLabel(key) {
+  const sel = document.getElementById('subject-select');
+  if (!sel) return key;
+  for (const opt of sel.options) {
+    if (opt.value === key) return opt.textContent;
+  }
+  return key;
+}
+
 // ─── 教学动作按钮（v0.9） ───
 const ACTIONS = {
   'act-hint': '请只给我一个提示，不要直接告诉我答案，让我自己再想想。',
@@ -1874,6 +1970,10 @@ askBtn.addEventListener('click', () => {
     generalChat(q);
   } else if (currentMode === 'answer') {
     answerChat(q, subjectSelect.value);
+  } else if (currentMode === 'method') {
+    methodChat(q, subjectSelect.value);
+  } else if (currentMode === 'knowledge') {
+    knowledgeChat(q);
   } else {
     teach(q, subjectSelect.value);
   }
@@ -1901,15 +2001,19 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     currentMode = btn.dataset.mode;
     // v0.19.7：教学模式/找答案模式显示学科+学段选择；闲聊模式全部隐藏
     // v0.19.14：新增 answer（找答案）模式
+    // v0.19.25：新增 method（学习方法）/ knowledge（知识库）模式
     const isTeach = currentMode === 'teach';
     const isAnswer = currentMode === 'answer';
-    const showSelects = isTeach || isAnswer;
+    const isMethod = currentMode === 'method';
+    const isKnowledge = currentMode === 'knowledge';
+    const showSelects = isTeach || isAnswer || isMethod;
     document.getElementById('subject-select').style.display = showSelects ? '' : 'none';
     document.getElementById('grade-select').style.display = showSelects ? '' : 'none';
     document.querySelector('.subject-chips').style.display = isTeach ? '' : 'none';
     questionInput.placeholder = isTeach
       ? '输入你想学习的内容…'
-      : (isAnswer ? '输入题目，直接给你完整答案（论述/计算/证明）…' : '闲聊一下——困惑、想法、生活里的事…');
+      : (isAnswer ? '输入题目，直接给你完整答案（论述/计算/证明）…'
+         : (isMethod ? '问这门课该怎么学、怎么复习、怎么规划…' : '输入任意内容，查看我的知识库…'));
     questionInput.focus();
   });
 });
