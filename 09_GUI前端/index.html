@@ -1689,7 +1689,7 @@ async function affectionChat(text) {
   const thinking = addThinking('chat');
   askBtn.disabled = true;
   try {
-    const result = await api('/api/emotion', {
+    const result = await api('/api/affection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
