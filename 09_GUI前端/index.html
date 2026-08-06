@@ -685,6 +685,7 @@ body {
     <div class="mode-switch">
       <button class="mode-btn active" data-mode="teach">学科教学</button>
       <button class="mode-btn" data-mode="chat">闲聊~</button>
+      <button class="mode-btn" data-mode="answer" title="直接给完整答案（论述/计算/证明题）">找答案</button>
     </div>
   </div>
 </header>
@@ -1467,11 +1468,19 @@ async function generalChat(text) {
     const reader = resp.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
+    // v0.19.14：SSE 读流超时保护——120s 无数据则停止（防止连接挂起导致"不回复"）
+    let lastData = Date.now();
+    const timeoutTimer = setInterval(() => {
+      if (Date.now() - lastData > 120000) {
+        try { reader.cancel(); } catch (e) {}
+      }
+    }, 5000);
 
     // 读取 SSE 流
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+      if (value && value.length) lastData = Date.now();
       buffer += decoder.decode(value, { stream: true });
       // 解析 SSE 事件
       let idx;
@@ -1519,6 +1528,7 @@ async function generalChat(text) {
         }
       }
     }
+    clearInterval(timeoutTimer);
     removeThinking(thinking);
     // 用 marked 渲染最终累积文本（替换纯文本为 markdown）
     const textParts = Array.from(bubbleBody.querySelectorAll('span')).map(s => s.textContent).join('');
@@ -1531,6 +1541,39 @@ async function generalChat(text) {
       bubble._rawText = textParts;
       renderMath(bubbleBody);
       chatWin.scrollTop = chatWin.scrollHeight;
+    }
+  } catch (e) {
+    clearInterval(timeoutTimer);
+    removeThinking(thinking);
+    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+  } finally {
+    askBtn.disabled = false;
+  }
+}
+
+// v0.19.14：找答案模式——直接给完整答案（不受教学约束）
+async function answerChat(question, subject) {
+  const thinking = addThinking('chat');
+  askBtn.disabled = true;
+  try {
+    const result = await api('/api/answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: question,
+        subject: subject,
+        grade_level: document.getElementById('grade-select').value,
+        learner_id: STATE.learnerId,
+        nickname: STATE.nickname,
+      }),
+    });
+    removeThinking(thinking);
+    if (result.answer) {
+      addMsg('paeg', result.answer);
+    } else if (result.error) {
+      addMsg('paeg', `出错了：${result.error}`);
+    } else {
+      addMsg('paeg', '（没有返回答案）');
     }
   } catch (e) {
     removeThinking(thinking);
@@ -1815,6 +1858,8 @@ askBtn.addEventListener('click', () => {
   questionInput.value = '';
   if (currentMode === 'chat') {
     generalChat(q);
+  } else if (currentMode === 'answer') {
+    answerChat(q, subjectSelect.value);
   } else {
     teach(q, subjectSelect.value);
   }
@@ -1840,14 +1885,17 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentMode = btn.dataset.mode;
-    // v0.19.7：教学模式显示学科+学段选择；闲聊模式全部隐藏（闲聊不需要学段）
+    // v0.19.7：教学模式/找答案模式显示学科+学段选择；闲聊模式全部隐藏
+    // v0.19.14：新增 answer（找答案）模式
     const isTeach = currentMode === 'teach';
-    document.getElementById('subject-select').style.display = isTeach ? '' : 'none';
-    document.getElementById('grade-select').style.display = isTeach ? '' : 'none';
+    const isAnswer = currentMode === 'answer';
+    const showSelects = isTeach || isAnswer;
+    document.getElementById('subject-select').style.display = showSelects ? '' : 'none';
+    document.getElementById('grade-select').style.display = showSelects ? '' : 'none';
     document.querySelector('.subject-chips').style.display = isTeach ? '' : 'none';
     questionInput.placeholder = isTeach
       ? '输入你想学习的内容…'
-      : '闲聊一下——困惑、想法、生活里的事…';
+      : (isAnswer ? '输入题目，直接给你完整答案（论述/计算/证明）…' : '闲聊一下——困惑、想法、生活里的事…');
     questionInput.focus();
   });
 });
