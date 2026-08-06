@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.19.4（2026-08-06）
+> **版本**：v0.19.5（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -763,6 +763,7 @@ python eval_harness.py
 | **v0.19.2** | **工具调用错误恢复**（tool_recovery.py：错误分类[瞬时/永久/限流/配额] + 指数退避重试 + 失败降级信号[防 LLM 编造] + 每工具指标；接入 tool_registry 5 工具）+ **harness 加 tool-use 维度**（正常/隐式乘法重试/错误恢复 5 项测试全过）+ **SVG 资源替换 emoji**（16 个 Lucide/Heroicons 图标存 assets/icons，工具卡片/下载/上传/文件 全部用 SVG）+ **文档完善**（§10.4 GitHub 部署指南 + §10.5 可扩充资源清单 + 评估 harness 说明）|
 | **v0.19.3** | **对话交互三原则**：①准确性（build_general_chat_user 打包页面设定[模式/学段/学科]+历史+身份，要求先理解再输出）②组织性（输出像教学讲义：观点明确/层次清晰/内容详实）③功能性（前端复制按钮 + 多选回复生成文档下载，msg-copy/msg-select/select-bar）+ **记忆机制检查**（短时/长期/压缩均规范）+ **上下文管理**（context_manager.py：滑动窗口 window_k + token 预算 System15%/History60%/Response25% + 摘要降级，长对话降本 ~40%）+ **前端个性化**（暖白画布 #FAF8F4 + 深色模式[data-theme] + 玻璃顶栏 backdrop-filter + 撕角便签每日一句 + 主题切换按钮 + 渐变背景）|
 | **v0.19.4** | **三问题修复**：①**偏离提问根因**（chat_stream 的 run_agent_loop 之前传原始 text，改为传打包后的 user[含当前设定/历史/身份]）+ **三段收紧**（prompts 默认 1 段、最多 2 段、强调段间承接，不再固定三段各说各的）②**公式渲染补齐**（教学 renderStepBubble + chat 流式 bubble 补上 sanitizeFormulas + MathJax.typesetPromise，$ 包裹公式正确渲染）③**复制/多选全挂载**（教学 makeStepBubble + chat 流式 bubble 都加 msg-copy 复制按钮 + msg-select 复选框 + 保存 _rawText，copyMsg/genSelectedDoc 逻辑齐全）|
+| **v0.19.5** | **教学针对性优化**：①**公式渲染彻底修复**（marked 公式保护 extension：$...$/$$...$$/\(...\)/\[...\] 在 tokenizer 阶段原样保留，防 _/* 被转成 em；renderer 原样输出让 MathJax 识别；MathJax 加 processEscapes）+ **讲义式输出**（presenter prompt 加"讲义式组织"：小标题/公式规范/内容详实/可直接复用）②**关键词系统**（_handle_keyword_doc：用户输入"讲义/要点/例题/笔记"→ 生成对应格式文档下载，SSE 推送 doc 事件 + 前端显示下载链接）③**关键词提示 UI**（欢迎语提示可用关键词）|
 
 ---
 
