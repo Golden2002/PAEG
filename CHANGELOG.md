@@ -5,6 +5,18 @@
 
 ---
 
+## v0.20.1（2026-08-06）
+
+**emotion → affection 命名统一（纯命名变化，逻辑不变）**
+
+- server.py：EmotionSupportor→AffectionSupportor、is_emotion_expression→is_affection_expression、emotion_support→affection_support、/api/emotion→/api/affection、step_type/mode/session_id 全部 emotion→affection
+- meta_router.py：EMOTION_PATTERNS→AFFECTION_PATTERNS、is_emotion_expression→is_affection_expression
+- subagents.py：EmotionSupportor→AffectionSupportor（保留无关的 emotion_signal——那是 Evaluator 的情绪信号字段）
+- index.html：/api/emotion→/api/affection
+- 验证：4 文件 emotion 全清（零残留）、affection 全面替换、语法 OK、/api/affection 工作（step_type=affection）、旧 /api/emotion 移除、测试 59/59
+
+---
+
 ## v0.20（2026-08-06）· 文档亮点完整化
 
 **核对并补全技术文档全部亮点章节**
