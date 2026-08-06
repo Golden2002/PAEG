@@ -354,12 +354,15 @@ def _exec_skill_load(name: str) -> str:
 
 
 def run_agent_loop(model, system: str, user_input: str,
-                   max_iterations: int = 3, include_skills: bool = True) -> Dict[str, Any]:
+                   max_iterations: int = 3, include_skills: bool = True,
+                   history: Optional[List[dict]] = None) -> Dict[str, Any]:
     """让 LLM 自主决定是否调用工具/技能（最多 max_iterations 轮）。
 
+    v0.20.2：新增 history 参数——在 user_input 前注入历史对话（多轮连贯性）。
     返回：{"answer": str, "tool_calls": [{"name","arguments","result"}]}
     """
-    messages = [{"role": "user", "content": user_input}]
+    messages = list(history or [])
+    messages.append({"role": "user", "content": user_input})
     tool_defs = get_all_tool_defs() if include_skills else get_tool_defs()
     calls_log: List[Dict[str, Any]] = []
 
