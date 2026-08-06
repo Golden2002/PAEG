@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.19.20（2026-08-06）
+> **版本**：v0.19.22（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -312,6 +312,63 @@ LLM 调用（带 tools+tool_choice）→ LLM 决定调哪些工具 → 逐个执
 - `SelfImprover.analyze_failures()`（分析失败案例生成改进建议写入 improvements.md）——**0 调用**
 
 **结论**：PAEG 的"自我更新"目前是**对话驱动的增量自我更新**（每次对话后反思沉淀，下一次对话自动注入），而非**时间驱动的周期性自我更新**。周期级进化（周度洞察提取、批量策略清洗、失败共性分析）的**机制已经全部实现并有防护设计（Library Drift cap/min_evidence/贡献分淘汰），只差一个调度器把它们跑起来**——这是明确的下一步（见 §10.7 优化任务 #1）。
+
+## 1.6.8 系统性自进化：知识库/提示词/工具经验四路更新（v0.19.22 ⭐ 核心亮点）
+
+> 自 v0.19.21 起补齐了周期调度器（periodic_self_update.py），v0.19.22 实现了**带质量门禁的四路自进化**（self_evolution.py + quality_gate.py）。
+> 这是对 §1.6.7"周期级待接调度器"缺口的完整闭环。
+
+### 四路自进化管线
+
+```
+教学/对话完成
+   │
+   ├─① 知识库更新（distill_knowledge）
+   │    成功教学(avg≥0.7) → LLM提炼知识点(definition+intuition)
+   │      → QualityGate过滤 → Library/KnowledgeBase/subjects/evolved_*.json
+   │      → 重启后 library_loader 自动注册（知识库闭环）
+   │
+   ├─② 学科提示词更新（evolve_prompt，SCOPE双流）
+   │    教学反思 → LLM提炼改进建议
+   │      → QualityGate过滤 → memory/subject_patches.md
+   │      → teaching_memory 注入 system prompt（下次对话生效）
+   │
+   ├─③ 工具使用经验（learn_tool_lesson）
+   │    工具调用成败 → memory/tool_lessons.md
+   │      → teaching_memory 注入（优化工具选择）
+   │
+   └─④ 周度洞察（periodic_self_update）
+       每周：weekly_insight_update(ExpeL) + batch_update + analyze_failures
+         → evolve_data/insights.json + memory/improvements.md
+```
+
+### 质量门禁（QualityGate）：不收集无效数据 ⭐
+
+调研依据：Constitutional AI（教育宪法）、AlpaGasus（52k 只有 9k 高质量，多维评分）、Self-RAG（反思令牌）、ExpeL（证据追踪）。
+
+**四层过滤**（快→慢）：
+
+| 层 | 机制 | 拦截示例 |
+|---|---|---|
+| L1 Constitution | 有害内容正则 + **提示词注入/记忆投毒** + **PII/凭证泄露** | 制造炸弹 / "忽略系统指令" / 手机号/身份证/API Key |
+| L2 硬规则 | 长度(12-2000字符)、信息量、去重 | 过短/无信息/重复 |
+| L3 LLM 多维评分 | factuality≥4 / safety≥4 / pedagogy≥3（knowledge 类不查 novelty——经典知识不该被判"不新颖"） | 事实错误/无教学价值 |
+| L4 证据沙盒 | 洞察/经验类先进沙盒，evidence≥2 转正、贡献分归零淘汰 | 低置信候选 |
+
+**防污染原则**（来自 State Contamination 研究）：安全优先于质量（有害内容不能被"高质量"抵消）；失败经验与成功经验分离（负例不当作正向经验入库）；提示词注入是最高危（污染 Agent 行为，比内容有害更危险）。
+
+### 与成熟项目的对应
+
+| PAEG 机制 | 对标项目 |
+|---|---|
+| 四路自进化 + 质量门禁 | ExpeL（经验提炼+投票）+ Voyager（自验证守门员）|
+| 教育宪法（L1） | Constitutional AI |
+| 多维 LLM 评分（L3） | AlpaGasus + Self-RAG |
+| 证据沙盒+贡献分淘汰（L4） | ExpeL + Generative Agents importance |
+| 周期调度器 | 时间驱动的持续学习 |
+| 提示词双流更新 | SCOPE（战术级+战略级）|
+
+**实现位置**：`05_实现原型/self_evolution.py` + `quality_gate.py` + `periodic_self_update.py`；API：`/api/self-update/run`（手动触发）、`/api/self-update/status`（查看状态）。
 
 ---
 
@@ -1399,14 +1456,16 @@ python arch_check.py          # 输出连通性报告 + arch_report.json
 
 | # | 任务 | 现状 | 目标 | 工作量 |
 |---|---|---|---|---|
-| 1 | **周期级自我更新调度器** | weekly_insight_update / batch_update / analyze_failures 已实现但 0 调用（见 §1.6.7） | 加定时调度（threading.Timer / APScheduler / 启动时后台线程），周期运行并注入 results | 中 |
-| 2 | SelfImprover 改进建议闭环 | analyze_failures 生成 improvements.md 但无人读 | 把 improvements.md 注入 system prompt（get_improvements 已实现，仅需接线） | 小 |
-| 3 | SelfEvolver 接入聊天模式 | on_session_end 只在 paeg.teach（教学模式）调用，闲聊模式未接 | 闲聊对话后也调用 on_session_end 做失败反思 | 小 |
+| 1 | ~~周期级自我更新调度器~~ | ✅ v0.19.21 已实现（periodic_self_update.py 后台线程 + /api/self-update/run） | 已闭环 | — |
+| 2 | SelfImprover 改进建议闭环 | analyze_failures 已接入周期调度器 | ✅ 已完成（periodic 每周跑 analyze_failures → improvements.md → 注入） | — |
+| 3 | SelfEvolver 接入聊天模式 | on_session_end 只在 paeg.teach（教学模式）调用 | 闲聊对话后也调用 on_session_end 做失败反思 | 小 |
 | 4 | 对话级记忆未完全落地 | MemorySystem 在 chat_stream 中构造但 long_term 读写链路待确认 | 确认/完善长期记忆跨会话读取 | 中 |
 | 5 | 学科数文档与实际不一致 | 实际 19 个基础学科（已修正 §3.3.2），文档其他处如"26 学科"需核对 | 全文核对统一 | 小 |
 | 6 | 工具调用前端可视化增强 | 已有 tool 事件但前端展示简单 | 展示工具名+参数+耗时，失败工具高亮 | 小 |
 | 7 | 固定域名方案 | 临时隧道 URL 每次重启变化（用户暂缓，见 02_用户决策记录） | 有预算后升级（§6.3 方案 B 已写好） | 待用户确认 |
 | 8 | 评估 harness 增强 | eval_harness 7 案例 | 扩充到学科×场景矩阵，接入 CI | 中 |
+| 9 | 自进化证据闭环 | QualityGate L4 沙盒/证据反馈已实现但前端无入口 | 前端展示"已进化知识/提示词补丁/工具经验"，支持手动确认 | 中 |
+| 10 | 知识蒸馏效果评估 | evolved 节点已能入库 | 评估蒸馏知识质量（对比权威来源），防止低级错误入库 | 中 |
 
 ## 10.7.2 内容层扩充（按优先级）
 
