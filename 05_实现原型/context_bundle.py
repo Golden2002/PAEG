@@ -112,6 +112,44 @@ def assemble_messages(history: list, current_text: str, max_history: int = 10) -
     return msgs
 
 
+def extract_user_facts(history: list, limit: int = 8) -> list:
+    """v0.21.8：从用户消息中提取关键个人事实（偏好/身份/经历/承诺）。
+
+    解决"多轮注意力丧失"——用户第 1 轮说"我喜欢蓝绿色"，
+    第 7 轮追问时 LLM 必须还能看到。原理：把用户陈述的
+    具体事实显式提取出来，注入 system prompt（而非只靠对话历史隐式携带）。
+
+    提取规则（确定性，不依赖 LLM）：
+    - 用户消息含"我喜欢/我爱/我讨厌/我最爱/我最喜欢/我养/我叫/我的" → 整句截取
+    - 排除问题句（含？）和过短句（<6 字）
+    """
+    facts: list = []
+    markers = ("我喜欢", "我爱", "我讨厌", "我最爱", "我最喜欢", "我养",
+               "我叫", "我的名字", "我家的", "我最爱的", "我有个", "我有一只",
+               "我住", "我的生日", "我下", "我准备", "我打算", "我的目标",
+               "顺便告诉你", "告诉你", "记得", "我最近", "我下周")
+    seen = set()
+    for msg in history or []:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("role") != "user":
+            continue
+        content = (msg.get("content") or "").strip()
+        if not content or "?" in content or len(content) < 6:
+            continue
+        for marker in markers:
+            idx = content.find(marker)
+            if idx >= 0:
+                fact = content[max(0, idx):idx + 60]
+                if fact not in seen:
+                    seen.add(fact)
+                    facts.append(fact)
+                break
+        if len(facts) >= limit:
+            break
+    return facts
+
+
 if __name__ == "__main__":
     import sys, io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
