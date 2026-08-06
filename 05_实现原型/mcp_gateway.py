@@ -121,6 +121,40 @@ def build_mcp_server() -> Optional[Any]:
         """把内容保存为可下载文档。"""
         return _save_document(title, content, subject)
 
+    # v0.19.25：新增标准教育工具（外部 agent 也能调）
+    @_mcp.tool()
+    def generate_quiz(concept: str, subject: str = "math",
+                      grade_level: str = "high_school", learner_id: str = "external") -> str:
+        """根据知识点生成练习题（含答案与讲解）。"""
+        try:
+            from server import _handle_problem_request
+            from paeg import LearnerProfile
+            learner = LearnerProfile(id=learner_id, nickname="外部",
+                                     grade_level=grade_level, age=18)
+            resp = _handle_problem_request(learner, concept, subject)
+            data = resp.get_json() if hasattr(resp, 'get_json') else resp
+            pres = (data.get("presentations") or [{}])[0]
+            return pres.get("content", "（未生成题目）")
+        except Exception as e:
+            return f"出题失败: {str(e)[:100]}"
+
+    @_mcp.tool()
+    def knowledge_search(query: str, subject: str = "") -> str:
+        """在 PAEG 知识库/Library 中检索相关知识点。"""
+        try:
+            from knowledge_base import KnowledgeBase
+            kb = KnowledgeBase()
+            hits = kb.search(query, subject=subject, top_k=3)
+            if not hits:
+                return "（知识库中未找到相关节点）"
+            parts = []
+            for h in hits:
+                node = kb.get_subject(h.get("concept_id", "")) or {}
+                parts.append(f"- {h.get('concept_id','')}: {node.get('definition','') or node.get('intuition','')}")
+            return "\n".join(parts)
+        except Exception as e:
+            return f"知识库检索失败: {str(e)[:100]}"
+
     return _mcp
 
 
