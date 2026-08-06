@@ -17,14 +17,16 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Optional
 
-# 触发关键词（绑定：提纲/思维导图/知识结构/脉络/系统）
+# 触发关键词（绑定：提纲/思维导图/知识结构/脉络/系统/图谱/脑图）
 MAP_KEYWORDS = [
     "知识导图", "思维导图", "知识结构", "知识脉络", "知识系统",
     "列提纲", "画导图", "知识地图", "框架图", "知识框架",
+    "知识图谱", "知识树", "概念图", "脑图", "认知地图", "mindmap",
+    "全景图", "总览", "鸟瞰", "体系图",
     "提纲", "的结构", "的分支", "的体系", "的脉络", "的框架",
 ]
-# 动词限定：必须含"画/列/整理/给我/看看"等请求动词，避免误触发
-MAP_VERBS = ["画", "列", "整理", "给我", "看看", "帮我", "做", "讲一下", "介绍"]
+# 动词限定：必须含"画/列/整理/梳理/给我"等请求动词，避免误触发
+MAP_VERBS = ["画", "列", "整理", "梳理", "给我", "看看", "帮我", "做", "讲一下", "介绍"]
 
 COMPILED = [re.compile(k) for k in MAP_KEYWORDS]
 
@@ -64,16 +66,19 @@ def _extract_topic(text: str) -> str:
     # 去掉请求动词和关键词，剩下的是知识点
     for kw in ["知识导图", "思维导图", "知识结构", "知识脉络", "知识系统",
                "列提纲", "画导图", "知识地图", "框架图", "知识框架",
-               "画", "列", "整理", "给我", "看看", "帮我", "做", "讲一下", "介绍",
+               "知识图谱", "知识树", "概念图", "脑图", "认知地图", "mindmap",
+               "全景图", "总览", "鸟瞰", "体系图",
+               "画", "列", "整理", "梳理", "给我", "看看", "帮我", "做", "讲一下", "介绍",
                "一下", "一个", "的", "关于", "请", "帮我"]:
         text = text.replace(kw, "")
     text = re.sub(r'[，。！？、\s]', '', text)
     return text.strip() or "这个知识点"
 
 
-def handle_knowledge_map(concept: str, subject: str, learner, llm) -> Dict[str, Any]:
+def handle_knowledge_map(concept: str, subject: str, learner, llm, history: list = None) -> Dict[str, Any]:
     """生成知识导图（结构化输出）。
 
+    v0.21.1：新增 history 参数——"先问知识点再问知识框架图"时 LLM 需要上文。
     返回 {"content": str, "step_type": "knowledge_map"}
     """
     topic = _extract_topic(concept)
@@ -113,7 +118,13 @@ def handle_knowledge_map(concept: str, subject: str, learner, llm) -> Dict[str, 
     )
     user = f"请为「{topic}」生成知识导图（学科：{subject_cn}）。"
     from subagents import _safe_chat
-    reply = _safe_chat(llm, system, user, max_tokens=1200)
+    # v0.21.1：若有历史（先问知识点再问导图），传真 messages 让 LLM 记住上文
+    if history:
+        from context_bundle import assemble_messages
+        msgs = assemble_messages(history, user)
+        reply = _safe_chat(llm, system, messages=msgs, max_tokens=1200)
+    else:
+        reply = _safe_chat(llm, system, user, max_tokens=1200)
     if not reply:
         reply = f"我试着为「{topic}」整理知识导图，但生成失败了，请再试一次。"
     return {"content": reply, "step_type": "knowledge_map"}
