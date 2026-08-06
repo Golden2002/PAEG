@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.19.22（2026-08-06）
+> **版本**：v0.19.25（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -369,6 +369,58 @@ LLM 调用（带 tools+tool_choice）→ LLM 决定调哪些工具 → 逐个执
 | 提示词双流更新 | SCOPE（战术级+战略级）|
 
 **实现位置**：`05_实现原型/self_evolution.py` + `quality_gate.py` + `periodic_self_update.py`；API：`/api/self-update/run`（手动触发）、`/api/self-update/status`（查看状态）。
+
+## 1.6.9 MCP 双向打通：Agent 通过 MCP 调标准化工具（v0.19.25 ⭐ 核心亮点）
+
+> 借鉴 oh-my-opencode 的 Skill-Embedded MCP 思想 + opencode 的 mcp 配置模式，
+> 让 PAEG 的 Agent 既能**对外暴露**教育工具（MCP Server），又能**反向调用**外部标准工具（MCP Client）。
+
+### 双向架构
+
+```
+                        ┌────────────────────────────────┐
+                        │   PAEG 核心（tool_registry）    │
+                        │   get_all_tool_defs()           │
+                        │   execute_tool()                │
+                        └───────┬────────────┬───────────┘
+                                │            │
+                   MCP Server  │            │  MCP Client
+              （mcp_gateway.py）│            │（mcp_client.py）
+                对外暴露教育工具│            │ 连接外部标准 server
+                                ▼            ▼
+                   外部 agent（opencode 等）    @modelcontextprotocol/server-*
+                    连 :8765/mcp              filesystem / memory / fetch
+```
+
+**① MCP Server（已有，v0.19）**：FastMCP 网关暴露 7 个教育工具（web_search/verify_math/fetch_page/daily_quote/get_time/solve_problem/save_document），外部 agent（opencode/Claude/Cursor）连 `http://host:8765/mcp` 复用。
+
+**② MCP Client（新增，v0.19.25）**：`mcp_client.py` 用 fastmcp.Client 连接外部标准 MCP server（与 opencode 同款 npx 启动）：
+- `mcp_servers.json` 声明配置（filesystem/memory 等）
+- 连接成功 → 工具列表缓存（`mcp__server__tool` 命名）
+- `list_tool_defs()` 转 Function Calling schema
+- `call_tool(name, args)` 执行并解析结果
+
+**③ 合并进 LLM 工具列表**：`tool_registry.get_all_tool_defs()` 合并 MCP 工具 → `run_agent_loop` 的 LLM 能看到它们并自主调用；`execute_tool()` 对 `mcp__` 前缀 fallback 到 MCP 客户端。
+
+### 效果
+
+| 项 | 值 |
+|---|---|
+| 内置 Function Calling 工具 | 11（含同步的 solve_problem/save_document）|
+| 外部 MCP 工具 | 23（filesystem 14 + memory 9）|
+| LLM/subagent 可用工具总数 | 34 |
+| 调用示例 | `mcp__filesystem__list_directory` → 返回真实目录 |
+
+### 借鉴 oh-my-opencode 的要点
+
+| omo 做法 | PAEG 实现 |
+|---|---|
+| 三层 MCP（built-in/claude/skill-embedded） | 双层：对外 Server + 对内 Client |
+| Skill-Embedded MCP 按需启停 | mcp_servers.json 的 enabled 开关 |
+| opencode 的 mcp 字段（npx 标准 server） | 同款 @modelcontextprotocol/server-* |
+| 工具命名 mcp__server__tool | 同款命名规则 |
+
+**实现位置**：`mcp_client.py` + `mcp_servers.json`（配置）+ `tool_registry.py`（合并）+ `mcp_gateway.py`（服务端）。
 
 ---
 
