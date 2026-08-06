@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.18.1（2026-08-06）
+> **版本**：v0.19（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -736,6 +736,8 @@ python test_demo_real_llm.py --provider auto
 | **v0.17.2** | **寒暄拦截**（"你好/hi"等不再当教学概念，走闲聊）+ **```math 代码块修复**（fixMathCodeBlocks 清理错乱 $ 转 $$...$$）+ **讲解深度提升**（presenter prompt 由浅入深四层次：看见→理解→深入→把握）+ **步骤标签自然化**（"步骤 N"→"先看一个问题/讲给你听/你来试试"）+ **昵称使用**（对象意识，不刻板）|
 | **v0.18** | **五大模块**：①专业深度守门员（expert_guard.py：深度评分/套话检测/理科公式检查/自我修订）②联网搜索工具（web_search_tool.py：Bing 免key 默认 + Tavily/Serper 可选，搜索结果注入 prompt 标注 [来源 N]，防 prompt injection）③文档生成增强（save_answer：任意回答→Markdown+HTML 双格式下载；对话中"生成文档/保存"指令自动触发）④做题模块（problem_solver.py：题型识别 论述/计算/证明 → 三套标准答案模板对齐高考/考研评分标准，计算题 SymPy 验证）⑤对话历史持久化（ConversationStore：保存/读取/删除/定期清理 30 天 + LRU 50 会话上限 + 线程锁原子写；API：GET/DELETE /api/conversations）|
 | **v0.18.1** | **前端历史会话 GUI**：侧栏"历史会话"卡片（教学/闲聊/做题标签）+ 点击恢复历史消息 + 单会话删除 + 清空全部（带确认）+ 登录/退出自动显隐；api() 支持 DELETE 方法；escapeHtml 安全转义 |
+| **v0.19** | **P0/P1/P2 全优化**：①Function Calling（tool_registry.py：web_search/verify_math/fetch_page/daily_quote/get_time + run_agent_loop 工具循环）②三层记忆（memory_system.py：短期对话+摘要压缩+长期画像）③MCP 网关（mcp_gateway.py：FastMCP 暴露教育工具，外部智能体可连接 :8765/mcp）④Skills 体系（skill_registry.py：4 技能 SKILL.md 三级加载）⑤chat 流式输出（/api/chat/stream SSE + 教学流式 teach/stream）⑥工具调用可视化（前端 tool-card）⑦Agent 主循环（agent_engine.py：Plan→Act→Observe→Reflect）⑧自我改进（self_improve.py：反思+失败案例库）⑨可编辑教学记忆（teaching_memory.py：memory/PAEG_PEDAGOGY.md CLAUDE.md 风格）⑩多模态（/api/upload 图片上传）|
+| **v0.19.1** | **公式渲染修复**：fixBracketedFormulas 跳过已存在的 $...$/$$...$$（不再二次包裹破坏公式）+ sanitizeFormulas 消毒错位$ + **出题意图拦截**（is_problem_request："给我一道经典题目"→结合学段/学科/画像生成题目，不答非所问）+ **教学流式输出**（teach 改 SSE 逐字显示）+ **登录默认输出优化** + **评估 harness**（eval_harness.py：单元测试+LLM 输出质量评估两层，7/7 通过，含意图/公式/深度评分）|
 
 ---
 
