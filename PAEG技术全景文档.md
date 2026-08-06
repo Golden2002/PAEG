@@ -1994,6 +1994,43 @@ python chaos_turn_eval.py --agent all --mock normal --tier all --report chaos_re
 
 **这就是"agent 执行 LLM 回复设计"这门手艺的核心——没有银弹，只有迭代。**
 
+### 10.2.6.3 语义压力测试（v0.21.7 ⭐ stress_turn_eval.py）
+
+> **定位**：chaos_turn_eval 测"LLM 退化"（古怪/攻击提示词下的鲁棒性），**stress_turn_eval 测"agent 架构的理解/记忆/区分三能力"**（相似但不同的问题、递进延伸、多轮干扰后的回溯）。两者互补，共同暴露两大难题（§10.2.6.2）。
+
+**工具**：`05_实现原型/stress_turn_eval.py`
+
+```
+python stress_turn_eval.py --suite all --uid stress_test_1
+python stress_turn_eval.py --suite similar       # 只跑相似混淆
+python stress_turn_eval.py --suite relevance --mode teach   # 只跑相关性（指定模式）
+```
+
+**4 个测试套件**（全部走真实 LLM + HTTP 多轮，共享同一 uid 触发上下文）：
+
+| 套件 | 测什么（对应难题） | 方法 | 评分/阈值 |
+|---|---|---|---|
+| **similar** | 答非所问（区分能力） | 同 uid 连发"看着像但语义不同"的问题组（如：什么是导数/导数的应用/导数的几何意义/导数与积分的关系/用导数求极值步骤），检查各轮回答侧重点是否不同 | `distinguish_score = 1 - avg两两Jaccard相似度`，<0.5 → FAIL |
+| **elaboration** | 注意力丧失（延续能力） | 同 uid 连发递进问题（如证明 sin²x+cos²x=1 → cos²x+sin²x 呢 → 换成 tan 呢 → tan²x+1=?），检查每轮是否含上轮核心实体 + 终轮推断正确性 | `continuity_score`，<0.7 → FAIL |
+| **attention** | 注意力丧失（记忆能力） | 第 1 轮埋"金句"（如"我最喜欢的颜色是蓝绿色 #08A89E"）→ 中间 6-10 轮无关干扰 → 终轮追问金句，检查是否还记得 | `recall + deep_recall`，<0.6 → FAIL |
+| **relevance** | 答非所问（回答相关性） | **LLM-as-judge**：把 (question, answer) 对发给真实 LLM 打 0-1 分（1.0 直接准确 / 0.7 答了核心 / 0.4 部分相关 / 0.0 完全无关），按 mode 聚合 | 按 mode 平均分，<0.7 → FAIL |
+
+**评分设计要点**：
+- 相似混淆用 **Jaccard 相似度**（字符 bigram，无 jieba 依赖）量化"不同问题回答是否雷同"
+- 注意力用 **recall（金句关键词是否出现）+ deep_recall（衍生值是否正确）** 双层检测
+- 相关性用 **LLM-as-judge**（LLM 评 LLM 是否答对）——现有工具没有的语义判断
+- 每个 FAIL 带具体案例（question + answer 摘要 + 失败原因），供定位根因
+
+**报告**：`stress_report.json`（或 `--report` 指定），含 4 套件得分 + summary（by_dimension + verdicts）。
+
+**实测发现（v0.21.7 首测）**：
+- **similar**：552s 完成——不同细分问题侧重点区分基本正常
+- **elaboration**：117s——递进延伸延续正常
+- **attention**：299s——**发现真实注意力丧失**：经历 7 轮干扰后，追问"我喜欢什么颜色"É 未明确说出"蓝绿色"（绕弯子）；"猫叫什么名字"未答出名字；但"下周参加什么考试"答对（avg_recall 0.67）
+- **relevance**：进行中
+
+**方法论闭环**（与 chaos 相同）：`FAIL → 定位根因（输入侧 or 状态侧）→ 修复（规则/模板/记忆机制）→ 二次运行验证 → 回归确认`。attention 发现的"远端遗忘"指向**显式记忆提取**（关键信息 → 独立存储 → 优先注入）是未来改进方向。
+
 ## 10.3 版本历史
 
 > 完整修改日志已拆分至独立文档：**[CHANGELOG.md](./CHANGELOG.md)**（v0.1 → v0.21.4 全部记录）。
