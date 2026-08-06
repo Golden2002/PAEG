@@ -719,10 +719,39 @@ def general_chat_stream():
     except Exception:
         mem = None
 
+    # v0.19.3：任务3 上下文管理——token 预算 + 滑动窗口（替代简单截断）
+    try:
+        from context_manager import ContextManager
+        _ctxmgr = ContextManager()
+        _ctx_result = _ctxmgr.build(
+            system, chat_hist[-24:], None)  # 最多 24 条进滑动窗口
+        if _ctx_result.messages:
+            hist_str = "\n".join(
+                f"{'学生' if m['role']=='user' else 'Émile'}: {m['content'][:300]}"
+                for m in _ctx_result.messages)
+            mem_ctx = f"【最近对话】\n{hist_str}"
+    except Exception:
+        pass
+
     user = build_general_chat_user(text)
     ctx_parts = [p for p in [long_ctx, mem_ctx] if p]
+    # v0.19.3：打包"页面设定"（教学模式/学段/学科）——准确性原则
+    try:
+        grade_cn = {"middle_school": "初中", "high_school": "高中",
+                    "undergraduate": "大学本科", "graduate_exam": "考研"}.get(
+            data.get("grade_level", "high_school"), data.get("grade_level", ""))
+        subject_cn = ""
+        if data.get("subject"):
+            from prompts import get_style
+            subject_cn = get_style(data["subject"])["label"]
+        page_ctx = (f"【当前设定】教学模式：{'学科教学' if data.get('mode')=='teach' else '闲聊'}；"
+                    f"学段：{grade_cn}" + (f"；学科：{subject_cn}" if subject_cn else ""))
+        ctx_parts.insert(0, page_ctx)
+    except Exception:
+        pass
     if ctx_parts:
         user = f"{chr(10).join(ctx_parts)}\n\n【学生现在说】\n{text}"
+        user = build_general_chat_user(text, context=chr(10).join(ctx_parts))
 
     def generate():
         import time as _time
