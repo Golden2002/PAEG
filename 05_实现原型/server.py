@@ -196,6 +196,14 @@ def teach():
                 and learner_id[1:].isdigit():
             try:
                 USER_STORE.save_learner(learner_id, learner)
+                # v0.15：追加对话历史（供自我进化/个性化使用）
+                USER_STORE.append_history(learner_id, {
+                    "type": "teach",
+                    "subject": subject,
+                    "concept": concept,
+                    "summary_avg": (result.get("summary") or {}).get("avg_score"),
+                    "timestamp": datetime.now().isoformat(),
+                })
             except Exception as _e:
                 print(f"[Server] 画像持久化失败: {_e}")
         return resp
