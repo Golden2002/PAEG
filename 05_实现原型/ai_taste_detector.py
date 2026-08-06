@@ -38,6 +38,14 @@ AI_MARKERS = {
     "总的来说", "综上所述", "值得注意的是", "不难发现", "众所周知",
     "让我们", "让我们一起", "首先", "其次", "最后", "总而言之",
     "的海洋中", "点亮", "赋能", "拥抱", "精彩纷呈", "无限可能",
+    # v0.16：AI 味形容词（"稳了"类——过度自信的口语化断言）
+    "稳了", "拿捏了", "拿捏", "妥了", "没跑了", "就完事了", "妥妥的",
+    "稳稳的", "完全没问题", "绝对没问题", "轻松拿下", "稳了稳了",
+    "真的绝了", "绝了", "天秀", "神了", "牛", "牛啊", "绝绝子",
+    "yyds", "YYDS", "秒懂", "狠狠", "狠狠拿捏",
+    "非常棒", "棒极了", "太给力了", "给力",
+    # AI 喜欢的高大上形容词
+    "深刻", "全面", "系统", "本质", "本质地", "深远", "独到",
 }
 
 
@@ -121,7 +129,8 @@ def measure_paragraph_symmetry(text: str) -> float:
 
 def detect_ai_taste(text: str) -> AITasteSignals:
     """综合检测。返回各信号 + 综合 AI 概率。"""
-    if not text or len(text) < 30:
+    # 短文本也检查词库（v0.16：确保"稳了"等词即使短文本也触发）
+    if not text or not text.strip():
         return AITasteSignals(0.5, 0, 0, 0, 0.5, 0.3, "Human")
 
     cv = measure_burstiness(text)
@@ -129,6 +138,17 @@ def detect_ai_taste(text: str) -> AITasteSignals:
     three_lists = count_three_lists(text)
     em_dashes = count_em_dashes(text)
     para_cv = measure_paragraph_symmetry(text)
+
+    # 短文本（<30字）：只靠词库信号判断（句子变异/段落无法可靠测量）
+    if len(text) < 30:
+        marker_ai = max(0.0, min(1.0, marker_density / 8.0))
+        composite = 0.6 * marker_ai + 0.4 * min(1.0, three_lists / 2.0)
+        verdict = "AI" if composite >= 0.5 else ("Mixed" if composite >= 0.3 else "Human")
+        return AITasteSignals(
+            burstiness_cv=round(cv, 3), marker_density=round(marker_density, 2),
+            three_list_count=three_lists, em_dash_count=em_dashes,
+            paragraph_cv=round(para_cv, 3), ai_likelihood=round(composite, 3), verdict=verdict,
+        )
 
     # 各信号 → AI 概率（0=人类，1=AI）
     burst_ai = max(0.0, min(1.0, (0.45 - cv) / 0.30))
