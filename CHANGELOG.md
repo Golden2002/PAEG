@@ -5,6 +5,34 @@
 
 ---
 
+## v0.21（2026-08-06）
+
+**模块化架构 + 元能力文档 + 可观测性（架构成熟化 ⭐）**
+
+### 1. 功能模块注册机制（module_registry.py ⭐ 模块化元技能）
+- 12 个功能模块（teach/chat/answer/method/knowledge/affection/knowledge_map/weather/mcp/self_update/file_gen/history）可独立启用/禁用
+- paeg_modules.json 配置驱动（支持 {env:VAR}）——上架=启用，下架=禁用，不改代码
+- /api/modules 查询端点 + weather.html 门控
+- **实测**：weather 禁用 → 403 下架成功；启用 → 200 恢复 ✓
+
+### 2. 元能力文档（元能力文档.md ⭐ 智能体设计方法论）
+- 7 条核心设计原则（Agent 是指挥者/子代理拆分/意图路由/上下文回传/语言质量/自我进化/模块化）
+- 开发流程元技能（中间过程记录/GitHub 同步/测试反馈循环/借鉴优秀项目）
+- 架构成熟度清单（opencode+Codex 借鉴的 P0/P1/P2）
+- 基于 PAEG v0.1→v0.21 完整开发经验总结
+
+### 3. 可观测性（observability.py ⭐ 借鉴 opencode/Codex）
+- 结构化日志（key=value grep-friendly）：get_logger
+- 核心指标（record_metric）：工具耗时/会话等
+- JSONL 事件流（emit_event）：thread/turn/item/tool 事件（供测试契约）
+- **接入**：chat_stream 工具调用记录指标+事件
+- **实测**：web_search 调用 → events.jsonl 记录 tool_call 事件 ✓
+
+### 4. 其他
+- 测试 59/59
+
+---
+
 ## v0.20.5（2026-08-06）
 
 **知识导图功能 + 气象页面 + 全面接口测试**
