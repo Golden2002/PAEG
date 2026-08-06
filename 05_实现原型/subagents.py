@@ -328,3 +328,51 @@ class Adapter:
                                "details": "补充一个例子再讲一遍",
                                "parameters": {"difficulty_delta": 0}}}
         return {"decision": "continue", "action": {"type": "continue"}}
+
+
+class AnswerSolver:
+    """找答案模式（v0.19.14 ⭐ 第 6 个子代理）。
+
+    与教学模式（Diagnostor→Planner→Presenter）的根本区别：
+    - 教学：一步步引导、由浅入深、提问式（"先看一个现象""你来试试"）
+    - 找答案：**直接输出完整、规范、可直接使用的答案**（如论述题范文、计算题完整解法、证明题标准答案）
+
+    适用场景：学生明确要"答案/解答/范文/标准答案"时，走此模式。
+    输出特点：完整、直接、规范，不绕弯子，不受教学"先例后抽象"约束。
+    """
+
+    def __init__(self):
+        pass
+
+    def run(self, model, question: str, subject: str = "math",
+            grade_level: str = "high_school", learner=None) -> dict:
+        """直接生成完整答案。
+
+        返回：{"answer": str, "mode": "answer"}
+        """
+        grade_cn = {"middle_school": "初中", "high_school": "高中",
+                    "undergraduate": "大学本科", "graduate_exam": "考研"}.get(
+            grade_level, grade_level)
+        desc = ""
+        if learner is not None:
+            desc = getattr(learner, "self_description", "") or ""
+        desc_line = f"学生自述：{desc}\n" if desc else ""
+
+        # 找答案模式的 system：明确"直接给完整答案"，不受教学范式约束
+        system = (
+            f"你是 Émile Novis，一位功底扎实的{grade_cn}学科老师。学生要的是**一份可以直接使用的完整答案**。\n\n"
+            "## 模式：直接给出答案（不是教学引导）\n"
+            "学生明确要答案，所以：\n"
+            "1. **直接输出完整答案**：论述题给完整范文、计算题给完整规范解法、证明题给标准证明。\n"
+            "2. 结构规范、可直接抄写/参考：开头点题，中间完整展开，结尾明确结论。\n"
+            "3. 不要用教学式的引导（不用'先看一个现象''你来试试''我们慢慢来'）。\n"
+            "4. 如果题目有多个解法，给出最标准的一个，并简要说明为什么。\n"
+            "5. 公式用 LaTeX（$...$ / $$...$$），答案要规范。\n"
+            "6. 语言准确、完整（主谓宾齐全），像一份标准答案，而不是课堂对话。\n"
+            "7. 不确定的地方注明（如'按常规解法'），不编造。"
+        )
+        user = f"学生的问题：{question}\n{desc_line}请直接给出完整答案。"
+        answer = _safe_chat(model, system, user, max_tokens=1800)
+        if not answer:
+            answer = f"（找答案模式生成失败，请重试）\n问题：{question}"
+        return {"answer": answer, "mode": "answer"}
