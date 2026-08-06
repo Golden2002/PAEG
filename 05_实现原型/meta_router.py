@@ -65,6 +65,28 @@ def is_problem_request(text: str) -> bool:
     return any(p.search(t) for p in PROBLEM_REQ_COMPILED)
 
 
+# v0.19.7：学习方法咨询检测——"如何学习X/怎么学/怎么复习/学习建议"
+# 这类问题应走"学习方法指导"而非教学模式（避免被当概念教学或出题）
+METHOD_ADVICE_PATTERNS = [
+    r"如何(学习|学|复习|学好|掌握|备考)|怎么(学|复习|学好|备考|入手|开始)",
+    r"学习方法|学习建议|复习(方法|计划|建议)|如何规划|怎么规划",
+    r"学(好|会)?.{0,6}(难吗|要多久|怎么|如何)|从(哪|哪里|何).{0,4}(开始|入手)",
+    r"有没有.{0,4}(学习方法|技巧|建议)|怎样才能(学|记|掌握)",
+]
+METHOD_COMPILED = [re.compile(p, re.IGNORECASE) for p in METHOD_ADVICE_PATTERNS]
+
+
+def is_method_advice(text: str) -> bool:
+    """判断用户是否在咨询"怎么学习"（方法/计划/建议）。"""
+    t = (text or "").strip()
+    if not t or len(t) > 60:
+        return False
+    # 排除纯题目请求（"给我一道题"不是方法咨询）
+    if is_problem_request(t):
+        return False
+    return any(p.search(t) for p in METHOD_COMPILED)
+
+
 def is_greeting(text: str) -> bool:
     """判断是否纯寒暄（如"你好""hi"）。"""
     t = (text or "").strip()
