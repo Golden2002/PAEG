@@ -1207,6 +1207,45 @@ def save_document_api():
 # v0.18：做题模块 API
 # ─────────────────────────────────────
 
+@app.route("/api/answer", methods=["POST"])
+def answer_api():
+    """找答案模式（v0.19.14 ⭐）：直接输出完整答案，不受教学范式约束。
+
+    请求：{"question": "论述题/计算题/证明题", "subject", "grade_level", "learner_id"}
+    响应：{"answer": "完整答案", "mode": "answer"}
+    """
+    data = request.get_json(force=True)
+    question = (data.get("question") or "").strip()
+    if not question:
+        return jsonify({"error": "question is required"}), 400
+    subject = data.get("subject", "math")
+    grade_level = data.get("grade_level", "high_school")
+    learner = None
+    learner_id = data.get("learner_id", "")
+    if learner_id:
+        learner = SESSIONS.get(f"learner_{learner_id}")
+    try:
+        from subagents import AnswerSolver
+        solver = AnswerSolver()
+        result = solver.run(llm, question, subject=subject,
+                            grade_level=grade_level, learner=learner)
+        # 保存到对话历史
+        if CONV_STORE is not None and USER_STORE is not None \
+                and str(learner_id).startswith('u') and learner_id[1:].isdigit():
+            try:
+                cid = SESSIONS.get(f"conv_answer_{learner_id}")
+                cid = CONV_STORE.add_message(learner_id, "answer", f"找答案：{question[:30]}",
+                                             "user", question, conv_id=cid)
+                cid = CONV_STORE.add_message(learner_id, "answer", f"找答案：{question[:30]}",
+                                             "assistant", result.get("answer") or "", conv_id=cid)
+                SESSIONS[f"conv_answer_{learner_id}"] = cid
+            except Exception:
+                pass
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/solve", methods=["POST"])
 def solve_problem_api():
     """标准答案生成（v0.18）：论述/计算/证明题 → benchmark 级答案。
