@@ -26,6 +26,7 @@ import json
 import os
 import re
 import time
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
@@ -290,6 +291,144 @@ class QualityGate:
                     e["contribution_score"] = e.get("contribution_score", 0) - 1
                 break
         self._save_sandbox()
+
+    # ─── v0.19.x：把已转正条目持久化到 insights.json（关闭"promoted 只在内存"漏洞） ───
+    def promote_to_insights(self) -> dict:
+        """运行 promote_or_purge，并把 promoted 条目持久化到 evolve_data/insights.json。
+
+        返回：{"promoted": N, "purged": M, "kept": K, "persisted_to_insights": N[, "error": str]}
+        """
+        try:
+            # 1) 预扫描沙盒，提取即将 promote 的条目（promote_or_purge 只返回 int count，
+            #    不返回条目本身；为了把 content 写入 insights，需要在调用前先抓快照）
+            data_dir = os.path.dirname(self.sandbox_path)
+            os.makedirs(data_dir, exist_ok=True)
+            promoted_candidates = [
+                e for e in self.sandbox
+                if e.get("evidence_count", 0) >= self.MIN_EVIDENCE
+                and e.get("contribution_score", 0) > 0
+            ]
+
+            # 2) 委托给既有 promote_or_purge（保持其"清沙盒+落盘"行为不变）
+            counts = self.promote_or_purge() or {}
+            promoted_n = int(counts.get("promoted", 0))
+            purged_n = int(counts.get("purged", 0))
+            kept_n = int(counts.get("kept", 0))
+
+            # 3) 把 promoted 条目的 content 写入 insights.json
+            #    SelfEvolver.record_insight_use(content, helped=True)：
+            #      - content 不存在则沿用现有 list（不新增条目，仅当精确匹配才递增 uses/score）
+            #    因此用 SelfEvolver 的 _save 直接写入更稳：保证每条 promoted 都进入 insights 库
+            persisted = 0
+            if promoted_candidates:
+                try:
+                    from self_evolve import SelfEvolver
+                except Exception:
+                    SelfEvolver = None
+
+                if SelfEvolver is not None:
+                    try:
+                        evolver = SelfEvolver(self.llm, data_dir=data_dir)
+                        # 先用每条 content 调一次 record_insight_use（content 已存在则无害，不存在则需要直接 append）
+                        existing_contents = {
+                            (i.get("content") or "").strip()
+                            for i in evolver.insights
+                        }
+                        for entry in promoted_candidates:
+                            content = (entry.get("content") or "").strip()
+                            if not content:
+                                continue
+                            if content in existing_contents:
+                                # 已存在的洞察：用 record_insight_use 标记一次有效使用
+                                try:
+                                    evolver.record_insight_use(content, helped=True)
+                                except Exception:
+                                    pass
+                            else:
+                                # 新洞察：直接 append，并赋初始 score（与 weekly_insight_update 风格一致）
+                                evolver.insights.append({
+                                    "content": content,
+                                    "score": 2,
+                                    "uses": 0,
+                                    "source": "quality_gate.promote",
+                                    "created": datetime.now().isoformat(),
+                                })
+                                existing_contents.add(content)
+                            persisted += 1
+                        # 一次写盘
+                        evolver._save("insights.json", evolver.insights)
+                    except Exception as inner_e:
+                        # SelfEvolver 初始化或写入失败：回退到直接 json.dump
+                        try:
+                            insights_path = os.path.join(data_dir, "insights.json")
+                            existing = []
+                            try:
+                                with open(insights_path, encoding="utf-8") as f:
+                                    existing = json.load(f)
+                            except Exception:
+                                existing = []
+                            existing_contents = {
+                                (i.get("content") or "").strip() for i in existing
+                            }
+                            for entry in promoted_candidates:
+                                content = (entry.get("content") or "").strip()
+                                if not content:
+                                    continue
+                                if content not in existing_contents:
+                                    existing.append({
+                                        "content": content,
+                                        "score": 2,
+                                        "uses": 0,
+                                        "source": "quality_gate.promote",
+                                        "created": datetime.now().isoformat(),
+                                    })
+                                    existing_contents.add(content)
+                                persisted += 1
+                            with open(insights_path, "w", encoding="utf-8") as f:
+                                json.dump(existing, f, ensure_ascii=False, indent=1)
+                        except Exception:
+                            return {
+                                "promoted": promoted_n, "purged": purged_n,
+                                "kept": kept_n, "persisted_to_insights": persisted,
+                                "error": f"fallback write failed: {inner_e}",
+                            }
+                else:
+                    # 极端情况：self_evolve 无法 import → 直接 json 追加
+                    insights_path = os.path.join(data_dir, "insights.json")
+                    existing = []
+                    try:
+                        with open(insights_path, encoding="utf-8") as f:
+                            existing = json.load(f)
+                    except Exception:
+                        existing = []
+                    existing_contents = {
+                        (i.get("content") or "").strip() for i in existing
+                    }
+                    for entry in promoted_candidates:
+                        content = (entry.get("content") or "").strip()
+                        if not content:
+                            continue
+                        if content not in existing_contents:
+                            existing.append({
+                                "content": content,
+                                "score": 2,
+                                "uses": 0,
+                                "source": "quality_gate.promote",
+                                "created": datetime.now().isoformat(),
+                            })
+                            existing_contents.add(content)
+                        persisted += 1
+                    with open(insights_path, "w", encoding="utf-8") as f:
+                        json.dump(existing, f, ensure_ascii=False, indent=1)
+
+            return {
+                "promoted": promoted_n,
+                "purged": purged_n,
+                "kept": kept_n,
+                "persisted_to_insights": persisted,
+            }
+        except Exception as e:
+            return {"promoted": 0, "purged": 0, "kept": 0, "persisted_to_insights": 0, "error": str(e)}
 
     def stats(self) -> dict:
         return {"sandbox_size": len(self.sandbox),
