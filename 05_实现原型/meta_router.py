@@ -87,6 +87,24 @@ def is_method_advice(text: str) -> bool:
     return any(p.search(t) for p in METHOD_COMPILED)
 
 
+# v0.19.15：知识库查询检测——用户问"你学过什么/你的知识库/你懂哪些"
+# 固定关键词"知识库"，查询 Library 汇报已收录知识 + 提示可上传资料
+KNOWLEDGE_QUERY_PATTERNS = [
+    r"知识库|你(学|懂|知道|会|有)(过)?(什么|哪些)|你(的)?知识|你会什么|你懂什么",
+    r"学了什么|会什么|懂什么|知道什么|有哪些知识|你有什么",
+    r"知识库里有|库里有|资料库",
+]
+KNOWLEDGE_COMPILED = [re.compile(p, re.IGNORECASE) for p in KNOWLEDGE_QUERY_PATTERNS]
+
+
+def is_knowledge_query(text: str) -> bool:
+    """判断用户是否在询问"知识库/你学过什么"（固定关键词）。"""
+    t = (text or "").strip()
+    if not t or len(t) > 60:
+        return False
+    return any(p.search(t) for p in KNOWLEDGE_COMPILED)
+
+
 def is_greeting(text: str) -> bool:
     """判断是否纯寒暄（如"你好""hi"）。"""
     t = (text or "").strip()
