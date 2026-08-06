@@ -226,6 +226,14 @@ def teach():
     except Exception:
         pass
 
+    # v0.19.15：知识库查询拦截——"你学过什么/你的知识库" → 汇报已收录 + 提示上传
+    try:
+        from meta_router import is_knowledge_query
+        if is_knowledge_query(concept):
+            return _handle_knowledge_query(learner, subject)
+    except Exception:
+        pass
+
     # v0.19：出题意图拦截——"给我一道经典题目" → 结合学段/学科/画像生成题目
     try:
         from meta_router import is_problem_request
@@ -1295,6 +1303,74 @@ def list_conversations(learner_id):
     """列出用户全部会话（不含消息体，倒序）。"""
     if not _is_registered(learner_id):
         return jsonify({"conversations": []})
+
+
+def _handle_knowledge_query(learner, subject):
+    """v0.19.15：知识库查询——汇报 Library 已收录的知识 + 提示上传。
+
+    用户问"你学过什么/你的知识库/你懂哪些"时，扫描 Library 文件夹，
+    按领域列出已收录内容，并提示用户可以上传资料让 Agent 更精通。
+    """
+    import os as _os
+    proj_root = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..')
+    lib_root = _os.path.join(proj_root, 'Library')
+
+    # 收集 Library 各领域的文件
+    areas = []
+    if _os.path.isdir(lib_root):
+        for name in sorted(_os.listdir(lib_root)):
+            d = _os.path.join(lib_root, name)
+            if _os.path.isdir(d) and not name.startswith('.'):
+                files = [f for f in _os.listdir(d)
+                         if not f.startswith('.') and _os.path.isfile(_os.path.join(d, f))]
+                if files:
+                    areas.append((name, files))
+
+    # 用户上传的资料（单独列出）
+    learner_id = getattr(learner, 'id', '')
+    user_lib = get_user_library(learner_id) if learner_id else ""
+
+    lines = ["我平时会参考这些领域的资料来备课：\n"]
+    if areas:
+        for name, files in areas:
+            lines.append(f"**{name}**（{len(files)} 份）")
+            for f in files[:5]:
+                lines.append(f"  - {f}")
+            if len(files) > 5:
+                lines.append(f"  - …还有 {len(files)-5} 份")
+            lines.append("")
+    else:
+        lines.append("（Library 目前还没有收录资料）\n")
+
+    if user_lib:
+        lines.append(f"**你的专属资料**（{len(user_lib.splitlines())-1} 份，我会特别参考）\n")
+        for l in user_lib.splitlines()[1:4]:
+            lines.append(f"  - {l}")
+
+    lines.append("\n不过，知识库不是我的上限——**真正重要的是你想学什么**。")
+    lines.append("如果你希望我更精通某个领域，可以把相关资料**上传给我**（点输入框旁的书本图标），")
+    lines.append("之后你问相关问题时，我会参考它来回答。")
+    answer = "\n".join(lines)
+
+    return jsonify({
+        "session_id": f"kb_{learner.id}",
+        "summary": {"avg_score": 0},
+        "worldview_used": "weil",
+        "tone_ratio": 0,
+        "presentations": [
+            {"step_id": 1, "content": answer, "step_type": "knowledge"}
+        ],
+        "evaluations": [],
+        "diagnosis": {},
+        "plan": {"steps": []},
+        "reflections": [],
+        "learner": {
+            "id": learner.id,
+            "nickname": learner.nickname,
+            "grade_level": learner.grade_level,
+            "subjects_mastery": learner.subjects_mastery,
+        },
+    })
 
 
 def _handle_method_advice(learner, concept, subject):
