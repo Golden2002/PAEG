@@ -376,3 +376,73 @@ class AnswerSolver:
         if not answer:
             answer = f"（找答案模式生成失败，请重试）\n问题：{question}"
         return {"answer": answer, "mode": "answer"}
+
+
+# ---------------------------------------------------------------------------
+# 7. 情绪与心理支持子代理（v0.19.27 ⭐）
+# ---------------------------------------------------------------------------
+
+class EmotionSupportor:
+    """情绪与心理支持（第 7 个子代理）。
+
+    与教学（Diagnostor→Planner→Presenter）和找答案（AnswerSolver）的根本区别：
+    - 教学：引导思考、由浅入深
+    - 找答案：直接输出完整答案
+    - 情绪支持：**不教、不答、不解决**——而是以注意力陪伴，让 ta 感到被看见
+
+    指导原则来源：memory/EMOTION_SUPPORT_CORE.md
+    （薇依注意力/扎根/苦难 + 尼采自我克服/Amor Fati + 胡塞尔现象学悬置/回到事物本身）
+
+    三阶段对话流程：
+    1. 现象学倾听（胡塞尔）——悬置判断，回到体验
+    2. 注意力深入（薇依）——让"我"退场，让"对方"显现
+    3. 自我克服（尼采）——邀请而非强制地重新站立
+    """
+
+    def __init__(self):
+        pass
+
+    def run(self, model, text: str, learner=None) -> dict:
+        """情绪支持回应。返回 {"content": str, "mode": "emotion"}"""
+        # 加载情绪支持原则
+        core = self._load_principles()
+        grade_cn = ""
+        if learner is not None:
+            grade_cn = getattr(learner, "grade_level", "high_school")
+            grade_cn = {"middle_school": "初中", "high_school": "高中",
+                        "undergraduate": "大学本科", "graduate_exam": "考研"}.get(grade_cn, grade_cn)
+            desc = getattr(learner, "self_description", "") or ""
+            desc_line = f"\n学生自我描述：{desc}" if desc else ""
+
+        system = (
+            "你是 Émile Novis，一位以注意力陪伴学生的老师。学生带着情绪/心理/人生困惑来找你。\n\n"
+            f"学生情况：{('学段：' + grade_cn) if grade_cn else ''}{desc_line or ''}\n\n"
+            f"## 你的情绪支持原则（必须遵守）\n{core}\n\n"
+            "## 回复要求\n"
+            "1. **先悬置判断**（胡塞尔）：不贴标签、不诊断、不急于解释原因\n"
+            "2. **给出注意力**（薇依）：让 ta 感到被看见——不是被教育、被解决\n"
+            "3. **邀请而非强制**（尼采）：不催促、不说教、不廉价安慰（不说'一切会好起来的'）\n"
+            "4. 用自然、温暖、完整的中文句子，像一位真实的老师在倾听\n"
+            "5. 如果涉及自伤/自杀等严重信号，温和建议寻求专业帮助\n"
+            "6. 结尾可以轻轻问一句，留给对方空间，不要强行总结或升华"
+        )
+        user = f"学生说：{text}"
+        reply = _safe_chat(model, system, user, max_tokens=900)
+        if not reply:
+            reply = ("我听见你说的了。我不急着给你答案或建议——"
+                     "如果你愿意，可以多说一点，我在这儿听着。")
+        return {"content": reply, "mode": "emotion"}
+
+    @staticmethod
+    def _load_principles() -> str:
+        """加载 EMOTION_SUPPORT_CORE.md（情绪支持宪法）。"""
+        try:
+            import os
+            p = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             'memory', 'EMOTION_SUPPORT_CORE.md')
+            with open(p, encoding='utf-8') as f:
+                return f.read()[:3000]  # 限制长度，避免超 token
+        except Exception:
+            return ("情绪支持三原则：1) 先悬置判断，回到体验本身（胡塞尔）"
+                    "2) 给出注意力，让 ta 感到被看见（薇依）"
+                    "3) 邀请而非强制地重新站立（尼采）。")
