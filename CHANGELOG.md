@@ -5,7 +5,51 @@
 
 ---
 
-## v0.21.3（2026-08-07）
+## v0.21.4（2026-08-07）⭐ 关键节点
+
+**测试方法论 + usr/ 用户系统 + SelfUpdateAgent + 关键节点标记与回退流程**
+
+> 🏷️ **本版本标记为关键节点**：本地快照 `snapshots/snapshot_v0.21.4_202608070335.zip`（sha256 已记录）+ GitHub Release `v0.21.4`。异常时可按 §10.9 回退。
+
+### 1. 测试方法论文档化（任务1 ⭐ 技术文档 §10.2.6）
+- 新增 §10.2.6：测试金字塔 5 层总览（arch_check/pytest/multi_turn/api_sweep/Playwright）+ 每层"何时用/何时不用"
+- Loop 机制：改 → pytest → qa_*.py → api_sweep → Playwright → 推送；"完成定义 = 5 层全跑过"
+- 防卡死守卫：单测 60s 超时、SSE 120s、Playwright 重试 1 次、3 次失败还原快照
+- 成果验收标准：pytest 计数对比 + qa 输出 + 浏览器证据 + CHANGELOG 记录 4 类证据
+- 清理 §10.2.4 重复块（multi_turn_eval 副本）；§10.3 版本号同步 v0.21.4
+
+### 2. usr/ 用户文件夹系统（任务2 ⭐）
+- 顶层 `usr/` 目录（README 说明视图映射）；`user_store.user_data_paths(uid)` 统一路径别名（profile/history/notes/self_description/feedback 5 键）
+- `/api/upload` 加 `library_root` 参数：`usr_knowledge` → `Library/usr_knowledge/<uid>/`；默认 `user` 向后兼容
+- 前端 lib-input 上传自动发送 `library_root=usr_knowledge`
+- **实测**：上传 test_note.md → `Library/usr_knowledge/u8/20260807035012_test_note.md` ✓
+
+### 3. SelfUpdateAgent 自我更新子代理（任务3 ⭐ 第 8 个 subagent）
+- `subagents.py` 新增类（仿 AffectionSupportor 模板）：读 feedback text + 过滤后洞察（insights.json）+ 外部反馈文件，驱动 LLM 生成结构化建议 {category/target/change/evidence/priority}
+- `memory/SELF_UPDATE_PRINCIPLES.md`：5 条自我更新原则（提示词改进/知识补充/工具调整/错误模式/安全护栏）
+- 新端点 `POST /api/self-update/from-feedback`：读取 `evolve_data/insights.json`（QualityGate 过滤后）+ `users_data/<uid>/feedback/` 或 `Library/usr_knowledge/<uid>/feedback/` → 建议追加到 `memory/self_update_suggestions.jsonl`
+- **实测**：反馈"教学示例太抽象" → 200 + 3 条建议（prompt_update/knowledge_update/tool_adjustment）✓
+
+### 4. QualityGate → insights 持久化桥接（任务3 ⭐ 链路联通确认）
+- `quality_gate.promote_to_insights()`：promote_or_purge 结果自动持久化到 `evolve_data/insights.json`
+- **链路确认**：反思候选 → sandbox（四层过滤）→ evidence 达标 → insights.json → SelfUpdateAgent 读取 → LLM 建议。**真实存在且全联通**（实测 promote 6 条 → insights.json 5 条）
+- 修复 AffectionSupportor.desc_line UnboundLocalError（learner=None 时）
+
+### 5. 真实用户测试方法论（任务5 ⭐ 技术文档 §10.8）
+- §10.8.1 反馈问卷设计：5 字段 schema（question/expected/actual/severity/suggestion）+ 闭环流程（回收→清洗→SelfUpdateAgent→修改→验证→记录）
+- §10.8.2 线下招募 6 注意事项：渠道/知情同意/测试脚本/记录方式/奖励/伦理
+
+### 6. 关键节点标记与回退流程（任务6 ⭐ 双文档同步）
+- 技术文档 §10.9：识别标准 + 4 步标记 SOP（快照/GitHub Release/CHANGELOG/公网验证）+ 回退流程 + 回退后行动清单
+- 元能力文档 §二.5：版本标记与回退（原则/实战验证/元技能）——与技术文档同步
+- 本次已执行：本地快照（230MB/236 文件）+ 将打 GitHub Release v0.21.4
+
+### 7. 测试
+- pytest 27 → 37（新增 test_self_update_agent.py 6 用例 + test_self_update_from_feedback.py 4 用例）
+- arch_check 16/16 (100%) 连通
+- 端到端实测：端点 400/200、上传落盘、insights 链路全通过
+
+---
 
 **答非所问修复 + 前端历史会话全链路修复（登录持久化 + 流式会话保存）**
 
