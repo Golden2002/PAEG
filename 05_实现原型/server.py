@@ -923,6 +923,7 @@ def teach_stream():
         yield f"event: plan\ndata: {json.dumps(plan, ensure_ascii=False)}\n\n"
 
         # 教学循环
+        _assistant_parts = []  # v0.21.3：累积助手回复（用于会话保存）
         for i, step in enumerate(plan["steps"]):
             yield f"event: step\ndata: {json.dumps({'step_id': i + 1, 'status': 'presenting'})}\n\n"
             presentation = paeg.presenter.run(
@@ -944,6 +945,7 @@ def teach_stream():
                             presentation["refined"] = True
                 except Exception:
                     pass
+            _assistant_parts.append(presentation.get("content") or "")  # v0.21.3
             yield f"event: presentation\ndata: {json.dumps(presentation, ensure_ascii=False)}\n\n"
 
             # 评估
@@ -970,6 +972,23 @@ def teach_stream():
         # 总结
         summary = paeg._summarize(_FakeSession(learner, concept, subject, plan, []))
         yield f"event: summary\ndata: {json.dumps(summary, ensure_ascii=False)}\n\n"
+
+        # v0.21.3：流式教学也保存会话到 CONV_STORE（修复前端历史会话列表为空）
+        try:
+            if USER_STORE is not None and str(learner_id).startswith('u') \
+                    and learner_id[1:].isdigit() and CONV_STORE is not None:
+                cid = SESSIONS.get(f"conv_{learner_id}")
+                # 用户消息
+                cid = CONV_STORE.add_message(
+                    learner_id, "teach", f"{concept}", "user", concept, conv_id=cid)
+                # 助手完整回复（从教学循环累积）
+                full_reply = " ".join(p for p in _assistant_parts if p.strip()) \
+                    or f"（已讲解 {concept}）"
+                cid = CONV_STORE.add_message(
+                    learner_id, "teach", full_reply[:30], "assistant", full_reply, conv_id=cid)
+                SESSIONS[f"conv_{learner_id}"] = cid
+        except Exception as _e:
+            print(f"[PAEG] teach_stream 保存会话失败: {_e}")
 
         # v0.19.6：关键词触发文档（教学对话中"讲义/要点/例题/笔记"）
         try:
