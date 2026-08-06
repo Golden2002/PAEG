@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.19.25（2026-08-06）
+> **版本**：v0.19.26（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -421,6 +421,141 @@ LLM 调用（带 tools+tool_choice）→ LLM 决定调哪些工具 → 逐个执
 | 工具命名 mcp__server__tool | 同款命名规则 |
 
 **实现位置**：`mcp_client.py` + `mcp_servers.json`（配置）+ `tool_registry.py`（合并）+ `mcp_gateway.py`（服务端）。
+
+---
+
+# 1.7 Agent Steering：自动识别学科并切换（v0.19.26 ⭐ 核心亮点）
+
+> 解决"用户设定考研政治，问经济学问题，agent 却用政治设定回答"的 steering 缺陷。
+
+## 1.7.1 问题
+
+用户手动选择学科/学段后，`subject` 参数一路透传到 `build_presenter_system`（prompts.py:467）注入学科 persona。但**内容驱动的学科 ≠ 用户选择的学科**时，agent 不会自动切换——例如：
+- 设定"考研政治" → 问"商品价值由什么决定" → 仍用政治 persona 回答（应切经济学）
+- 设定"高中政治" → 问"什么是供需曲线" → 仍用政治 persona（应切经济学）
+
+## 1.7.2 解决方案：学科自动识别层
+
+**`subject_detector.py`（新）**：
+- **LLM 判断**（主）：从 26 个学科清单中选择最匹配学科；判断为未收录学科时返回 `unknown:<中文名>`
+- **规则兜底**（次）：学科关键词表（物理/数学/化学/经济/法律/历史/哲学…），LLM 不可用时用
+- **缓存**：同一问题 10 分钟内不重复调用（教学场景常见）
+- **失败安全**：识别失败 → 保持用户设定（不打断教学）
+
+**`server.py` 接入（_steer_subject）**：在 `subject = data["subject"]` 之后、meta_router 拦截之前：
+1. 识别学科 ≠ 用户设定 → **覆盖 subject 变量**（下游 paeg.teach/diagnostor/planner/presenter 全链路生效）
+2. 识别为未收录学科 → 返回 `unregistered_subject` 响应（反馈"已记录需求，后续优化升级"）
+
+**切换日志**：`[PAEG][steering] 考研政治 → 经济学（问题: 商品价值...）`
+
+## 1.7.3 未收录学科 → 自我更新闭环
+
+```
+用户问量子力学（不在 26 学科）
+  → detect_subject 返回 unknown:量子力学
+  → server 调用 EVOLVER.record_subject_request("量子力学", 概念, learner_id)
+  → evolve_data/subject_requests.json（去重+计数）
+  → 向用户反馈："我已经把这条需求记下来，后续会优先优化升级"
+  → 周度任务 periodic_self_update 读 subject_requests.json
+  → 按 count 排序生成"新增学科建议" → memory/improvements.md
+  → teaching_memory 自动注入 system prompt（下次对话 PAEG 知道该学科是用户需求）
+```
+
+**闭环价值**：用户需求 → 记录 → 周度分析 → 注入上下文 → 驱动 PAEG 学科扩张（内容层自进化）。
+
+---
+
+# 1.8 学科/学段定制化的技术实现路径（v0.19.26 ⭐ 文档化）
+
+> 回答"PAEG 的学科和学段差异化设定，技术上是怎么实现的"。
+
+## 1.8.1 数据源：prompts.py 两个核心字典
+
+| 字典 | 结构 | 作用 |
+|---|---|---|
+| `SUBJECT_STYLES`（26 学科） | `{key: {label, persona, language, structure, emphasis}}` | 每学科独立 persona/语言/节奏/侧重 |
+| `_GRADE_GUIDE`（4 学段） | `{key: {label, depth, tone_extra}}` | 每学段深度与语气 |
+
+**学科字段语义**：
+- `persona`：学科教师人格（如经济学"把理论讲回生活"）
+- `language`：如何切入/展开（从生活场景→概念→图形含义→真实例子）
+- `structure`：讲解顺序骨架
+- `emphasis`：教学重点 + 学段分层提示
+
+**学段字段语义**：
+- `depth`：讲解深度（初中生活化/高中严谨+例题/大学严格定义/考研考点导向）
+- `tone_extra`：额外语气
+
+## 1.8.2 归一化路由
+
+```
+任意学科写法（"经济学"/"经济"/"economics"）
+  → _SUBJECT_ALIASES（~50 个别名）→ normalize_subject() → 标准 key（"economics"）
+  → get_style(subject) → SUBJECT_STYLES[key]（未知回退 default）
+```
+
+**调用链**（subject 从请求到 system prompt）：
+```
+前端 subject-select → /api/teach 请求体 subject
+  → server.py: subject = data["subject"]
+  → paeg.teach(learner, concept, subject)  [v0.19.26 前: 无重写; 后: _steer_subject 可覆盖]
+  → Presenter.run (subagents.py:191)
+  → build_presenter_system(subject) (prompts.py:376)
+  → get_style(subject) → 注入 style['label']/persona/language/structure/emphasis
+    (prompts.py:467-487 唯一注入点)
+```
+
+**学段路由**：`grade_level`（middle_school/high_school/undergraduate/graduate_exam）→ `_GRADE_GUIDE[key]` → `grade_line` 注入 system（prompts.py:389-401）。
+
+## 1.8.3 分层效果
+
+| 层 | 机制 | 效果 |
+|---|---|---|
+| 学科 persona | SUBJECT_STYLES 26 学科 × 5 字段 | 每学科独立"人格+语言+节奏" |
+| 学段深度 | _GRADE_GUIDE 4 学段 × 3 字段 | 同学科不同学段不同讲法 |
+| 学科别名 | _SUBJECT_ALIASES 50+ 别名 | 任意说法归一 |
+| 内容 steering | subject_detector（v0.19.26） | 问题内容自动匹配学科，覆盖手动设定 |
+| 未收录反馈 | record_subject_request | 清单外学科→记录需求+反馈 |
+
+---
+
+# 1.9 市场垂直优势：专门的博雅教育（v0.19.26 ⭐ 定位）
+
+> PAEG 不是又一个"刷题 AI"，而是**博雅教育（Liberal Arts Education）的垂直智能体**。
+
+## 1.9.1 什么是博雅教育定位
+
+博雅教育强调：**培养完整的人**——广博的知识、独立的思考、深刻的共情，而非单一技能的应试训练。PAEG 的整个设计都在服务这个定位：
+
+| 维度 | PAEG 的博雅教育体现 |
+|---|---|
+| **知识广度** | 26 学科横跨文理（数学/物理/化学 → 哲学/美学/文学/伦理/现象学），不止应试科目 |
+| **人格内核** | 薇依（Simone Weil）教育哲学："爱是朝向"、注意力是最稀有的慷慨、不评判学生 |
+| **批判思维** | 专项学科：thinking（批判性思维）/ expression（公众表达）/ writing（议论文写作） |
+| **人文深度** | 专属学科：philosophy/aesthetics/literature/ethics/phenomenology + Library 薇依原著 |
+| **学习之道** | 独立"高效学习法"学科 + 学习方法对话类型（教学生怎么学，不只教内容） |
+| **情感陪伴** | 意向性层让非教学问题获得"人"的回应（不是每句都强行上课） |
+| **自我进化** | 从对话中学习如何教得更好（与博雅教育的"成长性"契合） |
+
+## 1.9.2 与通用 AI 教育产品的差异
+
+| 对比项 | 通用教育 AI | PAEG（博雅教育） |
+|---|---|---|
+| 覆盖 | 全科目刷题/答疑 | **精选 26 学科 + 人文深度**（质量优先于广度） |
+| 人格 | 无/工具人 | **薇依式教师**（有价值观的教育者） |
+| 教学 | 一次性问答 | **六阶段教学循环**（诊断→计划→呈现→评估→调整→反思）|
+| 价值 | 提分 | **培养完整的人**（知识+思考+共情+学习方法）|
+| 进化 | 无 | 自进化（知识/提示词/工具/新学科需求闭环）|
+
+## 1.9.3 垂直优势总结
+
+**"专门的博雅教育" = 可识别的差异化**：
+1. **有灵魂**：不是冷冰冰的工具，是"先做人，再教书"的 Émile Novis
+2. **有深度**：哲学/美学/伦理/现象学这些"不赚钱"但塑造人的学科，PAEG 专精
+3. **有方法**：教你怎么学（学习方法类型）+ 批判性思维，而不只是给答案
+4. **有成长**：自我进化让 PAEG 越来越懂"怎么教好一个人"
+
+**一句话定位**：PAEG 是"**用薇依的注意力，教完整的你**"——这是通用 AI 教育产品无法复制的垂直纵深。
 
 ---
 
