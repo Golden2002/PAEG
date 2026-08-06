@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.20.5（2026-08-06）
+> **版本**：v0.21（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -827,6 +827,36 @@ LLM 中文输出常出现：
 - **位置共享**：navigator.geolocation + 隐私提示（HTTPS/localhost 必需）
 
 **文件**：`09_GUI前端/weather.html` + 主页顶部"气象"链接。
+
+---
+
+# 1.15 模块化架构 + 元能力 + 可观测性（v0.21 ⭐ 架构成熟化）
+
+> 借鉴 opencode v2 插件架构 + OpenAI Codex agent 设计，将 PAEG 从"脚本式 Flask"升级为**可配置、可模块、可观测**的工程化平台。
+
+## 1.15.1 功能模块注册机制（module_registry.py）
+
+**原则**：功能模块独立注册，配置驱动启用/禁用，**上架/下架不改代码**。
+
+```
+paeg_modules.json（配置）→ module_registry.py（注册表）→ server 挂载
+```
+
+- 12 个模块：teach/chat/answer/method/knowledge/affection/knowledge_map/weather/mcp/self_update/file_gen/history
+- `is_enabled(module_id)` / `enabled_modules()` / `module_status()`
+- `/api/modules` 查询端点；weather.html 门控（禁用 → 403）
+- 支持 `{env:VAR}` 环境变量替换
+
+## 1.15.2 元能力文档（元能力文档.md）
+
+7 条智能体设计原则 + 4 项开发流程元技能 + 架构成熟度清单——**指导后续所有开发的方法论**。
+
+## 1.15.3 可观测性（observability.py）
+
+- 结构化日志：`get_logger("server").info("tool.execute.after", tool=..., session=...)`
+- 核心指标：`record_metric("paeg.tool.duration", ms, {"tool": ...})`
+- JSONL 事件流：`emit_event("item.completed", type="tool_call", ...)`（供测试契约）
+- 接入 chat_stream：工具调用自动记录指标+事件
 
 ---
 
