@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>气象 · PAEG</title>
+  <style>
+    :root { --bg: #0f172a; --surface: #1e293b; --accent: #38bdf8; --text: #e2e8f0; }
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+           background: var(--bg); color: var(--text); min-height: 100vh; }
+    .toolbar { padding: 12px 16px; background: var(--surface); display: flex; gap: 10px;
+               align-items: center; flex-wrap: wrap; }
+    .toolbar a.back { color: var(--accent); text-decoration: none; font-size: 14px; margin-right: 8px; }
+    .toolbar button { padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer;
+                      background: var(--accent); color: #0f172a; font-weight: 600; }
+    .toolbar select { padding: 8px; border-radius: 6px; background: var(--bg); color: var(--text);
+                      border: 1px solid #334155; }
+    #status { font-size: 13px; opacity: 0.85; margin-left: auto; }
+    .metrics { padding: 12px 16px; background: var(--surface); display: flex; gap: 16px;
+               flex-wrap: wrap; font-size: 14px; }
+    .metric { display: flex; flex-direction: column; gap: 2px; }
+    .metric .val { font-size: 18px; font-weight: 600; color: var(--accent); }
+    #map-wrap { position: relative; width: 100%; height: calc(100vh - 140px); }
+    #windy { width: 100%; height: 100%; border: 0; border-radius: 8px; }
+    #fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+                background: var(--bg); color: #64748b; }
+    .privacy { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+               background: var(--surface); border: 1px solid #334155; border-radius: 10px;
+               padding: 16px 20px; max-width: 420px; display: none; z-index: 100; }
+    .privacy button { margin-top: 10px; padding: 8px 16px; border-radius: 6px; border: none;
+                      background: var(--accent); color: #0f172a; font-weight: 600; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <a class="back" href="/">← 返回课堂</a>
+    <button id="locBtn">共享我的位置</button>
+    <select id="overlay">
+      <option value="wind">风</option>
+      <option value="temp">温度</option>
+      <option value="rain">降雨</option>
+      <option value="clouds">云量</option>
+      <option value="pressure">气压</option>
+      <option value="waves">海浪</option>
+    </select>
+    <select id="model">
+      <option value="ecmwf">ECMWF</option>
+      <option value="gfs">GFS</option>
+      <option value="icon">ICON</option>
+    </select>
+    <span id="status">未定位 · 默认显示中国</span>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><span>温度</span><span class="val" id="m-temp">--</span></div>
+    <div class="metric"><span>湿度</span><span class="val" id="m-hum">--</span></div>
+    <div class="metric"><span>风速</span><span class="val" id="m-wind">--</span></div>
+    <div class="metric"><span>降水</span><span class="val" id="m-precip">--</span></div>
+    <div class="metric"><span>坐标</span><span class="val" id="m-coord" style="font-size:13px">--</span></div>
+  </div>
+
+  <div id="map-wrap">
+    <iframe id="windy" title="Windy 气象图" allow="geolocation"></iframe>
+    <div id="fallback">地图加载中…</div>
+  </div>
+
+  <div class="privacy" id="privacy">
+    <b>位置权限说明</b>
+    <p style="margin-top:6px;opacity:0.9;font-size:14px">PAEG 将请求您的浏览器位置权限，用于在气象图上定位到您所在位置。位置信息仅在本机使用，不会上传到任何服务器。</p>
+    <button id="privacy-ok">我了解，开始定位</button>
+  </div>
+
+<script>
+const DEFAULTS = { lat: 35.8617, lon: 104.1954, zoom: 4 };
+const overlaySel = document.getElementById('overlay');
+const modelSel = document.getElementById('model');
+const locBtn = document.getElementById('locBtn');
+const statusEl = document.getElementById('status');
+const iframe = document.getElementById('windy');
+const fallback = document.getElementById('fallback');
+const privacy = document.getElementById('privacy');
+let currentPos = { ...DEFAULTS };
+
+function buildWindyUrl({ lat, lon, zoom = 6, overlay = 'wind', product = 'ecmwf' }) {
+  const p = new URLSearchParams({
+    lat: lat.toFixed(3), lon: lon.toFixed(3), zoom,
+    level: 'surface', overlay, product,
+    menu: '', message: 'true', marker: '', calendar: 'now',
+    pressure: '', type: 'map', location: 'coordinates',
+    detail: 'true', detailLat: lat.toFixed(3), detailLon: lon.toFixed(3),
+    metricWind: 'default', metricTemp: 'default', radarRange: '-1'
+  });
+  return `https://embed.windy.com/embed2.html?${p.toString()}`;
+}
+
+function loadMap({ lat, lon }) {
+  currentPos = { lat, lon, zoom: currentPos.zoom || 6 };
+  iframe.src = buildWindyUrl({ lat, lon, zoom: currentPos.zoom,
+                               overlay: overlaySel.value, product: modelSel.value });
+  iframe.onload = () => { fallback.style.display = 'none'; };
+  statusEl.textContent = `已定位 (${lat.toFixed(2)}, ${lon.toFixed(2)})`;
+  loadOpenMeteo(lat, lon);
+}
+
+// Open-Meteo 补充数据（无 key、CORS 开）
+async function loadOpenMeteo(lat, lon) {
+  try {
+    const url = new URL('https://api.open-meteo.com/v1/forecast');
+    url.searchParams.set('latitude', lat); url.searchParams.set('longitude', lon);
+    url.searchParams.set('current', 'temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation');
+    url.searchParams.set('timezone', 'auto');
+    const resp = await fetch(url);
+    const data = await resp.json();
+    const c = data.current || {};
+    document.getElementById('m-temp').textContent = (c.temperature_2m ?? '--') + '°C';
+    document.getElementById('m-hum').textContent = (c.relative_humidity_2m ?? '--') + '%';
+    document.getElementById('m-wind').textContent = (c.wind_speed_10m ?? '--') + ' km/h';
+    document.getElementById('m-precip').textContent = (c.precipitation ?? '--') + ' mm';
+    document.getElementById('m-coord').textContent = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+  } catch (e) {
+    document.getElementById('m-temp').textContent = '--';
+  }
+}
+
+overlaySel.addEventListener('change', () => loadMap(currentPos));
+modelSel.addEventListener('change', () => loadMap(currentPos));
+
+// 位置共享（隐私提示 → 授权 → 定位）
+locBtn.addEventListener('click', () => { privacy.style.display = 'block'; });
+document.getElementById('privacy-ok').addEventListener('click', () => {
+  privacy.style.display = 'none';
+  requestLocation();
+});
+
+async function requestLocation() {
+  if (!window.isSecureContext) {
+    statusEl.textContent = '需要 HTTPS 或 localhost 才能定位';
+    return;
+  }
+  if (!('geolocation' in navigator)) {
+    statusEl.textContent = '浏览器不支持定位';
+    return;
+  }
+  statusEl.textContent = '请求授权中…';
+  try {
+    const p = await navigator.permissions.query({ name: 'geolocation' });
+    if (p.state === 'denied') {
+      statusEl.textContent = '位置权限已拒绝，请在浏览器设置中开启';
+      return;
+    }
+  } catch (_) {}
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude, longitude } = pos.coords;
+      statusEl.textContent = `已定位（精度 ${Math.round(pos.coords.accuracy)} 米）`;
+      currentPos.zoom = 7;
+      loadMap({ lat: latitude, lon: longitude });
+      locBtn.textContent = '重新定位';
+    },
+    err => {
+      const msgs = { 1: '用户拒绝授权', 2: '设备无法定位', 3: '定位超时' };
+      statusEl.textContent = msgs[err.code] || '定位失败';
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+  );
+}
+
+// 首次进入弹隐私提示
+setTimeout(() => { privacy.style.display = 'block'; }, 800);
+// 默认加载
+loadMap(DEFAULTS);
+</script>
+</body>
+</html>
