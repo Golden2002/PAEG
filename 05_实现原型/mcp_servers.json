@@ -1,0 +1,28 @@
+{
+  "filesystem": {
+    "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "C:/Users/团聚体"],
+    "enabled": true,
+    "note": "文件系统读写（opencode 同款标准 server）。路径限定在 C:/Users/团聚体（sandbox）。"
+  },
+  "memory": {
+    "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
+    "enabled": true,
+    "note": "知识图谱记忆（opencode 同款标准 server）。"
+  },
+  "fetch": {
+    "command": ["npx", "-y", "@modelcontextprotocol/server-fetch"],
+    "enabled": false,
+    "note": "网页抓取。标准包名已变动导致 npx 404，默认关闭。"
+  },
+  "git": {
+    "command": ["npx", "-y", "@modelcontextprotocol/server-git"],
+    "enabled": false,
+    "note": "Git 操作。默认关闭，按需启用。"
+  },
+  "brave-search": {
+    "command": ["npx", "-y", "@modelcontextprotocol/server-brave-search"],
+    "enabled": false,
+    "environment": {"BRAVE_API_KEY": ""},
+    "note": "Brave 搜索（需 BRAVE_API_KEY）。与内置 web_search 互补。"
+  }
+}
