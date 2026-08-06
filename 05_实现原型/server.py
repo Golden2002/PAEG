@@ -141,6 +141,70 @@ def static_files(filename):
 # v0.19.26：Agent Steering — 学科自动识别层
 # ─────────────────────────────────────
 
+def _build_learner_ctx_str(learner) -> str:
+    """构造学生画像上下文段（v0.20.3，供各端点 system 注入）。"""
+    try:
+        from context_bundle import build_learner_context, inject_user_model
+        # 懒推断 user_model（若已有则跳过）
+        if not getattr(learner, "_user_model", None):
+            inject_user_model(learner, [], getattr(learner, "self_description", ""))
+        return build_learner_context(learner)
+    except Exception:
+        return ""
+
+
+def _mode_auto_correct(text: str, requested_mode: str, learner, learner_id: str,
+                       subject: str = "default") -> Optional[dict]:
+    """模式自动纠正（v0.20.3 ⭐）：用户在独立端点（method/knowledge/affection/answer）
+    但输入其实属于其他模式时，后端自动纠正到正确模式。
+
+    返回纠正后的 jsonify 响应（或 None——无需纠正，走本模式默认逻辑）。
+    """
+    if not text or not text.strip():
+        return None
+    try:
+        from meta_router import is_affection_expression, is_knowledge_query, is_method_advice, is_problem_request
+
+        # 优先级：情绪 > 知识库 > 学习方法 > 出题（按语义严肃性）
+        if requested_mode != "affection" and is_affection_expression(text):
+            from subagents import AffectionSupportor
+            _emo = AffectionSupportor()
+            _hist = SESSIONS.get(f"chat_hist_{learner_id}", [])
+            _res = _emo.run(llm, text, learner, history=_hist)
+            return jsonify({
+                "session_id": f"affection_{learner_id}",
+                "summary": {"avg_score": 0}, "worldview_used": "weil", "tone_ratio": 0,
+                "presentations": [{"step_id": 1, "content": _polish_text(_res.get("content", ""), context=f"affection:{text[:30]}"), "step_type": "affection"}],
+                "evaluations": [], "diagnosis": {}, "plan": {"steps": []}, "reflections": [],
+                "learner": {"id": learner.id, "nickname": learner.nickname,
+                            "grade_level": learner.grade_level, "subjects_mastery": learner.subjects_mastery},
+                "actual_mode": "affection", "requested_mode": requested_mode, "was_redirected": True,
+            })
+        if requested_mode != "knowledge" and is_knowledge_query(text):
+            _kb = _handle_knowledge_query(learner, subject)
+            _kb["actual_mode"] = "knowledge"
+            _kb["requested_mode"] = requested_mode
+            _kb["was_redirected"] = True
+            return jsonify(_kb)
+        if requested_mode not in ("method", "affection") and is_method_advice(text):
+            _ma = _handle_method_advice(learner, text, subject)
+            _ma_data = _ma.get_json()
+            _ma_data["actual_mode"] = "method"
+            _ma_data["requested_mode"] = requested_mode
+            _ma_data["was_redirected"] = True
+            return jsonify(_ma_data)
+        if requested_mode not in ("answer", "problem") and is_problem_request(text):
+            _pr = _handle_problem_request(learner, text, subject)
+            _pr_data = _pr.get_json()
+            _pr_data["actual_mode"] = "problem"
+            _pr_data["requested_mode"] = requested_mode
+            _pr_data["was_redirected"] = True
+            return jsonify(_pr_data)
+    except Exception:
+        pass
+    return None
+
+
 def _polish_text(text: str, context: str = "") -> str:
     """全局语言质量修正（v0.20）：所有输出端点统一过 LanguageRefiner。
 
@@ -557,12 +621,13 @@ def teach_stream():
     learner_id = data.get("learner_id", f"user_{len(SESSIONS)}")
     learner = SESSIONS.get(f"learner_{learner_id}")
     if not learner:
-        learner = LearnerProfile(
+        learner =         LearnerProfile(
             id=learner_id,
             nickname=data.get("nickname", "学生"),
             grade_level=data.get("grade_level", "high_school"),
             age=data.get("age", 17),
             cognitive_style=data.get("cognitive_style", "visual"),
+            self_description=data.get("self_description", ""),
         )
         SESSIONS[f"learner_{learner_id}"] = learner
 
@@ -708,6 +773,12 @@ def teach_stream():
         pass
 
     def generate():
+        # v0.20.3：补 user_model/BDI 推断（原漏洞——手动教学循环没走 paeg.teach 的注入）
+        try:
+            from context_bundle import inject_user_model
+            inject_user_model(learner, [{"content": concept}], getattr(learner, "self_description", ""))
+        except Exception:
+            pass
         # 诊断
         yield f"event: diagnosis\ndata: {json.dumps({'status': 'diagnosing'})}\n\n"
         diagnosis = paeg.diagnostor.run(learner, concept, subject)
@@ -1809,6 +1880,7 @@ def _handle_knowledge_query(learner, subject):
     from subagents import _safe_chat
     system = (
         "你是 Émile Novis。学生问你'你的知识库/你学过什么'。\n\n"
+        f"{('【学生画像】' + _build_learner_ctx_str(learner) + '\n\n') if learner else ''}"
         "**最重要：你只能基于下面【Library 资料库收录】里的实际文件内容来回答**——"
         "这些是你真正'拥有'的资料。逐份介绍它们具体讲了什么（从内容摘要里提炼）。\n\n"
         "规则：\n"
@@ -1936,6 +2008,13 @@ def method_advice():
     subject = data.get("subject", "general")
     if not concept:
         return jsonify({"error": "concept is required"}), 400
+    # v0.20.3：模式自动纠正——选错模式时后端兜底
+    try:
+        _correct = _mode_auto_correct(concept, "method", learner, learner_id, subject)
+        if _correct is not None:
+            return _correct
+    except Exception:
+        pass
     return _handle_method_advice(learner, concept, subject)
 
 
@@ -1960,6 +2039,15 @@ def knowledge_query():
         )
         SESSIONS[f"learner_{learner_id}"] = learner
     subject = data.get("subject", "general")
+    # v0.20.3：知识库模式若用户实际在倾诉/问方法，自动纠正
+    try:
+        _q = data.get("text") or data.get("concept") or ""
+        if _q:
+            _correct = _mode_auto_correct(_q, "knowledge", learner, learner_id, subject)
+            if _correct is not None:
+                return _correct
+    except Exception:
+        pass
     return jsonify(_handle_knowledge_query(learner, subject))
 
 
@@ -1987,6 +2075,13 @@ def affection_support():
     text = data.get("text") or data.get("concept") or ""
     if not text:
         return jsonify({"error": "text is required"}), 400
+    # v0.20.3：模式自动纠正——倾诉模式下若明显是知识/方法/出题，纠正（情绪输入保留）
+    try:
+        _correct = _mode_auto_correct(text, "affection", learner, learner_id, "general")
+        if _correct is not None:
+            return _correct
+    except Exception:
+        pass
     from subagents import AffectionSupportor
     _emo = AffectionSupportor()
     _chat_hist = SESSIONS.get(f"chat_hist_{learner_id}", [])
