@@ -425,7 +425,8 @@ def teach():
         if is_affection_expression(concept):
             from subagents import AffectionSupportor
             _emo = AffectionSupportor()
-            _emo_result = _emo.run(llm, concept, learner)
+            _hist = SESSIONS.get(f"chat_hist_{learner_id}", [])
+            _emo_result = _emo.run(llm, concept, learner, history=_hist)
             _emo_content = _polish_text(_emo_result.get("content", ""), context=f"affection:{concept[:30]}")
             return jsonify({
                 "session_id": f"affection_{learner_id}",
@@ -674,7 +675,8 @@ def teach_stream():
         if is_affection_expression(concept):
             from subagents import AffectionSupportor
             _emo = AffectionSupportor()
-            _emo_result = _emo.run(llm, concept, learner)
+            _hist = SESSIONS.get(f"chat_hist_{learner_id}", [])
+            _emo_result = _emo.run(llm, concept, learner, history=_hist)
             _emo_content = _polish_text(_emo_result.get("content", ""), context=f"affection:{concept[:30]}")
 
             def gen_emo():
@@ -1249,7 +1251,8 @@ def general_chat_stream():
             if is_affection_expression(text):
                 from subagents import AffectionSupportor
                 _emo = AffectionSupportor()
-                _emo_result = _emo.run(llm, text, learner)
+                _hist = SESSIONS.get(f"chat_hist_{learner_id}", [])
+                _emo_result = _emo.run(llm, text, learner, history=_hist)
                 _emo_content = _polish_text(_emo_result.get("content", ""), context=f"affection:{text[:30]}")
                 for _c in [_emo_content[i:i+60] for i in range(0, len(_emo_content), 60)] or [_emo_content]:
                     yield f"event: seg\ndata: {json.dumps({'text': _c}, ensure_ascii=False)}\n\n"
@@ -1310,7 +1313,11 @@ def general_chat_stream():
                 "像一位真正的好老师当面讲解，而不是搜索结果的堆砌。")
             # v0.19.4：把打包后的 user（含当前设定/历史/身份）传给 agent loop，
             # 修复"偏离提问"——之前传的是原始 text，LLM 收不到上下文
-            _ar = run_agent_loop(llm, _agent_sys, user, max_iterations=3)
+            # v0.20.2：同时传真 messages 历史（多轮连贯性——LLM 能记住上文）
+            _hist_msgs = [{"role": "user", "content": u["content"]} if u["role"] == "user"
+                          else {"role": "assistant", "content": u["content"]}
+                          for u in chat_hist[-10:]]
+            _ar = run_agent_loop(llm, _agent_sys, user, max_iterations=3, history=_hist_msgs)
             reply = _ar.get("answer")
             tool_log = _ar.get("tool_calls", [])
         except Exception:
@@ -1982,7 +1989,8 @@ def affection_support():
         return jsonify({"error": "text is required"}), 400
     from subagents import AffectionSupportor
     _emo = AffectionSupportor()
-    _emo_result = _emo.run(llm, text, learner)
+    _chat_hist = SESSIONS.get(f"chat_hist_{learner_id}", [])
+    _emo_result = _emo.run(llm, text, learner, history=_chat_hist)
     _emo_content = _polish_text(_emo_result.get("content", ""), context=f"affection:{text[:30]}")
     return jsonify({
         "session_id": f"affection_{learner_id}",
