@@ -128,8 +128,25 @@ def index():
 
 @app.route("/<path:filename>")
 def static_files(filename):
-    """提供静态资源。"""
+    """提供静态资源（v0.21：weather.html 受模块开关控制，可独立下架）。"""
+    if filename == "weather.html":
+        try:
+            from module_registry import is_enabled
+            if not is_enabled("weather"):
+                return "气象模块已下架（在 paeg_modules.json 中启用）", 403
+        except Exception:
+            pass
     return send_from_directory(str(GUI_DIR), filename)
+
+
+@app.route("/api/modules", methods=["GET"])
+def modules_status():
+    """查询功能模块启用状态（v0.21 ⭐ 模块化元技能）。"""
+    try:
+        from module_registry import module_status
+        return jsonify({"modules": module_status()})
+    except Exception as e:
+        return jsonify({"modules": {}, "error": str(e)})
 
 
 # ─────────────────────────────────────
@@ -1448,6 +1465,16 @@ def general_chat_stream():
         # 3) SSE 推送工具记录
         for tc in tool_log:
             yield f"event: tool\ndata: {json.dumps(tc, ensure_ascii=False)}\n\n"
+            # v0.21：可观测性——记录工具调用指标与事件
+            try:
+                from observability import record_metric, emit_event, get_logger
+                get_logger("chat").info("tool.execute.after", tool=tc.get("name", ""),
+                                        session=learner_id[:8])
+                record_metric("paeg.tool.duration", 1, {"tool": tc.get("name", "")})
+                emit_event("item.completed", type="tool_call",
+                           tool=tc.get("name", ""), session=learner_id[:8])
+            except Exception:
+                pass
 
         # 4) 分段推送回复（模拟流式，兼顾 P1-5 体验）
         import re as _re
