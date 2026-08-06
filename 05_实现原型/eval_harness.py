@@ -176,6 +176,38 @@ class PAEGEvaluator:
                       f, ensure_ascii=False, indent=1)
         return path
 
+    # ─── v0.19.2：tool-use 评估维度 ───
+    def evaluate_tool_use(self) -> Dict[str, Any]:
+        """评估工具调用质量（借鉴 ClawBench trajectory 思路）。
+
+        直接调用 tool_registry 的 execute_tool，检查：
+        - 正常调用成功率
+        - 错误恢复（瞬时错误重试）
+        - 降级信号（永久错误）
+        """
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from tool_registry import execute_tool
+        from tool_recovery import reset_metrics, get_metrics_summary
+
+        reset_metrics()
+        results = {}
+
+        # 1. 正常工具
+        results["get_time"] = "正常" if "今天是" in execute_tool("get_time", {}) else "异常"
+        results["daily_quote"] = "正常" if "——" in execute_tool("daily_quote", {}) else "异常"
+        results["verify_math"] = "正常" if "解析成功" in execute_tool("verify_math", {"expr": "x**2-4"}) else "异常"
+        # 隐式乘法重试
+        results["verify_math_implicit"] = "重试成功" if "自动修正" in execute_tool("verify_math", {"expr": "2x^2+3x-5"}) else "异常"
+        # 错误参数 → 应给建议
+        bad_arg = execute_tool("web_search", {"wrong": 1})
+        results["error_recovery"] = "有建议" if "参数" in bad_arg and "重试" in bad_arg else "无建议"
+
+        # 2. 指标汇总
+        metrics = get_metrics_summary()
+        return {"tool_tests": results, "metrics": metrics,
+                "all_pass": all("正常" in v or "成功" in v or "有建议" in v
+                                for v in results.values())}
+
 
 # 默认回归集
 def default_cases(ev: PAEGEvaluator):
@@ -209,5 +241,12 @@ if __name__ == "__main__":
     print(f"通过率: {rep['pass_rate']} ({rep['passed']}/{rep['total']})")
     print(f"平均分: {rep['avg_score']}")
     print(f"耗时: {round(time.time() - t0, 1)}s")
+    # v0.19.2：tool-use 评估
+    print(f"\n=== Tool-Use 评估 ===")
+    tu = ev.evaluate_tool_use()
+    for k, v in tu["tool_tests"].items():
+        print(f"  {k}: {v}")
+    print(f"  全部通过: {tu['all_pass']}")
+    rep["tool_use"] = tu
     path = ev.save_report()
     print(f"报告已存: {path}")
