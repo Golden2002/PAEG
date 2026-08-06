@@ -38,6 +38,12 @@ Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（
 ### 9. 博雅教育市场垂直
 26 学科横跨文理（数学→哲学/美学/伦理/现象学）+ 薇依人格 + 自我进化——"刷题 AI"红海中的差异化垂直智能体。
 
+### 10. 知识导图功能（v0.20.5）
+说"画知识导图/列提纲/思维导图/知识结构/知识脉络/知识系统"→ 输出结构化知识地图（知识定位/知识树/关联/学习路径）。
+
+### 11. 气象页面（v0.20.5）
+顶部"气象"链接 → windy.com 气象图（免费嵌入）+ 位置共享 + Open-Meteo 实时数据。
+
 ## 架构全景
 
 ```
@@ -74,7 +80,11 @@ python -m pytest "..\06_测试与验证\tests\test_paeg_v0_5.py" -q
 python multi_turn_eval.py --mode all
 #   5 维度：退化/决策/语言风格/harness约束/tool use
 
-# 7. 评估 harness（LLM 输出质量）
+# 7. 全面接口测试（v0.20.5 ⭐ 全端点多轮覆盖）
+python api_sweep.py
+#   36 端点 × 多轮：概念/续问/边界/拦截/知识导图/工具
+
+# 8. 评估 harness（LLM 输出质量）
 python eval_harness.py --fast   # 快速意图识别
 python eval_harness.py          # 完整质量评估
 ```
