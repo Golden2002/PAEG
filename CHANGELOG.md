@@ -5,6 +5,38 @@
 
 ---
 
+## v0.21.2（2026-08-06）
+
+**架构一致性验证 + 教育 AI 借鉴转化 + 元能力文档深化**
+
+### 1. 架构连通性验证（任务1 ⭐）
+- arch_check.py：**16/16 (100%)** 连通 + 8 条关键链路全 OK
+- 扩展验证 v0.19-v0.21 新增模块：subject_detector/self_referential/knowledge_map/context_bundle/module_registry/observability/session_model/periodic_self_update/self_evolution 全连通
+- mcp_client（经 tool_registry）/ quality_gate（经 self_evolution）间接连通确认
+- **结论**：技术文档记录的架构全部真实实现
+
+### 2. 教育 AI 商业产品借鉴（任务2+4 ⭐）
+- 调研：Khanmigo（可汗）/ Duolingo / Socratic / 豆包课堂 / Quizizz/Knowt / 智谱清言
+- **§1.16 商业教育 AI 借鉴设计**写入技术文档：
+  - 防止直接给答案（Khanmigo 4 层防线）
+  - 教育 KPI（独立复述正确率/认知参与度/时延/Guardrail）
+  - 哲学知识图谱（Socratic X-ray）
+  - 间隔重复（Duolingo HLR + Anki FSRS）
+  - 动机系统（勋章/Streak/深度模式）
+- **落地 P0-1 防剧透**：prompts.py 加"引导式不剧透协议"（提问步骤不直接给答案/只验证学生已写步骤/思考链前置/挣扎是默认路径）
+- 验证：build_presenter_system 含全部防剧透约束 ✓
+
+### 3. 元能力文档深化（任务3 ⭐ 用智能体设计智能体）
+- 新增第五部分：设计方法论 M1-M5（指挥边界/意图路由三问/上下文命脉/语言质量程序化/可上架可下架）
+- 标准开发循环 9 步工作流
+- 7 条注意事项（踩坑表）
+- 元技能：让智能体自己设计智能体（文档→技能→复用）
+
+### 4. 其他
+- 测试 59/59
+
+---
+
 ## v0.21.1（2026-08-06）
 
 **知识导图上下文修复 + 卷首语提示 + 历史验证 + Thread/Turn/Item 会话模型**
