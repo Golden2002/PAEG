@@ -1995,11 +1995,12 @@ document.getElementById('lib-input').addEventListener('change', async (e) => {
   fd.append('file', file);
   fd.append('learner_id', STATE.learnerId);
   fd.append('purpose', 'library');
+  fd.append('library_root', 'usr_knowledge');
   try {
     const r = await fetch(API_BASE + '/api/upload', { method: 'POST', body: fd });
     const j = await r.json();
     if (!r.ok) { alert('资料上传失败: ' + (j.error || '')); return; }
-    addMsg('paeg', `已将资料 <b>${escapeHtml(file.name)}</b> 存入你的个人资料库。<br><small>之后提问相关问题时，我会参考这份资料来回答。</small>`);
+    addMsg('paeg', `已将资料 <b>${escapeHtml(file.name)}</b> 存入 usr_knowledge 资料库。<br><small>之后提问相关问题时，我会参考这份资料来回答。</small>`);
   } catch (err) {
     alert('资料上传失败: ' + err.message);
   }
