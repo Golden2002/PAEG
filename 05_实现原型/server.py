@@ -868,6 +868,22 @@ def general_chat_stream():
         import time as _time
         from subagents import _safe_chat
 
+        # v0.19.16：知识库查询——闲聊模式下问"你学过什么/知识库"也走知识库总结
+        try:
+            from meta_router import is_knowledge_query
+            if is_knowledge_query(text):
+                _kb = _handle_knowledge_query(learner, data.get("subject", "general"))
+                _kb_content = _kb.get_json().get("presentations", [{}])[0].get("content", "")
+                # 分段推送
+                _chunks = [_kb_content[i:i+60] for i in range(0, len(_kb_content), 60)] or [_kb_content]
+                for _c in _chunks:
+                    yield f"event: seg\ndata: {json.dumps({'text': _c}, ensure_ascii=False)}\n\n"
+                    _time.sleep(0.02)
+                yield f"event: done\ndata: {json.dumps({'ok': True}, ensure_ascii=False)}\n\n"
+                return
+        except Exception:
+            pass
+
         # 1) Function Calling agent loop
         reply = None
         tool_log = []
@@ -1330,27 +1346,44 @@ def _handle_knowledge_query(learner, subject):
     learner_id = getattr(learner, 'id', '')
     user_lib = get_user_library(learner_id) if learner_id else ""
 
-    lines = ["我平时会参考这些领域的资料来备课：\n"]
+    # 构造"已收录内容清单"（文件列表 + 可读内容摘要）
+    inventory = []
     if areas:
+        inventory.append("【Library 资料库收录】")
         for name, files in areas:
-            lines.append(f"**{name}**（{len(files)} 份）")
-            for f in files[:5]:
-                lines.append(f"  - {f}")
-            if len(files) > 5:
-                lines.append(f"  - …还有 {len(files)-5} 份")
-            lines.append("")
-    else:
-        lines.append("（Library 目前还没有收录资料）\n")
-
+            inventory.append(f"- {name}：{len(files)} 份（{'、'.join(files[:6])}" + ("…" if len(files) > 6 else "") + "）")
+            # 尝试读 1-2 个 md/txt 文件的内容摘要，让 LLM 能"真懂"内容
+            for f in files[:2]:
+                if f.endswith(('.md', '.txt')):
+                    try:
+                        with open(os.path.join(lib_root, name, f), encoding='utf-8') as _f:
+                            snippet = _f.read(300).strip()
+                        if snippet:
+                            inventory.append(f"  资料《{f}》要点：{snippet[:200]}")
+                    except Exception:
+                        pass
     if user_lib:
-        lines.append(f"**你的专属资料**（{len(user_lib.splitlines())-1} 份，我会特别参考）\n")
-        for l in user_lib.splitlines()[1:4]:
-            lines.append(f"  - {l}")
+        inventory.append("【用户上传的专属资料】")
+        inventory.append(user_lib)
 
-    lines.append("\n不过，知识库不是我的上限——**真正重要的是你想学什么**。")
-    lines.append("如果你希望我更精通某个领域，可以把相关资料**上传给我**（点输入框旁的书本图标），")
-    lines.append("之后你问相关问题时，我会参考它来回答。")
-    answer = "\n".join(lines)
+    inventory_text = "\n".join(inventory) if inventory else "（Library 目前没有收录资料）"
+
+    # v0.19.16：用 LLM 根据知识库内容自然总结回答（不是干巴巴列文件）
+    from subagents import _safe_chat
+    system = (
+        "你是 Émile Novis。学生问你'你的知识库/你学过什么'，请根据下面的知识库清单，"
+        "用**自然、老师式的语言**总结你掌握了哪些领域的知识，让 ta 感受到你真的了解这些内容。\n\n"
+        "要求：\n"
+        "1. 按领域介绍（如'我手头有一些数学和统计的讲义'），不是生硬列文件名\n"
+        "2. 提到某份资料时，说它大概讲什么（从要点里提炼），证明你'读过'它\n"
+        "3. 如果有用户上传的资料，特别提到'我还保存着你上传的XXX'\n"
+        "4. 结尾自然引导：你可以问我这些领域的任何问题；如果你想让我更精通某领域，把资料上传给我（点书本图标）\n"
+        "5. 语言像一位认真备课的老师，主谓宾完整，不要用'一句话总结'这类碎句\n"
+        "6. 如果清单是空的，就说'目前我的资料库还比较空，你可以先问我任何问题，或者上传资料让我更擅长'"
+    )
+    user = f"学生的知识库清单：\n{inventory_text}\n\n请用老师式的语言总结你掌握的知识。"
+    llm_answer = _safe_chat(llm, system, user, max_tokens=700)
+    answer = llm_answer or ("我目前的知识库里收录了这些领域的资料，你可以问我相关问题，也可以上传资料让我更擅长。")
 
     return jsonify({
         "session_id": f"kb_{learner.id}",
