@@ -1623,6 +1623,63 @@ def _handle_method_advice(learner, concept, subject):
     })
 
 
+# ─────────────────────────────────────
+# v0.19.25：独立对话类型端点——学习方法 / 知识库
+# 前端通过 mode 参数选择：method（学科学习方法）/ knowledge（知识库）
+# ─────────────────────────────────────
+
+@app.route("/api/method", methods=["POST"])
+def method_advice():
+    """学科学习方法咨询（独立对话类型）。
+
+    与 teach 模式内置拦截不同：这是用户显式选择"学习方法"模式时的端点，
+    无论输入什么（不必命中 is_method_advice 模式），都走学习方法指导。
+    """
+    data = request.get_json(force=True)
+    from paeg import LearnerProfile
+    learner_id = data.get("learner_id", f"user_{len(SESSIONS)}")
+    learner = SESSIONS.get(f"learner_{learner_id}")
+    if not learner:
+        learner = LearnerProfile(
+            id=learner_id,
+            nickname=data.get("nickname", "学生"),
+            grade_level=data.get("grade_level", "high_school"),
+            age=data.get("age", 17),
+            cognitive_style=data.get("cognitive_style", "visual"),
+            self_description=data.get("self_description", ""),
+        )
+        SESSIONS[f"learner_{learner_id}"] = learner
+    concept = data.get("concept") or data.get("text") or ""
+    subject = data.get("subject", "general")
+    if not concept:
+        return jsonify({"error": "concept is required"}), 400
+    return _handle_method_advice(learner, concept, subject)
+
+
+@app.route("/api/knowledge", methods=["POST"])
+def knowledge_query():
+    """知识库查询（独立对话类型）。
+
+    用户显式选择"知识库"模式时的端点：清点 Library 已收录资料 + 提示上传。
+    """
+    data = request.get_json(force=True)
+    from paeg import LearnerProfile
+    learner_id = data.get("learner_id", f"user_{len(SESSIONS)}")
+    learner = SESSIONS.get(f"learner_{learner_id}")
+    if not learner:
+        learner = LearnerProfile(
+            id=learner_id,
+            nickname=data.get("nickname", "学生"),
+            grade_level=data.get("grade_level", "high_school"),
+            age=data.get("age", 17),
+            cognitive_style=data.get("cognitive_style", "visual"),
+            self_description=data.get("self_description", ""),
+        )
+        SESSIONS[f"learner_{learner_id}"] = learner
+    subject = data.get("subject", "general")
+    return jsonify(_handle_knowledge_query(learner, subject))
+
+
 def _handle_problem_request(learner, concept, subject):
     """v0.19：出题请求处理——结合学段/学科/画像生成经典题目。
 
