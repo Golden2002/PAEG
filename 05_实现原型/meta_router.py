@@ -233,6 +233,62 @@ def is_teaching_intent(text: str, llm=None) -> bool:
     return intent
 
 
+# v0.21.9：复合输入检测——"指令 + 资源"（用户给指令让处理一段资料）
+_COMPOSITE_CMD = re.compile(
+    r"(帮我|请|麻烦|能不能|可以|我想让你|求|帮我看看|帮我分析|帮我解释|帮我翻译|"
+    r"帮我总结|帮我找|帮我改|帮我写|帮我润色|帮我检查|帮我点评|帮我评价|帮我读|"
+    r"分析一下|解释一下|翻译一下|总结一下|检查一下|看看|点评一下|"
+    r"这段|这段代码|这个代码|下面这段|以下这段|这段文字|这段内容)"
+    r".{0,12}(这|本|以下|下面|那|一段|这篇|这个|这份|我的|这段|这份)?"
+    r"(段|篇|文|文章|内容|代码|题目|对话|资料|材料|文字|作文|话|简历|论文|"
+    r"有什么问题|什么毛病|对不对|怎么改|什么意思)?"
+    r"([:：]\s*)?"
+)
+_SEP_MARKERS = (":\n", "：\n", "\n\n", "```", "「", "\u201c", "【")
+
+_IS_INTENT_CACHE: dict = {}
+
+
+def is_intent_with_material(text: str) -> bool:
+    """v0.21.9：检测"指令 + 资料"复合输入。
+
+    形态 B：用户输入 = 指令（分析/翻译/找问题/总结）+ 一大段资源（文章/代码/资料）。
+    检测信号：
+    1. 长度 > 60 且含明显分隔符（冒号换行/双换行/代码块/引号）
+    2. 短指令关键词（"帮我分析/请解释/翻译一下"）+ 跟资源指示词（这段/这篇/以下）
+    返回 True 时，调用方应走"资源分析"流程而非"概念教学"流程。
+    """
+    t = (text or "").strip()
+    if not t:
+        return False
+    cache_key = t[:60]
+    if cache_key in _IS_INTENT_CACHE:
+        return _IS_INTENT_CACHE[cache_key]
+    result = False
+    # 信号 1：长文本 + 分隔符
+    if len(t) > 60 and any(sep in t for sep in _SEP_MARKERS):
+        result = True
+    # 信号 2：复合指令关键词（长度 ≥ 20，避免"你好"类误判）
+    elif _COMPOSITE_CMD.search(t) and len(t) >= 20:
+        result = True
+    _IS_INTENT_CACHE[cache_key] = result
+    return result
+
+
+def split_intent_and_material(text: str):
+    """v0.21.9：把"指令+资料"切成 (指令, 资料) 两段。
+
+    用第一个分隔符（冒号换行/双换行/引号）切分；找不到则指令=前80字。
+    """
+    t = (text or "").strip()
+    for sep in _SEP_MARKERS:
+        idx = t.find(sep)
+        if idx > 0:
+            return t[:idx].strip(), t[idx + len(sep):].strip()
+    # 退化：前 80 字当指令，其余当资料
+    return t[:80], t[80:]
+
+
 if __name__ == "__main__":
     tests = [
         "你能调用知识库吗",           # True（幻觉案例）
