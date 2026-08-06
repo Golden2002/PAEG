@@ -217,6 +217,43 @@ body {
 .typing span:nth-child(3) { animation-delay: .4s; }
 @keyframes blink { 0%,80%,100% { opacity: .25 } 40% { opacity: 1 } }
 
+/* v0.17：阶段化思考提示（等待时不空转，展示思考过程） */
+.thinking-box {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 2px; font-size: 13.5px; color: var(--text-dim);
+}
+.thinking-box .th-spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: th-spin .8s linear infinite; flex-shrink: 0;
+}
+@keyframes th-spin { to { transform: rotate(360deg) } }
+.thinking-box .th-text { line-height: 1.4; }
+.thinking-box .th-text b { color: var(--text); font-weight: 600; }
+.thinking-box .th-dots::after {
+  content: ''; display: inline-block; width: 1.2em; text-align: left;
+  animation: th-dots 1.5s steps(4, end) infinite;
+}
+@keyframes th-dots { 0% { content: '' } 25% { content: '.' } 50% { content: '..' } 75% { content: '...' } }
+@media (prefers-reduced-motion: reduce) {
+  .thinking-box .th-spinner { animation: none; }
+  .thinking-box .th-dots::after { animation: none; content: ''; }
+}
+
+/* v0.17：每日一句卡片 */
+.quote-card { padding: 14px 16px; text-align: center; }
+.quote-card .q-text {
+  font-family: 'Georgia', 'Songti SC', 'STSong', serif;
+  font-size: 14.5px; line-height: 1.75; color: var(--text);
+  letter-spacing: .02em; font-style: italic;
+}
+.quote-card .q-author {
+  margin-top: 8px; font-size: 12px; color: var(--text-dim);
+  font-family: 'Georgia', 'Songti SC', 'STSong', serif;
+}
+.quote-card .q-source { font-size: 11px; color: var(--text-dim); opacity: .7; }
+
 /* ─── 输入区 ─── */
 .input-bar {
   display: flex; gap: 10px; margin-top: 14px;
@@ -390,7 +427,7 @@ body {
 <!-- 顶栏 -->
 <header class="topbar">
   <div class="brand">
-    <div class="brand-logo">PA</div>
+    <div class="brand-logo">É</div>
     <div>
       <div class="brand-name">Émile Novis · 教育者</div>
       <div class="brand-sub">Pedagogical Agent with Evolving Growth · 自我更新的教育者</div>
@@ -402,7 +439,7 @@ body {
     <button class="user-btn" id="user-btn">登录/注册</button>
     <div class="mode-switch">
       <button class="mode-btn active" data-mode="teach">学科教学</button>
-      <button class="mode-btn" data-mode="chat">随便说说</button>
+      <button class="mode-btn" data-mode="chat">闲聊~</button>
     </div>
   </div>
 </header>
@@ -462,6 +499,13 @@ body {
       <div class="log-list" id="log-list">
         <div class="log-item"><div class="txt" style="color:var(--text-dim)">等待教学记录…</div></div>
       </div>
+    </div>
+
+    <!-- v0.17：每日一句 -->
+    <div class="card quote-card" id="quote-card">
+      <h3>今日一句</h3>
+      <div class="q-text" id="quote-text">—</div>
+      <div class="q-author" id="quote-author"></div>
     </div>
   </aside>
 
@@ -584,6 +628,74 @@ const INTENT_LABELS = {
   question: '引导思考', present: '讲解', guide: '启发',
   practice: '练习', feedback: '反馈', evaluate: '检查理解',
 };
+// v0.17.1：修复 LLM 把公式包在括号里的问题（如 "函数 (f(x)=x^2)"）→ 转为 "$...$"
+// 增强：支持嵌套括号、更多 LaTeX 命令、单字母变量、更长公式（≤120 字符）
+function isFormulaLike(inner) {
+  const s = (inner || '').trim();
+  if (!s) return false;
+  // 特征1：含 = < > ^ 或数学符号
+  if (/[=<>^≤≥≠≈]/.test(s)) return true;
+  // 特征2：含 LaTeX 命令（\ 开头，含常用希腊字母）
+  if (/\\[a-zA-Z]+/.test(s)) return true;
+  // 特征3：数学函数调用形式 f(x) 且含变量/数字/运算符
+  if (/^[a-zA-Zα-ωπ]\s*\([^()]*\)/.test(s) && /[+\-*/×÷0-9a-zA-Zα-ωπ]/.test(s)) return true;
+  // 特征4：纯数学表达式（无汉字，含数字/希腊字母和运算符）
+  if (!/[\u4e00-\u9fff]/.test(s) && /[0-9a-zA-Zα-ωπ]/.test(s) && /[+\-*/^=<>]/.test(s)) return true;
+  // 特征5：单个数学变量（单字母或希腊字母）
+  if (/^[a-zA-Zα-ωπ]$/.test(s)) return true;
+  return false;
+}
+function fixBracketedFormulas(text) {
+  if (!text) return text;
+  let out = '';
+  let i = 0;
+  const len = text.length;
+  while (i < len) {
+    const ch = text[i];
+    if (ch === '(' || ch === '（') {
+      // 找匹配右括号（支持一层嵌套）
+      let depth = 1, j = i + 1, inner = '';
+      while (j < len && depth > 0) {
+        if (text[j] === '(' || text[j] === '（') depth++;
+        else if (text[j] === ')' || text[j] === '）') depth--;
+        if (depth > 0) { inner += text[j]; j++; }
+      }
+      if (depth === 0 && isFormulaLike(inner) && inner.length <= 120) {
+        out += '$' + inner + '$';
+        i = j + 1;
+        continue;
+      }
+      out += ch; i++;
+    } else if (ch === '[') {
+      let j = i + 1, inner = '';
+      while (j < len && text[j] !== ']') { inner += text[j]; j++; }
+      if (j < len && isFormulaLike(inner) && inner.length <= 120) {
+        out += '$' + inner + '$';
+        i = j + 1;
+        continue;
+      }
+      out += ch; i++;
+    } else {
+      out += ch; i++;
+    }
+  }
+  return out;
+}
+
+// v0.17.2：处理 ```math ... ``` 代码块（LLM 常用它包数学）。
+// 提取内容、清理错乱的 $ 分隔符、统一包成 $$...$$（MathJax 显示公式）。
+function fixMathCodeBlocks(text) {
+  if (!text) return text;
+  return text.replace(/```math\s*\n?([\s\S]*?)```/g, (m, inner) => {
+    let body = inner.trim();
+    if (!body) return m;
+    // 去掉混入的行内 $ 分隔符（错乱的），保留 LaTeX 命令和运算符
+    body = body.replace(/\$/g, '').trim();
+    // 如果本身已是 $$...$$ 包裹则保留
+    return '\n\n$$' + body + '$$\n\n';
+  });
+}
+
 function addMsg(role, html, tone, intent, preHtml) {
   const div = document.createElement('div');
   div.className = 'msg ' + role;
@@ -594,15 +706,22 @@ function addMsg(role, html, tone, intent, preHtml) {
   if (intent && INTENT_LABELS[intent]) intentTag = `<span class="intent-tag">${INTENT_LABELS[intent]}</span>`;
   // v0.14：Markdown 渲染（PAEG 消息是 markdown 内容）
   // v0.16：preHtml（如 step-tag）不进入 markdown 渲染，避免被转义
+  // v0.17：渲染前修复括号包住的公式（如 "函数 (f(x)=x^2)" → "函数 $f(x)=x^2$"）
+  // v0.17.2：修复 ```math 代码块
+  let fixed = role === 'paeg' ? html : html;
+  if (role === 'paeg') {
+    fixed = fixMathCodeBlocks(fixed);
+    fixed = fixBracketedFormulas(fixed);
+  }
   let contentHtml;
-  if (role === 'paeg' && typeof marked !== 'undefined' && !html.startsWith('出错了')) {
+  if (role === 'paeg' && typeof marked !== 'undefined' && !fixed.startsWith('出错了')) {
     try {
-      contentHtml = '<div class="md-content">' + marked.parse(html) + '</div>';
+      contentHtml = '<div class="md-content">' + marked.parse(fixed) + '</div>';
     } catch (e) {
-      contentHtml = html;
+      contentHtml = fixed;
     }
   } else {
-    contentHtml = html;
+    contentHtml = fixed;
   }
   const pre = preHtml || '';
   div.innerHTML = `
@@ -617,13 +736,56 @@ function addMsg(role, html, tone, intent, preHtml) {
   return div;
 }
 
-function addTyping() {
+// v0.17：阶段化思考提示（教学 vs 闲聊不同阶段文案，参考 Perplexity/Claude 等待设计）
+const THINK_STAGES_TEACH = [
+  '正在理解你的问题',
+  '正在检索相关的知识点',
+  '正在构思适合你的讲解',
+  '正在写下讲解',
+];
+const THINK_STAGES_CHAT = [
+  '正在听你说',
+  '正在琢磨你说的意思',
+  '正在想怎样回应你',
+];
+function addThinking(mode) {
   const div = document.createElement('div');
   div.className = 'msg paeg';
-  div.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  const stages = mode === 'chat' ? THINK_STAGES_CHAT : THINK_STAGES_TEACH;
+  let si = 0;
+  const inner = document.createElement('div');
+  inner.className = 'msg-bubble';
+  const box = document.createElement('div');
+  box.className = 'thinking-box';
+  box.innerHTML = `<span class="th-spinner"></span><span class="th-text">${stages[0]}<span class="th-dots"></span></span>`;
+  inner.appendChild(box);
+  div.appendChild(inner);
   chatWin.appendChild(div);
   chatWin.scrollTop = chatWin.scrollHeight;
+  // 阶段轮换：每 2.2s 进入下一阶段（纯前端预制，不等后端）
+  div._stageTimer = setInterval(() => {
+    si = (si + 1) % stages.length;
+    const t = box.querySelector('.th-text');
+    if (t) t.firstChild.textContent = stages[si];
+  }, 2200);
   return div;
+}
+
+// 移除思考提示（清理定时器）
+function removeThinking(div) {
+  if (div && div._stageTimer) { clearInterval(div._stageTimer); div._stageTimer = null; }
+  if (div) div.remove();
+}
+
+// 加载每日一句（v0.17）
+async function loadDailyQuote() {
+  try {
+    const q = await api('/api/quote');
+    const t = document.getElementById('quote-text');
+    const a = document.getElementById('quote-author');
+    if (t) t.textContent = '「' + q.text + '」';
+    if (a) a.textContent = '—— ' + q.author + (q.source ? ' · ' + q.source : '');
+  } catch (e) { /* 服务离线时静默 */ }
 }
 
 // ─── 后端调用 ───
@@ -741,7 +903,7 @@ function updateStats() {
 
 // ─── 教学主流程 ───
 async function teach(question, subject) {
-  const typing = addTyping();
+  const thinking = addThinking('teach');
   askBtn.disabled = true;
   try {
     const result = await api('/api/teach', {
@@ -756,19 +918,26 @@ async function teach(question, subject) {
       }),
     });
 
-    typing.remove();
+    removeThinking(thinking);
     STATE.sessions++;
 
-    // 逐步呈现（用 plan 的步骤类型标注意图）
+    // 逐步呈现（v0.17.2：不再显示"步骤 N"，用自然过渡标签）
     const steps = result.presentations || [];
     const planSteps = (result.plan && result.plan.steps) || [];
+    const STEP_LABELS = {
+      question: '先看一个问题', present: '讲给你听', guide: '我们慢慢来',
+      practice: '你来试试', feedback: '这里要注意', evaluate: '想一想',
+      meta: '',  // 元问题回答无标签
+    };
     for (let i = 0; i < steps.length; i++) {
       const p = steps[i];
       const planStep = planSteps[i] || {};
-      // v0.16：step-tag 作为 preHtml，不进入 markdown 渲染（避免被转义）
-      const preHtml = p.step_id ? `<span class="step-tag">步骤 ${p.step_id}</span>` : '';
+      const stype = planStep.type || p.step_type || 'present';
+      const label = STEP_LABELS[stype] || (i === steps.length - 1 ? '小结' : '');
+      // preHtml：自然过渡标签（step_id 仍保留在数据里，但不再显示"步骤 N"）
+      const preHtml = label ? `<span class="step-tag">${label}</span>` : '';
       addMsg('paeg', p.content || p.text || '', result.worldview_used,
-            planStep.type || p.step_type, preHtml);
+            stype, preHtml);
       await new Promise(r => setTimeout(r, 120));
     }
 
@@ -786,16 +955,16 @@ async function teach(question, subject) {
     updateStats();
     loadMetaLog();
   } catch (e) {
-    typing.remove();
+    removeThinking(thinking);
     addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
   } finally {
     askBtn.disabled = false;
   }
 }
 
-// ─── 一般对话 ───
+// ─── 一般对话（闲聊~） ───
 async function generalChat(text) {
-  const typing = addTyping();
+  const thinking = addThinking('chat');
   askBtn.disabled = true;
   try {
     const result = await api('/api/chat', {
@@ -808,10 +977,19 @@ async function generalChat(text) {
         text: text,
       }),
     });
-    typing.remove();
-    addMsg('paeg', result.reply || '……');
+    removeThinking(thinking);
+    // v0.17：按 segments 错时显示（核心回应→自我迭代补充→推荐询问）
+    const segs = Array.isArray(result.segments) && result.segments.length > 0
+      ? result.segments : [result.reply || '……'];
+    for (let i = 0; i < segs.length; i++) {
+      addMsg('paeg', segs[i]);
+      if (i < segs.length - 1) {
+        // 段间停顿（让 ta 有时间阅读）
+        await new Promise(r => setTimeout(r, 1800 + Math.min(segs[i].length * 25, 1200)));
+      }
+    }
   } catch (e) {
-    typing.remove();
+    removeThinking(thinking);
     addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
   } finally {
     askBtn.disabled = false;
@@ -998,7 +1176,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     document.querySelector('.subject-chips').style.display = isTeach ? '' : 'none';
     questionInput.placeholder = isTeach
       ? '输入你想学习的内容…'
-      : '随便聊聊——困惑、想法、生活里的事…';
+      : '闲聊一下——困惑、想法、生活里的事…';
     questionInput.focus();
   });
 });
@@ -1006,6 +1184,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 // ─── 启动 ───
 checkHealth();
 loadMetaLog();
+loadDailyQuote();        // v0.17：每日一句
 setInterval(checkHealth, 30000);  // 30s 健康检查
 </script>
 </body>
