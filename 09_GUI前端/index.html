@@ -12,55 +12,39 @@ if (typeof marked === 'undefined') {
   document.write('<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"><\/script>');
 }
 </script>
-<!-- v0.16：数学公式渲染（MathJax，支持 $...$ 和 \(...\)） -->
+<!-- v0.19.9：数学公式渲染（KaTeX——完全自包含，替代 MathJax。
+     之前 MathJax tex-chtml.js 内置 autoload 会按需加载 input/tex/extensions/*.js，
+     本地缺失导致 404 → startup.promise reject → 公式全部不渲染。
+     KaTeX 同步渲染、无需按需加载、throwOnError 天然降级，最适合离线单 HTML。 -->
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<script src="assets/vendor/katex/katex.min.js"></script>
+<script src="assets/vendor/katex/auto-render.min.js"></script>
 <script>
-window.MathJax = {
-  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']],
-        processEscapes: true },
-  options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] },
-  loader: { load: ['[tex]/html', '[tex]/ams', '[tex]/newcommand'] },
-  startup: { typeset: true }
-};
-</script>
-<script>
-// MathJax 本地优先，失败则 CDN 兜底（动态加载）
+// KaTeX 本地加载失败 → CDN 兜底
 (function () {
-  var src = 'assets/vendor/mathjax/tex-chtml.js';
-  var el = document.createElement('script');
-  el.src = src;
-  el.async = true;
-  el.onerror = function () {
-    var cdn = document.createElement('script');
-    cdn.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js';
-    cdn.async = true;
-    document.head.appendChild(cdn);
-  };
-  document.head.appendChild(el);
+  if (typeof window.katex === 'undefined') {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js';
+    document.head.appendChild(s);
+  }
 })();
-// v0.19.7：统一 MathJax 渲染——等待 startup 完成，修复"公式不显示"（MathJax 异步加载竞态）
-let _mathjaxReady = null;
-function mathjaxReady() {
-  if (_mathjaxReady) return _mathjaxReady;
-  _mathjaxReady = new Promise(function (resolve) {
-    var check = function () {
-      if (window.MathJax && MathJax.startup && MathJax.startup.promise) {
-        MathJax.startup.promise.then(function () { resolve(true); }).catch(function () { resolve(false); });
-      } else if (window.MathJax && MathJax.typesetPromise) {
-        resolve(true);
-      } else {
-        setTimeout(check, 200);
-      }
-    };
-    setTimeout(check, 100);
-  });
-  return _mathjaxReady;
-}
+// v0.19.9：统一公式渲染——KaTeX 同步渲染（替代 MathJax typesetPromise）
 function renderMath(el) {
-  return mathjaxReady().then(function (ok) {
-    if (ok && window.MathJax && MathJax.typesetPromise && el) {
-      try { return MathJax.typesetPromise([el]); } catch (e) {}
-    }
-  });
+  if (!el) return;
+  if (window.renderMathInElement) {
+    try {
+      renderMathInElement(el, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '\\[', right: '\\]', display: true }
+        ],
+        throwOnError: false,   // 渲染失败显示原始 LaTeX，不崩溃
+        ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      });
+    } catch (e) {}
+  }
 }
 </script>
 <script>
