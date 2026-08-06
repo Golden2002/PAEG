@@ -206,6 +206,26 @@ class UserStore:
         return {"users": len(self._data["users"])}
 
 
+# ─── v0.21.5：usr/ 视图路径别名（SelfUpdateAgent 等外部消费者）───
+def user_data_paths(uid: str) -> dict:
+    """返回用户数据的逻辑路径别名（usr/ 视图 → 实际 users_data 目录）。
+
+    给"usr/视图"等外部路径消费者使用：输入用户 ID，输出基于 user_store.py
+    所在目录绝对路径的 5 个数据文件路径别名。
+
+    返回键：profile / history / notes / self_description / feedback
+    """
+    base = os.path.dirname(os.path.abspath(__file__))
+    users_data_dir = os.path.join(base, 'users_data', uid)
+    return {
+        "profile": os.path.join(users_data_dir, 'profile.json'),
+        "history": os.path.join(users_data_dir, 'history.jsonl'),
+        "notes": os.path.join(users_data_dir, 'notes'),
+        "self_description": os.path.join(users_data_dir, 'self_description.json'),
+        "feedback": os.path.join(users_data_dir, 'feedback'),
+    }
+
+
 class ConversationStore:
     """对话历史持久化（v0.18）。
 
