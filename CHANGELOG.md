@@ -5,6 +5,30 @@
 
 ---
 
+## v0.20.2（2026-08-06）
+
+**多轮对话连贯性修复（核心 bug）+ GitHub 项目完整性**
+
+### 1. 对话连贯性修复（用户发现的关键 bug）
+- **根因**：`_safe_chat`（subagents.py:32）内部硬编码 `messages=[{"role":"user","content":user}]`——所有调用方传的历史被丢弃，LLM 永远只看 system + 当前一句话
+- **各模式状态（修复前）**：chat_stream/chat 半回传（历史拼字符串塞 user）；teach_stream/affection/knowledge/method/answer **零回传**
+- **修复**：
+  - `_safe_chat` 升级支持 messages 列表参数（旧风格兼容）
+  - `run_agent_loop` 新增 history 参数（在 user_input 前注入历史）
+  - chat_stream：传真 messages 历史（最近 10 条 user/assistant）
+  - AffectionSupportor.run 新增 history 参数 + 4 个 affection 入口（teach/teach_stream/chat_stream/api 端点）传 chat_hist
+- **实测**：chat_stream 两轮（"我叫小明喜欢篮球"→"我叫什么？"→"你叫小明，你喜欢篮球，这两句我都记住了"）；affection 两轮（"考试考砸难过"→"数学考砸了"→"我听到你说'就是数学考砸了'"）✓
+
+### 2. GitHub 项目完整性
+- 补全 Library 目录结构：Language/Philosophy/Simone Weil/user_qa_lib（占位 README，说明资料如何恢复）
+- 重要文档已上传（00_Gap/01-04 设计/08_Loop/亮点总览/小红书推文）
+- 从 GitHub 可拉出完整项目骨架 + 全部代码/文档
+
+### 3. 其他
+- 测试 59/59
+
+---
+
 ## v0.20.1（2026-08-06）
 
 **emotion → affection 命名统一（纯命名变化，逻辑不变）**
