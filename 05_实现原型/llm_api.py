@@ -26,9 +26,11 @@ class ModelAPI:
     name = "abstract"
 
     def chat(self, system: str, messages: list, max_tokens: int = 2000,
-             temperature: float = 0.7) -> str:
+             temperature: float = 0.7, tools: Optional[list] = None,
+             tool_choice: Optional[str] = None) -> str:
         """一次对话。messages: [{"role": "user"/"assistant", "content": str}, ...]
-        返回模型回复文本。失败抛 ModelError。"""
+        返回模型回复文本。若模型请求工具调用，返回 JSON 字符串（含 tool_calls）。
+        失败抛 ModelError。"""
         raise NotImplementedError
 
     def available(self) -> bool:
@@ -75,7 +77,8 @@ class OpenAICompatModelAPI(ModelAPI):
         return self._base_url + "/v1/chat/completions"
 
     def chat(self, system: str, messages: list, max_tokens: int = 2000,
-             temperature: float = 0.7) -> str:
+             temperature: float = 0.7, tools: Optional[list] = None,
+             tool_choice: Optional[str] = None) -> str:
         payload = {
             "model": self._model,
             "messages": [{"role": "system", "content": system}] + messages,
@@ -83,6 +86,10 @@ class OpenAICompatModelAPI(ModelAPI):
             "temperature": temperature,
             "stream": False,
         }
+        if tools:
+            payload["tools"] = tools
+        if tool_choice:
+            payload["tool_choice"] = tool_choice
         body = json.dumps(payload).encode("utf-8")
         req = request.Request(
             self._url(),
@@ -96,7 +103,18 @@ class OpenAICompatModelAPI(ModelAPI):
         try:
             with request.urlopen(req, timeout=self._timeout) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-            return data["choices"][0]["message"]["content"]
+            msg = data["choices"][0]["message"]
+            # v0.19：若模型请求工具调用，返回完整 message（含 tool_calls）
+            if msg.get("tool_calls"):
+                return json.dumps({
+                    "tool_calls": [
+                        {"id": tc.get("id", ""),
+                         "name": tc.get("function", {}).get("name", ""),
+                         "arguments": tc.get("function", {}).get("arguments", "{}")}
+                        for tc in msg["tool_calls"]
+                    ],
+                }, ensure_ascii=False)
+            return msg.get("content") or ""
         except error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")[:300]
             raise ModelError(f"[{self.name}] HTTP {e.code}: {detail}") from e
