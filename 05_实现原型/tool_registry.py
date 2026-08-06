@@ -89,11 +89,28 @@ def get_tool_defs() -> List[dict]:
 # ─────────────────────────────────────
 
 def _exec_web_search(query: str, max_results: int = 4) -> str:
+    """搜索（v0.19.2 改进：失败自动换短查询重试，给 LLM 明确错误）。"""
     try:
         from web_search_tool import web_search
-        return web_search(query, max_results=min(max_results, 8))
+        result = web_search(query, max_results=min(max_results, 8))
+        if "搜索未返回结果" in result or "未返回有效结果" in result:
+            # 第一次失败 → 拆短查询重试（中文长短语 Bing 分词差）
+            try:
+                from web_search_tool import _shorten_query, _bing_search
+                short_q = _shorten_query(query)
+                if short_q and short_q != query:
+                    short_results = _bing_search(short_q, min(max_results, 4))
+                    if short_results:
+                        parts = []
+                        for i, r in enumerate(short_results, 1):
+                            parts.append(f"[来源 {i}] {r.get('title','')}\n"
+                                         f"URL: {r.get('url','')}\n{r.get('content','')}")
+                        return "\n\n".join(parts)
+            except Exception:
+                pass
+        return result
     except Exception as e:
-        return f"搜索失败: {e}"
+        return f"搜索失败（请换更短的关键词重试）: {e}"
 
 
 def _exec_verify_math(expr: str) -> str:
@@ -131,29 +148,97 @@ def _exec_get_time() -> str:
 
 
 # 工具名 → 执行函数
+# v0.19.2：接入 tool_recovery（错误恢复：重试 + 降级 + 指标）
+try:
+    from tool_recovery import with_recovery
+    _RECOVERY = True
+except Exception:
+    _RECOVERY = False
+
+
+def _wrap(name, fn, retries=2):
+    """给工具加错误恢复装饰器（若 tool_recovery 可用）。"""
+    if _RECOVERY:
+        return with_recovery(max_retries=retries, tool_name=name)(fn)
+    return fn
+
+
 _HANDLERS: Dict[str, Callable[..., str]] = {
-    "web_search": _exec_web_search,
-    "verify_math": _exec_verify_math,
-    "fetch_page": _exec_fetch_page,
-    "daily_quote": _exec_daily_quote,
-    "get_time": _exec_get_time,
+    "web_search": _wrap("web_search", _exec_web_search, retries=2),
+    "verify_math": _wrap("verify_math", _exec_verify_math, retries=1),
+    "fetch_page": _wrap("fetch_page", _exec_fetch_page, retries=2),
+    "daily_quote": _wrap("daily_quote", _exec_daily_quote, retries=1),
+    "get_time": _wrap("get_time", _exec_get_time, retries=1),
 }
 
 
 def execute_tool(name: str, arguments: Dict[str, Any]) -> str:
-    """执行工具，返回文本结果（给 LLM 看）。"""
+    """执行工具（v0.19.2 改进：重试 + 明确错误建议）。
+
+    失败时返回包含"修复建议"的错误信息，让 LLM 能自我纠正后重试。
+    """
     handler = _HANDLERS.get(name)
     if not handler:
-        return f"未知工具: {name}"
+        return f"未知工具: {name}（可用工具：{', '.join(_HANDLERS.keys())}）"
+    if not isinstance(arguments, dict):
+        arguments = {}
     try:
-        if not isinstance(arguments, dict):
-            arguments = {}
-        return str(handler(**arguments))
+        result = str(handler(**arguments))
+        # verify_math 失败时自动重试（简化/修正表达式）
+        if name == "verify_math" and ("失败" in result or "错误" in result):
+            expr = arguments.get("expr", "")
+            retried = _retry_verify_math(expr)
+            if retried:
+                return retried
+        return result
     except TypeError as e:
-        # 参数不匹配：尝试忽略多余参数
-        return str(handler())
+        # 参数不匹配：对无参工具（daily_quote/get_time）直接调用；
+        # 有参工具直接给参数建议（不盲目重试，避免返回误导结果）
+        if name in ("daily_quote", "get_time"):
+            try:
+                return str(handler())
+            except Exception:
+                pass
+        return (f"工具 {name} 参数错误: {e}。"
+                f"需要的参数：{_describe_params(name)}。请修正后重试。")
     except Exception as e:
-        return f"工具执行出错: {e}"
+        return f"工具 {name} 执行出错: {e}（请换一种方式重试）"
+
+
+def _retry_verify_math(expr: str) -> str:
+    """verify_math 失败时的重试策略：去空格、转中缀、补 *。"""
+    if not expr:
+        return ""
+    try:
+        import sympy as sp
+        candidates = [expr]
+        # 1. 去空格
+        candidates.append(expr.replace(" ", ""))
+        # 2. 隐式乘法：2x → 2*x
+        import re
+        candidates.append(re.sub(r'(\d)([a-zA-Zα-ωπ])', r'\1*\2', expr))
+        for cand in candidates:
+            try:
+                e = sp.sympify(cand)
+                return (f"表达式（经自动修正）解析成功：{sp.sstr(e)}\n"
+                        f"LaTeX: {sp.latex(e)}")
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return ""
+
+
+def _describe_params(name: str) -> str:
+    """返回工具需要的参数说明（供错误提示）。"""
+    params = {
+        "web_search": "query(str) 必填, max_results(int) 可选",
+        "verify_math": "expr(str) 必填 - 数学表达式",
+        "fetch_page": "url(str) 必填",
+        "daily_quote": "无参数",
+        "get_time": "无参数",
+    }
+    return params.get(name, "见工具描述")
 
 
 # ─────────────────────────────────────
@@ -244,7 +329,17 @@ def run_agent_loop(model, system: str, user_input: str,
         # 正常文本回答
         return {"answer": resp, "tool_calls": calls_log}
 
-    return {"answer": "（工具调用轮数超限，停止）", "tool_calls": calls_log}
+    return {"answer": "（工具调用轮数超限，停止）", "tool_calls": calls_log,
+            "metrics": _tool_metrics()}
+
+
+def _tool_metrics() -> dict:
+    """收集工具调用指标（供 harness / Reflect 评估 tool-use）。"""
+    try:
+        from tool_recovery import get_metrics_summary
+        return get_metrics_summary()
+    except Exception:
+        return {}
 
 
 if __name__ == "__main__":
