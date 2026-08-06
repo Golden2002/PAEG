@@ -46,6 +46,14 @@ def load_teaching_memory() -> str:
     notes = _read(os.path.join(mem_dir, 'teacher_notes.md'), limit=1500)
     if notes:
         parts.append(f"## 老师自定义教学约定\n{notes}")
+    # v0.19.22：自进化——学科提示词补丁（战术/战略，自动提炼）
+    patches = _read(os.path.join(mem_dir, 'subject_patches.md'), limit=2000)
+    if patches:
+        parts.append(f"## 近期自动提炼的学科教学改进（自进化，供参考）\n{patches}")
+    # v0.19.22：自进化——工具使用经验
+    tlessons = _read(os.path.join(mem_dir, 'tool_lessons.md'), limit=1000)
+    if tlessons:
+        parts.append(f"## 工具使用经验（自进化，供参考）\n{tlessons}")
 
     if not parts:
         return ""
