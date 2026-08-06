@@ -1124,11 +1124,16 @@ def upload_file():
     """v0.19 P2-10：图片/文件上传 + v0.19.11 资料上传。
 
     请求：multipart/form-data, file + learner_id + purpose(可选: library=资料库)
+          + library_root(可选: "usr_knowledge" 存到 Library/usr_knowledge/<id>/，
+                         默认 "user" 存到 Library/user_<id>/，向后兼容)
     响应：{"url", "filename"} 或 {"library": 资料列表}
     """
     learner_id = request.form.get("learner_id", "anonymous")
     f = request.files.get("file")
     purpose = request.form.get("purpose", "chat")
+    # v0.19.x：资料库根目录选择；默认 "user"（Library/user_<id>/），
+    # 设为 "usr_knowledge" 则保存到 Library/usr_knowledge/<id>/
+    library_root = request.form.get("library_root", "user")
 
     # v0.19.11：资料上传 → Library/用户id/
     if purpose == "library":
@@ -1140,17 +1145,25 @@ def upload_file():
         if ext not in allowed:
             return jsonify({"error": f"不支持的格式 {ext}"}), 400
         try:
-            # 保存到 Library/用户id/
+            # 根据 library_root 选择目录：usr_knowledge 或 user（默认，向后兼容）
+            if library_root == "usr_knowledge":
+                sub_dir = "usr_knowledge"
+                note_text = "资料已存入 usr_knowledge，回答时会自动参考"
+            else:
+                sub_dir = f"user_{learner_id}"
+                note_text = "资料已存入你的专属资料库，回答时会自动参考"
             lib_root = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
-                                     '..', 'Library', f'user_{learner_id}')
+                                     '..', 'Library', sub_dir, learner_id)
             _os.makedirs(lib_root, exist_ok=True)
             from datetime import datetime
             safe_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{_os.path.basename(f.filename)}"
             f.save(_os.path.join(lib_root, safe_name))
             return jsonify({
                 "ok": True, "filename": safe_name,
-                "library_path": f"Library/user_{learner_id}/{safe_name}",
-                "note": "资料已存入你的专属资料库，回答时会自动参考",
+                "url": f"/Library/{sub_dir}/{learner_id}/{safe_name}",
+                "library_root": library_root if library_root == "usr_knowledge" else "user",
+                "library_path": f"Library/{sub_dir}/{learner_id}/{safe_name}",
+                "note": note_text,
             })
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -2504,6 +2517,83 @@ def self_update_status():
         "last_weekly": PERIODIC_UPDATER.last_weekly,
         "last_activity": PERIODIC_UPDATER.last_activity,
     })
+
+
+@app.route("/api/self-update/from-feedback", methods=["POST"])
+def self_update_from_feedback():
+    """v0.21.4：从反馈/反思生成自我更新建议（第 8 个子代理 SelfUpdateAgent）。
+
+    请求：{"text": str, "learner_id": str, "include_insights": bool(默认true),
+            "include_feedback_files": bool(默认true)}
+    流程：读取经过 QualityGate 过滤的洞察（evolve_data/insights.json）+
+          外部反馈文件（users_data/<uid>/feedback/ 或 Library/usr_knowledge/<uid>/feedback/）
+          → SelfUpdateAgent 驱动 LLM 生成结构化更新建议 → 追加到 memory/self_update_suggestions.jsonl
+    响应：{"ok": true, "result": {"suggestions": [...], "summary": str, "sources_used": [...], "mode": "self_update"}}
+    """
+    data = request.get_json(force=True) or {}
+    text = (data.get("text") or "").strip()
+    learner_id = data.get("learner_id") or "anonymous"
+    if not text:
+        return jsonify({"ok": False, "error": "缺少 text 字段"}), 400
+
+    try:
+        from subagents import SelfUpdateAgent
+        _su = SelfUpdateAgent()
+
+        # 1) 读取过滤后的反思洞察（QualityGate promote 后落盘的 insights.json）
+        insights = []
+        if data.get("include_insights", True):
+            try:
+                _evolve_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "evolve_data")
+                _ins_path = os.path.join(_evolve_dir, "insights.json")
+                if os.path.exists(_ins_path):
+                    _ins = json.load(open(_ins_path, encoding="utf-8"))
+                    if isinstance(_ins, list):
+                        insights = [{"content": i.get("content", "") if isinstance(i, dict) else str(i),
+                                     "subject": i.get("subject", "") if isinstance(i, dict) else "",
+                                     "helped": i.get("helped", True) if isinstance(i, dict) else True}
+                                    for i in _ins if i]
+            except Exception as _e:
+                print(f"[PAEG] 读取 insights.json 失败: {_e}")
+
+        # 2) 读取外部反馈文件（线下用户测试反馈）
+        library_paths = []
+        if data.get("include_feedback_files", True):
+            _base = os.path.dirname(os.path.abspath(__file__))
+            _cands = [
+                os.path.join(_base, "users_data", learner_id, "feedback"),
+                os.path.join(_base, "..", "Library", "usr_knowledge", learner_id, "feedback"),
+            ]
+            for _fd in _cands:
+                _fd = os.path.normpath(_fd)
+                if os.path.isdir(_fd):
+                    for _f in sorted(os.listdir(_fd)):
+                        if _f.endswith((".md", ".txt", ".jsonl", ".json")):
+                            library_paths.append(os.path.join(_fd, _f))
+
+        # 3) 调用 SelfUpdateAgent 驱动 LLM
+        result = _su.run(llm, text, learner=None, history=[],
+                         insights=insights, library_paths=library_paths)
+
+        # 4) 追加建议记录（供人工/调度器后续处理）
+        try:
+            _mem_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")
+            os.makedirs(_mem_dir, exist_ok=True)
+            _log_path = os.path.join(_mem_dir, "self_update_suggestions.jsonl")
+            with open(_log_path, "a", encoding="utf-8") as _f:
+                _f.write(json.dumps({
+                    "timestamp": datetime.now().isoformat(),
+                    "learner_id": learner_id,
+                    "text": text,
+                    "suggestions": result.get("suggestions", []),
+                    "sources_used": result.get("sources_used", []),
+                }, ensure_ascii=False) + "\n")
+        except Exception as _e:
+            print(f"[PAEG] 写入 self_update_suggestions.jsonl 失败: {_e}")
+
+        return jsonify({"ok": True, "result": result})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 # ─────────────────────────────────────
