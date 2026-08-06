@@ -935,12 +935,13 @@ def teach_stream():
 
         # 教学循环
         _assistant_parts = []  # v0.21.3：累积助手回复（用于会话保存）
+        _prev_presentations = []  # v0.21.8：累积前几轮讲解（多轮上下文延续——修复 stress 发现的"问x³忘了在讲积分"）
         for i, step in enumerate(plan["steps"]):
             yield f"event: step\ndata: {json.dumps({'step_id': i + 1, 'status': 'presenting'})}\n\n"
             presentation = paeg.presenter.run(
                 step=step,
                 learner=learner,
-                previous=[],
+                previous=_prev_presentations,
                 tone_info=tone_info,
                 concept=concept,
                 subject=subject,
@@ -957,6 +958,7 @@ def teach_stream():
                 except Exception:
                     pass
             _assistant_parts.append(presentation.get("content") or "")  # v0.21.3
+            _prev_presentations.append(presentation)  # v0.21.8：累积讲解供下一轮参考
             yield f"event: presentation\ndata: {json.dumps(presentation, ensure_ascii=False)}\n\n"
 
             # 评估
@@ -1436,6 +1438,18 @@ def general_chat_stream():
         _ulib = get_user_library(learner_id)
         if _ulib:
             system = system + "\n\n" + _ulib
+    except Exception:
+        pass
+
+    # v0.21.8：注入用户关键事实（多轮注意力——"我喜欢蓝绿色"第N轮追问仍可见）
+    try:
+        from context_bundle import extract_user_facts
+        _facts = extract_user_facts(SESSIONS.get(f"chat_hist_{learner_id}", []))
+        if _facts:
+            _facts_str = "\n".join(f"- {f}" for f in _facts)
+            system = system + (
+                "\n\n## 用户说过的事实（v0.21.8 记忆锚点，回答相关问题时必须引用）\n"
+                + _facts_str)
     except Exception:
         pass
 
@@ -1941,6 +1955,15 @@ def answer_api():
                 cid = CONV_STORE.add_message(learner_id, "answer", f"找答案：{question[:30]}",
                                              "assistant", result.get("answer") or "", conv_id=cid)
                 SESSIONS[f"conv_answer_{learner_id}"] = cid
+            except Exception:
+                pass
+        # v0.21.8：answer 也写入 chat_hist（修复多轮上下文丢失——"那 x³ 呢"必须记得上文在讲积分）
+        if learner_id:
+            try:
+                _ch = SESSIONS.setdefault(f"chat_hist_{learner_id}", [])
+                _ch.append({"role": "user", "content": question})
+                _ch.append({"role": "assistant", "content": result.get("answer") or ""})
+                SESSIONS[f"chat_hist_{learner_id}"] = _ch[-30:]
             except Exception:
                 pass
         return jsonify(result)
