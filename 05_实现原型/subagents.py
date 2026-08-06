@@ -164,19 +164,15 @@ class Presenter:
         topic = step.get("topic", concept or "该主题")
         wv_ratio = tone_info.get("ratio", {1: 0.20, 2: 0.35, 3: 0.35, 4: 0.10})
 
-        # 知识库上下文（优先精确节点，其次检索）
+        # 知识库上下文（v0.15：用缓存 resolve_node，避免重复检索）
         kb_node = None
         if concept:
-            kb_node = (self.kb.get_subject(concept) or self.kb.get_humanity(concept)
-                       or self.kb.get_skill(concept))
-        if kb_node is None and concept:
-            hits = self.kb.search(concept, subject=subject, top_k=1)
-            if hits:
-                cid = hits[0]["concept_id"]
-                kb_node = (self.kb.get_subject(cid) or self.kb.get_humanity(cid)
-                           or self.kb.get_skill(cid))
+            try:
+                kb_node = self.kb.resolve_node(concept, subject)
+            except Exception:
+                kb_node = (self.kb.get_subject(concept) or self.kb.get_humanity(concept)
+                           or self.kb.get_skill(concept))
         if kb_node is None and subject:
-            # 技能类别匹配（如 subject=writing / coding / thinking）
             kb_node = self.kb.get_skill_by_name(subject)
 
         # 真实 LLM 生成（v0.8.1：使用学科专属提示词中心，去掉数字噪音；v0.9 注入教学策略）
@@ -200,12 +196,27 @@ class Presenter:
                 strategy_line=teaching_line,
                 user_model=getattr(learner, "_user_model", None),
             )
+            # v0.15：生成前文摘要（避免重复）——取前几步内容的核心要点
+            prev_summary = ""
+            if previous:
+                # 取前两步内容的开头（作为"已讲过"的线索）
+                prev_parts = []
+                for p in previous[-2:]:
+                    pc = p.get("content", "") if isinstance(p, dict) else str(p)
+                    if pc:
+                        # 压缩到 60 字作为要点线索
+                        prev_parts.append(pc[:60].replace("\n", " "))
+                if prev_parts:
+                    prev_summary = "；".join(prev_parts)
+            strategy_name = step.get("strategy") or ""
             user = build_presenter_user(
                 subject=subject or "default",
                 topic=topic,
                 step_type=step.get("type", "present"),
                 step_id=step.get("step_id", 1),
                 total_steps=len(previous) + 2 if previous else 3,
+                previous_summary=prev_summary,
+                strategy_name=strategy_name,
             )
             content = _safe_chat(self.model, system, user, max_tokens=512)
             if content:
