@@ -138,15 +138,23 @@ def test_intent_guide_in_system_prompt():
     print("✓ test_intent_guide_in_system_prompt")
 
 
-def test_identity_questions_self_referential():
-    """"你是谁/有哪些功能"应触发自我指涉（身份确定性回复，非闲聊）。"""
+def test_ability_questions_self_referential():
+    """"有哪些功能/能做什么"应触发自我指涉（能力确定性回复）。"""
     from self_referential import is_interface_query, handle_interface_query
-    for q in ['你是谁', '你有哪些功能', '你能做什么', '你叫什么名字', '你有什么功能']:
+    for q in ['你有哪些功能', '你能做什么', '你有什么功能', '你会做什么', '你能帮我什么', '有什么功能']:
         assert is_interface_query(q) is True, f"应命中自我指涉: {q}"
-    r = handle_interface_query('你是谁')
+    r = handle_interface_query('你有哪些功能')
     assert 'Émile Novis' in r
-    assert '我能帮你做的事' in r or '能帮你' in r
-    print("✓ test_identity_questions_self_referential")
+    assert '能帮你' in r or '我能帮你做的事' in r
+    print("✓ test_ability_questions_self_referential")
+
+
+def test_identity_questions_left_to_llm():
+    """"你是谁/你叫什么"保留给 LLM 角色设定回复（不走自我指涉确定性模板）。"""
+    from self_referential import is_interface_query
+    for q in ['你是谁', '你叫什么名字', '你的名字是什么', '介绍一下你自己']:
+        assert is_interface_query(q) is False, f"身份类应留给 LLM: {q}"
+    print("✓ test_identity_questions_left_to_llm")
 
 
 def test_identity_not_hijack_normal():
