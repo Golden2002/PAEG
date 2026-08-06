@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import threading
 import time
+import os
+import json
 from datetime import datetime
 from typing import Optional
 
@@ -115,8 +117,32 @@ class PeriodicSelfUpdater:
         except Exception as e:
             self._log(f"[PAEG][periodic] 失败分析失败: {e}")
 
+        # 4. 新学科需求（v0.19.26）→ 生成待新增学科建议（写入 improvements.md 自动注入）
+        try:
+            req_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    'evolve_data', 'subject_requests.json')
+            if os.path.isfile(req_path):
+                with open(req_path, encoding='utf-8') as f:
+                    reqs = json.load(f)
+                top = sorted(reqs, key=lambda x: x.get("count", 0), reverse=True)[:10]
+                if top:
+                    suggestions = [
+                        f"- 新增学科建议：{r['subject']}（累计被问 {r['count']} 次，"
+                        f"最近：{r.get('last_seen', '')[:10]}）"
+                        for r in top
+                    ]
+                    imp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                            'memory', 'improvements.md')
+                    with open(imp_path, 'a', encoding='utf-8') as f:
+                        f.write(f"\n## {datetime.now().strftime('%Y-%m-%d')} · 新学科需求\n")
+                        f.write("\n".join(suggestions) + "\n")
+                    results["subject_requests"] = len(top)
+                    self._log(f"[PAEG][periodic] 待新增学科: {len(top)} 条已写入 improvements.md")
+        except Exception as e:
+            self._log(f"[PAEG][periodic] 新学科需求读取失败: {e}")
+
         results["summary"] = (f"洞察+{results['insights']} 批处理:{bool(results['batch'])} "
-                              f"改进+{results['improvements']}")
+                              f"改进+{results['improvements']} 学科需求+{results.get('subject_requests', 0)}")
         return results
 
 
