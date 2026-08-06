@@ -382,7 +382,7 @@ class AnswerSolver:
 # 7. 情绪与心理支持子代理（v0.19.27 ⭐）
 # ---------------------------------------------------------------------------
 
-class EmotionSupportor:
+class AffectionSupportor:
     """情绪与心理支持（第 7 个子代理）。
 
     与教学（Diagnostor→Planner→Presenter）和找答案（AnswerSolver）的根本区别：
@@ -404,7 +404,7 @@ class EmotionSupportor:
         pass
 
     def run(self, model, text: str, learner=None) -> dict:
-        """情绪支持回应。返回 {"content": str, "mode": "emotion"}"""
+        """情绪支持回应。返回 {"content": str, "mode": "affection"}"""
         # 加载情绪支持原则
         core = self._load_principles()
         grade_cn = ""
@@ -456,7 +456,7 @@ class EmotionSupportor:
         if not reply:
             reply = ("我听见你说的了。我不急着给你答案或建议——"
                      "如果你愿意，可以多说一点，我在这儿听着。")
-        return {"content": reply, "mode": "emotion"}
+        return {"content": reply, "mode": "affection"}
 
     @staticmethod
     def _load_principles() -> str:
