@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.19.9（2026-08-06）
+> **版本**：v0.19.10（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -768,6 +768,7 @@ python eval_harness.py
 | **v0.19.7** | **四大问题修复**：①**答非所问**——新增"学习方法咨询"意图（is_method_advice + _handle_method_advice："如何学习线性代数"走学习指导而非教学/出题）②**讲义修复**——同步 /api/chat 也接入 _handle_keyword_doc + 修复 fgen 变量作用域 bug（讲义文件成功生成：`数学讲义：线性代数的特征值.md` 实测）③**闲聊模式学段**——mode 切换同时隐藏学段下拉框（闲聊不需要学段）+ chat_stream 实测正常回复 ④**架构连通性**——检查全部模块调用链：tool_recovery/tool_cache/skill_registry 经 tool_registry 间接调用 ✓；接入 teaching_memory（system 注入教学记忆）+ self_improve（对话后记录案例）；**公式渲染竞态**——统一 renderMath() 等待 MathJax startup 完成（修复异步加载竞态导致公式不显示）|
 | **v0.19.8** | **提升 Agent 指导大模型能力**：①**架构连通性指标**——新增 arch_check.py 自动检测 16 模块连通率（100%）+ 8 条关键调用链，作为关键技术指标写入 §10.6 ②**教学对话全面提升**——presenter 加"好讲解的质量标准"（7 条：具体>抽象/有为什么/建直觉/像人话/有层次/能带走/有余味）+ "学科黄金法则"（数学物理=直觉→严格桥、语文=回文本、历史=前因后果、哲学=论证+反例、外语=可用法、编程=最小示例）③**"接住"类动词屏蔽**——调研业界 prompt 工程共识（Memex/SullyOS/CipherTalk/AI-Novel-Writing 等 7 项目），AI_MARKERS 扩至 612 词 + AI_TELLS 556 词（接住/托住/抱抱/我懂你/赋能/点亮/你很棒等 150 个伪共情/AI腔词）+ prompts 三条语言铁律（动词要小/副词全去/不用动词包住对方/评价换描述）|
 | **v0.19.9** | **公式渲染彻底修复（KaTeX 替代 MathJax）**：根因=MathJax 3 tex-chtml.js 内置 autoload 按需加载 input/tex/extensions/*.js（如 html.js），本地缺失 → 404 → startup.promise reject → **公式全部不渲染**。方案=切换到 **KaTeX**（完全自包含 18 文件：katex.min.js/css + auto-render + 16 字体 woff2，本地加载无 CDN 依赖；同步渲染无竞态；throwOnError:false 天然降级显示原始 LaTeX）。renderMath() 改为 KaTeX renderMathInElement（支持 $...$/$$...$$/\(...\)/\[...\]）|
+| **v0.19.10** | **Agent 指导 LLM 工作能力全面强化**：①**工具调用修复**——llm_adapter.py 透传 tools/tool_choice 参数（修复 run_agent_loop 报错）；实测 LLM 自主触发 web_search（"2026诺贝尔奖"）与 verify_math（等式验证）②**Agent 工作协议**——chat_stream 注入完整协议（先理解→需时调工具→自我检查 loop→输出高质量），杜绝编造 ③**讲义级结构**——学习《数理统计讲义》(bookdown) 的教科书范式（为什么→定义/定理→生活案例→证明思路→反例边界→思考题）融入 presenter ④**在线资源入库**——数理统计讲义 URL 加入 Library/Math/（library_loader 已扫描识别）|
 
 ---
 
