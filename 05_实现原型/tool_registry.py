@@ -81,6 +81,25 @@ def get_tool_defs() -> List[dict]:
             {},
             [],
         ),
+        # v0.19.25：MCP-only 工具同步到 Function Calling 端（内部 LLM 也能用）
+        _make_tool(
+            "solve_problem",
+            "做题：生成可作为标准答案的完整解答（论述/计算/证明题）。"
+            "当学生明确要一道题的完整答案、解题过程或标准解时使用。",
+            {"problem": {"type": "string", "description": "题目内容"},
+             "subject": {"type": "string", "description": "学科（math/physics 等）"},
+             "grade_level": {"type": "string", "description": "学段（high_school 等）"}},
+            ["problem"],
+        ),
+        _make_tool(
+            "save_document",
+            "把当前回答保存为可下载的文档（markdown + HTML）。"
+            "当学生想要'讲义/要点/笔记/文章'文件下载时使用。",
+            {"title": {"type": "string", "description": "文档标题"},
+             "content": {"type": "string", "description": "文档内容"},
+             "subject": {"type": "string", "description": "学科（可选）"}},
+            ["title", "content"],
+        ),
     ]
 
 
@@ -163,25 +182,80 @@ def _wrap(name, fn, retries=2):
     return fn
 
 
+def _exec_solve_problem(problem: str, subject: str = "math",
+                        grade_level: str = "high_school") -> str:
+    """做题：生成标准答案。"""
+    try:
+        from problem_solver import solve_problem
+        from llm_adapter import create_llm
+        llm = create_llm("auto")
+        r = solve_problem(llm, problem, subject=subject, grade_level=grade_level)
+        ans = (r.get("answer") or "") + (f"\n[验证: {r.get('verification_note')}]"
+                                         if r.get("verification_note") else "")
+        return ans or "（未能生成答案）"
+    except Exception as e:
+        return f"做题失败: {str(e)[:100]}"
+
+
+def _exec_save_document(title: str, content: str, subject: str = "通用") -> str:
+    """保存为文档。"""
+    try:
+        from file_generator import FileGenerator
+        from llm_adapter import create_llm
+        llm = create_llm("auto")
+        fg = FileGenerator(llm)
+        md, html = fg.save_answer(content, title, subject)
+        return f"已保存：{md}\nHTML: {html}"
+    except Exception as e:
+        return f"文档保存失败: {str(e)[:100]}"
+
+
 _HANDLERS: Dict[str, Callable[..., str]] = {
     "web_search": _wrap("web_search", _exec_web_search, retries=2),
     "verify_math": _wrap("verify_math", _exec_verify_math, retries=1),
     "fetch_page": _wrap("fetch_page", _exec_fetch_page, retries=2),
     "daily_quote": _wrap("daily_quote", _exec_daily_quote, retries=1),
     "get_time": _wrap("get_time", _exec_get_time, retries=1),
+    # v0.19.25：MCP-only 工具同步到 FC 端
+    "solve_problem": _exec_solve_problem,
+    "save_document": _exec_save_document,
 }
 
 
 def execute_tool(name: str, arguments: Dict[str, Any]) -> str:
-    """执行工具（v0.19.2 改进：重试 + 明确错误建议）。
+    """执行工具（v0.19.3 改进：缓存 + 重试 + 明确错误建议）。
 
-    失败时返回包含"修复建议"的错误信息，让 LLM 能自我纠正后重试。
+    v0.19.3：确定性工具（daily_quote/get_time/verify_math）走结果缓存，
+    命中直接返回（0 延迟 + 省 token）。失败时返回含"修复建议"的错误信息。
     """
     handler = _HANDLERS.get(name)
     if not handler:
+        # v0.19.25：fallback 到外部 MCP 工具（mcp__server__tool 形式）
+        if name.startswith("mcp__"):
+            try:
+                from mcp_client import get_mcp_client
+                return get_mcp_client().call_tool(name, arguments or {})
+            except Exception as e:
+                return f"MCP 工具 {name} 调用失败: {str(e)[:120]}"
         return f"未知工具: {name}（可用工具：{', '.join(_HANDLERS.keys())}）"
     if not isinstance(arguments, dict):
         arguments = {}
+
+    # v0.19.3：工具结果缓存（确定性工具高价值缓存目标）
+    try:
+        from tool_cache import cached_call
+        if name in ("daily_quote", "get_time", "verify_math"):
+            # 注意：verify_math 失败会自动重试（_retry），缓存只存成功结果
+            result, _from_cache = cached_call(name, arguments, handler)
+            if name == "verify_math" and ("失败" in str(result) or "错误" in str(result)):
+                expr = arguments.get("expr", "")
+                retried = _retry_verify_math(expr)
+                if retried:
+                    return retried
+            return str(result)
+    except Exception:
+        pass  # 缓存失败不影响正常执行
+
     try:
         result = str(handler(**arguments))
         # verify_math 失败时自动重试（简化/修正表达式）
@@ -247,12 +321,23 @@ def _describe_params(name: str) -> str:
 
 # v0.19：P1-4 Skills 技能加载工具（合并进工具列表）
 def get_all_tool_defs() -> List[dict]:
-    """工具定义 + 技能加载定义。"""
+    """工具定义 + 技能加载定义 + 外部 MCP 工具（v0.19.25）。
+
+    MCP 工具通过 mcp_client.MCPClientManager 合并进来，
+    LLM 可用 mcp__server__tool 形式的工具名调用外部标准工具。
+    """
     defs = get_tool_defs()
     try:
         from skill_registry import SkillRegistry
         reg = SkillRegistry()
         defs += reg.tool_defs()
+    except Exception:
+        pass
+    # v0.19.25：合并外部 MCP 工具（filesystem/memory 等标准 server）
+    try:
+        from mcp_client import get_mcp_client
+        _mcp = get_mcp_client()
+        defs += _mcp.list_tool_defs()
     except Exception:
         pass
     return defs
