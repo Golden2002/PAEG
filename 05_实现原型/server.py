@@ -65,6 +65,15 @@ except Exception as _e:
 
 paeg = PAEG(llm, kb, enable_self_update=True, verbose=False)
 
+# v0.19.22：自进化模块（知识提炼/提示词进化/工具经验，全部经 QualityGate 过滤）
+try:
+    from self_evolution import SelfEvolution
+    EVOLVER = SelfEvolution(llm=llm, verbose=True)
+    print("[PAEG Server] 自进化模块就绪（知识库/提示词/工具经验，质量门禁过滤）")
+except Exception as _e:
+    EVOLVER = None
+    print(f"[PAEG Server] 自进化模块初始化失败（不影响主服务）: {_e}")
+
 # v0.12：文件生成器（练习题/文章/讲义下载）
 try:
     from file_generator import FileGenerator
@@ -184,6 +193,14 @@ def teach():
     concept = data["concept"]
     subject = data["subject"]
 
+    # v0.19.21：知识库查询拦截必须先于 meta——"知识库/你学过什么"应清点 Library 而非讲身份
+    try:
+        from meta_router import is_knowledge_query
+        if is_knowledge_query(concept):
+            return jsonify(_handle_knowledge_query(learner, subject))
+    except Exception:
+        pass
+
     # v0.17.1：元问题/寒暄拦截——用户问"你是谁/能做什么/能调用知识库吗"或打招呼，
     # 走闲聊模式回答，避免被当成学科概念去教学（幻觉/答非所问）。
     try:
@@ -226,14 +243,6 @@ def teach():
     except Exception:
         pass
 
-    # v0.19.15：知识库查询拦截——"你学过什么/你的知识库" → 汇报已收录 + 提示上传
-    try:
-        from meta_router import is_knowledge_query
-        if is_knowledge_query(concept):
-            return _handle_knowledge_query(learner, subject)
-    except Exception:
-        pass
-
     # v0.19：出题意图拦截——"给我一道经典题目" → 结合学段/学科/画像生成题目
     try:
         from meta_router import is_problem_request
@@ -241,6 +250,41 @@ def teach():
             return _handle_problem_request(learner, concept, subject)
     except Exception:
         pass
+
+    # v0.19.21：意向性层 ⭐——规则都没拦住的输入，用 LLM 判断是否为教学意图。
+    # 若用户其实在寒暄/闲聊/倾诉/问老师近况（如"你今天怎么样"），
+    # 就一般化响应，不让教学 harness 的指令覆盖用户提问的出发点与目的。
+    try:
+        from meta_router import is_teaching_intent
+        if not is_teaching_intent(concept, llm):
+            from prompts import build_general_chat_system, build_general_chat_user
+            from subagents import _safe_chat
+            g_sys = build_general_chat_system(learner)
+            g_usr = build_general_chat_user(concept)
+            g_reply = _safe_chat(llm, g_sys, g_usr, max_tokens=700)
+            if not g_reply:
+                g_reply = f"嗯，我听着。你想聊{subject}之外的什么，我都在。"
+            return jsonify({
+                "session_id": f"intent_{learner_id}",
+                "summary": {"avg_score": 0},
+                "worldview_used": "weil",
+                "tone_ratio": 0,
+                "presentations": [
+                    {"step_id": 1, "content": g_reply, "step_type": "chat"}
+                ],
+                "evaluations": [],
+                "diagnosis": {},
+                "plan": {"steps": []},
+                "reflections": [],
+                "learner": {
+                    "id": learner.id,
+                    "nickname": learner.nickname,
+                    "grade_level": learner.grade_level,
+                    "subjects_mastery": learner.subjects_mastery,
+                },
+            })
+    except Exception:
+        pass  # 意向性层失败不影响正常教学（默认按教学处理）
 
     try:
         result = paeg.teach(learner, concept, subject)
@@ -292,6 +336,12 @@ def teach():
                     SESSIONS[f"conv_{learner_id}"] = cid
             except Exception as _e:
                 print(f"[Server] 画像持久化失败: {_e}")
+        # v0.19.22：自进化——成功教学后提炼知识点（经质量门禁）
+        if EVOLVER is not None:
+            try:
+                EVOLVER.distill_knowledge(result.get("session"))
+            except Exception as _e:
+                print(f"[Server] 知识蒸馏失败: {_e}")
         return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -871,9 +921,13 @@ def general_chat_stream():
         # v0.19.16：知识库查询——闲聊模式下问"你学过什么/知识库"也走知识库总结
         try:
             from meta_router import is_knowledge_query
-            if is_knowledge_query(text):
+            _kb_hit = is_knowledge_query(text)
+            import traceback as _tb
+            print(f"[PAEG][kb] text={text!r} hit={_kb_hit}")
+            if _kb_hit:
                 _kb = _handle_knowledge_query(learner, data.get("subject", "general"))
-                _kb_content = _kb.get_json().get("presentations", [{}])[0].get("content", "")
+                _kb_content = _kb.get("presentations", [{}])[0].get("content", "")
+                print(f"[PAEG][kb] content len={len(_kb_content)}")
                 # 分段推送
                 _chunks = [_kb_content[i:i+60] for i in range(0, len(_kb_content), 60)] or [_kb_content]
                 for _c in _chunks:
@@ -881,8 +935,9 @@ def general_chat_stream():
                     _time.sleep(0.02)
                 yield f"event: done\ndata: {json.dumps({'ok': True}, ensure_ascii=False)}\n\n"
                 return
-        except Exception:
-            pass
+        except Exception as _kb_e:
+            print(f"[PAEG][kb] 知识库分支异常: {type(_kb_e).__name__}: {_kb_e}")
+            _tb.print_exc()
 
         # 1) Function Calling agent loop
         reply = None
@@ -973,6 +1028,24 @@ def general_chat_stream():
                                            "learner_id": str(learner_id)[:12]})
         except Exception:
             pass
+        # v0.19.21：标记调度器活跃（周期自我更新的前提）
+        try:
+            PERIODIC_UPDATER.mark_activity()
+        except Exception:
+            pass
+        # v0.19.22：自进化——工具调用经验学习（从 tool_log 提炼）
+        if EVOLVER is not None:
+            try:
+                for tc in (tool_log or [])[:5]:
+                    if isinstance(tc, dict) and tc.get("name"):
+                        EVOLVER.learn_tool_lesson(
+                            tool_name=tc.get("name", ""),
+                            question=text,
+                            success=bool(tc.get("result")) and "错误" not in str(tc.get("result", ""))[:60],
+                            note=str(tc.get("result", ""))[:100],
+                        )
+            except Exception as _e:
+                print(f"[Server] 工具经验学习失败: {_e}")
         if CONV_STORE is not None and USER_STORE is not None \
                 and str(learner_id).startswith('u') and learner_id[1:].isdigit():
             try:
@@ -1326,6 +1399,8 @@ def _handle_knowledge_query(learner, subject):
 
     用户问"你学过什么/你的知识库/你懂哪些"时，扫描 Library 文件夹，
     按领域列出已收录内容，并提示用户可以上传资料让 Agent 更精通。
+    返回**纯 dict**（不 jsonify），调用方自行决定序列化方式——
+    生成器（SSE 流）里没有 Flask app context，不能调 jsonify。
     """
     import os as _os
     proj_root = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..')
@@ -1346,46 +1421,64 @@ def _handle_knowledge_query(learner, subject):
     learner_id = getattr(learner, 'id', '')
     user_lib = get_user_library(learner_id) if learner_id else ""
 
-    # 构造"已收录内容清单"（文件列表 + 可读内容摘要）
+    # 构造"已收录内容清单"（读取所有文件的真实内容，让 LLM 真正基于内容总结）
     inventory = []
     if areas:
-        inventory.append("【Library 资料库收录】")
+        inventory.append("【Library 资料库收录（以下是每个文件的真实内容摘要，务必基于这些总结）】")
         for name, files in areas:
-            inventory.append(f"- {name}：{len(files)} 份（{'、'.join(files[:6])}" + ("…" if len(files) > 6 else "") + "）")
-            # 尝试读 1-2 个 md/txt 文件的内容摘要，让 LLM 能"真懂"内容
-            for f in files[:2]:
-                if f.endswith(('.md', '.txt')):
+            inventory.append(f"## 领域：{name}（{len(files)} 份）")
+            for f in files:
+                fpath = os.path.join(lib_root, name, f)
+                content_snippet = ""
+                if f.endswith(('.md', '.txt', '.json')):
                     try:
-                        with open(os.path.join(lib_root, name, f), encoding='utf-8') as _f:
-                            snippet = _f.read(300).strip()
-                        if snippet:
-                            inventory.append(f"  资料《{f}》要点：{snippet[:200]}")
+                        with open(fpath, encoding='utf-8', errors='replace') as _f:
+                            content_snippet = _f.read(800).strip()
                     except Exception:
-                        pass
+                        content_snippet = ""
+                elif f.endswith('.pdf'):
+                    # 尝试提取 PDF 文本（用 pypdf 若可用）
+                    try:
+                        from pypdf import PdfReader
+                        reader = PdfReader(fpath)
+                        content_snippet = ""
+                        for page in reader.pages[:3]:
+                            content_snippet += (page.extract_text() or "") + " "
+                        content_snippet = content_snippet.strip()[:800]
+                    except Exception:
+                        content_snippet = "（PDF，未能提取文本，仅知道文件名）"
+                if content_snippet:
+                    inventory.append(f"### 文件：{f}\n{content_snippet}")
+                else:
+                    inventory.append(f"### 文件：{f}\n（内容不可读，仅文件名）")
     if user_lib:
         inventory.append("【用户上传的专属资料】")
         inventory.append(user_lib)
 
     inventory_text = "\n".join(inventory) if inventory else "（Library 目前没有收录资料）"
 
-    # v0.19.16：用 LLM 根据知识库内容自然总结回答（不是干巴巴列文件）
+    # v0.19.19：用 LLM 严格基于知识库实际内容总结（不得凭训练知识自由发挥）
     from subagents import _safe_chat
     system = (
-        "你是 Émile Novis。学生问你'你的知识库/你学过什么'，请根据下面的知识库清单，"
-        "用**自然、老师式的语言**总结你掌握了哪些领域的知识，让 ta 感受到你真的了解这些内容。\n\n"
-        "要求：\n"
-        "1. 按领域介绍（如'我手头有一些数学和统计的讲义'），不是生硬列文件名\n"
-        "2. 提到某份资料时，说它大概讲什么（从要点里提炼），证明你'读过'它\n"
-        "3. 如果有用户上传的资料，特别提到'我还保存着你上传的XXX'\n"
-        "4. 结尾自然引导：你可以问我这些领域的任何问题；如果你想让我更精通某领域，把资料上传给我（点书本图标）\n"
-        "5. 语言像一位认真备课的老师，主谓宾完整，不要用'一句话总结'这类碎句\n"
-        "6. 如果清单是空的，就说'目前我的资料库还比较空，你可以先问我任何问题，或者上传资料让我更擅长'"
+        "你是 Émile Novis。学生问你'你的知识库/你学过什么'。\n\n"
+        "**最重要：你只能基于下面【Library 资料库收录】里的实际文件内容来回答**——"
+        "这些是你真正'拥有'的资料。逐份介绍它们具体讲了什么（从内容摘要里提炼）。\n\n"
+        "规则：\n"
+        "1. 严格基于给出的文件内容总结，不要说你知识库里没有的东西\n"
+        "2. 每份资料提到时，说它实际讲什么（如'《数理统计讲义》从概率基础讲到假设检验、回归分析'）\n"
+        "3. 按领域分组介绍，像一位老师清点自己的藏书\n"
+        "4. 如果有用户上传的资料，特别提到'我还保存着你上传的XXX'\n"
+        "5. 结尾自然引导：**明确告诉学生以后只要说'知识库'或'你学过什么'，我就会为你打开这份资料清单**；"
+        "同时邀请 ta 问我这些领域的任何问题；想让更精通某领域就上传资料（点书本图标）\n"
+        "6. 语言像认真备课的老师，主谓宾完整\n"
+        "7. 如果某文件内容不可读，如实说'这份是 PDF，我存着但还没细读内容'\n"
+        "8. 如果清单是空的，就说'目前我的资料库还比较空，你可以先问我任何问题，或者上传资料让我更擅长'"
     )
-    user = f"学生的知识库清单：\n{inventory_text}\n\n请用老师式的语言总结你掌握的知识。"
-    llm_answer = _safe_chat(llm, system, user, max_tokens=700)
+    user = f"【Library 资料库实际内容】\n{inventory_text}\n\n请逐份基于这些内容，用老师式的语言总结你掌握的知识。"
+    llm_answer = _safe_chat(llm, system, user, max_tokens=900)
     answer = llm_answer or ("我目前的知识库里收录了这些领域的资料，你可以问我相关问题，也可以上传资料让我更擅长。")
 
-    return jsonify({
+    return {
         "session_id": f"kb_{learner.id}",
         "summary": {"avg_score": 0},
         "worldview_used": "weil",
@@ -1403,7 +1496,7 @@ def _handle_knowledge_query(learner, subject):
             "grade_level": learner.grade_level,
             "subjects_mastery": learner.subjects_mastery,
         },
-    })
+    }
 
 
 def _handle_method_advice(learner, concept, subject):
@@ -1666,6 +1759,36 @@ def cleanup_conversations():
 
 
 # ─────────────────────────────────────
+# v0.19.21：周期自我更新调度器
+# ─────────────────────────────────────
+from periodic_self_update import PeriodicSelfUpdater
+
+PERIODIC_UPDATER = PeriodicSelfUpdater(llm=llm, paeg=paeg, verbose=True)
+
+
+@app.route("/api/self-update/run", methods=["POST"])
+def run_self_update():
+    """手动触发一次周度自我更新（洞察提取 + 批处理 + 失败分析）。"""
+    try:
+        result = PERIODIC_UPDATER.run_now()
+        return jsonify({"ok": True, "result": result})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/self-update/status", methods=["GET"])
+def self_update_status():
+    """查看调度器状态。"""
+    return jsonify({
+        "ok": True,
+        "thread_alive": PERIODIC_UPDATER._thread is not None and PERIODIC_UPDATER._thread.is_alive(),
+        "interval_hours": PERIODIC_UPDATER.interval / 3600,
+        "last_weekly": PERIODIC_UPDATER.last_weekly,
+        "last_activity": PERIODIC_UPDATER.last_activity,
+    })
+
+
+# ─────────────────────────────────────
 # 入口
 # ─────────────────────────────────────
 
@@ -1681,4 +1804,9 @@ if __name__ == "__main__":
         start_mcp_server(port=int(os.environ.get("MCP_PORT", 8765)))
     except Exception as _e:
         print(f"[PAEG Server] MCP 网关启动失败（不影响主服务）: {_e}")
+    # v0.19.21：周期自我更新调度器（后台守护线程）
+    try:
+        PERIODIC_UPDATER.start()
+    except Exception as _e:
+        print(f"[PAEG Server] 周期自我更新调度器启动失败（不影响主服务）: {_e}")
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
