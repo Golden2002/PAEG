@@ -5,6 +5,34 @@
 
 ---
 
+## v0.19.26（2026-08-06）
+
+**Agent Steering（学科自动识别切换）+ 未收录学科反馈闭环 + 博雅教育定位文档化**
+
+### 1. Agent Steering：学科自动识别（核心）
+- **问题**：用户设定"考研政治"，问经济学问题，agent 仍用政治 persona 回答（steering 缺陷）
+- **subject_detector.py（新）**：LLM 从 26 学科识别问题学科 + 规则关键词兜底 + 10 分钟缓存 + 失败安全（保持用户设定）
+- **server.py _steer_subject**：在 `subject = data["subject"]` 后、meta 拦截前——识别学科 ≠ 用户设定 → 覆盖 subject（下游全链路生效）；切换打日志 `[PAEG][steering]`
+- **实测**：
+  - 考研政治设定问"商品价值由什么决定" → 切换经济学（沙漠金子直觉引入）✓
+  - 高中政治设定问"什么是供需曲线" → 切换经济学（早餐店供需讲解）✓
+  - 未收录学科"量子力学" → unregistered_subject 反馈 + 记录需求 ✓
+
+### 2. 未收录学科 → 自我更新闭环
+- `record_subject_request`（self_evolution.py）：写入 evolve_data/subject_requests.json（去重+计数+concepts）
+- 向用户反馈："我已经把这条需求记下来，后续会优先优化升级"
+- `periodic_self_update._do_weekly` 第 4 步：读 subject_requests → 按 count 生成新增学科建议 → improvements.md → teaching_memory 自动注入 system
+- **修复**：periodic_self_update.py 缺 os/json import（第 4 步 NameError）
+- **实测**：量子力学需求 → subject_requests.json → 周度任务 → improvements.md "新增学科建议：量子力学" ✓
+
+### 3. 技术文档
+- §1.7 Agent Steering（问题/方案/闭环）
+- §1.8 学科/学段定制化技术实现路径（SUBJECT_STYLES/_GRADE_GUIDE/别名/调用链/分层效果）
+- §1.9 市场垂直优势：专门的博雅教育（定位/与通用教育AI差异/一句话定位）
+- 测试 59/59 通过
+
+---
+
 ## v0.19.25（2026-08-06）
 
 **经济学学科 + 学习方法/知识库独立对话类型 + MCP 双向打通 ⭐**
