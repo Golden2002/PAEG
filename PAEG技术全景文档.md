@@ -1725,6 +1725,40 @@ python qa_method_kb.py        # 学习方法+知识库端点
 | 模式按钮切换 bug | 切模式后 placeholder 不变 | 查 `currentMode = btn.dataset.mode` |
 | 情绪/界面拦截不触发 | 输入情绪话术走了教学 | 查 meta_router 模式是否命中（`qa_emotion_detect.py`）|
 
+### 10.2.2.1 公网冒烟测试（v0.21.5 ⭐ 每次发布前必做）
+
+> **目的**：API/Playwright 本地测试验证"代码对"，但**公网冒烟验证"线上真的可用"**——隧道是否在服务最新代码、页面是否正常加载、关键功能是否上线。
+> 这是发布流程的**最后一环**（本地 5 层全过 ≠ 公网可用）。
+
+**触发时机**：每次版本发布（关键节点标记）后、每次重启 server/隧道后。
+
+**流程**（Playwright 打开公网 URL）：
+
+```
+1. browser_navigate → https://<公网URL>（带 ?hist=1 测历史会话功能）
+2. 等待 domcontentloaded + 1-2 秒（React/JS 渲染完成）
+3. browser_evaluate 检查关键标志：
+   - document.title === 'PAEG · 教育者智能体'（页面真的加载）
+   - typeof restoreLoginState === 'function'（最新 JS 已上线）
+   - innerHTML.includes('library_root')（上传功能代码在）
+   - #conv-list 存在（历史会话容器）
+4. browser_console_messages → 无致命 JS 错误
+```
+
+**关键检查点（v0.21.5 实测表）**：
+
+| 检查 | 方法 | 判定 |
+|---|---|---|
+| 页面加载 | `document.title` | `PAEG · 教育者智能体` |
+| 最新代码上线 | `typeof restoreLoginState === 'function'` | true（旧缓存会缺失）|
+| 功能代码在位 | `innerHTML.includes('library_root')` | true（usr_knowledge 上传）|
+| 会话容器 | `getElementById('conv-list')` | 非空（历史会话功能）|
+| JS 错误 | console messages | 无致命 error |
+
+**判定标准**：以上全部通过 = 公网冒烟通过；任一失败 → 检查（a）隧道是否重启换了 URL（b）浏览器缓存（Ctrl+F5）（c）server 是否在跑。
+
+**经验**：公网冒烟发现的常见问题——**浏览器缓存旧 JS**（功能"没生效"其实是缓存）、**隧道 URL 重启后变化**（bookmark 旧地址打不开）。发布流程必须包含"公网冒烟 + 记录当前有效 URL"。
+
 ### 10.2.3 测试金字塔总览（v0.19.27）
 
 ```
@@ -1831,6 +1865,30 @@ python multi_turn_eval.py --mode all   # 5 维度多轮实验
 2. 相关 qa_*.py / api_sweep / arch_check 输出通过
 3. 浏览器可视证据（Playwright 截图/实测记录）或 API 实际响应
 4. CHANGELOG 一条记录 + GitHub 一次推送（可追溯）
+
+**回归确认（★ 任何代码修复/改动后必做的环节，不可省略）**：
+
+> **定义**：修复 bug 或改动代码后，**必须跑全量回归测试，确认没有破坏原有功能**——不能只看"新功能通了"就宣布完成。
+
+```
+1. 修复/改动代码（如修 _safe_chat 泄漏过滤）
+2. 跑修复针对的专项测试（如 chaos 用例）→ 确认修复生效
+3. ★ 全量回归（不破坏原有功能的证明）：
+   - pytest 全量（如 37 → 44，44/44 全过）——原有 37 个用例一个不能少、不能挂
+   - arch_check 连通率（16/16 = 100%）——新增/改动模块后架构仍全连通
+   - api_sweep 全端点——HTTP 层无新失败
+4. 端到端实测：修复路径的真实调用（如 affection 走真实 LLM 确认无泄漏、teach 正常 200）
+5. 记录：CHANGELOG 写"修复 X → 回归确认通过（pytest N/N + arch_check 100%）"
+```
+
+**判定标准**：修复专项测试通过 **且** pytest 全量（含既有用例）全过 **且** arch_check 100% **且** 端到端实测正常——四者齐备，才算"修复完成且不破坏原有功能"。
+
+**实测案例（v0.21.5）**：修复 `_safe_chat` 泄漏过滤后——
+- chaos 专项 7/7 ✓（修复生效）
+- pytest 全量 44/44 ✓（原有 37 个未破坏 + 新 7 个）
+- arch_check 16/16 ✓
+- 真实 LLM affection 调用无泄漏 + teach 200 ✓
+- → 判定：修复完成，原有功能无损
 
 **版本标记**：每个迭代在 CHANGELOG 顶部记录版本号 + 改动清单；关键节点（架构里程碑）额外打 GitHub Release tag + 本地快照（见 §10.9）。
 
