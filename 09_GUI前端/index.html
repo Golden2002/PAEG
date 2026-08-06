@@ -37,6 +37,31 @@ window.MathJax = {
   };
   document.head.appendChild(el);
 })();
+// v0.19.7：统一 MathJax 渲染——等待 startup 完成，修复"公式不显示"（MathJax 异步加载竞态）
+let _mathjaxReady = null;
+function mathjaxReady() {
+  if (_mathjaxReady) return _mathjaxReady;
+  _mathjaxReady = new Promise(function (resolve) {
+    var check = function () {
+      if (window.MathJax && MathJax.startup && MathJax.startup.promise) {
+        MathJax.startup.promise.then(function () { resolve(true); }).catch(function () { resolve(false); });
+      } else if (window.MathJax && MathJax.typesetPromise) {
+        resolve(true);
+      } else {
+        setTimeout(check, 200);
+      }
+    };
+    setTimeout(check, 100);
+  });
+  return _mathjaxReady;
+}
+function renderMath(el) {
+  return mathjaxReady().then(function (ok) {
+    if (ok && window.MathJax && MathJax.typesetPromise && el) {
+      try { return MathJax.typesetPromise([el]); } catch (e) {}
+    }
+  });
+}
 </script>
 <script>
 // v0.19.5：marked 公式保护扩展——$...$ / $$...$$ / \(...\) / \[...\] 原样保留给 MathJax。
@@ -1028,9 +1053,7 @@ function addMsg(role, html, tone, intent, preHtml) {
   div._rawText = fixed || html;
   chatWin.appendChild(div);
   // v0.16：渲染后触发 MathJax 处理公式
-  if (role === 'paeg' && window.MathJax && window.MathJax.typesetPromise) {
-    try { window.MathJax.typesetPromise([div]); } catch (e) {}
-  }
+  renderMath(div);
   chatWin.scrollTop = chatWin.scrollHeight;
   return div;
 }
@@ -1372,9 +1395,7 @@ async function teach(question, subject) {
       contentDiv.innerHTML = typeof marked !== 'undefined'
         ? marked.parse(fixedText) : escapeHtml(allText);
       mainBubble._rawText = allText;
-      if (window.MathJax && window.MathJax.typesetPromise) {
-        try { window.MathJax.typesetPromise([contentDiv]); } catch (e) {}
-      }
+      renderMath(contentDiv);
     }
     if (lastSummary) {
       addMsg('paeg', `本次教学完成，平均掌握度 <b style="color:var(--accent)">${Number(lastSummary).toFixed(2)}</b>`);
@@ -1427,9 +1448,7 @@ function renderStepBubble(bubble, text, idx) {
   }</div>`;
   // 保存原始文本（复制用）
   bubble._rawText = text;
-  if (window.MathJax && window.MathJax.typesetPromise) {
-    try { window.MathJax.typesetPromise([contentDiv]); } catch (e) {}
-  }
+  renderMath(contentDiv);
   chatWin.scrollTop = chatWin.scrollHeight;
 }
 
@@ -1523,9 +1542,7 @@ async function generalChat(text) {
         '<div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button></div>';
       // 保存原始文本（复制/文档用）
       bubble._rawText = textParts;
-      if (window.MathJax && window.MathJax.typesetPromise) {
-        try { window.MathJax.typesetPromise([bubbleBody]); } catch (e) {}
-      }
+      renderMath(bubbleBody);
       chatWin.scrollTop = chatWin.scrollHeight;
     }
   } catch (e) {
@@ -1817,9 +1834,10 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentMode = btn.dataset.mode;
-    // 学科教学模式显示学科+学段选择；一般对话模式隐藏学科选择（保留学段）
+    // v0.19.7：教学模式显示学科+学段选择；闲聊模式全部隐藏（闲聊不需要学段）
     const isTeach = currentMode === 'teach';
     document.getElementById('subject-select').style.display = isTeach ? '' : 'none';
+    document.getElementById('grade-select').style.display = isTeach ? '' : 'none';
     document.querySelector('.subject-chips').style.display = isTeach ? '' : 'none';
     questionInput.placeholder = isTeach
       ? '输入你想学习的内容…'
