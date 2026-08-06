@@ -306,6 +306,30 @@ def teach():
     except Exception:
         pass
 
+    # v0.19.27：界面自指涉拦截——"界面/按钮/怎么用"类问题返回结构化说明
+    try:
+        from self_referential import is_interface_query, handle_interface_query
+        if is_interface_query(concept):
+            _ui_reply = handle_interface_query(concept, learner)
+            return jsonify({
+                "session_id": f"ui_{learner_id}",
+                "summary": {"avg_score": 0},
+                "worldview_used": "weil",
+                "tone_ratio": 0,
+                "presentations": [
+                    {"step_id": 1, "content": _ui_reply, "step_type": "interface"}
+                ],
+                "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
+                "reflections": [],
+                "learner": {
+                    "id": learner.id, "nickname": learner.nickname,
+                    "grade_level": learner.grade_level,
+                    "subjects_mastery": learner.subjects_mastery,
+                },
+            })
+    except Exception:
+        pass
+
     # v0.19.21：知识库查询拦截必须先于 meta——"知识库/你学过什么"应清点 Library 而非讲身份
     try:
         from meta_router import is_knowledge_query
@@ -361,6 +385,33 @@ def teach():
         from meta_router import is_problem_request
         if is_problem_request(concept):
             return _handle_problem_request(learner, concept, subject)
+    except Exception:
+        pass
+
+    # v0.19.27：情绪与心理支持拦截——情绪/心理/人生困惑走 EmotionSupportor
+    try:
+        from meta_router import is_emotion_expression
+        if is_emotion_expression(concept):
+            from subagents import EmotionSupportor
+            _emo = EmotionSupportor()
+            _emo_result = _emo.run(llm, concept, learner)
+            return jsonify({
+                "session_id": f"emotion_{learner_id}",
+                "summary": {"avg_score": 0},
+                "worldview_used": "weil",
+                "tone_ratio": 0,
+                "presentations": [
+                    {"step_id": 1, "content": _emo_result.get("content", ""),
+                     "step_type": "emotion"}
+                ],
+                "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
+                "reflections": [],
+                "learner": {
+                    "id": learner.id, "nickname": learner.nickname,
+                    "grade_level": learner.grade_level,
+                    "subjects_mastery": learner.subjects_mastery,
+                },
+            })
     except Exception:
         pass
 
@@ -505,6 +556,21 @@ def teach_stream():
     except Exception:
         pass
 
+    # v0.19.27：界面自指涉拦截（流式版本）
+    try:
+        from self_referential import is_interface_query, handle_interface_query
+        if is_interface_query(concept):
+            _ui_reply = handle_interface_query(concept, learner)
+
+            def gen_ui():
+                for i in range(0, len(_ui_reply), 60):
+                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _ui_reply[i:i+60], 'step_type': 'interface'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            return Response(gen_ui(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception:
+        pass
+
     # v0.19.22：知识库查询拦截必须先于 meta（流式版本）——"知识库/你学过什么"应清点 Library
     try:
         from meta_router import is_knowledge_query
@@ -566,6 +632,24 @@ def teach_stream():
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _pr_content, 'step_type': 'problem'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_pr(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception:
+        pass
+
+    # v0.19.27：情绪与心理支持拦截（流式版本）
+    try:
+        from meta_router import is_emotion_expression
+        if is_emotion_expression(concept):
+            from subagents import EmotionSupportor
+            _emo = EmotionSupportor()
+            _emo_result = _emo.run(llm, concept, learner)
+            _emo_content = _emo_result.get("content", "")
+
+            def gen_emo():
+                for i in range(0, len(_emo_content), 60):
+                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _emo_content[i:i+60], 'step_type': 'emotion'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'emotion'}, ensure_ascii=False)}\n\n"
+            return Response(gen_emo(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
         pass
@@ -1115,6 +1199,22 @@ def general_chat_stream():
     def generate():
         import time as _time
         from subagents import _safe_chat
+
+        # v0.19.27：情绪与心理支持——闲聊模式下表达情绪/心理/人生困惑走 EmotionSupportor
+        try:
+            from meta_router import is_emotion_expression
+            if is_emotion_expression(text):
+                from subagents import EmotionSupportor
+                _emo = EmotionSupportor()
+                _emo_result = _emo.run(llm, text, learner)
+                _emo_content = _emo_result.get("content", "")
+                for _c in [_emo_content[i:i+60] for i in range(0, len(_emo_content), 60)] or [_emo_content]:
+                    yield f"event: seg\ndata: {json.dumps({'text': _c}, ensure_ascii=False)}\n\n"
+                    _time.sleep(0.02)
+                yield f"event: done\ndata: {json.dumps({'ok': True, 'mode': 'emotion'}, ensure_ascii=False)}\n\n"
+                return
+        except Exception:
+            pass
 
         # v0.19.16：知识库查询——闲聊模式下问"你学过什么/知识库"也走知识库总结
         try:
