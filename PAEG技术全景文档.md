@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.17.2（2026-08-06）
+> **版本**：v0.18（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -454,6 +454,14 @@ Flask 写的本地 Web 服务，**同时提供网页和 API**。默认监听 `0.
 | `/api/login` | POST | **登录**（v0.14）| `{identifier, password}` |
 | `/api/knowledge/search` | GET | 搜索知识库 | `?q=熵&subject=physics` |
 | `/api/batch` | POST | 批处理（每周）| — |
+| `/api/quote` | GET | **每日一句**（v0.17，薇依等六位思想家轮换）| — |
+| `/api/solve` | POST | **做题模块**（v0.18）：标准答案 | `{problem, subject, grade_level, learner_id}` |
+| `/api/save-document` | POST | **保存文档**（v0.18）：回答→MD+HTML | `{title, content, subject}` |
+| `/api/conversations/<uid>` | GET | **列出会话**（v0.18）| — |
+| `/api/conversations/<uid>` | DELETE | **清空全部会话**（v0.18）| — |
+| `/api/conversations/<uid>/<cid>` | GET | **读取某会话**（v0.18）| — |
+| `/api/conversations/<uid>/<cid>` | DELETE | **删除某会话**（v0.18）| — |
+| `/api/conversations/cleanup` | POST | **定期清理**（v0.18，手动触发）| — |
 
 ## 4.3 关键：/api/teach 请求格式
 
@@ -726,6 +734,7 @@ python test_demo_real_llm.py --provider auto
 | **v0.17** | **每日一句库**（quotes.py：薇依/约纳斯/胡塞尔/维特根斯坦/斯宾诺莎/怀特海 47 句按日轮换 + /api/quote + 页面卡片）+ **"随便说说"→"闲聊~"** + **身份三层**（Émile Novis 对外 / 薇依内在 / PAEG 工程代号不对外）+ **阶段化思考动画**（理解→检索→构思→撰写）+ **低劣网络用语排除库**（AI_MARKERS 483 条 + AI_TELLS 406 条 + prompts 禁令）|
 | **v0.17.1** | **幻觉修复（meta_router.py）**：元问题拦截（"你是谁/能做什么/能调用知识库吗"不再被当学科概念教学，走闲聊回答）+ **公式渲染增强**（fixBracketedFormulas 支持嵌套括号/希腊字母/方括号长公式/单变量自动转 $...$）+ **多段对话流**（【NEXT】分段：核心回应→自我迭代补充→推荐询问，前端错时显示）|
 | **v0.17.2** | **寒暄拦截**（"你好/hi"等不再当教学概念，走闲聊）+ **```math 代码块修复**（fixMathCodeBlocks 清理错乱 $ 转 $$...$$）+ **讲解深度提升**（presenter prompt 由浅入深四层次：看见→理解→深入→把握）+ **步骤标签自然化**（"步骤 N"→"先看一个问题/讲给你听/你来试试"）+ **昵称使用**（对象意识，不刻板）|
+| **v0.18** | **五大模块**：①专业深度守门员（expert_guard.py：深度评分/套话检测/理科公式检查/自我修订）②联网搜索工具（web_search_tool.py：Bing 免key 默认 + Tavily/Serper 可选，搜索结果注入 prompt 标注 [来源 N]，防 prompt injection）③文档生成增强（save_answer：任意回答→Markdown+HTML 双格式下载；对话中"生成文档/保存"指令自动触发）④做题模块（problem_solver.py：题型识别 论述/计算/证明 → 三套标准答案模板对齐高考/考研评分标准，计算题 SymPy 验证）⑤对话历史持久化（ConversationStore：保存/读取/删除/定期清理 30 天 + LRU 50 会话上限 + 线程锁原子写；API：GET/DELETE /api/conversations）|
 
 ---
 
