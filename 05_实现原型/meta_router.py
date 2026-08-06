@@ -72,6 +72,10 @@ METHOD_ADVICE_PATTERNS = [
     r"学习方法|学习建议|复习(方法|计划|建议)|如何规划|怎么规划",
     r"学(好|会)?.{0,6}(难吗|要多久|怎么|如何)|从(哪|哪里|何).{0,4}(开始|入手)",
     r"有没有.{0,4}(学习方法|技巧|建议)|怎样才能(学|记|掌握)",
+    # v0.21.3：思路/技巧/妙招/套路/解题思路（方法咨询，非知识库）
+    r"(有什么|有何|求|求教|讲讲).{0,4}(思路|技巧|妙招|套路|方法|攻略)",
+    r"(解题|做题|答题).{0,6}(思路|技巧|方法|套路|妙招|策略)",
+    r"(基本思路|整体思路|解题思路|做题思路|答题思路)",
 ]
 METHOD_COMPILED = [re.compile(p, re.IGNORECASE) for p in METHOD_ADVICE_PATTERNS]
 
@@ -101,9 +105,15 @@ KNOWLEDGE_COMPILED = [re.compile(p, re.IGNORECASE) for p in KNOWLEDGE_QUERY_PATT
 
 
 def is_knowledge_query(text: str) -> bool:
-    """判断用户是否在询问"知识库/你学过什么"（固定关键词）。"""
+    """判断用户是否在询问"知识库/你学过什么"（固定关键词）。
+
+    v0.21.3：加排除规则——"有什么思路/方法/技巧/妙招"属方法咨询，不触发知识库。
+    """
     t = (text or "").strip()
     if not t or len(t) > 60:
+        return False
+    # 排除：方法/技巧/思路类（应走学习方法或教学，不是知识库清点）
+    if re.search(r"(思路|方法|技巧|妙招|套路|怎么(做|解|学|复习)|如何(解|学|复习)|解题)", t):
         return False
     return any(p.search(t) for p in KNOWLEDGE_COMPILED)
 
