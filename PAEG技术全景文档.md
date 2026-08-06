@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.19（2026-08-06）
+> **版本**：v0.19.2（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -713,6 +713,28 @@ python test_demo.py
 python test_demo_real_llm.py --provider auto
 ```
 
+### 评估 Harness（v0.19 ⭐）
+
+两层测试体系，`eval_harness.py`：
+
+```bash
+cd "05_实现原型"
+
+# 快速模式：只测意图识别（寒暄/身份/出题/概念），几秒完成
+python eval_harness.py --fast
+
+# 完整模式：调真实 LLM 评估输出质量（意图+公式+深度+tool-use），约 30-60 秒
+python eval_harness.py
+```
+
+评估维度：
+- **意图识别**：寒暄 / 元问题 / 出题请求 / 概念教学是否正确路由
+- **公式格式**：数学回答是否使用 `$...$`，有无损坏的 `$`
+- **回答深度**：expert_guard 深度评分（长度/套话/理科公式/论述结构）
+- **Tool-Use**：工具调用正确性（正常/重试/错误恢复降级）
+
+报告输出到 `eval_report.json`。
+
 ## 10.3 版本历史
 
 | 版本 | 内容 |
@@ -738,6 +760,241 @@ python test_demo_real_llm.py --provider auto
 | **v0.18.1** | **前端历史会话 GUI**：侧栏"历史会话"卡片（教学/闲聊/做题标签）+ 点击恢复历史消息 + 单会话删除 + 清空全部（带确认）+ 登录/退出自动显隐；api() 支持 DELETE 方法；escapeHtml 安全转义 |
 | **v0.19** | **P0/P1/P2 全优化**：①Function Calling（tool_registry.py：web_search/verify_math/fetch_page/daily_quote/get_time + run_agent_loop 工具循环）②三层记忆（memory_system.py：短期对话+摘要压缩+长期画像）③MCP 网关（mcp_gateway.py：FastMCP 暴露教育工具，外部智能体可连接 :8765/mcp）④Skills 体系（skill_registry.py：4 技能 SKILL.md 三级加载）⑤chat 流式输出（/api/chat/stream SSE + 教学流式 teach/stream）⑥工具调用可视化（前端 tool-card）⑦Agent 主循环（agent_engine.py：Plan→Act→Observe→Reflect）⑧自我改进（self_improve.py：反思+失败案例库）⑨可编辑教学记忆（teaching_memory.py：memory/PAEG_PEDAGOGY.md CLAUDE.md 风格）⑩多模态（/api/upload 图片上传）|
 | **v0.19.1** | **公式渲染修复**：fixBracketedFormulas 跳过已存在的 $...$/$$...$$（不再二次包裹破坏公式）+ sanitizeFormulas 消毒错位$ + **出题意图拦截**（is_problem_request："给我一道经典题目"→结合学段/学科/画像生成题目，不答非所问）+ **教学流式输出**（teach 改 SSE 逐字显示）+ **登录默认输出优化** + **评估 harness**（eval_harness.py：单元测试+LLM 输出质量评估两层，7/7 通过，含意图/公式/深度评分）|
+| **v0.19.2** | **工具调用错误恢复**（tool_recovery.py：错误分类[瞬时/永久/限流/配额] + 指数退避重试 + 失败降级信号[防 LLM 编造] + 每工具指标；接入 tool_registry 5 工具）+ **harness 加 tool-use 维度**（正常/隐式乘法重试/错误恢复 5 项测试全过）+ **SVG 资源替换 emoji**（16 个 Lucide/Heroicons 图标存 assets/icons，工具卡片/下载/上传/文件 全部用 SVG）+ **文档完善**（§10.4 GitHub 部署指南 + §10.5 可扩充资源清单 + 评估 harness 说明）|
+
+---
+
+## 10.4 从 GitHub 拉取并部署到自己的电脑/服务器
+
+> 目标：任何人都可以从 `https://github.com/Golden2002/PAEG` 拉取项目，在**自己的 PC 或云服务器**上跑起来。
+> 全程约 10 分钟（不含安装 Python 的时间）。
+
+### 10.4.1 前置要求
+
+| 依赖 | 版本 | 说明 |
+|---|---|---|
+| Python | ≥ 3.10（建议 3.12+）| 开发环境用 3.14 验证过 |
+| pip | 随 Python | 装依赖用 |
+| 网络 | 能访问 api.deepseek.com | 需要真实的 LLM API key（见下） |
+
+### 10.4.2 拉取项目
+
+```bash
+# 方式一：git clone（推荐）
+git clone https://github.com/Golden2002/PAEG.git
+cd PAEG
+
+# 方式二：下载 zip（没有 git 时）
+#   打开 https://github.com/Golden2002/PAEG → Code → Download ZIP → 解压
+```
+
+### 10.4.3 安装依赖
+
+```bash
+cd "05_实现原型"
+
+# 核心依赖（Flask 后端）
+pip install flask flask-cors requests sympy fastmcp
+
+# 可选：MCP 网关（让外部智能体连接 PAEG 工具）
+pip install fastmcp
+
+# 可选：联网搜索升级（不装也能用 Bing 免 key 兜底）
+pip install requests
+```
+
+### 10.4.4 配置 LLM（DeepSeek）
+
+PAEG 会自动按以下顺序查找模型凭据：
+
+1. **环境变量**（推荐）：
+   ```bash
+   # Windows PowerShell
+   $env:DEEPSEEK_API_KEY = "sk-你的key"
+   # Linux/macOS
+   export DEEPSEEK_API_KEY="sk-你的key"
+   ```
+2. **opencode auth.json**（`~/.config/opencode/auth.json` 里的 deepseek key）
+3. 都找不到 → 启动**离线模拟模式**（MockLLM，可跑通流程但回答是占位的）
+
+> 没有 DeepSeek key？去 https://platform.deepseek.com 注册，充值几块钱就够测试。
+
+### 10.4.5 启动服务
+
+```bash
+cd "05_实现原型"
+# Windows
+set PYTHONPATH=%CD%
+python server.py
+
+# Linux/macOS
+PYTHONPATH=$PWD python server.py
+```
+
+启动成功后看到：
+```
+[PAEG Server] 启动在 http://localhost:5000
+[PAEG Server] GUI 在 http://localhost:5000/
+[PAEG Server] 健康检查 http://localhost:5000/api/health
+[PAEG Server] MCP 网关已启动: http://localhost:8765/mcp
+```
+
+浏览器打开 **http://localhost:5000** 即可使用。
+
+### 10.4.6 验证
+
+```bash
+# 健康检查（应返回 200）
+curl http://localhost:5000/api/health
+
+# 跑测试（59 个，2 秒）
+cd "05_实现原型"
+python -m pytest tests "..\06_测试与验证\tests\test_paeg_v0_5.py" -q
+
+# 跑评估 harness（7 个案例，调真实 LLM 约 30 秒）
+python eval_harness.py --fast    # 快速：只测意图识别
+python eval_harness.py           # 完整：调 LLM 评估输出质量
+```
+
+### 10.4.7 部署到云服务器（公网访问）
+
+**方式 A：Cloudflare 临时隧道（免费，适合演示）**
+
+在项目目录跑（需先启动 server.py）：
+```bash
+cloudflared tunnel --url http://localhost:5000
+```
+会输出一个 `https://xxx.trycloudflare.com` 地址，任何人可访问。
+
+**方式 B：nginx + 系统服务（长期稳定）**
+
+```bash
+# 1. 用 systemd 管理 server.py（Linux）
+sudo tee /etc/systemd/system/paeg.service <<'EOF'
+[Unit]
+Description=PAEG Education Agent
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/PAEG/05_实现原型
+Environment=PYTHONPATH=/opt/PAEG/05_实现原型
+Environment=DEEPSEEK_API_KEY=sk-xxx
+ExecStart=/usr/bin/python3 server.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl enable paeg && sudo systemctl start paeg
+
+# 2. nginx 反代（可选：加 HTTPS/域名）
+#    server { listen 80; location / { proxy_pass http://127.0.0.1:5000; } }
+```
+
+**安全提示**：公网部署建议：
+- 用户注册/登录已内置（`/api/register`），可防止匿名滥用
+- 若不需要公网，保持 localhost 即可
+
+---
+
+## 10.5 可扩充与更新的资源清单
+
+> 维护升级 PAEG 时，以下是**最容易扩充/更新**的资源点。每个都独立成文件，改动不影响其他模块。
+
+### 10.5.1 每日一句语料库（quotes.py）
+
+| 位置 | 说明 |
+|---|---|
+| `05_实现原型/quotes.py` | 47 句语录，`DAILY_QUOTES` 列表 |
+
+**如何扩充**：
+- 直接往 `DAILY_QUOTES` 列表追加 `{"text": "...", "author": "...", "source": "..."}`
+- 每句格式：`text`（句子）、`author`（作者）、`source`（出处，可空）
+- 已收录：西蒙娜·薇依、汉斯·约纳斯、胡塞尔、维特根斯坦、斯宾诺莎、怀特海
+- **可加**：更多思想家、中国古典（孔子/庄子）、教育格言、学科名言
+- 按日期自动轮换（`day_index % len(DAILY_QUOTES)`），加多少句都行
+
+### 10.5.2 用户模型 / 画像（user_store.py + agent_core.py）
+
+| 位置 | 说明 |
+|---|---|
+| `05_实现原型/user_store.py` | 用户注册、画像持久化、对话历史 |
+| `05_实现原型/agent_core.py` | `infer_user_model`（对象意识）、`infer_bdi`（信念/愿望/意图）|
+| `05_实现原型/memory_system.py` | 三层记忆（短期/中期/长期+摘要）|
+
+**可扩充**：
+- **画像字段**：在 `LearnerProfile`（paeg.py）加字段（如学习风格、目标院校、薄弱科目），保存逻辑自动兼容
+- **BDI 模型**：`agent_core.py` 的 `infer_bdi` 里可加更多心理维度（如动机类型、挫败感阈值）
+- **对话摘要**：`memory_system.py` 的摘要压缩策略（保留条数、摘要长度可调）
+
+### 10.5.3 学科与教学法（prompts.py + pedagogy.py + subjects_ext.py）
+
+| 位置 | 说明 |
+|---|---|
+| `05_实现原型/prompts.py` | 学科风格（SUBJECT_STYLES）+ 学段分层（_GRADE_GUIDE）|
+| `05_实现原型/pedagogy.py` | 教学策略库 |
+| `05_实现原型/subjects_ext.py` | 扩展学科 |
+
+**可扩充**：
+- **新学科**：在 `SUBJECT_STYLES` 加 dict（label/persona/language/structure/emphasis）
+- **新学段**：在 `_GRADE_GUIDE` 加 dict（如"专升本""国际课程"）
+- **教学策略**：`pedagogy.py` 加新策略函数，`PEDAGOGY_MAP` 注册即可
+
+### 10.5.4 语言词库（ai_taste_detector.py + language_refiner.py）
+
+| 位置 | 说明 |
+|---|---|
+| `05_实现原型/ai_taste_detector.py` | `AI_MARKERS`（483 条 AI 味/网络用语）|
+| `05_实现原型/language_refiner.py` | `AI_TELLS`（406 条，本地预检）|
+
+**可扩充**：
+- 往 `AI_MARKERS` / `AI_TELLS` 追加词条（新网络用语、新 AI 腔）
+- 建议每季度更新一次（追踪《咬文嚼字》年度网络用语）
+
+### 10.5.5 技能库（skills/ 目录）
+
+| 位置 | 说明 |
+|---|---|
+| `05_实现原型/skills/<技能名>/SKILL.md` | 4 个技能（math-solver/essay-feedback/study-planner/concept-explainer）|
+
+**如何新增技能**：
+1. 建目录 `skills/你的技能名/SKILL.md`
+2. 写 frontmatter：`name` + `description`（描述触发条件）
+3. 正文写工作流程和输出规范
+4. 重启服务，`SkillRegistry` 自动扫描加载
+
+### 10.5.6 知识库（Library/KnowledgeBase + knowledge_base.py）
+
+| 位置 | 说明 |
+|---|---|
+| `Library/KnowledgeBase/` | 知识库扩展文件（README.md 有指南）|
+| `05_实现原型/knowledge_base.py` | 55+ 知识节点 |
+
+**可扩充**：
+- 往 `Library/KnowledgeBase/` 加主题文件（含"直觉/定义/形式定义/核心问题"字段）
+- `library_loader.py` 自动注册新节点
+
+### 10.5.7 评估用例（eval_harness.py）
+
+| 位置 | 说明 |
+|---|---|
+| `05_实现原型/eval_harness.py` | `default_cases()` 里的案例列表 |
+
+**可扩充**：
+- `ev.add_case("问题", subject=..., expect_type=..., expect_keywords=[...])`
+- 加更多学科/题型/边界案例，形成回归测试集
+
+### 10.5.8 对话历史存储（ConversationStore）
+
+| 位置 | 说明 |
+|---|---|
+| `05_实现原型/user_store.py` | `ConversationStore` 类 |
+
+**可调参数**：
+- `retention_days=30`（会话保留天数）
+- `max_conversations=50`（每用户会话数上限）
+- `users_data/<user_id>/` 下按用户隔离存储
 
 ---
 
