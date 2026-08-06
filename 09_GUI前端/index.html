@@ -1534,15 +1534,27 @@ async function generalChat(text) {
     // 用 marked 渲染最终累积文本（替换纯文本为 markdown）
     const textParts = Array.from(bubbleBody.querySelectorAll('span')).map(s => s.textContent).join('');
     if (textParts) {
-      const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(textParts)));
-      bubbleBody.innerHTML = toolCards.map(c => c.outerHTML).join('') +
-        '<div class="md-content">' + (typeof marked !== 'undefined' ? marked.parse(fixedText) : escapeHtml(textParts)) + '</div>' +
-        '<div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button></div>';
-      // 保存原始文本（复制/文档用）
-      bubble._rawText = textParts;
-      renderMath(bubbleBody);
-      chatWin.scrollTop = chatWin.scrollHeight;
+      try {
+        const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(textParts)));
+        bubbleBody.innerHTML = toolCards.map(c => c.outerHTML).join('') +
+          '<div class="md-content">' + (typeof marked !== 'undefined' ? marked.parse(fixedText) : escapeHtml(textParts)) + '</div>' +
+          '<div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button></div>';
+        // 保存原始文本（复制/文档用）
+        bubble._rawText = textParts;
+        renderMath(bubbleBody);
+        chatWin.scrollTop = chatWin.scrollHeight;
+      } catch (e) {
+        // v0.19.18：渲染失败不阻塞——至少显示纯文本
+        bubbleBody.innerHTML = '<div class="md-content">' + escapeHtml(textParts) + '</div>' +
+          '<div class="msg-actions"><input type="checkbox" class="msg-select" /><button class="msg-copy" onclick="copyMsg(this)">复制</button></div>';
+        bubble._rawText = textParts;
+      }
+    } else {
+      // v0.19.18：空结果兜底——流正常结束但没内容时，显示占位而不是静默无回复
+      if (!bubbleBody.parentNode) chatWin.appendChild(bubble);
+      bubbleBody.innerHTML = '<div class="md-content">（没有收到回复，可能是服务端暂时没生成内容。请再试一次。）</div>';
     }
+    if (!bubbleBody.parentNode) chatWin.appendChild(bubble);
   } catch (e) {
     clearInterval(timeoutTimer);
     removeThinking(thinking);
