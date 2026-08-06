@@ -262,7 +262,7 @@ def _steer_subject(concept: str, subject: str, learner, learner_id: str) -> dict
                 f"但**我已经把这条需求记下来**，后续会优先优化升级来覆盖它。\n\n"
                 f"在此之前，你可以：\n"
                 f"· 问我相关的**其他学科**（如物理、数学、哲学……）\n"
-                f"· 或者把资料上传给我（点左上角书本图标），我就能基于你给的资料回答\n\n"
+                f"· 或者把资料上传给我（点右下角输入栏旁的书本图标），我就能基于你给的资料回答\n\n"
                 f"感谢你的反馈，这会让 PAEG 变得更好。"
             )
             return {"subject": subject, "unknown": True, "unknown_name": uname,
@@ -312,7 +312,7 @@ def _steer_unknown_response(concept: str, learner, learner_id: str,
         f"但**我已经把这条需求记下来**，后续会优先优化升级来覆盖它。\n\n"
         f"在此之前，你可以：\n"
         f"· 问我相关的**其他学科**（如物理、数学、哲学……）\n"
-        f"· 或者把资料上传给我（点左上角书本图标），我就能基于你给的资料回答\n\n"
+        f"· 或者把资料上传给我（点右下角输入栏旁的书本图标），我就能基于你给的资料回答\n\n"
         f"感谢你的反馈，这会让 PAEG 变得更好。"
     )
     return {
@@ -430,6 +430,31 @@ def teach():
         from meta_router import is_knowledge_query
         if is_knowledge_query(concept):
             return jsonify(_handle_knowledge_query(learner, subject))
+    except Exception:
+        pass
+
+    # v0.20.5：知识导图拦截——"画知识导图/列提纲/思维导图/知识结构/脉络/系统"
+    try:
+        from knowledge_map import is_knowledge_map_request, handle_knowledge_map
+        if is_knowledge_map_request(concept):
+            _map_result = handle_knowledge_map(concept, subject, learner, llm)
+            return jsonify({
+                "session_id": f"map_{learner_id}",
+                "summary": {"avg_score": 0},
+                "worldview_used": "weil",
+                "tone_ratio": 0,
+                "presentations": [
+                    {"step_id": 1, "content": _map_result.get("content", ""),
+                     "step_type": "knowledge_map"}
+                ],
+                "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
+                "reflections": [],
+                "learner": {
+                    "id": learner.id, "nickname": learner.nickname,
+                    "grade_level": learner.grade_level,
+                    "subjects_mastery": learner.subjects_mastery,
+                },
+            })
     except Exception:
         pass
 
@@ -681,6 +706,22 @@ def teach_stream():
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _kb_content[i:i+60], 'step_type': 'knowledge'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_kb(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception:
+        pass
+
+    # v0.20.5：知识导图拦截（流式版本）——"画知识导图/列提纲/知识结构"
+    try:
+        from knowledge_map import is_knowledge_map_request, handle_knowledge_map
+        if is_knowledge_map_request(concept):
+            _map_result = handle_knowledge_map(concept, subject, learner, llm)
+            _map_content = _map_result.get("content", "")
+
+            def gen_map():
+                for i in range(0, len(_map_content), 60):
+                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _map_content[i:i+60], 'step_type': 'knowledge_map'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            return Response(gen_map(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
         pass
@@ -1743,8 +1784,10 @@ def answer_api():
     try:
         from subagents import AnswerSolver
         solver = AnswerSolver()
+        # v0.20.5：续问时传历史（answer 也要记住上文）
+        _hist = SESSIONS.get(f"chat_hist_{learner_id}", []) if learner_id else []
         result = solver.run(llm, question, subject=subject,
-                            grade_level=grade_level, learner=learner)
+                            grade_level=grade_level, learner=learner, history=_hist)
         # 保存到对话历史
         if CONV_STORE is not None and USER_STORE is not None \
                 and str(learner_id).startswith('u') and learner_id[1:].isdigit():
@@ -1811,6 +1854,13 @@ def list_conversations(learner_id):
     """列出用户全部会话（不含消息体，倒序）。"""
     if not _is_registered(learner_id):
         return jsonify({"conversations": []})
+    try:
+        if CONV_STORE is None:
+            return jsonify({"conversations": []})
+        convs = CONV_STORE.list_conversations(learner_id)
+        return jsonify({"conversations": convs})
+    except Exception as e:
+        return jsonify({"conversations": [], "error": str(e)}), 500
 
 
 def _handle_knowledge_query(learner, subject):
