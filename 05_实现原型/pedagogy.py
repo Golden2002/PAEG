@@ -127,14 +127,31 @@ def choose_strategy(learner, diagnosis: dict, subject: str) -> dict:
 
 
 def build_plan_steps(strategy: dict, concept: str, tone: str, bloom_level: str = None) -> list:
-    """根据策略生成教学步骤（与世界观语气联动），每个 step 携带策略提示。"""
+    """根据策略生成教学步骤（与世界观语气联动），每个 step 携带策略提示。
+
+    v0.15：topic 明确标注"本步阶段"（第1步直觉/第2步机制/第3步应用/辨析），
+    避免三步都讲同一个概念导致重复。
+    """
     steps = []
     hint = strategy.get("presenter_hint", "")
+    n = len(strategy["steps"])
     for i, s in enumerate(strategy["steps"], 1):
+        # 阶段名：按步骤类型和序号生成差异化话题
+        stage = s.get("topic", "讲解")
+        if "{concept}" in stage:
+            topic = stage.replace("{concept}", concept)
+        else:
+            # 给话题加"阶段后缀"，明确每步的推进方向
+            if i == 1 and n > 1:
+                topic = f"{stage}：{concept}（本步讲直觉和现象）"
+            elif i == n:
+                topic = f"{stage}：{concept}（本步讲应用/辨析/练习，不重复前两步）"
+            else:
+                topic = f"{stage}：{concept}（本步讲机制和定义，在上一步基础上深入）"
         steps.append({
             "step_id": i,
             "type": s["type"],
-            "topic": s["topic"].replace("{concept}", concept) if "{concept}" in s["topic"] else f"{s['topic']}：{concept}",
+            "topic": topic,
             "duration_min": 3 if s["type"] in ("present", "guide") else 2,
             "worldview": tone,
             "strategy": strategy["key"],
