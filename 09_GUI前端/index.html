@@ -9,11 +9,47 @@
 <!-- v0.16：数学公式渲染（MathJax，支持 $...$ 和 \(...\)） -->
 <script>
 window.MathJax = {
-  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true },
   options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] }
 };
 </script>
 <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<script>
+// v0.19.5：marked 公式保护扩展——$...$ / $$...$$ / \(...\) / \[...\] 原样保留给 MathJax。
+// 参考 marked 官方 extension 模式 + MathJax 集成最佳实践：
+//   marked.parse → innerHTML → MathJax.typesetPromise
+(function () {
+  if (typeof marked === 'undefined' || !marked.use) return;
+  try {
+    // 合并的行内/块级数学 extension（tokenizer 在 marked 内置规则之前执行）
+    marked.use({
+      extensions: [
+        {
+          name: 'mathInline',
+          level: 'inline',
+          start(src) {
+            const m = src.match(/\\\(|\$\$|\$(?!\$)/);
+            return m ? m.index : undefined;
+          },
+          tokenizer(src) {
+            // 优先 $$...$$（display），再 $...$（inline，支持转义 \$ 和 \(...\)）
+            const m = /^(\$\$(?:\\.|[^$\\])*?\$\$|\\\[(?:\\.|[^\\])*?\\\]|\$(?!\$)(?:\\.|[^$\\])+\$|\\\((?:\\.|[^\\])*?\\\))/.exec(src);
+            if (m) {
+              return { type: 'mathInline', raw: m[0], text: m[0] };
+            }
+            return undefined;
+          },
+          renderer(token) {
+            // 原样输出（含 $ 分隔符），MathJax 从文本节点识别
+            return token.text;
+          }
+        }
+      ]
+    });
+  } catch (e) { /* 扩展失败不影响基本渲染 */ }
+})();
+</script>
 <script>
 // 若 CDN 加载失败，用极简内置渲染器
 if (typeof marked === 'undefined') {
@@ -362,6 +398,10 @@ body {
 .conv-item:hover .conv-del { opacity: 1; }
 .conv-item .conv-del:hover { color: #c0392b; background: rgba(192,57,43,.1); }
 
+/* v0.19.5：数学公式 */
+.math-block { margin: 12px 0; overflow-x: auto; }
+.math-inline { white-space: nowrap; }
+
 /* v0.19.3：复制/选择/生成文档 */
 .msg-actions {
   display: flex; align-items: center; gap: 8px;
@@ -706,6 +746,8 @@ body {
           · <b>学知识</b> —— 数学、物理、哲学……从初高中到考研<br>
           · <b>做题目</b> —— 说"给我一道经典题"，我给你出题并讲解<br>
           · <b>聊想法</b> —— 困惑、焦虑、好奇，都可以跟我说<br><br>
+          <span style="font-size:12.5px;color:var(--text-dim)">想生成文档？对话里带上关键词：<b>讲义</b>（授课式讲义）/ <b>要点</b>（知识清单）/ <b>例题</b>（配套习题）/ <b>笔记</b>（简洁笔记）——我会把讨论内容整理成文件供你下载。</span><br><br>
+          试着问我：「什么是熵？」或「给我一道考研数学经典题」。
           如果你想让我记住你的情况，点左上角「告诉老师你是谁」。<br>
           试着问我：「什么是熵？」或「给我一道考研数学经典题」。
         </div>
@@ -1417,6 +1459,12 @@ async function generalChat(text) {
           textDiv.textContent = obj.text || '';
           bubbleBody.appendChild(textDiv);
           chatWin.scrollTop = chatWin.scrollHeight;
+        } else if (event === 'doc') {
+          // v0.19.5：关键词触发文档生成 → 显示下载链接
+          const typeCn = { 讲义: '讲义', 要点: '要点', 例题: '例题', 笔记: '笔记' }[obj.type] || '文档';
+          addMsg('paeg', `已生成${typeCn}：<b>${escapeHtml(obj.filename || '')}</b><br><br>` +
+            `<a class="download-link" href="${obj.md_url}" download><img class="link-icon" src="assets/icons/download.svg" alt="下载"/> 下载 ${typeCn}</a>` +
+            (obj.html_url ? ` <a class="download-link" href="${obj.html_url}" target="_blank" style="margin-left:10px">预览</a>` : ''));
         } else if (event === 'done') {
           break;
         }
