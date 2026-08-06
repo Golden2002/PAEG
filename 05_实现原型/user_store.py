@@ -22,6 +22,7 @@ import json
 import os
 import re
 import secrets
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
@@ -203,3 +204,169 @@ class UserStore:
 
     def stats(self) -> dict:
         return {"users": len(self._data["users"])}
+
+
+class ConversationStore:
+    """对话历史持久化（v0.18）。
+
+    按用户保存多轮会话，支持：
+    - 自动保存（每次 teach/chat 后追加）
+    - 读取（前端恢复显示）
+    - 用户删除（单会话/全部）
+    - 定期清理（超过 retention_days 自动删除，惰性清理）
+
+    存储：users_data/<user_id>/conversations.json
+    {
+      "conversations": [
+        {"id": "c_xxx", "title": "什么是熵", "mode": "teach|chat",
+         "created_at": 1234567890, "updated_at": ...,
+         "messages": [{"role": "user|assistant", "content": "...", "ts": ...}]}
+      ]
+    }
+    """
+
+    def __init__(self, base_dir: Optional[str] = None, retention_days: int = 30,
+                 max_conversations: int = 50):
+        base = base_dir or os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), 'users_data')
+        self.base_dir = base
+        self.retention_days = retention_days
+        self.max_conversations = max_conversations   # LRU 容量上限
+        self._lock = threading.Lock()   # v0.18.1：并发写保护
+        os.makedirs(self.base_dir, exist_ok=True)
+
+    def _path(self, user_id: str) -> str:
+        return os.path.join(self.base_dir, user_id, 'conversations.json')
+
+    def _load(self, user_id: str) -> dict:
+        with self._lock:
+            try:
+                with open(self._path(user_id), encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception:
+                return {"conversations": []}
+
+    def _save(self, user_id: str, data: dict) -> None:
+        with self._lock:
+            udir = os.path.join(self.base_dir, user_id)
+            os.makedirs(udir, exist_ok=True)
+            tmp = self._path(user_id) + '.tmp'
+            with open(tmp, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=1)
+            os.replace(tmp, self._path(user_id))  # 原子替换
+
+    # ─── 保存 ───
+    def add_message(self, user_id: str, mode: str, title: str,
+                    role: str, content: str,
+                    conv_id: Optional[str] = None) -> str:
+        """追加一条消息。若 conv_id 给定则加入该会话，否则新建会话。
+
+        返回会话 id。
+        """
+        data = self._load(user_id)
+        convs = data["conversations"]
+        now = time.time()
+        if conv_id is None:
+            conv_id = f"c_{int(now)}_{secrets.token_hex(3)}"
+            convs.append({
+                "id": conv_id, "title": title[:50], "mode": mode,
+                "created_at": now, "updated_at": now, "messages": [],
+            })
+        conv = next((c for c in convs if c["id"] == conv_id), None)
+        if conv is None:
+            conv_id = f"c_{int(now)}_{secrets.token_hex(3)}"
+            convs.append({
+                "id": conv_id, "title": title[:50], "mode": mode,
+                "created_at": now, "updated_at": now, "messages": [],
+            })
+            conv = convs[-1]
+        conv["messages"].append({
+            "role": role, "content": content[:20000], "ts": now,
+        })
+        conv["updated_at"] = now
+        # 控制单会话消息上限（防止无限增长）
+        conv["messages"] = conv["messages"][-100:]
+        # v0.18.1：LRU 容量上限（保留最新 max_conversations 个会话）
+        if len(convs) > self.max_conversations:
+            convs.sort(key=lambda c: c.get("updated_at", 0), reverse=True)
+            data["conversations"] = convs[:self.max_conversations]
+        self._save(user_id, data)
+        return conv_id
+
+    def update_title(self, user_id: str, conv_id: str, title: str) -> None:
+        data = self._load(user_id)
+        for c in data["conversations"]:
+            if c["id"] == conv_id:
+                c["title"] = title[:50]
+                break
+        self._save(user_id, data)
+
+    # ─── 读取 ───
+    def list_conversations(self, user_id: str, limit: int = 50) -> List[dict]:
+        """列出用户会话（不含消息体，按更新时间倒序）。"""
+        data = self._load(user_id)
+        convs = sorted(data["conversations"], key=lambda c: c.get("updated_at", 0), reverse=True)
+        return [{
+            "id": c["id"], "title": c.get("title", ""), "mode": c.get("mode", "chat"),
+            "created_at": c.get("created_at", 0), "updated_at": c.get("updated_at", 0),
+            "message_count": len(c.get("messages", [])),
+        } for c in convs[:limit]]
+
+    def get_conversation(self, user_id: str, conv_id: str) -> Optional[dict]:
+        data = self._load(user_id)
+        for c in data["conversations"]:
+            if c["id"] == conv_id:
+                return c
+        return None
+
+    # ─── 删除 ───
+    def delete_conversation(self, user_id: str, conv_id: str) -> bool:
+        data = self._load(user_id)
+        before = len(data["conversations"])
+        data["conversations"] = [c for c in data["conversations"] if c["id"] != conv_id]
+        if len(data["conversations"]) != before:
+            self._save(user_id, data)
+            return True
+        return False
+
+    def clear_all(self, user_id: str) -> bool:
+        """清空该用户全部会话。"""
+        data = self._load(user_id)
+        if data["conversations"]:
+            data["conversations"] = []
+            self._save(user_id, data)
+            return True
+        return False
+
+    # ─── 定期清理 ───
+    def cleanup(self, retention_days: Optional[int] = None) -> int:
+        """清理所有用户超过保留期的会话。返回删除的会话数。"""
+        days = retention_days or self.retention_days
+        cutoff = time.time() - days * 86400
+        removed = 0
+        if not os.path.isdir(self.base_dir):
+            return 0
+        for uid in os.listdir(self.base_dir):
+            udir = os.path.join(self.base_dir, uid)
+            path = os.path.join(udir, 'conversations.json')
+            if not os.path.isfile(path):
+                continue
+            try:
+                with open(path, encoding='utf-8') as f:
+                    data = json.load(f)
+                before = len(data.get("conversations", []))
+                data["conversations"] = [
+                    c for c in data.get("conversations", [])
+                    if c.get("updated_at", 0) >= cutoff
+                ]
+                removed += before - len(data["conversations"])
+                if len(data["conversations"]) != before:
+                    self._save(uid, data)
+            except Exception:
+                pass
+        return removed
+
+    def stats(self, user_id: str) -> dict:
+        data = self._load(user_id)
+        return {"conversations": len(data["conversations"]),
+                "messages": sum(len(c.get("messages", [])) for c in data["conversations"])}
