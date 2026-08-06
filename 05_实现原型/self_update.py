@@ -1,0 +1,222 @@
+"""
+自我更新机制（v0.5 - JSON 持久化版）。
+
+v0.1：仅内存记录。
+v0.5：每次会话后原子写入 data/ 目录（UTF-8 JSON）：
+  - data/reflections.json   反思历史
+  - data/strategies.json    发现的教学策略
+  - data/profiles.json      学习者画像快照
+  - data/versions/          版本化快照（保留最近 10 版，支持回滚）
+
+阈值常量（沿用 v0.2 设计）：
+  MIN_EVIDENCE_FOR_STRATEGY = 3       策略提炼最少证据数
+  MIN_CONFIDENCE_FOR_KNOWLEDGE = 0.8  新知识入库最低可信度
+  PROFILE_EMA_ALPHA = 0.3             画像 EMA 平滑系数
+  ROLLBACK_WINDOW_DAYS = 7            回滚窗口（天）
+"""
+from __future__ import annotations
+
+import json
+import shutil
+from collections import Counter
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Optional
+
+MIN_EVIDENCE_FOR_STRATEGY = 3
+MIN_CONFIDENCE_FOR_KNOWLEDGE = 0.8
+PROFILE_EMA_ALPHA = 0.3
+ROLLBACK_WINDOW_DAYS = 7
+VERSION_KEEP = 10
+
+
+class SelfUpdater:
+    def __init__(self, knowledge_base, data_dir: Optional[str] = None):
+        self.kb = knowledge_base
+        self.data_dir = Path(data_dir) if data_dir else (Path(__file__).parent / "data")
+        self.history = []            # 反思历史
+        self.strategies_discovered = []  # 发现的新策略
+        self.version = 0
+        self._load()
+
+    # ------------------------------------------------------------------
+    # 持久化
+    # ------------------------------------------------------------------
+    def _ensure_dirs(self):
+        (self.data_dir / "versions").mkdir(parents=True, exist_ok=True)
+
+    def _load(self):
+        """启动时加载持久化状态（不存在则从空开始）。"""
+        self._ensure_dirs()
+        try:
+            refs = (self.data_dir / "reflections.json")
+            if refs.is_file():
+                self.history = json.loads(refs.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            self.history = []
+        try:
+            strs = (self.data_dir / "strategies.json")
+            if strs.is_file():
+                self.strategies_discovered = json.loads(strs.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            self.strategies_discovered = []
+        # 读取版本号
+        ver = (self.data_dir / "version.txt")
+        if ver.is_file():
+            try:
+                self.version = int(ver.read_text(encoding="utf-8").strip())
+            except (ValueError, OSError):
+                self.version = 0
+
+    def _save(self):
+        """原子写入 + 版本快照。"""
+        self._ensure_dirs()
+        self.version += 1
+        # 原子写当前状态
+        for name, payload in (
+            ("reflections.json", self.history),
+            ("strategies.json", self.strategies_discovered),
+        ):
+            tmp = self.data_dir / (name + ".tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                           encoding="utf-8")
+            tmp.replace(self.data_dir / name)
+        (self.data_dir / "version.txt").write_text(str(self.version), encoding="utf-8")
+        # 版本快照（保留最近 VERSION_KEEP 版）
+        snap_dir = self.data_dir / "versions"
+        snap = snap_dir / f"v{self.version:04d}.json"
+        snap.write_text(json.dumps({
+            "version": self.version,
+            "timestamp": datetime.now().isoformat(),
+            "history": self.history,
+            "strategies": self.strategies_discovered,
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
+        for old in sorted(snap_dir.glob("v*.json"))[:-VERSION_KEEP]:
+            old.unlink(missing_ok=True)
+
+    # ------------------------------------------------------------------
+    # 更新
+    # ------------------------------------------------------------------
+    def incremental_update(self, session):
+        """每次会话后的增量更新。"""
+        # 1. 记录反思
+        for reflection in session.reflections:
+            self.history.append({
+                "timestamp": datetime.now().isoformat(),
+                "learner_id": session.learner.id,
+                "concept": session.concept,
+                "subject": getattr(session, "subject", ""),
+                "reflection": reflection
+            })
+
+        # 2. 如果教学成功，提炼模式
+        if any(r.get('success', False) for r in session.reflections):
+            for evaluation in session.evaluations:
+                if evaluation.get('score', 0) > 0.85:
+                    self.strategies_discovered.append({
+                        "discovered_at": datetime.now().isoformat(),
+                        "learner_profile": {
+                            "grade_level": session.learner.grade_level,
+                            "cognitive_style": session.learner.cognitive_style
+                        },
+                        "concept": session.concept,
+                        "score": evaluation['score']
+                    })
+
+        # 3. 更新画像掌握度（EMA）
+        if session.evaluations:
+            avg_score = sum(e['score'] for e in session.evaluations) / len(session.evaluations)
+            subject = session.subject
+            if subject not in session.learner.subjects_mastery:
+                session.learner.subjects_mastery[subject] = {"mastery": 0.5, "count": 0}
+            old = session.learner.subjects_mastery[subject]["mastery"]
+            new = PROFILE_EMA_ALPHA * avg_score + (1 - PROFILE_EMA_ALPHA) * old
+            session.learner.subjects_mastery[subject]["mastery"] = round(new, 3)
+            session.learner.subjects_mastery[subject]["count"] += 1
+
+        # 4. 画像落盘
+        self._save_profile(session.learner)
+        self._save()
+
+    def _save_profile(self, learner):
+        """画像快照落盘。"""
+        profiles_path = self.data_dir / "profiles.json"
+        data = {}
+        if profiles_path.is_file():
+            try:
+                data = json.loads(profiles_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                data = {}
+        data[learner.id] = {
+            "nickname": learner.nickname,
+            "grade_level": learner.grade_level,
+            "age": learner.age,
+            "cognitive_style": learner.cognitive_style,
+            "subjects_mastery": learner.subjects_mastery,
+            "world_view_blend": learner.world_view_blend,
+            "target_exam": getattr(learner, "target_exam", None),
+            "specialty_target": getattr(learner, "specialty_target", None),
+            "updated_at": datetime.now().isoformat(),
+        }
+        tmp = profiles_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(profiles_path)
+
+    def batch_update(self):
+        """每周批处理：识别反复模式 + 清理过期快照。"""
+        from collections import Counter
+        concepts_seen = Counter(r['concept'] for r in self.history)
+        # 清理超出回滚窗口的快照
+        cutoff = datetime.now() - timedelta(days=ROLLBACK_WINDOW_DAYS)
+        snap_dir = self.data_dir / "versions"
+        if snap_dir.is_dir():
+            for old in snap_dir.glob("v*.json"):
+                try:
+                    meta = json.loads(old.read_text(encoding="utf-8"))
+                    ts = datetime.fromisoformat(meta.get("timestamp", ""))
+                    if ts < cutoff and len(list(snap_dir.glob("v*.json"))) > 3:
+                        old.unlink(missing_ok=True)
+                except (ValueError, OSError, json.JSONDecodeError):
+                    continue
+        self._save()
+        return {
+            "recurring_concepts": concepts_seen.most_common(5),
+            "total_sessions": len(self.history),
+            "strategies_discovered_count": len(self.strategies_discovered),
+            "version": self.version,
+            "data_dir": str(self.data_dir),
+        }
+
+    def rollback_to_version(self, target_version: int) -> bool:
+        """回滚到指定版本快照。"""
+        snap = self.data_dir / "versions" / f"v{target_version:04d}.json"
+        if not snap.is_file():
+            return False
+        try:
+            data = json.loads(snap.read_text(encoding="utf-8"))
+            self.history = data.get("history", [])
+            self.strategies_discovered = data.get("strategies", [])
+            self.version = data.get("version", target_version)
+            self._save()
+            return True
+        except (OSError, json.JSONDecodeError):
+            return False
+
+    def add_knowledge(self, node: dict, source: str, confidence: float):
+        """带可信度的新知识入库（v0.2 设计保留）。"""
+        if confidence < MIN_CONFIDENCE_FOR_KNOWLEDGE:
+            return False
+        # 简化：写入 strategies（演示用途）
+        self.strategies_discovered.append({
+            "discovered_at": datetime.now().isoformat(),
+            "source": source,
+            "confidence": confidence,
+            "node_id": node.get("id"),
+        })
+        self._save()
+        return True
+
+
+if __name__ == "__main__":
+    su = SelfUpdater(None, data_dir="data")
+    print(f"当前版本：{su.version}，历史 {len(su.history)} 条，策略 {len(su.strategies_discovered)} 条")
