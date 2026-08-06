@@ -29,14 +29,23 @@ def _is_real_llm(model) -> bool:
     return hasattr(model, "chat") and getattr(model, "name", "mock") != "mock"
 
 
-def _safe_chat(model, system: str, user: str, max_tokens: int = 512) -> Optional[str]:
-    """安全调用真实 LLM，失败返回 None（调用方回退规则模式）。"""
+def _safe_chat(model, system: str, user: str = None, messages: list = None,
+               max_tokens: int = 512) -> Optional[str]:
+    """安全调用真实 LLM，失败返回 None（调用方回退规则模式）。
+
+    v0.20.2：支持 messages 列表（多轮对话）——若传 messages，则忽略 user。
+    旧调用风格 _safe_chat(model, sys, user) 保持兼容。
+    """
     if not _is_real_llm(model):
+        return None
+    if messages is None and user is not None:
+        messages = [{"role": "user", "content": user}]
+    if not messages:
         return None
     try:
         return model.chat(
             system=system,
-            messages=[{"role": "user", "content": user}],
+            messages=messages,
             max_tokens=max_tokens,
             temperature=0.7,
         )
@@ -403,8 +412,11 @@ class AffectionSupportor:
     def __init__(self):
         pass
 
-    def run(self, model, text: str, learner=None) -> dict:
-        """情绪支持回应。返回 {"content": str, "mode": "affection"}"""
+    def run(self, model, text: str, learner=None, history: list = None) -> dict:
+        """情绪支持回应。返回 {"content": str, "mode": "affection"}
+
+        v0.20.2：新增 history 参数——多轮对话时 LLM 能记住上文。
+        """
         # 加载情绪支持原则
         core = self._load_principles()
         grade_cn = ""
@@ -452,7 +464,15 @@ class AffectionSupportor:
             "不用'这是划时代的课题'这类宣告。"
         )
         user = f"学生说：{text}"
-        reply = _safe_chat(model, system, user, max_tokens=900)
+        # v0.20.2：若有历史，传真 messages（多轮连贯性）
+        if history:
+            msgs = [{"role": "user", "content": h["content"]} if h["role"] == "user"
+                    else {"role": "assistant", "content": h["content"]}
+                    for h in history[-10:]]
+            msgs.append({"role": "user", "content": user})
+            reply = _safe_chat(model, system, messages=msgs, max_tokens=900)
+        else:
+            reply = _safe_chat(model, system, user, max_tokens=900)
         if not reply:
             reply = ("我听见你说的了。我不急着给你答案或建议——"
                      "如果你愿意，可以多说一点，我在这儿听着。")
