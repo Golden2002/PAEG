@@ -5,6 +5,32 @@
 
 ---
 
+## v0.20.3（2026-08-06）
+
+**统一上下文打包器 + 模式自动纠正（关键技术）**
+
+### 1. 上下文打包器（context_bundle.py ⭐）
+- **问题**：各端点上下文注入不一致——chat_stream 完整，affection/knowledge/method/answer 缺画像/BDI；teach_stream 主循环漏 user_model 推断
+- **ContextBundle**：build_user_model_bundle（infer_user_model + BDI）/ build_learner_context（昵称/学段/自我陈述/掌握度/BDI）/ build_meta_context（模式/学科/学段）/ assemble_messages（多轮历史）
+- **修复**：
+  - teach_stream 主循环补 user_model/BDI 推断（原漏洞——手动教学循环没走 paeg.teach 注入）
+  - teach_stream 创建 LearnerProfile 补 self_description 字段（与 teach 不一致）
+  - AffectionSupportor 注入 user_model/BDI（情绪场景最需要 BDI：subject_fear/about_to_give_up）
+  - knowledge 端点 system 注入学生画像段
+
+### 2. 模式自动纠正（_mode_auto_correct ⭐）
+- **问题**：method/knowledge/affection/answer 端点完全裸奔——用户选错模式后端不纠正
+- **修复**：_mode_auto_correct 函数（优先级：情绪 > 知识库 > 方法 > 出题），method/knowledge/affection 端点接入；响应带 actual_mode/requested_mode/was_redirected 字段
+- **实测**：
+  - 选"学习方法"实际倾诉 → 纠正到 affection（"老师不催你解释什么"）✓
+  - 选"倾诉"问知识库 → 纠正到 knowledge ✓
+  - 选"知识库"问数学题 → 保留知识库（不误伤）✓
+
+### 3. 其他
+- 测试 59/59
+
+---
+
 ## v0.20.2（2026-08-06）
 
 **多轮对话连贯性修复（核心 bug）+ GitHub 项目完整性**
