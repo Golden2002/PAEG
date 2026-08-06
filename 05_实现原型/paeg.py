@@ -68,6 +68,13 @@ class PAEG:
                 self.refiner = LanguageRefiner(model_api)
             except Exception as _e:
                 print(f"[PAEG] 语言优化 Agent 初始化失败（跳过）: {_e}")
+        # v0.15：自我更新模块（Reflexion 微反思 + ExpeL 周度洞察）
+        self.evolver = None
+        try:
+            from self_evolve import SelfEvolver
+            self.evolver = SelfEvolver(model_api)
+        except Exception as _e:
+            print(f"[PAEG] 自我更新模块初始化失败（跳过）: {_e}")
         self.verbose = verbose
 
     def _log(self, msg: str):
@@ -195,6 +202,27 @@ class PAEG:
         if self.self_updater:
             self.self_updater.incremental_update(session)
             self._log(f"   OK 自我更新完成")
+
+        # 7.5 v0.15：自我进化（Reflexion 微反思——EMA 下降时诊断原因）
+        if self.evolver:
+            try:
+                ema_delta = 0.0
+                if session.evaluations:
+                    avg = sum(e['score'] for e in session.evaluations) / len(session.evaluations)
+                    ema_delta = avg - 0.7  # 相对达标线
+                dialogue_summary = "；".join(
+                    p.get("content", "")[:100] for p in session.history[:2]
+                )
+                entry = self.evolver.on_session_end(
+                    student_id=learner.id,
+                    dialogue_summary=dialogue_summary or question,
+                    ema_delta=ema_delta,
+                    subject=subject,
+                )
+                if entry:
+                    self._log(f"   🔄 自我进化：记录反思（EMA Δ={ema_delta:.2f}）")
+            except Exception as _e:
+                self._log(f"   (自我进化跳过: {_e})")
 
         return {
             "session": session,
