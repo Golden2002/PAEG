@@ -5,6 +5,18 @@
 
 ---
 
+## v0.19.29（2026-08-06）
+
+**affection 倾诉模式（情绪支持独立对话类型）**
+
+- 新增 `/api/emotion` 端点：显式选择"倾诉"模式时走 EmotionSupportor（不教不答，以注意力陪伴）
+- 前端新增第 6 个模式按钮 **"倾诉"**（data-mode="affection"）+ affectionChat 函数 + "倾诉 · 我在听" 标签 + placeholder
+- 命名：affection/affectionChat（用户指定），后端 API 路径保持 /api/emotion
+- 实测（真实浏览器）：点"倾诉"→ 输入"最近总觉得自己很没用"→ "倾诉 · 我在听"标签 + 悬置判断/注意力陪伴回应 ✓
+- 测试 59/59
+
+---
+
 ## v0.19.28（2026-08-06）
 
 **测试方法论文档化（含 Playwright 浏览器测试）**
