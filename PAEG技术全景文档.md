@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.19.7（2026-08-06）
+> **版本**：v0.19.8（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -766,6 +766,7 @@ python eval_harness.py
 | **v0.19.5** | **教学针对性优化**：①**公式渲染彻底修复**（marked 公式保护 extension：$...$/$$...$$/\(...\)/\[...\] 在 tokenizer 阶段原样保留，防 _/* 被转成 em；renderer 原样输出让 MathJax 识别；MathJax 加 processEscapes）+ **讲义式输出**（presenter prompt 加"讲义式组织"：小标题/公式规范/内容详实/可直接复用）②**关键词系统**（_handle_keyword_doc：用户输入"讲义/要点/例题/笔记"→ 生成对应格式文档下载，SSE 推送 doc 事件 + 前端显示下载链接）③**关键词提示 UI**（欢迎语提示可用关键词）|
 | **v0.19.6** | **三大根因修复**：①**公式渲染**——marked + MathJax **本地化**（assets/vendor/ 本地优先 + CDN 兜底，摆脱国内 jsdelivr 不稳定导致公式完全不渲染）②**三段式→完整回答**——教学模式改为**单个连续气泡**（所有教学步骤内容累积到一个气泡，像 deepseek 网页端，不再每步拆新气泡）③**讲义主题错位**——_handle_keyword_doc 主题提取优先用教学 concept（修复"输入讲义生成'本次讨论'而非讨论主题"），teach_stream 也接入关键词检测 + 前端 teach 处理 doc 事件显示下载链接|
 | **v0.19.7** | **四大问题修复**：①**答非所问**——新增"学习方法咨询"意图（is_method_advice + _handle_method_advice："如何学习线性代数"走学习指导而非教学/出题）②**讲义修复**——同步 /api/chat 也接入 _handle_keyword_doc + 修复 fgen 变量作用域 bug（讲义文件成功生成：`数学讲义：线性代数的特征值.md` 实测）③**闲聊模式学段**——mode 切换同时隐藏学段下拉框（闲聊不需要学段）+ chat_stream 实测正常回复 ④**架构连通性**——检查全部模块调用链：tool_recovery/tool_cache/skill_registry 经 tool_registry 间接调用 ✓；接入 teaching_memory（system 注入教学记忆）+ self_improve（对话后记录案例）；**公式渲染竞态**——统一 renderMath() 等待 MathJax startup 完成（修复异步加载竞态导致公式不显示）|
+| **v0.19.8** | **提升 Agent 指导大模型能力**：①**架构连通性指标**——新增 arch_check.py 自动检测 16 模块连通率（100%）+ 8 条关键调用链，作为关键技术指标写入 §10.6 ②**教学对话全面提升**——presenter 加"好讲解的质量标准"（7 条：具体>抽象/有为什么/建直觉/像人话/有层次/能带走/有余味）+ "学科黄金法则"（数学物理=直觉→严格桥、语文=回文本、历史=前因后果、哲学=论证+反例、外语=可用法、编程=最小示例）③**"接住"类动词屏蔽**——调研业界 prompt 工程共识（Memex/SullyOS/CipherTalk/AI-Novel-Writing 等 7 项目），AI_MARKERS 扩至 612 词 + AI_TELLS 556 词（接住/托住/抱抱/我懂你/赋能/点亮/你很棒等 150 个伪共情/AI腔词）+ prompts 三条语言铁律（动词要小/副词全去/不用动词包住对方/评价换描述）|
 
 ---
 
@@ -1059,6 +1060,62 @@ sudo systemctl enable paeg && sudo systemctl start paeg
 **可扩充**：
 - **打包内容**：在 server.py 的 chat 路由 `ctx_parts` 加更多页面设定（如当前题目、模式）
 - **文档模板**：前端 `genSelectedDoc` 的组装格式可定制
+
+---
+
+## 10.6 架构连通性指标（v0.19.7 ⭐ 关键技术指标）
+
+> **目的**：确保 PAEG 的所有模块不是"空有独立文件"，而是真正被调用链连接、在实际对话中发挥作用。
+> 每次重大改动后运行以下检测，连通率必须保持 **100%**。
+
+### 10.6.1 检测命令
+
+```bash
+cd "05_实现原型"
+python arch_check.py          # 输出连通性报告 + arch_report.json
+```
+
+### 10.6.2 连通性定义
+
+每个模块的判定标准：**文件存在 + 被 server.py 或 tool_registry.py 调用**（直接或间接）。
+
+| 模块 | 调用方式 | 状态 |
+|---|---|---|
+| tool_registry | server 直接调用（run_agent_loop）| ✅ |
+| tool_recovery | 经 tool_registry 间接调用（with_recovery 装饰器）| ✅ |
+| tool_cache | 经 tool_registry 间接调用（cached_call）| ✅ |
+| context_manager | server 直接调用（ContextManager）| ✅ |
+| memory_system | server 直接调用（MemorySystem + compress）| ✅ |
+| expert_guard | server 直接调用（ExpertGuard 深度守门）| ✅ |
+| skill_registry | 经 tool_registry 间接调用（SkillRegistry）| ✅ |
+| problem_solver | server 直接调用（/api/solve）| ✅ |
+| web_search_tool | server + tool_registry 调用 | ✅ |
+| meta_router | server 直接调用（意图路由）| ✅ |
+| self_improve | server 直接调用（对话后记录）| ✅ |
+| teaching_memory | server 直接调用（system 注入）| ✅ |
+| mcp_gateway | server 启动时挂载 | ✅ |
+| file_generator | server 直接调用（文档生成）| ✅ |
+| quotes | server + tool_registry 调用 | ✅ |
+| agent_engine | server + tool_registry 调用 | ✅ |
+
+### 10.6.3 关键调用链（必须全部存在）
+
+```
+① chat 链路:  /api/chat/stream → run_agent_loop → tool_registry → tools
+② teach 链路: /api/teach → paeg.teach → subagents(5子代理)
+③ 记忆压缩:   chat → MemorySystem.compress_if_needed → memory_summary.json
+④ 教学记忆:   chat/teach → load_teaching_memory → memory/PAEG_PEDAGOGY.md
+⑤ 自我改进:   chat 对话后 → SelfImprover.record → memory/cases.jsonl
+⑥ 上下文管理: chat → ContextManager.build → token预算+滑动窗口
+⑦ 深度守门:   chat 回答后 → ExpertGuard.refine → 改进
+⑧ 意图路由:   teach → meta_router(is_problem_request/is_method_advice/is_meta_question)
+```
+
+### 10.6.4 失败处理
+
+- **连通率 < 100%**：说明有模块没被调用（可能新加模块未接入）→ 立即排查
+- **关键链路缺失**：对话功能会静默失效 → 用 `arch_check.py` 的报告定位
+- 检测输出保存在 `05_实现原型/arch_report.json`，可纳入 CI
 
 ---
 
