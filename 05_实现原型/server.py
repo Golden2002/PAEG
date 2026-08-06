@@ -218,6 +218,14 @@ def teach():
     except Exception:
         pass  # 元问题路由失败不影响正常教学
 
+    # v0.19.7：学习方法咨询拦截——"如何学习线性代数"不应被当概念教学或出题
+    try:
+        from meta_router import is_method_advice
+        if is_method_advice(concept):
+            return _handle_method_advice(learner, concept, subject)
+    except Exception:
+        pass
+
     # v0.19：出题意图拦截——"给我一道经典题目" → 结合学段/学科/画像生成题目
     try:
         from meta_router import is_problem_request
@@ -715,6 +723,15 @@ def general_chat_stream():
     except Exception:
         pass
 
+    # v0.19.7：注入可编辑教学记忆（teaching_memory，CLAUDE.md 风格）
+    try:
+        from teaching_memory import load_teaching_memory
+        _tm = load_teaching_memory()
+        if _tm:
+            system = system + "\n\n" + _tm
+    except Exception:
+        pass
+
     # 三层记忆
     mem_ctx = ""
     long_ctx = ""
@@ -827,6 +844,14 @@ def general_chat_stream():
                 mem.compress_if_needed()
             except Exception:
                 pass
+        # v0.19.7：自我改进——记录对话案例（轻量，不阻塞）
+        try:
+            from self_improve import SelfImprover
+            _improver = SelfImprover(llm=llm)
+            _improver.record(text, reply, {"subject": data.get("subject", "chat"),
+                                           "learner_id": str(learner_id)[:12]})
+        except Exception:
+            pass
         if CONV_STORE is not None and USER_STORE is not None \
                 and str(learner_id).startswith('u') and learner_id[1:].isdigit():
             try:
@@ -1026,6 +1051,14 @@ def general_chat():
         except Exception as _e:
             print(f"[Server] 对话保存失败: {_e}")
 
+    # v0.19.7：同步 chat 也接关键词触发（讲义/要点/例题/笔记）——之前只在 stream
+    try:
+        _doc = _handle_keyword_doc(text, reply, learner, data)
+        if _doc and not doc_urls:
+            doc_urls = _doc
+    except Exception:
+        pass
+
     return jsonify({
         "reply": reply,            # 兼容旧前端
         "segments": segments,       # v0.17：多段输出
@@ -1126,6 +1159,65 @@ def list_conversations(learner_id):
     """列出用户全部会话（不含消息体，倒序）。"""
     if not _is_registered(learner_id):
         return jsonify({"conversations": []})
+
+
+def _handle_method_advice(learner, concept, subject):
+    """v0.19.7：学习方法咨询——"如何学习X/怎么复习"走学习指导而非教学/出题。
+
+    结合学段/学科/用户画像，给出针对性的学习方法建议（像一位有经验的老师
+    在谈怎么学这门课），而不是把"如何学习线性代数"当成概念去教学或出题。
+    """
+    from prompts import build_general_chat_system, build_general_chat_user
+    from subagents import _safe_chat
+
+    grade = getattr(learner, "grade_level", "high_school")
+    grade_cn = {"middle_school": "初中", "high_school": "高中/高考",
+                "undergraduate": "大学本科", "graduate_exam": "考研"}.get(grade, grade)
+    from prompts import get_style
+    try:
+        subject_cn = get_style(subject)["label"]
+    except Exception:
+        subject_cn = subject
+    desc = getattr(learner, "self_description", "") or ""
+    desc_line = f"学生的自述：{desc.strip()}\n" if desc.strip() else ""
+
+    system = (
+        "你是 Émile Novis，一位既懂学科又懂学习的老师。学生问的是'如何学习{subject}'这类方法问题。\n"
+        "请给出一份**具体、可执行的学习方法建议**，而不是讲学科概念，更不是出题考他。\n"
+        "要点：\n"
+        "1. 先理解 ta 的处境（{grade}学生）和基础\n"
+        "2. 给出学习路径：入门→进阶→强化，每阶段该做什么\n"
+        "3. 推荐具体方法（如：先建立直觉再用工具、做例题找规律、错题复盘）\n"
+        "4. 结合这门学科的特点（{subject}该怎么学才有感觉）\n"
+        "5. 语气像一位耐心的老师，不列'步骤1/2/3'，用自然的讲义式叙述\n"
+        "不需要出题，不需要讲具体知识点，就谈'怎么学'。"
+    ).format(subject=subject_cn, grade=grade_cn)
+
+    user = f"学生问：{concept}\n{desc_line}请给出{subject_cn}的学习方法建议。"
+    answer = _safe_chat(llm, system, user, max_tokens=1400)
+    if not answer:
+        answer = (f"关于怎么学{subject_cn}，我的建议是：先从最基础的概念建立直觉，"
+                  f"再通过做典型例题巩固，最后用错题复盘查漏补缺。具体方法我可以展开讲。")
+
+    return jsonify({
+        "session_id": f"method_{learner.id}",
+        "summary": {"avg_score": 0},
+        "worldview_used": "weil",
+        "tone_ratio": 0,
+        "presentations": [
+            {"step_id": 1, "content": answer, "step_type": "method"}
+        ],
+        "evaluations": [],
+        "diagnosis": {},
+        "plan": {"steps": [{"type": "method"}]},
+        "reflections": [],
+        "learner": {
+            "id": learner.id,
+            "nickname": learner.nickname,
+            "grade_level": learner.grade_level,
+            "subjects_mastery": learner.subjects_mastery,
+        },
+    })
 
 
 def _handle_problem_request(learner, concept, subject):
@@ -1259,6 +1351,7 @@ def _handle_keyword_doc(user_text, reply, learner, data):
     # 保存并返回下载链接
     try:
         from file_generator import FileGenerator
+        global fgen
         if fgen is None:
             fgen = FileGenerator(llm)
         title = f"{subject_cn}{doc_type}：{topic[:20]}"
