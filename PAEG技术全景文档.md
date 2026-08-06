@@ -344,6 +344,32 @@ Library/
 - **意图**：在提问/在求助/可能要放弃/在求证
 推断结果注入 prompt，并给出教学调整建议（如"ta 想放弃→降低难度"）
 
+## 3.14 语法完整性与用户系统（v0.14 ⭐）
+
+### 3.14.1 语法完整性（language_refiner.py + prompts.py）
+教学语言要求**每个句子语法结构完整**（有主谓宾），不写省略句/无主句：
+- ❌ "一句话记住：…" → ✅ "我们可以用一句话来记住：…"
+- ❌ "先看一个现象" → ✅ "我们先来看一个现象。"
+- ❌ "再看它周围是否独一份" → ✅ "我们再来看它周围是否只有它这一条闭合轨道。"
+
+实现：`_check_ellipsis()` 按标点切句检测省略（动词开头命令句/"一句话记住"模式/"关键在"短句），
+检测到即触发 Self-Refine 改写补全。
+
+### 3.14.2 Markdown 渲染（GUI）
+对话框支持 Markdown：**加粗/斜体/标题/列表/代码/表格/引用/链接**。
+用 marked.js（CDN）+ 内置 fallback，消息气泡用 `.md-content` 渲染。
+
+### 3.14.3 用户注册系统（user_store.py + API + GUI）
+- **注册**：邮箱或手机号 + 密码（SHA-256 + salt 哈希，不存明文）
+- **登录**：验证并加载持久化画像
+- **持久化**：`users.json` 保存用户 + 学习者画像（含 self_description、mastery）
+- **API**：`POST /api/register`、`POST /api/login`
+- **GUI**：顶栏"登录/注册"按钮 + 弹窗；登录后 user_id 固定，**刷新不丢画像**
+- **效果**：不同用户有独立画像和反应（个体性持久）
+
+### 3.14.4 下拉菜单小三角（GUI）
+学段/学科下拉框加 SVG 三角箭头提示（appearance:none + 背景图）。
+
 ---
 
 # 4. 后端服务（server.py + API）
@@ -368,6 +394,8 @@ Flask 写的本地 Web 服务，**同时提供网页和 API**。默认监听 `0.
 | `/api/knowledge/library` | GET | **Library 扩展信息**（v0.11）| — |
 | `/api/generate` | POST | **生成文件**（v0.12）| `{type: quiz\|article, subject, topic}` |
 | `/api/download/<f>` | GET | **下载文件**（v0.12）| — |
+| `/api/register` | POST | **注册**（v0.14）| `{identifier, password, nickname}` |
+| `/api/login` | POST | **登录**（v0.14）| `{identifier, password}` |
 | `/api/knowledge/search` | GET | 搜索知识库 | `?q=熵&subject=physics` |
 | `/api/batch` | POST | 批处理（每周）| — |
 
@@ -576,6 +604,7 @@ s["skill.cooking.egg"] = {
 │   ├── file_generator.py ⭐ 文件生成器（练习题/文章/下载，v0.12）
 │   ├── language_refiner.py ⭐ 语言优化 Agent（Self-Refine 多轮，v0.12/0.13）
 │   ├── ai_taste_detector.py ⭐ AI 味检测器（5 信号，v0.13）
+│   ├── user_store.py      ⭐ 用户注册与画像持久化（v0.14）
 │   ├── weil_corpus.json   薇依语料（10 条，few-shot 矫正用）
 │   ├── subagents.py      5 子代理
 │   ├── prompts.py        ⭐ 学科提示词中心（v0.8.1）
@@ -634,6 +663,7 @@ python test_demo_real_llm.py --provider auto
 | **v0.11** | **薇依思想深化**（文库一手文本：爱是朝向/移情/注意力）+ **语言规范**（防怪动词短语/滥比喻/语气词）+ **对象意识**（用户建模，不同用户不同反应）+ **知识库扩展接口**（Library/KnowledgeBase）|
 | **v0.12** | **文件生成与下载**（练习题/文章 → 生成 → 下载）+ **语言优化 Agent**（薇依语料 few-shot 矫正，去除 AI 痕迹）|
 | **v0.13** | **新方法加强**：AI 味风格检测器（句长变异/过渡词密度/三段清单）+ **Self-Refine 多轮改写** + **Actor-Critic 自我认知反思** + **BDI 用户建模**（信念/愿望/意图）|
+| **v0.14** | **语法完整性**（省略句检测与补全）+ **Markdown 渲染** + **用户注册系统**（邮箱/手机号+画像持久化）+ **个体性验证** + **下拉小三角** |
 
 ---
 
