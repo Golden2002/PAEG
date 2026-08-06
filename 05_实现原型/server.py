@@ -137,6 +137,109 @@ def static_files(filename):
 # ─────────────────────────────────────
 
 
+# ─────────────────────────────────────
+# v0.19.26：Agent Steering — 学科自动识别层
+# ─────────────────────────────────────
+
+def _steer_subject(concept: str, subject: str, learner, learner_id: str) -> dict:
+    """根据问题内容自动判断学科，覆盖用户手动设定。
+
+    返回 {"subject": 最终学科, "unknown": bool, "unknown_name": str|None,
+          "switched": bool, "response": 可选（unknown 时返回响应对象）}
+    """
+    try:
+        from subject_detector import detect_subject
+        from prompts import normalize_subject
+        norm_subject = normalize_subject(subject)
+        det = detect_subject(concept, llm, user_subject=norm_subject)
+
+        # 未收录学科：记录需求 + 反馈用户
+        if det.get("unknown"):
+            uname = det.get("unknown_name") or "该学科"
+            if EVOLVER is not None:
+                try:
+                    EVOLVER.record_subject_request(uname, concept, learner_id)
+                except Exception:
+                    pass
+            reply = (
+                f"我注意到你问的是「{uname}」领域的问题。\n\n"
+                f"目前我还没有把「{uname}」正式列入我的学科清单，"
+                f"但**我已经把这条需求记下来**，后续会优先优化升级来覆盖它。\n\n"
+                f"在此之前，你可以：\n"
+                f"· 问我相关的**其他学科**（如物理、数学、哲学……）\n"
+                f"· 或者把资料上传给我（点左上角书本图标），我就能基于你给的资料回答\n\n"
+                f"感谢你的反馈，这会让 PAEG 变得更好。"
+            )
+            return {"subject": subject, "unknown": True, "unknown_name": uname,
+                    "switched": False, "response": jsonify({
+                        "session_id": f"unknown_{learner_id}",
+                        "summary": {"avg_score": 0},
+                        "worldview_used": "weil",
+                        "tone_ratio": 0,
+                        "presentations": [
+                            {"step_id": 1, "content": reply, "step_type": "unregistered_subject"}
+                        ],
+                        "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
+                        "reflections": [],
+                        "learner": {
+                            "id": learner.id, "nickname": learner.nickname,
+                            "grade_level": learner.grade_level,
+                            "subjects_mastery": learner.subjects_mastery,
+                        },
+                        "unregistered_subject": True,
+                        "subject_requested": uname,
+                    })}
+
+        # 识别到学科且 ≠ 用户设定 → steering 切换
+        if det.get("switched"):
+            new_subject = det["subject"]
+            try:
+                from prompts import get_style
+                old_label = get_style(subject)["label"]
+                new_label = get_style(new_subject)["label"]
+                print(f"[PAEG][steering] {old_label} → {new_label}（问题: {concept[:30]}）")
+            except Exception:
+                pass
+            return {"subject": new_subject, "unknown": False, "unknown_name": None,
+                    "switched": True, "response": None}
+    except Exception:
+        pass
+    return {"subject": subject, "unknown": False, "unknown_name": None,
+            "switched": False, "response": None}
+
+
+def _steer_unknown_response(concept: str, learner, learner_id: str,
+                           unknown_name: str) -> dict:
+    """构造未收录学科的 SSE 流式响应（teach_stream/chat_stream 用）。"""
+    reply = (
+        f"我注意到你问的是「{unknown_name}」领域的问题。\n\n"
+        f"目前我还没有把「{unknown_name}」正式列入我的学科清单，"
+        f"但**我已经把这条需求记下来**，后续会优先优化升级来覆盖它。\n\n"
+        f"在此之前，你可以：\n"
+        f"· 问我相关的**其他学科**（如物理、数学、哲学……）\n"
+        f"· 或者把资料上传给我（点左上角书本图标），我就能基于你给的资料回答\n\n"
+        f"感谢你的反馈，这会让 PAEG 变得更好。"
+    )
+    return {
+        "session_id": f"unknown_{learner_id}",
+        "summary": {"avg_score": 0},
+        "worldview_used": "weil",
+        "tone_ratio": 0,
+        "presentations": [
+            {"step_id": 1, "content": reply, "step_type": "unregistered_subject"}
+        ],
+        "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
+        "reflections": [],
+        "learner": {
+            "id": learner.id, "nickname": learner.nickname,
+            "grade_level": learner.grade_level,
+            "subjects_mastery": learner.subjects_mastery,
+        },
+        "unregistered_subject": True,
+        "subject_requested": unknown_name,
+    }
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
     """健康检查。"""
@@ -192,6 +295,16 @@ def teach():
     # 教学
     concept = data["concept"]
     subject = data["subject"]
+
+    # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（在拦截器之前）
+    try:
+        _steer = _steer_subject(concept, subject, learner, learner_id)
+        if _steer.get("response") is not None:
+            return _steer["response"]  # 未收录学科反馈
+        if _steer.get("switched"):
+            subject = _steer["subject"]
+    except Exception:
+        pass
 
     # v0.19.21：知识库查询拦截必须先于 meta——"知识库/你学过什么"应清点 Library 而非讲身份
     try:
@@ -371,6 +484,26 @@ def teach_stream():
 
     concept = data["concept"]
     subject = data["subject"]
+
+    # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（流式版本）
+    try:
+        _steer = _steer_subject(concept, subject, learner, learner_id)
+        if _steer.get("unknown"):
+            # 未收录学科 → SSE 推反馈
+            _unk = _steer_unknown_response(concept, learner, learner_id,
+                                           _steer.get("unknown_name") or "该学科")
+            _unk_content = _unk.get("presentations", [{}])[0].get("content", "")
+
+            def gen_unknown():
+                for i in range(0, len(_unk_content), 60):
+                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _unk_content[i:i+60], 'step_type': 'unregistered_subject'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'unregistered_subject': True}, ensure_ascii=False)}\n\n"
+            return Response(gen_unknown(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        if _steer.get("switched"):
+            subject = _steer["subject"]
+    except Exception:
+        pass
 
     # v0.19.22：知识库查询拦截必须先于 meta（流式版本）——"知识库/你学过什么"应清点 Library
     try:
