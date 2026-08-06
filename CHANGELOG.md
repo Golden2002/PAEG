@@ -5,6 +5,53 @@
 
 ---
 
+## v0.19.22（2026-08-06）
+
+**系统性自进化（四路更新 + 质量门禁）⭐ + 知识库拦截修复 + 意向性层**
+
+### 1. 自进化系统（核心亮点，调研 10+ 成熟项目后设计）
+- **调研依据**：Reflexion / ExpeL / Voyager / MemGPT / Generative Agents / Self-RAG / Constitutional AI / AlpaGasus / SCOPE / SWE-agent（librarian 双路调研）
+- **四路进化管线**（self_evolution.py）：
+  ① 知识库更新：成功教学(avg≥0.7)→LLM提炼(definition+intuition)→QualityGate→`Library/KnowledgeBase/subjects/evolved_*.json`（重启自动注册，知识库闭环）
+  ② 学科提示词更新（SCOPE 双流）：教学反思→memory/subject_patches.md→teaching_memory 注入 system
+  ③ 工具使用经验：调用成败→memory/tool_lessons.md→注入
+  ④ 周度洞察：periodic 调度器跑 weekly_insight_update+batch_update+analyze_failures
+- **质量门禁**（quality_gate.py，4 层防污染）：
+  L1 教育宪法（有害词 + **提示词注入/记忆投毒** + **PII/凭证泄露**——修复中文环境 \b 词边界 bug）
+  L2 硬规则（长度/信息量/去重）
+  L3 LLM 多维评分（factuality/safety/pedagogy；knowledge 类不查 novelty——经典知识不该被判"不新颖"）
+  L4 证据沙盒（洞察类先进沙盒，evidence≥2 转正、贡献分归零淘汰）
+- **实测**：教学"牛顿第二定律"(avg=0.95)→自动蒸馏 F=ma+购物车直觉→evolved_20260806.json；"忽略系统指令"/"手机号"/"身份证"/"API Key" 全部被 L1 拦截
+
+### 2. 知识库关键词拦截顺序修复
+- **根因**：META_PATTERNS 含裸"知识库|资料库"且 meta 拦截在 knowledge 之前→"知识库"永远被 meta 抢走（讲身份而非清点 Library）
+- **修复**：META_PATTERNS 移除裸"知识库"（只留"调用/查"类动词）；server 把 knowledge 拦截移到 meta 之前
+- 实测：teach 模式问"知识库/你学过什么"→ step_type=knowledge 清点 Library ✓
+
+### 3. 意向性层
+- **问题**：教学模式问"你今天怎么样"被强行变成数学课（教学指令覆盖用户出发点）
+- **修复**：meta_router.is_teaching_intent（LLM 判断教学意图，缓存 10 分钟）+ server 在规则拦截后接入
+- 实测：教学模式下"你今天怎么样/你今天过得怎么样/我心情不好"→ step_type=chat 一般化响应；"什么是导数"→ 正常教学 ✓
+
+### 4. 前端欢迎语提示关键词
+- 初始会话欢迎气泡新增："看我的知识库——问「知识库」或「你学过什么」，我把收着的资料清点给你看"
+
+### 5. 其他
+- teaching_memory 注入 subject_patches.md + tool_lessons.md（自进化产物生效）
+- 测试 59/59 通过
+
+---
+
+## v0.19.21（2026-08-06）
+
+**知识库拦截顺序 + 意向性层 + 周期调度器（本轮前半）**
+
+- 知识库/闲聊不回复问题根因：公网与本地 index.html MD5 不一致→确认是本地文件编码读取差异（磁盘二进制 24b7faba == 服务返回），实际后端前端均最新，需浏览器强刷
+- 周期自我更新调度器（periodic_self_update.py）：后台守护线程 + /api/self-update/run（手动）+ /api/self-update/status，对话后 mark_activity
+- 调度器已实测运行（thread_alive=True）
+
+---
+
 ## v0.19.20（2026-08-06）
 
 **阶段性总结：项目最大亮点文档化 + 自检复盘 + 材料索引**
