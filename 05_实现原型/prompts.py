@@ -661,9 +661,17 @@ def build_general_chat_system(learner=None) -> str:
 {LANGUAGE_STYLE}"""
 
 
-def build_general_chat_user(user_text: str) -> str:
-    """一般对话的 user prompt。"""
-    return f"学生说：{user_text}\n请以自然、真诚的方式回应，像一位认真倾听的良师。"
+def build_general_chat_user(user_text: str, context: str = "") -> str:
+    """一般对话的 user prompt（v0.19.3：打包页面设定 + 先理解再输出）。
+
+    context: 额外的上下文（教学模式/学段/学科等页面设定），由调用方拼好传入。
+    """
+    base = (f"{context}\n\n" if context else "") + \
+        f"学生说：{user_text}\n"
+    return (base +
+            "请先准确理解学生这句话的意思（结合上下文中的身份、设定和历史），"
+            "再组织你的回应。回应要像一份规范的教学讲义片段："
+            "观点明确、层次清晰、内容详实，但不用'步骤1/2/3'的僵硬结构。")
 
 
 def build_presenter_user(subject: str, topic: str, step_type: str = "present",
