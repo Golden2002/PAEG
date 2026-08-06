@@ -133,9 +133,9 @@ def is_meta_question(text: str) -> bool:
 # ─────────────────────────────────────────────
 # v0.19.27：情绪与心理支持意图检测
 # ─────────────────────────────────────────────
-# 学生表达情绪/心理/人生困惑（而非学科问题）时，走 EmotionSupportor 子代理。
+# 学生表达情绪/心理/人生困惑（而非学科问题）时，走 AffectionSupportor 子代理。
 
-EMOTION_PATTERNS = [
+AFFECTION_PATTERNS = [
     # 情绪表达
     r"(难过|伤心|沮丧|失落|焦虑|紧张|害怕|恐惧|孤独|寂寞|迷茫|困惑|无助|绝望|崩溃)",
     r"(烦|烦死了|压力|累|疲惫|心累|emo|破防|没意思|没劲|空虚|麻木)",
@@ -155,15 +155,15 @@ EMOTION_PATTERNS = [
     r"(帮帮我|救救我|好难受|受不了了|撑不下去|坚持不下去)",
     r"想(哭|一个人待着|消失|离开)|不想(说话|见人|活了)",
 ]
-EMOTION_COMPILED = [re.compile(p, re.IGNORECASE) for p in EMOTION_PATTERNS]
+AFFECTION_COMPILED = [re.compile(p, re.IGNORECASE) for p in AFFECTION_PATTERNS]
 
 
-def is_emotion_expression(text: str) -> bool:
+def is_affection_expression(text: str) -> bool:
     """判断是否情绪/心理/人生困惑（而非学科问题）。"""
     t = (text or "").strip()
     if not t or len(t) > 100:
         return False
-    return any(p.search(t) for p in EMOTION_COMPILED)
+    return any(p.search(t) for p in AFFECTION_COMPILED)
 
 
 # ─────────────────────────────────────────────
