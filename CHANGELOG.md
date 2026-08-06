@@ -5,7 +5,30 @@
 
 ---
 
-## v0.21.5（2026-08-07）⭐ 关键节点
+## v0.21.6（2026-08-07）
+
+**自我指涉答非所问修复：subagent/学科学段问题不再误路由知识库清点**
+
+### 1. 问题识别（用户问答案例）
+- 用户问"你都有哪些subagent，切换学科和学段对你意味着什么"→ É 却清点知识库藏书（答非所问）
+- **根因**（与 v0.21.3 圆锥曲线同源）：`KNOWLEDGE_QUERY_PATTERNS[1]` 正则 `(你|我)?...有...(什么|哪些)...` 把"你**有**哪些**subagent**"误判为知识库清点（"有...哪些"双语义）；"切换学科学段"问题所有路由都不命中落到 LLM 兜底被知识库 prompt 干扰
+
+### 2. 修复（self_referential.py）
+- 新增 `self_arch` 桶：8 个 subagent 分工说明 + 学科/学段切换含义（确定性模板，不走 LLM）
+- INTERFACE_QUERY_PATTERNS 扩展 3 条正则：`subagent/子代理/内部结构` 自我指涉 + `学科/学段切换意味着/什么意思`
+- **利用拦截顺序**：is_interface_query 在 is_knowledge_query **之前**（server.py 1974 < 2776），扩展后正确拦截
+- **验证**：5 个问法全路由 self_referential；对照不误伤——"什么是导数"→教学、"你学过什么"→知识库、"你的知识库里有什么"→知识库
+
+### 3. 端到端验证
+- teach_stream 实测："你都有哪些subagent"→ step_type=interface（含 Diagnostor/分工/切换学科内容，**无藏书清点**）；"切换学科和学段对你意味着什么"→ 同上 ✓
+- 回答内容：8 subagent 分工（Diagnostor/Planner/Presenter/Evaluator/Adapter/AnswerSolver/AffectionSupportor/SelfUpdateAgent）+ 学科换备课/学段调深度
+
+### 4. 回归确认（★ 不破坏原有功能）
+- 新增 tests/test_self_referential.py 6 用例（subagent路由/学科学段路由/知识库不劫持/教学不误伤/内容完整/界面不受影响）全过
+- pytest 44 → 50（50/50 全过）；arch_check 16/16
+- 端到端实测正常
+
+---
 
 **古怪提示词对抗测试 + ability decay 发现与修复 + 文档经验补全**
 
