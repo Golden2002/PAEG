@@ -765,7 +765,9 @@ def general_chat_stream():
             _agent_sys = system + (
                 "\n\n## 工具使用\n可调用 web_search/verify_math/fetch_page/daily_quote/"
                 "get_time/load_skill__* 辅助回答。需要外部信息或数学验证时使用，否则直接回答。")
-            _ar = run_agent_loop(llm, _agent_sys, text, max_iterations=3)
+            # v0.19.4：把打包后的 user（含当前设定/历史/身份）传给 agent loop，
+            # 修复"偏离提问"——之前传的是原始 text，LLM 收不到上下文
+            _ar = run_agent_loop(llm, _agent_sys, user, max_iterations=3)
             reply = _ar.get("answer")
             tool_log = _ar.get("tool_calls", [])
         except Exception:
