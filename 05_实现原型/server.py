@@ -515,13 +515,40 @@ def skills_list():
 
 @app.route("/api/upload", methods=["POST"])
 def upload_file():
-    """v0.19 P2-10：图片/文件上传（存到用户目录，返回访问 URL）。
+    """v0.19 P2-10：图片/文件上传 + v0.19.11 资料上传。
 
-    请求：multipart/form-data, file + learner_id
-    响应：{"url": "/uploads/<learner_id>/<filename>", "filename": ...}
+    请求：multipart/form-data, file + learner_id + purpose(可选: library=资料库)
+    响应：{"url", "filename"} 或 {"library": 资料列表}
     """
     learner_id = request.form.get("learner_id", "anonymous")
     f = request.files.get("file")
+    purpose = request.form.get("purpose", "chat")
+
+    # v0.19.11：资料上传 → Library/用户id/
+    if purpose == "library":
+        if not f or not f.filename:
+            return jsonify({"error": "no file"}), 400
+        allowed = (".pdf", ".md", ".txt", ".docx", ".csv", ".json", ".png", ".jpg")
+        import os as _os
+        ext = _os.path.splitext(f.filename)[1].lower()
+        if ext not in allowed:
+            return jsonify({"error": f"不支持的格式 {ext}"}), 400
+        try:
+            # 保存到 Library/用户id/
+            lib_root = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                                     '..', 'Library', f'user_{learner_id}')
+            _os.makedirs(lib_root, exist_ok=True)
+            from datetime import datetime
+            safe_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{_os.path.basename(f.filename)}"
+            f.save(_os.path.join(lib_root, safe_name))
+            return jsonify({
+                "ok": True, "filename": safe_name,
+                "library_path": f"Library/user_{learner_id}/{safe_name}",
+                "note": "资料已存入你的专属资料库，回答时会自动参考",
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
     if not f or not f.filename:
         return jsonify({"error": "no file"}), 400
     # 限制类型（图片为主）
@@ -552,6 +579,48 @@ def uploaded_file(filename):
     """提供上传文件的访问。"""
     base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
     return send_from_directory(base, filename)
+
+
+def get_user_library(learner_id: str) -> str:
+    """v0.19.11：读取用户专属资料库内容（供 Agent 注入回答上下文）。
+
+    路径：Library/user_<learner_id>/
+    返回：可注入 system 的资料摘要文本；无资料返回 ""。
+    """
+    import os as _os
+    lib_root = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                             '..', 'Library', f'user_{learner_id}')
+    if not _os.path.isdir(lib_root):
+        return ""
+    files = [f for f in _os.listdir(lib_root) if not f.startswith('.')]
+    if not files:
+        return ""
+    parts = [f"【用户上传的资料（{len(files)} 份，回答相关问题时请参考）】"]
+    for fn in files[:20]:
+        parts.append(f"- {fn}")
+    # 尝试读 md/txt 内容摘要（前 500 字）
+    for fn in files[:3]:
+        if fn.endswith(('.md', '.txt')):
+            try:
+                with open(_os.path.join(lib_root, fn), encoding='utf-8') as f:
+                    content = f.read(500)
+                if content.strip():
+                    parts.append(f"\n资料《{fn}》内容节选：{content.strip()[:400]}")
+            except Exception:
+                pass
+    return "\n".join(parts)
+
+
+@app.route("/api/user-library/<learner_id>", methods=["GET"])
+def user_library_info(learner_id):
+    """列出用户上传的资料。"""
+    import os as _os
+    lib_root = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                             '..', 'Library', f'user_{learner_id}')
+    if not _os.path.isdir(lib_root):
+        return jsonify({"files": [], "total": 0})
+    files = [f for f in _os.listdir(lib_root) if not f.startswith('.')]
+    return jsonify({"files": files, "total": len(files)})
 
 
 @app.route("/api/knowledge/library", methods=["GET"])
@@ -729,6 +798,14 @@ def general_chat_stream():
         _tm = load_teaching_memory()
         if _tm:
             system = system + "\n\n" + _tm
+    except Exception:
+        pass
+
+    # v0.19.11：注入用户专属资料库（上传的资料，回答相关问题时参考）
+    try:
+        _ulib = get_user_library(learner_id)
+        if _ulib:
+            system = system + "\n\n" + _ulib
     except Exception:
         pass
 
