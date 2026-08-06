@@ -1,0 +1,14 @@
+{
+  "teach": true,
+  "chat": true,
+  "answer": true,
+  "method": true,
+  "knowledge": true,
+  "affection": true,
+  "knowledge_map": true,
+  "weather": true,
+  "mcp": true,
+  "self_update": true,
+  "file_gen": true,
+  "history": true
+}
