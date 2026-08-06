@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 运行数据
+05_实现原型/data/
+05_实现原型/downloads/
+*.log
+
+# 大型二进制
+Library/**/*.pdf
+Library/**/*.docx
+Library/**/*.doc
+
+# 系统
+.DS_Store
+Thumbs.db
