@@ -703,6 +703,7 @@ body {
       <button class="mode-btn" data-mode="answer" title="直接给完整答案（论述/计算/证明题）">找答案</button>
       <button class="mode-btn" data-mode="method" title="问某门课该怎么学、怎么复习、怎么规划">学习方法</button>
       <button class="mode-btn" data-mode="knowledge" title="查看我的知识库：我收着哪些资料">知识库</button>
+      <button class="mode-btn" data-mode="affection" title="难过、焦虑、迷茫……想找人说说话">倾诉</button>
     </div>
   </div>
 </header>
@@ -1683,6 +1684,40 @@ async function knowledgeChat(question) {
   }
 }
 
+// v0.19.29：倾诉模式——情绪与心理支持（不教不答，以注意力陪伴）
+async function affectionChat(text) {
+  const thinking = addThinking('chat');
+  askBtn.disabled = true;
+  try {
+    const result = await api('/api/emotion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: text,
+        learner_id: STATE.learnerId,
+        nickname: STATE.nickname,
+        grade_level: document.getElementById('grade-select').value,
+        self_description: STATE.selfDescription || '',
+      }),
+    });
+    removeThinking(thinking);
+    const pres = (result.presentations && result.presentations[0]) || {};
+    const content = pres.content || '';
+    if (content) {
+      addMsg('paeg', `<div class="mode-tag">倾诉 · 我在听</div>` + content);
+    } else if (result.error) {
+      addMsg('paeg', `出错了：${result.error}`);
+    } else {
+      addMsg('paeg', '（没有回应）');
+    }
+  } catch (e) {
+    removeThinking(thinking);
+    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+  } finally {
+    askBtn.disabled = false;
+  }
+}
+
 // 辅助：学科 key → 中文 label（从 subject-select 读）
 function subjectLabel(key) {
   const sel = document.getElementById('subject-select');
@@ -1974,6 +2009,8 @@ askBtn.addEventListener('click', () => {
     methodChat(q, subjectSelect.value);
   } else if (currentMode === 'knowledge') {
     knowledgeChat(q);
+  } else if (currentMode === 'affection') {
+    affectionChat(q);
   } else {
     teach(q, subjectSelect.value);
   }
@@ -2002,10 +2039,12 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     // v0.19.7：教学模式/找答案模式显示学科+学段选择；闲聊模式全部隐藏
     // v0.19.14：新增 answer（找答案）模式
     // v0.19.25：新增 method（学习方法）/ knowledge（知识库）模式
+    // v0.19.29：新增 affection（倾诉）模式
     const isTeach = currentMode === 'teach';
     const isAnswer = currentMode === 'answer';
     const isMethod = currentMode === 'method';
     const isKnowledge = currentMode === 'knowledge';
+    const isAffection = currentMode === 'affection';
     const showSelects = isTeach || isAnswer || isMethod;
     document.getElementById('subject-select').style.display = showSelects ? '' : 'none';
     document.getElementById('grade-select').style.display = showSelects ? '' : 'none';
@@ -2013,7 +2052,8 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     questionInput.placeholder = isTeach
       ? '输入你想学习的内容…'
       : (isAnswer ? '输入题目，直接给你完整答案（论述/计算/证明）…'
-         : (isMethod ? '问这门课该怎么学、怎么复习、怎么规划…' : '输入任意内容，查看我的知识库…'));
+         : (isMethod ? '问这门课该怎么学、怎么复习、怎么规划…'
+            : (isAffection ? '难过、焦虑、迷茫……想说什么都可以' : '输入任意内容，查看我的知识库…')));
     questionInput.focus();
   });
 });
