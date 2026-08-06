@@ -710,6 +710,11 @@ LLM 中文输出常出现：
 └─────────────────────────────────────────────┘
 ```
 
+**分层过滤确认（v0.21.8 ⭐ 用户核查）**：
+- **全局主层**：`_polish_text`（server.py）是**所有输出端点的统一入口**——teach/teach_stream/chat/affection/answer 全过此层 → L2 规则检测 → 命中才触发 L3 LLM 修正
+- **精细触发层**：L3 只在**检测到问题**时触发（AI 味 ≥0.4 或 `_check_ellipsis` 命中或动宾不当）——零问题文本跳过 LLM 改写（省成本）
+- 分层逻辑：**主层对全部输出全局生效（L1+L2 检测），精细层（L3 修正）对问题句定向生效**——正是"一个主要的层 + 更精细的过滤"
+
 ## L1 提示词约束（prompts.py"动宾搭配与省略边界"）
 
 - **主谓必须真搭配**：不用"进行/展开/赋能"抽象动词装饰主语
@@ -720,6 +725,16 @@ LLM 中文输出常出现：
   2. 上下文同一主语已明确（"他喜欢音乐，也喜欢电影"）——合法
   3. 简短应答（"你吃了吗？——吃了"）——合法
   - 讲解/总结/承诺/描述——**必须显式主语**
+- **词法完整（v0.21.8 ⭐ 新规则1）**：**必须使用完整词语，禁止省略用法**——动词/名词/形容词一律用完整词形：
+  - 双字词不得压缩为单字：「疲倦」不写「倦」，「倾听」不写「听」，「告诉」不写「告」
+  - 不得用古语/书面压缩动词：「道出」→「说出来」，「探知」→「探索并了解」
+  - 仅当单字词本身语义完整、无对应完整双字词时可用（「走」「看」「吃」）
+  - ❌"觉得倦了"→✅"觉得疲倦了"；❌"道出真相"→✅"把真相说出来"
+- **句法完整（v0.21.8 ⭐ 新规则2）**：**句子成分完整 + 动宾搭配合理 + 充足修饰成分与连接词**：
+  1. **主谓宾/主系表结构完整**：不省略必要成分——"我想与你探讨。"（缺宾语）→"我想与你探讨这个问题。"
+  2. **动宾搭配合理**：动词带恰当宾语，不悬空、不强组——"带着重量"→"这句话的分量很重"
+  3. **充足修饰成分**：主动补宾语补足语、双宾语、状语——"我来把这个结论告诉你"（双宾语）；"她仔细地把解法讲给小明听"（状语+双宾语）
+  4. **充足连接词**：用因为/所以/但是/同时/然后标明逻辑——"因为需要先化简，所以我们从通分开始"
 
 ## L2 规则检测（language_refiner._check_ellipsis 扩展）
 
@@ -730,12 +745,15 @@ LLM 中文输出常出现：
 | 动宾搭配不当 | "带着重量/分量/意义/温度" | "有很重的分量""本身就很重" |
 | 凑词动宾 | "做着思考/努力" | "正在思考/努力" |
 | 翻译腔冗余 | "进行一个分析/讨论" | "分析/讨论" |
+| **省略词形（v0.21.8）** | "觉得倦了/道出/探知" | "疲倦""说出来""探索并了解" |
+| **悬空宾语（v0.21.8）** | "与你探讨。/和你分享。"（句尾悬空）| "与你探讨这个问题""和你分享我的想法" |
 
 ## L3 LLM 修正（minimal-edit）
 
 - **最小改动**：保留原意/事实/已通顺句子，只改问题部分
 - **不重写风格**：保留原文本温度和亲切感，不改书面语
 - **教学场景补主语**：讲解/总结/承诺必须显式主语；纯祈使指令可保留
+- **词法/句法补全（v0.21.8）**：补全省略词形（倦→疲倦）+ 补足悬空宾语（与你探讨→与你探讨这个问题）；实测"我觉得倦了，想与你探讨"→"我觉得疲倦了，想与你探讨这个问题" ✓
 
 ## 关键修复：teach_stream 绕过 refiner 漏洞
 
@@ -2030,6 +2048,63 @@ python stress_turn_eval.py --suite relevance --mode teach   # 只跑相关性（
 - **relevance**：进行中
 
 **方法论闭环**（与 chaos 相同）：`FAIL → 定位根因（输入侧 or 状态侧）→ 修复（规则/模板/记忆机制）→ 二次运行验证 → 回归确认`。attention 发现的"远端遗忘"指向**显式记忆提取**（关键信息 → 独立存储 → 优先注入）是未来改进方向。
+
+### 10.2.6.4 知识库注入 + 联网搜索链路核查（v0.21.7 ⭐ 能力矩阵）
+
+> **背景**：用户要求核查"agent 是否指引大模型在思考和输出时参考知识库内容 + 联网搜索内容"——这是"更新知识库对 agent 是重要扩展"的前提。**如果注入链路缺失，更新知识库就无意义**。以下为逐端点实测结论（基于代码核查）。
+
+**知识库注入矩阵**（知识库内容是否进 LLM prompt）：
+
+| 端点 | 触发 KB 检索 | KB 进 prompt | 注入方式 |
+|---|---|---|---|
+| `/api/teach`（同步教学） | ✅ | ⚠️ 部分 | Presenter 用 `kb.resolve_node` → `build_presenter_system` 注入 4 字段（intuition/definition/formal_definition/core_question）|
+| `/api/teach/stream`（流式教学） | ✅ | ⚠️ 同上 | 同上 |
+| `/api/answer`（找答案） | ❌ | ❌ | AnswerSolver 不查 KB |
+| `/api/chat` / `/api/chat/stream` | ❌ | ❌ | 闲聊不查 KB（仅注入了 user_library）|
+| `/api/knowledge`（知识库汇报） | ✅ | ✅ | 注入 Library 完整文件清单（仅用于"你学过什么"元问题）|
+| `/api/affection` / `/api/method` / `/api/solve` | ❌ | ❌ | 不查 KB |
+
+**联网搜索矩阵**（搜索结果是否回灌 LLM）：
+
+| 入口 | 触发 | 结果回灌 |
+|---|---|---|
+| `/api/chat` + `/api/chat/stream`（Function Calling 主路径） | ✅ LLM 自主调 `web_search` | ✅ tool result → messages（最多 3 轮）|
+| `/api/chat` 启发式兜底 | ✅ `should_search` 命中关键词（最新/新闻/查一下…）| ✅ 拼 user prompt + 标注来源 |
+| `/api/teach` / `/api/answer` / `/api/solve` / `/api/affection` / `/api/method` | ❌ 不暴露搜索工具 | ❌ |
+
+**用户资料库注入**：`Library/user_<uid>/` 只在 `/api/chat/stream` 和 `/api/knowledge` 注入；`Library/usr_knowledge/<uid>/`（v0.21.4 上传）**只被 SelfUpdateAgent 读取作自我更新输入，不进教学对话 prompt**。
+
+**关键结论**：
+- 知识库真正生效的地方 = **仅 teach 模式**（且只 4 字段）
+- 搜索真正生效的地方 = **仅 chat/chat_stream**
+- 其余 7 个端点的"知识库/搜索"承诺是空头支票
+- **改进方向**（P0）：teach/answer 暴露搜索工具；KB 注入字段扩到 8 个（补误区/变体/前置知识）；所有模式注入 user_library
+
+### 10.2.6.5 自我更新覆盖矩阵（v0.21.7 ⭐ 可更新模块 + 联通确认）
+
+> **背景**：用户要求核查"sub agent 是否具有更新数据库的功能；自我更新能否覆盖本 agent 能够扩展的所有模块"。这是"自我更新智能体"方法论的前提——**必须明确哪些模块可更新、更新链路是否联通**。
+
+**9 个自我更新模块总表**（模块 → 更新内容 → 写入 → 读取 → 联通状态）：
+
+| 模块 | 触发 | 更新内容 | 写入 | 读取 | 状态 |
+|---|---|---|---|---|---|
+| SelfUpdater | 成功教学 | 反思/策略/画像 | data/*.json + versions/ | meta-log API（教学不读）| 半闭环 |
+| SelfEvolver | 教学后 | 洞察/技能 | evolve_data/insights.json | SelfUpdateAgent 输入 | 半闭环 |
+| SelfEvolution 知识库 | distill_knowledge | 知识节点 | evolved_*.json（**已生成 10 节点**）| 启动时 register + 教学 resolve_node | ⚠️ **半闭环**（需重启才加载，无热更新）|
+| SelfEvolution 提示词 | **evolve_prompt（0 处调用）** | 学科补丁 | subject_patches.md（**不存在**）| teaching_memory 注入 | ❌ **未闭环** |
+| SelfEvolution 工具 | learn_tool_lesson | 工具经验 | tool_lessons.md（已写）| 仅 chat_stream 注入 | 半闭环（teach 不读）|
+| SelfEvolution 新学科 | record_subject_request | 学科需求 | subject_requests.json（2 条）| PeriodicSelfUpdater → improvements.md | ✅ 闭环 |
+| SelfImprover | 对话后 | 失败案例/建议 | cases.jsonl + improvements.md | 仅 chat_stream 注入 | 半闭环 |
+| PeriodicSelfUpdater | 24h 后台线程 | 调度 4 路 | — | — | ✅ 闭环（前置）|
+| QualityGate | 更新入口 | 沙盒候选 | sandbox.json（**含 PII 漏判**）| promote_to_insights（**0 调用**）| 半闭环 |
+| **SelfUpdateAgent（第8个）** | from-feedback | 结构化建议 | **self_update_suggestions.jsonl（13 条）**| **无执行器应用** | ❌ **死端** |
+
+**核心结论**：
+- **写盘环节基本完整**：知识库/工具/学科需求/洞察都能落盘（evolved_*.json 已有 10 个真实节点）
+- **读取闭环 5 个缺口**：①SelfUpdateAgent 建议无执行器（13 条全未应用）②evolve_prompt 0 调用（提示词补丁从未写入）③teach_stream 不注入教学记忆（improvements/tool_lessons 只在 chat_stream 读）④evolved_*.json 需重启才加载 ⑤promote_to_insights 无调度
+- **可更新模块覆盖**：知识库 ✅、工具 ✅、学科需求 ✅、洞察 ✅；**提示词 ❌、建议执行 ❌、教学路径读取 ❌**
+
+**改进方向**（P0）：实现 `apply_suggestion` 补丁引擎（按 category 分派到 prompts/subject_patches/KB/tools）；teach_stream 注入教学记忆；PeriodicSelfUpdater 调度 promote_to_insights + evolve_prompt。
 
 ## 10.3 版本历史
 
