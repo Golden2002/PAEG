@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.19.27（2026-08-06）
+> **版本**：v0.19.28（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -1332,6 +1332,101 @@ python eval_harness.py
 - **Tool-Use**：工具调用正确性（正常/重试/错误恢复降级）
 
 报告输出到 `eval_report.json`。
+
+### 10.2.1 端到端 API 测试（v0.19.20+ 推荐）
+
+不依赖前端，直接 POST 各端点验证完整链路（脚本在 `C:\Users\团聚体\AppData\Local\Temp\opencode\qa_*.py`）：
+
+```python
+# -*- coding: utf-8 -*-
+"""端到端验证示例：知识库/steering/情绪/界面。"""
+import sys, io, json, urllib.request
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+BASE = 'http://localhost:5000'
+
+def teach(concept, subject='math', uid='qa_test'):
+    data = json.dumps({"concept": concept, "learner_id": uid, "nickname": "测试",
+                       "grade_level": "high_school", "subject": subject}).encode()
+    req = urllib.request.Request(BASE + '/api/teach', data=data,
+                                 headers={'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=150) as resp:
+        body = json.loads(resp.read().decode('utf-8'))
+    first = body.get('presentations', [{}])[0]
+    return first.get('step_type', '?'), first.get('content', '')[:150]
+
+# 关键验证点（每次改后端后跑一遍）
+assert teach('知识库', 'general')[0] == 'knowledge'          # 知识库清点
+assert teach('你今天怎么样', 'general')[0] == 'chat'          # 意向性层
+assert teach('商品的价值由什么决定', 'kaoyan_politics')[0] != 'politics'  # steering 切换
+assert teach('量子力学是什么', 'physics')[0] == 'unregistered_subject'     # 未收录学科
+assert teach('这个界面的按钮是干嘛的', 'general')[0] == 'interface'        # 界面自指涉
+assert teach('我最近好难过', 'general')[0] == 'emotion'       # 情绪支持
+```
+
+```powershell
+# 运行
+python qa_steering.py          # steering 场景
+python qa_v01927.py           # 界面+情绪
+python qa_method_kb.py        # 学习方法+知识库端点
+```
+
+### 10.2.2 Playwright 真实浏览器测试（v0.19.24 ⭐ 最终验证手段）
+
+> **为什么必须用浏览器测**：API 测试验证后端逻辑，但**前端渲染 bug（如气泡不显示）只有真实浏览器能发现**。
+> v0.19.24 的"闲聊不回复"就是 `if (!bubbleBody.parentNode)` 判断 bug——API 正常但气泡永不 append，
+> 用 Playwright 打开真实页面才定位到。
+
+**环境**：opencode 内置 playwright MCP（`skill_mcp(mcp_name="playwright", ...)`）。
+
+**核心流程**（测任何前端功能）：
+
+```
+1. browser_navigate → 打开公网 URL（带 ?v=版本号 防缓存）
+2. browser_snapshot / browser_find → 定位元素（获取 ref）
+3. browser_click → 点模式按钮（学科教学/闲聊~/找答案/学习方法/知识库）
+4. browser_type → 输入问题 + Enter
+5. browser_wait_for(time) → 等待 LLM 响应
+6. browser_evaluate → 查 DOM：msgs.length、last.textContent（验证气泡真的渲染了）
+7. browser_console_messages(level="error") → 查 JS 错误
+8. browser_network_requests(filter="/api/") → 确认请求 200 + 响应体
+```
+
+**关键检查点**：
+
+| 检查 | 方法 | 判定 |
+|---|---|---|
+| 气泡出现 | `browser_evaluate: chatWin.querySelectorAll('.msg').length` | 比发送前 +1 |
+| 回复内容 | `browser_evaluate: last.textContent` | 含预期关键词 |
+| JS 错误 | `browser_console_messages(level="error")` | 无新错误（favicon 404 无害）|
+| 网络请求 | `browser_network_requests(filter="/api/chat")` | 200 且响应含 `event: seg` |
+| 模式切换 | 点按钮后 `browser_find` 输入框 placeholder | 随模式变化 |
+
+**历史教训（必须避开的坑）**：
+
+| 坑 | 症状 | 排查 |
+|---|---|---|
+| 前端气泡不 append | 后端 200 + seg 正常，但页面无回复 | 查 `bubble.isConnected`（v0.19.24 修复）|
+| 浏览器缓存旧 JS | 后端已修但页面仍旧 | 强刷 Ctrl+F5 或 URL 加 `?v=版本` |
+| 模式按钮切换 bug | 切模式后 placeholder 不变 | 查 `currentMode = btn.dataset.mode` |
+| 情绪/界面拦截不触发 | 输入情绪话术走了教学 | 查 meta_router 模式是否命中（`qa_emotion_detect.py`）|
+
+### 10.2.3 测试金字塔总览（v0.19.27）
+
+```
+        ┌─────────────┐
+        │ Playwright  │ ← 真实浏览器：UI 渲染/交互/模式切换（最终验证）
+        │  浏览器测试  │
+        ├─────────────┤
+        │ 端到端 API  │ ← 验证后端链路：拦截/steering/情绪/知识库
+        │  qa_*.py    │
+        ├─────────────┤
+        │ eval_harness│ ← 质量评估：意图识别/公式/深度/tool-use
+        ├─────────────┤
+        │ pytest 59   │ ← 单元+集成+验收：子代理/知识库/安全/世界观
+        └─────────────┘
+```
+
+**开发节奏**：改后端 → pytest 59 保底 → qa_*.py 验证新功能 → Playwright 真实浏览器确认渲染 → 推送。
 
 ## 10.3 版本历史
 
