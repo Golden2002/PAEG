@@ -112,6 +112,59 @@ class FileGenerator:
             f.write(content)
         return path
 
+    # v0.18：把任意回答/讲解保存为文档（Markdown + HTML 双格式）
+    def save_answer(self, content: str, title: str,
+                    subject: str = "通用") -> tuple:
+        """把一段回答保存为可下载文档。
+
+        返回 (md_path, html_path)
+        - Markdown：保留原始格式（公式/列表）
+        - HTML：带基础样式，可直接打开/打印/分享
+        """
+        ts = datetime.now().strftime('%Y%m%d%H%M')
+        safe_title = _safe_filename(title)
+        md_filename = f"{safe_title}_{ts}.md"
+        html_filename = f"{safe_title}_{ts}.html"
+
+        md_path = self.save(content, md_filename)
+
+        # 简单 HTML 包装（转义 + 保留换行）
+        import html as _html
+        esc = _html.escape(content)
+        # 公式占位保留（MathJax 渲染）
+        body = esc.replace('\n\n', '</p><p>').replace('\n', '<br>')
+        html_doc = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>{_html.escape(title)}</title>
+<script>
+window.MathJax = {{ tex: {{ inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] }} }};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<style>
+  body {{ font-family: 'Songti SC', 'SimSun', serif; max-width: 780px; margin: 40px auto; padding: 0 24px; line-height: 1.8; color: #222; }}
+  h1 {{ font-size: 22px; border-bottom: 2px solid #eee; padding-bottom: 8px; }}
+  h2 {{ font-size: 18px; margin-top: 24px; }}
+  p {{ margin: 12px 0; }}
+  blockquote {{ border-left: 3px solid #ccc; margin-left: 0; padding-left: 16px; color: #555; }}
+  code {{ background: #f5f5f5; padding: 1px 5px; border-radius: 3px; }}
+  pre {{ background: #f5f5f5; padding: 12px; border-radius: 6px; overflow-x: auto; }}
+  table {{ border-collapse: collapse; }}
+  td, th {{ border: 1px solid #ddd; padding: 6px 10px; }}
+  .footer {{ margin-top: 40px; color: #999; font-size: 12px; text-align: center; }}
+</style>
+</head>
+<body>
+<h1>{_html.escape(title)}</h1>
+<p>{body}</p>
+<div class="footer">由 PAEG · Émile Novis 生成 · {subject}</div>
+</body>
+</html>"""
+        with open(os.path.join(self.download_dir, html_filename), 'w', encoding='utf-8') as f:
+            f.write(html_doc)
+        return md_path, os.path.join(self.download_dir, html_filename)
+
     def list_files(self) -> list:
         """列出已生成的文件。"""
         if not os.path.exists(self.download_dir):
