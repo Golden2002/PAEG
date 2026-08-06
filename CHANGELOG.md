@@ -5,6 +5,20 @@
 
 ---
 
+## v0.19.24（2026-08-06）
+
+**关键修复：闲聊模式气泡不显示的 JS bug（Playwright 实测定位）**
+
+- **根因**：`generalChat` 里 3 处 `if (!bubbleBody.parentNode) chatWin.appendChild(bubble)` 判断错误——`bubbleBody.parentNode` 永远等于 bubble 自身（即使 bubble 尚未进入聊天窗口），导致**回复气泡永远不被 append 到 DOM**：后端流式响应正常（HTTP 200 + seg + done），但前端无任何输出
+- **诊断方法**：Playwright 真实浏览器复现——网络请求 200 且响应体完整，但 DOM 无回复气泡；逐行复刻 SSE 解析逻辑可正常解析 → 定位到 append 条件 bug
+- **修复**：3 处改为 `if (!bubble.isConnected)`（`isConnected` 才真正反映元素是否在文档中）
+- **实测（公网真实浏览器）**：
+  - 闲聊模式"你好" → Émile 正常回复气泡 ✓
+  - 闲聊模式"知识库" → 正确清点 Library 资料 ✓
+- 测试 59/59 通过
+
+---
+
 ## v0.19.23（2026-08-06）
 
 **关键修复：/api/teach/stream 补齐拦截链（前端实际接口）**
