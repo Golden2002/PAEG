@@ -5,6 +5,25 @@
 
 ---
 
+## v0.19.20（2026-08-06）
+
+**阶段性总结：项目最大亮点文档化 + 自检复盘 + 材料索引**
+
+- **技术文档新增 §1.6「项目最大亮点：教育者 Agent 的基础架构定义」**：完整回答"一个教育者智能体需要怎样的基础架构"——
+  - 教学设计循环（teach 六阶段：诊断→计划→呈现→评估→调整→反思→自检→自更新）
+  - 6 个子代理架构（Diagnostor/Planner/Presenter/Evaluator/Adapter/AnswerSolver，各自是否用 LLM 的原则）
+  - 执行引擎 harness（教学层 teach 循环 + 对话层 Plan-Act-Observe-Reflect）
+  - 工具调用系统（5 工具 + 缓存 + 错误恢复 + 优雅降级）
+  - 子代理连通（SessionContext 枢纽 + 共享知识库 + 对象意识 + 三层记忆）
+  - 角色与提示词（Émile Novis / 薇依哲学 / "先做人再教书" / 19 学科 × 4 学段 / 价值观护栏）
+- **自我更新能力如实确认（§1.6.7）**：对话级自我更新真实运行（SelfUpdater.incremental_update → reflections.json 1297KB；SelfImprover.record → cases.jsonl 21KB；teaching_memory 注入）；**周期级（周度）自我更新机制已实现但缺定时调度器**（weekly_insight_update/batch_update/analyze_failures 在 server.py 0 调用）——列入优化任务 #1
+- **文档新增 §10.7 自检复盘与优化任务列表**（8 项机制优化 + 7 项内容扩充，含优先级与工作量）
+- **文档新增 §10.8 设计背景与材料存放位置索引**（快速启动路径 / 设计决策记录 / 代码数据 / Library / 外部环境）——方便下次 LLM 启动工作
+- **修正**：SUBJECT_STYLES 学科数 25→19（实际代码核对）
+- 测试 59/59 通过（本轮为纯文档变更，未改代码）
+
+---
+
 ## v0.19.19（2026-08-06）
 
 **知识库总结真正基于 Library 实际内容**
