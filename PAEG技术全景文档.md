@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.19.2（2026-08-06）
+> **版本**：v0.19.3（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -761,6 +761,7 @@ python eval_harness.py
 | **v0.19** | **P0/P1/P2 全优化**：①Function Calling（tool_registry.py：web_search/verify_math/fetch_page/daily_quote/get_time + run_agent_loop 工具循环）②三层记忆（memory_system.py：短期对话+摘要压缩+长期画像）③MCP 网关（mcp_gateway.py：FastMCP 暴露教育工具，外部智能体可连接 :8765/mcp）④Skills 体系（skill_registry.py：4 技能 SKILL.md 三级加载）⑤chat 流式输出（/api/chat/stream SSE + 教学流式 teach/stream）⑥工具调用可视化（前端 tool-card）⑦Agent 主循环（agent_engine.py：Plan→Act→Observe→Reflect）⑧自我改进（self_improve.py：反思+失败案例库）⑨可编辑教学记忆（teaching_memory.py：memory/PAEG_PEDAGOGY.md CLAUDE.md 风格）⑩多模态（/api/upload 图片上传）|
 | **v0.19.1** | **公式渲染修复**：fixBracketedFormulas 跳过已存在的 $...$/$$...$$（不再二次包裹破坏公式）+ sanitizeFormulas 消毒错位$ + **出题意图拦截**（is_problem_request："给我一道经典题目"→结合学段/学科/画像生成题目，不答非所问）+ **教学流式输出**（teach 改 SSE 逐字显示）+ **登录默认输出优化** + **评估 harness**（eval_harness.py：单元测试+LLM 输出质量评估两层，7/7 通过，含意图/公式/深度评分）|
 | **v0.19.2** | **工具调用错误恢复**（tool_recovery.py：错误分类[瞬时/永久/限流/配额] + 指数退避重试 + 失败降级信号[防 LLM 编造] + 每工具指标；接入 tool_registry 5 工具）+ **harness 加 tool-use 维度**（正常/隐式乘法重试/错误恢复 5 项测试全过）+ **SVG 资源替换 emoji**（16 个 Lucide/Heroicons 图标存 assets/icons，工具卡片/下载/上传/文件 全部用 SVG）+ **文档完善**（§10.4 GitHub 部署指南 + §10.5 可扩充资源清单 + 评估 harness 说明）|
+| **v0.19.3** | **对话交互三原则**：①准确性（build_general_chat_user 打包页面设定[模式/学段/学科]+历史+身份，要求先理解再输出）②组织性（输出像教学讲义：观点明确/层次清晰/内容详实）③功能性（前端复制按钮 + 多选回复生成文档下载，msg-copy/msg-select/select-bar）+ **记忆机制检查**（短时/长期/压缩均规范）+ **上下文管理**（context_manager.py：滑动窗口 window_k + token 预算 System15%/History60%/Response25% + 摘要降级，长对话降本 ~40%）+ **前端个性化**（暖白画布 #FAF8F4 + 深色模式[data-theme] + 玻璃顶栏 backdrop-filter + 撕角便签每日一句 + 主题切换按钮 + 渐变背景）|
 
 ---
 
@@ -995,6 +996,65 @@ sudo systemctl enable paeg && sudo systemctl start paeg
 - `retention_days=30`（会话保留天数）
 - `max_conversations=50`（每用户会话数上限）
 - `users_data/<user_id>/` 下按用户隔离存储
+
+### 10.5.9 工具链（tool_registry + tool_recovery + tool_cache + web_search_tool）
+
+| 位置 | 说明 |
+|---|---|
+| `05_实现原型/tool_registry.py` | 5 个 Function Calling 工具（web_search/verify_math/fetch_page/daily_quote/get_time）+ agent loop |
+| `05_实现原型/tool_recovery.py` | 错误分类（瞬时/永久/限流/配额）+ 指数退避重试 + 失败降级 |
+| `05_实现原型/tool_cache.py` | 工具结果缓存（canonical key + 按工具 TTL）|
+| `05_实现原型/web_search_tool.py` | 搜索后端（Bing 免 key 默认 + Tavily/Serper 可选）|
+
+**可扩充**：
+- **新工具**：在 `tool_registry.py` 加 `_make_tool(...)` 定义 + `_HANDLERS` 注册 + `TOOL_TTL`（tool_cache）加 TTL
+- **搜索后端**：配 `TAVILY_API_KEY` / `SERPER_API_KEY` 环境变量自动升级搜索质量
+- **工具缓存 TTL**：`tool_cache.py` 的 `TOOL_TTL` 表按需调整（如 web_search 时效性高可缩短）
+
+### 10.5.10 上下文管理（context_manager.py）
+
+| 位置 | 说明 |
+|---|---|
+| `05_实现原型/context_manager.py` | 多轮对话上下文管理（滑动窗口 window_k + token 预算 System15%/History60%/Response25%）|
+
+**可调参数**（`ContextConfig`）：
+- `window_k=12`：保留最近多少轮对话
+- `max_context_tokens=32000`：总预算（适配不同模型窗口）
+- `summarize_trigger=0.80`：history 使用率阈值触发摘要
+
+### 10.5.11 记忆与自我改进（memory_system + self_improve + expert_guard）
+
+| 位置 | 说明 |
+|---|---|
+| `05_实现原型/memory_system.py` | 三层记忆（短时/长期/摘要压缩）|
+| `05_实现原型/self_improve.py` | 自我改进（反思 + 失败案例库 + 改进建议）|
+| `05_实现原型/expert_guard.py` | 专业深度守门员（深度评分/套话检测/理科公式检查）|
+
+**可扩充**：
+- **记忆摘要**：`memory_system.py` 的 `compress_if_needed` 摘要策略（保留条数、摘要长度）
+- **改进建议**：`memory/improvements.md` 由 `self_improve.py` 自动生成，也可手工编辑
+- **深度标准**：`expert_guard.py` 的评分阈值（`_SHALLOW_PATTERNS` / `_FLUFF_PATTERNS`）
+
+### 10.5.12 做题模块（problem_solver.py）
+
+| 位置 | 说明 |
+|---|---|
+| `05_实现原型/problem_solver.py` | 题型识别（论述/计算/证明）+ 三套标准答案模板 + SymPy 验证 |
+
+**可扩充**：
+- **题型模板**：`_CALC_PROMPT` / `_PROOF_PROMPT` / `_ESSAY_PROMPT` 按学科细化
+- **关键词**：`_CALC_KEYWORDS` / `_PROOF_KEYWORDS` / `_ESSAY_KEYWORDS` 扩展识别
+
+### 10.5.13 对话交互增强（打包 + 复制/文档）
+
+| 位置 | 说明 |
+|---|---|
+| `05_实现原型/prompts.py` | `build_general_chat_user`（页面设定打包 + 先理解再输出）|
+| `09_GUI前端/index.html` | 复制按钮 + 多选生成文档（msg-copy/msg-select/select-bar）|
+
+**可扩充**：
+- **打包内容**：在 server.py 的 chat 路由 `ctx_parts` 加更多页面设定（如当前题目、模式）
+- **文档模板**：前端 `genSelectedDoc` 的组装格式可定制
 
 ---
 
