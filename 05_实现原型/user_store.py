@@ -23,7 +23,7 @@ import os
 import re
 import secrets
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 class UserStore:
@@ -122,6 +122,84 @@ class UserStore:
         """加载学习者画像。"""
         u = self.get_user(user_id)
         return u.get("learner") if u else None
+
+    # ─── v0.15：每用户独立文件夹 ───
+    def user_dir(self, user_id: str) -> Optional[str]:
+        """获取/创建用户独立文件夹（profile.json + history/ + notes/）。
+
+        结构：
+        users_data/<user_id>/
+        ├── profile.json      学习者画像（自我描述/掌握度/偏好）
+        ├── history.jsonl     对话历史（追加）
+        ├── notes/            用户笔记/生成文件
+        └── insights.json     从该用户对话中提取的学习洞察
+        """
+        u = self.get_user(user_id)
+        if not u:
+            return None
+        base = os.path.dirname(os.path.abspath(__file__))
+        udir = os.path.join(base, 'users_data', user_id)
+        os.makedirs(os.path.join(udir, 'notes'), exist_ok=True)
+        # 初始化 profile.json（若不存在）
+        profile_path = os.path.join(udir, 'profile.json')
+        if not os.path.exists(profile_path):
+            learner = u.get('learner') or {}
+            with open(profile_path, 'w', encoding='utf-8') as f:
+                json.dump(learner, f, ensure_ascii=False, indent=1)
+        return udir
+
+    def append_history(self, user_id: str, entry: dict) -> None:
+        """追加一条对话历史到用户的 history.jsonl。"""
+        udir = self.user_dir(user_id)
+        if not udir:
+            return
+        with open(os.path.join(udir, 'history.jsonl'), 'a', encoding='utf-8') as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    def read_history(self, user_id: str, limit: int = 20) -> List[dict]:
+        """读取用户的最近对话历史。"""
+        udir = self.user_dir(user_id)
+        if not udir:
+            return []
+        path = os.path.join(udir, 'history.jsonl')
+        if not os.path.exists(path):
+            return []
+        entries = []
+        try:
+            with open(path, encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        entries.append(json.loads(line))
+        except Exception:
+            pass
+        return entries[-limit:]
+
+    def save_insight(self, user_id: str, insight: dict) -> None:
+        """保存从该用户对话中提取的洞察。"""
+        udir = self.user_dir(user_id)
+        if not udir:
+            return
+        path = os.path.join(udir, 'insights.json')
+        try:
+            with open(path, encoding='utf-8') as f:
+                insights = json.load(f)
+        except Exception:
+            insights = []
+        insights.append(insight)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(insights, f, ensure_ascii=False, indent=1)
+
+    def load_insights(self, user_id: str) -> List[dict]:
+        """加载该用户的学习洞察。"""
+        udir = self.user_dir(user_id)
+        if not udir:
+            return []
+        path = os.path.join(udir, 'insights.json')
+        try:
+            with open(path, encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return []
 
     def stats(self) -> dict:
         return {"users": len(self._data["users"])}
