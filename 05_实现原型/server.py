@@ -552,13 +552,37 @@ def general_chat():
         learner.self_description = data["self_description"]
 
     system = build_general_chat_system(learner)
+
+    # v0.16：注入用户画像 + BDI（让"随便说说"也有个体性）
+    try:
+        from agent_core import infer_user_model, infer_bdi
+        from prompts import build_general_chat_system as _bgcs
+        um = infer_user_model([{'content': text}], learner.self_description or "")
+        um['bdi'] = infer_bdi([{'content': text}], learner.self_description or "")
+        learner._user_model = um  # type: ignore[attr-defined]
+        system = _bgcs(learner)
+    except Exception:
+        pass
+
+    # v0.16：携带最近对话历史（连续对话，非单轮）
+    chat_hist = SESSIONS.get(f"chat_hist_{learner_id}", [])
     user = build_general_chat_user(text)
+    if chat_hist:
+        hist_str = "\n".join(
+            f"{'学生' if m['role'] == 'user' else 'Émile'}: {m['content'][:100]}"
+            for m in chat_hist[-6:]
+        )
+        user = f"【最近对话】\n{hist_str}\n\n【学生现在说】\n{text}"
 
     from subagents import _safe_chat
     reply = _safe_chat(llm, system, user, max_tokens=600)
     if not reply:
-        # 无 LLM 时给一个朴素但真诚的回应
         reply = f"我听到你说：{text}。想多说说吗？我会认真听。"
+
+    # 记录对话历史
+    chat_hist.append({'role': 'user', 'content': text})
+    chat_hist.append({'role': 'assistant', 'content': reply})
+    SESSIONS[f"chat_hist_{learner_id}"] = chat_hist[-20:]
 
     return jsonify({
         "reply": reply,
