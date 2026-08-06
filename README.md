@@ -46,6 +46,8 @@ Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（
 12 个功能模块可独立启用/禁用（paeg_modules.json），上架下架不改代码。
 
 ### 13. 元能力文档 + 可观测性（v0.21）
+### 14. Thread/Turn/Item 会话模型（v0.21.1，借鉴 Codex）
+教学会话持久化三层模型，支持 fork/archive/SSE 事件流续传。
 元能力文档.md（智能体设计方法论）+ observability.py（结构化日志/指标/事件流）。
 顶部"气象"链接 → windy.com 气象图（免费嵌入）+ 位置共享 + Open-Meteo 实时数据。
 
