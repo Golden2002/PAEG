@@ -48,9 +48,11 @@ class AdapterLLM:
         return self._api.name
 
     def chat(self, system: str, messages: list, max_tokens: int = 2000,
-             temperature: float = 0.7) -> str:
+             temperature: float = 0.7, tools: Optional[list] = None,
+             tool_choice: Optional[str] = None) -> str:
         return self._api.chat(system, messages, max_tokens=max_tokens,
-                              temperature=temperature)
+                              temperature=temperature, tools=tools,
+                              tool_choice=tool_choice)
 
     def available(self) -> bool:
         return self._api.available()
