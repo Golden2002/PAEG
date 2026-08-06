@@ -820,6 +820,11 @@ body {
         <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.md,.txt" style="display:none" />
         <img class="upload-btn-icon" src="assets/icons/upload.svg" alt="上传" />
       </label>
+      <!-- v0.19.11：资料上传（存入个人资料库，Agent 回答时参考） -->
+      <label class="upload-btn" id="lib-upload-btn" title="上传资料到个人资料库（回答时自动参考）">
+        <input type="file" id="lib-input" accept=".pdf,.md,.txt,.docx,.csv,.json,.png,.jpg" style="display:none" />
+        <img class="upload-btn-icon" src="assets/icons/book-open.svg" alt="资料" />
+      </label>
       <button class="ask-btn" id="ask-btn">发送</button>
     </div>
 
@@ -1757,6 +1762,25 @@ document.getElementById('auth-submit').addEventListener('click', async () => {
 let currentMode = 'teach';
 
 // v0.19 P2-10：图片/文件上传
+// v0.19.11：资料上传到个人资料库
+document.getElementById('lib-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('learner_id', STATE.learnerId);
+  fd.append('purpose', 'library');
+  try {
+    const r = await fetch(API_BASE + '/api/upload', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) { alert('资料上传失败: ' + (j.error || '')); return; }
+    addMsg('paeg', `已将资料 <b>${escapeHtml(file.name)}</b> 存入你的个人资料库。<br><small>之后提问相关问题时，我会参考这份资料来回答。</small>`);
+  } catch (err) {
+    alert('资料上传失败: ' + err.message);
+  }
+  e.target.value = '';
+});
+
 document.getElementById('file-input').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
