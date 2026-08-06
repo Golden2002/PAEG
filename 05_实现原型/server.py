@@ -375,6 +375,15 @@ def teach_stream():
         # 总结
         summary = paeg._summarize(_FakeSession(learner, concept, subject, plan, []))
         yield f"event: summary\ndata: {json.dumps(summary, ensure_ascii=False)}\n\n"
+
+        # v0.19.6：关键词触发文档（教学对话中"讲义/要点/例题/笔记"）
+        try:
+            doc_evt = _handle_keyword_doc(concept, "", learner, data)
+            if doc_evt:
+                yield f"event: doc\ndata: {json.dumps(doc_evt, ensure_ascii=False)}\n\n"
+        except Exception:
+            pass
+
         yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
 
     return Response(generate(), mimetype="text/event-stream",
@@ -1223,10 +1232,15 @@ def _handle_keyword_doc(user_text, reply, learner, data):
     except Exception:
         subject_cn = subject
 
-    # 主题：从用户输入提取（去掉关键词），否则用最近对话
-    topic = _re.sub(r'讲义|授课|课件|要点|提纲|大纲|例题|习题|题目|笔记|note|notes|给|我|把|这个|主题|做成|生成|一份|下载', '', t).strip()
+    # 主题：优先用教学主题（data.concept），否则从用户输入提取，再否则用回复
+    # v0.19.6：修复"输入讲义不生成对应主题讲义"——之前 topic 只从输入提取，
+    # 纯"讲义"输入时 topic 为空落到"本次讨论"
+    topic = (data.get("concept") or "").strip()
+    if not topic or len(topic) < 2:
+        topic = _re.sub(r'讲义|授课|课件|要点|提纲|大纲|例题|习题|题目|笔记|note|notes|给|我|把|这个|主题|做成|生成|一份|下载', '', t).strip()
     if not topic or len(topic) < 2:
         topic = (reply or "本次讨论").strip()[:30]
+    topic = topic[:30]
 
     # 各类型文档的生成指令
     sys_tpl = {
