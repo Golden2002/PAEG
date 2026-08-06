@@ -46,6 +46,25 @@ GREETING_PATTERNS = [
 GREETING_COMPILED = [re.compile(p, re.IGNORECASE) for p in GREETING_PATTERNS]
 
 
+# v0.19：出题/练习意图（"给我一道题" → 走出题逻辑，不当概念教学）
+PROBLEM_REQ_PATTERNS = [
+    r"给(我)?(出|来)?(一?道|些)?(经典|典型|例题|题目|题|练习|测试|题组|试卷|真题)",
+    r"(出|来|给).{0,4}(题目|题|练习|例题|测试题|真题|卷子)",
+    r"出(几)?道.{0,4}题|练习(一?下|几道)|考考(我)?|测(试|一?下)(我)?",
+    r"来(几)?道题|做(一?道)?题|练习题|典型题|例题.{0,6}(给我|看看)?",
+]
+
+PROBLEM_REQ_COMPILED = [re.compile(p, re.IGNORECASE) for p in PROBLEM_REQ_PATTERNS]
+
+
+def is_problem_request(text: str) -> bool:
+    """判断用户是否在请求出题/练习题（而非询问概念）。"""
+    t = (text or "").strip()
+    if not t or len(t) > 60:
+        return False
+    return any(p.search(t) for p in PROBLEM_REQ_COMPILED)
+
+
 def is_greeting(text: str) -> bool:
     """判断是否纯寒暄（如"你好""hi"）。"""
     t = (text or "").strip()
