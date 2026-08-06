@@ -1505,12 +1505,12 @@ async function generalChat(text) {
           card.className = 'tool-card';
           card.innerHTML = `<img class="tool-icon-svg" src="assets/icons/settings.svg" alt=""/><span class="tool-name">${nameCn}</span><span class="tool-args">${escapeHtml(JSON.stringify(obj.arguments || {}).slice(0, 60))}</span>`;
           toolCards.push(card);
-          if (!bubbleBody.parentNode) chatWin.appendChild(bubble);
+          if (!bubble.isConnected) chatWin.appendChild(bubble);
           bubbleBody.appendChild(card);
           chatWin.scrollTop = chatWin.scrollHeight;
         } else if (event === 'seg') {
           // 流式文本累积
-          if (!bubbleBody.parentNode) chatWin.appendChild(bubble);
+          if (!bubble.isConnected) chatWin.appendChild(bubble);
           accText += obj.text || '';
           bubbleBody.lastChild && bubbleBody.lastChild.classList && bubbleBody.lastChild.classList.contains('tool-card')
             ? null : null;
@@ -1552,10 +1552,10 @@ async function generalChat(text) {
       }
     } else {
       // v0.19.18：空结果兜底——流正常结束但没内容时，显示占位而不是静默无回复
-      if (!bubbleBody.parentNode) chatWin.appendChild(bubble);
+      if (!bubble.isConnected) chatWin.appendChild(bubble);
       bubbleBody.innerHTML = '<div class="md-content">（没有收到回复，可能是服务端暂时没生成内容。请再试一次。）</div>';
     }
-    if (!bubbleBody.parentNode) chatWin.appendChild(bubble);
+    if (!bubble.isConnected) chatWin.appendChild(bubble);
   } catch (e) {
     clearInterval(timeoutTimer);
     removeThinking(thinking);
