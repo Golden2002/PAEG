@@ -1,0 +1,41 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\鍥㈣仛浣揬AppData\Local\Python\pythoncore-3.14-64\python.exe
+cachedir: .pytest_cache
+rootdir: D:\妗岄潰\鏅鸿兘浣撴灦鏋勪笌寮€鍙戯紙鍚ぇ妯″瀷锛塡14_鏁欒偛鑰匒gent椤圭洰\06_娴嬭瘯涓庨獙璇乗tests
+plugins: anyio-4.12.1
+collecting ... collected 32 items
+
+test_paeg_v0_5.py::test_diagnostor_basic PASSED                          [  3%]
+test_paeg_v0_5.py::test_diagnostor_returns_prerequisites_dict PASSED     [  6%]
+test_paeg_v0_5.py::test_kb_has_50_plus_subjects PASSED                   [  9%]
+test_paeg_v0_5.py::test_kb_has_humanities PASSED                         [ 12%]
+test_paeg_v0_5.py::test_kb_has_strategies PASSED                         [ 15%]
+test_paeg_v0_5.py::test_planner_basic PASSED                             [ 18%]
+test_paeg_v0_5.py::test_presenter_physics_rigorous_cold PASSED           [ 21%]
+test_paeg_v0_5.py::test_presenter_literature_contemplative PASSED        [ 25%]
+test_paeg_v0_5.py::test_evaluator_returns_score_in_range PASSED          [ 28%]
+test_paeg_v0_5.py::test_adapter_low_score_reinforce PASSED               [ 31%]
+test_paeg_v0_5.py::test_adapter_high_score_continue PASSED               [ 34%]
+test_paeg_v0_5.py::test_worldview_physics_tone PASSED                    [ 37%]
+test_paeg_v0_5.py::test_worldview_math_tone PASSED                       [ 40%]
+test_paeg_v0_5.py::test_worldview_literature_tone PASSED                 [ 43%]
+test_paeg_v0_5.py::test_worldview_ethics_tone PASSED                     [ 46%]
+test_paeg_v0_5.py::test_worldview_unknown_tone PASSED                    [ 50%]
+test_paeg_v0_5.py::test_worldview_ratio_sums_to_one PASSED               [ 53%]
+test_paeg_v0_5.py::test_self_update_incremental_records_reflection PASSED [ 56%]
+test_paeg_v0_5.py::test_self_update_profile_mastery_ema PASSED           [ 59%]
+test_paeg_v0_5.py::test_self_update_ema_alpha_0_3 PASSED                 [ 62%]
+test_paeg_v0_5.py::test_self_update_batch_returns_keys PASSED            [ 65%]
+test_paeg_v0_5.py::test_e2e_physics PASSED                               [ 68%]
+test_paeg_v0_5.py::test_e2e_math PASSED                                  [ 71%]
+test_paeg_v0_5.py::test_e2e_literature PASSED                            [ 75%]
+test_paeg_v0_5.py::test_e2e_ethics PASSED                                [ 78%]
+test_paeg_v0_5.py::test_e2e_phenomenology PASSED                         [ 81%]
+test_paeg_v0_5.py::test_e2e_worldview_used PASSED                        [ 84%]
+test_paeg_v0_5.py::test_e2e_session_has_unique_id PASSED                 [ 87%]
+test_paeg_v0_5.py::test_safety_module_importable PASSED                  [ 90%]
+test_paeg_v0_5.py::test_safety_passes_normal_input PASSED                [ 93%]
+test_paeg_v0_5.py::test_mock_model_api_available PASSED                  [ 96%]
+test_paeg_v0_5.py::test_mock_model_api_chat PASSED                       [100%]
+
+============================= 32 passed in 0.80s ==============================
