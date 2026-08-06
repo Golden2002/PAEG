@@ -136,3 +136,22 @@ def test_intent_guide_in_system_prompt():
     s2 = build_presenter_system('math', 'rigorous_cold')
     assert '指令' in s2 and '资料' in s2
     print("✓ test_intent_guide_in_system_prompt")
+
+
+def test_identity_questions_self_referential():
+    """"你是谁/有哪些功能"应触发自我指涉（身份确定性回复，非闲聊）。"""
+    from self_referential import is_interface_query, handle_interface_query
+    for q in ['你是谁', '你有哪些功能', '你能做什么', '你叫什么名字', '你有什么功能']:
+        assert is_interface_query(q) is True, f"应命中自我指涉: {q}"
+    r = handle_interface_query('你是谁')
+    assert 'Émile Novis' in r
+    assert '我能帮你做的事' in r or '能帮你' in r
+    print("✓ test_identity_questions_self_referential")
+
+
+def test_identity_not_hijack_normal():
+    """"你是谁"改造不误伤正常问题。"""
+    from self_referential import is_interface_query
+    for q in ['什么是导数', '你好', '帮我讲讲勾股定理']:
+        assert is_interface_query(q) is False, f"不应命中自我指涉: {q}"
+    print("✓ test_identity_not_hijack_normal")
