@@ -75,6 +75,15 @@ except Exception as _e:
     DOWNLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads')
     print(f"[PAEG Server] 文件生成器初始化失败: {_e}")
 
+# v0.14：用户注册与画像持久化
+try:
+    from user_store import UserStore
+    USER_STORE = UserStore()
+    print(f"[PAEG Server] 用户系统就绪: {USER_STORE.stats()['users']} 个已注册用户")
+except Exception as _e:
+    USER_STORE = None
+    print(f"[PAEG Server] 用户系统初始化失败: {_e}")
+
 # 全局 session 存储（生产环境用 Redis/DB）
 SESSIONS: Dict[str, Any] = {}
 
@@ -162,7 +171,7 @@ def teach():
     try:
         result = paeg.teach(learner, concept, subject)
         # 序列化
-        return jsonify({
+        resp = jsonify({
             "session_id": result["session"].session_id,
             "summary": result["summary"],
             "worldview_used": result["worldview_used"],
@@ -182,6 +191,14 @@ def teach():
                 "subjects_mastery": learner.subjects_mastery,
             },
         })
+        # v0.14：用户登录后持久化画像（user_id 形如 uN 表示已注册用户）
+        if USER_STORE is not None and str(learner_id).startswith('u') \
+                and learner_id[1:].isdigit():
+            try:
+                USER_STORE.save_learner(learner_id, learner)
+            except Exception as _e:
+                print(f"[Server] 画像持久化失败: {_e}")
+        return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -445,6 +462,55 @@ def download_file(filename):
     """下载生成的文件（v0.12）。"""
     from flask import send_from_directory
     return send_from_directory(DOWNLOAD_DIR, filename, as_attachment=True)
+
+
+# ─── v0.14：用户注册/登录 ───
+
+@app.route("/api/register", methods=["POST"])
+def register():
+    """注册（邮箱或手机号 + 密码）。"""
+    if USER_STORE is None:
+        return jsonify({"ok": False, "error": "用户系统不可用"}), 500
+    data = request.get_json(force=True)
+    identifier = (data.get("identifier") or "").strip()
+    password = data.get("password") or ""
+    nickname = data.get("nickname") or ""
+    result = USER_STORE.register(identifier, password, nickname)
+    code = 200 if result.get("ok") else 400
+    return jsonify(result), code
+
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    """登录（邮箱或手机号 + 密码）。"""
+    if USER_STORE is None:
+        return jsonify({"ok": False, "error": "用户系统不可用"}), 500
+    data = request.get_json(force=True)
+    identifier = (data.get("identifier") or "").strip()
+    password = data.get("password") or ""
+    result = USER_STORE.login(identifier, password)
+    if result.get("ok"):
+        # 加载该用户的持久化画像到 SESSIONS
+        learner_dict = USER_STORE.load_learner(result["user_id"])
+        if learner_dict:
+            from paeg import LearnerProfile
+            try:
+                learner = LearnerProfile(
+                    id=learner_dict.get("id", result["user_id"]),
+                    nickname=learner_dict.get("nickname", result.get("nickname", "学生")),
+                    grade_level=learner_dict.get("grade_level", "high_school"),
+                    age=learner_dict.get("age", 17),
+                    cognitive_style=learner_dict.get("cognitive_style", "visual"),
+                    self_description=learner_dict.get("self_description", ""),
+                    target_exam=learner_dict.get("target_exam"),
+                    specialty_target=learner_dict.get("specialty_target"),
+                )
+                SESSIONS[f"learner_{result['user_id']}"] = learner
+            except Exception as _e:
+                print(f"[Server] 加载用户画像失败: {_e}")
+        result["nickname"] = USER_STORE.get_user(result["user_id"]).get("nickname", "学生")
+    code = 200 if result.get("ok") else 401
+    return jsonify(result), code
 
 
 @app.route("/api/chat", methods=["POST"])
