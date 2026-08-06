@@ -1913,6 +1913,53 @@ def knowledge_query():
     return jsonify(_handle_knowledge_query(learner, subject))
 
 
+@app.route("/api/emotion", methods=["POST"])
+def emotion_support():
+    """情绪与心理支持（独立对话类型 v0.19.29）。
+
+    用户显式选择"倾诉"模式时的端点：走 EmotionSupportor 子代理，
+    以注意力陪伴（胡塞尔悬置 + 薇依注意力 + 尼采自我克服），不教不答不解决。
+    """
+    data = request.get_json(force=True)
+    from paeg import LearnerProfile
+    learner_id = data.get("learner_id", f"user_{len(SESSIONS)}")
+    learner = SESSIONS.get(f"learner_{learner_id}")
+    if not learner:
+        learner = LearnerProfile(
+            id=learner_id,
+            nickname=data.get("nickname", "学生"),
+            grade_level=data.get("grade_level", "high_school"),
+            age=data.get("age", 17),
+            cognitive_style=data.get("cognitive_style", "visual"),
+            self_description=data.get("self_description", ""),
+        )
+        SESSIONS[f"learner_{learner_id}"] = learner
+    text = data.get("text") or data.get("concept") or ""
+    if not text:
+        return jsonify({"error": "text is required"}), 400
+    from subagents import EmotionSupportor
+    _emo = EmotionSupportor()
+    _emo_result = _emo.run(llm, text, learner)
+    return jsonify({
+        "session_id": f"emotion_{learner_id}",
+        "summary": {"avg_score": 0},
+        "worldview_used": "weil",
+        "tone_ratio": 0,
+        "presentations": [
+            {"step_id": 1, "content": _emo_result.get("content", ""),
+             "step_type": "emotion"}
+        ],
+        "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
+        "reflections": [],
+        "learner": {
+            "id": learner.id, "nickname": learner.nickname,
+            "grade_level": learner.grade_level,
+            "subjects_mastery": learner.subjects_mastery,
+        },
+        "mode": "emotion",
+    })
+
+
 def _handle_problem_request(learner, concept, subject):
     """v0.19：出题请求处理——结合学段/学科/画像生成经典题目。
 
