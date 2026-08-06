@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.21（2026-08-06）
+> **版本**：v0.21.1（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -857,6 +857,24 @@ paeg_modules.json（配置）→ module_registry.py（注册表）→ server 挂
 - 核心指标：`record_metric("paeg.tool.duration", ms, {"tool": ...})`
 - JSONL 事件流：`emit_event("item.completed", type="tool_call", ...)`（供测试契约）
 - 接入 chat_stream：工具调用自动记录指标+事件
+
+## 1.15.4 Thread/Turn/Item 三层会话模型（v0.21.1 ⭐ 借鉴 Codex App Server）
+
+**Codex 核心抽象落地**：教学会话从"内存 SESSIONS dict"升级为**持久化三层模型**。
+
+| 层 | 含义 | PAEG 实现 |
+|---|---|---|
+| **Thread** | 跨 turn 持久容器（可 create/resume/fork/archive）| session_model.ThreadStore |
+| **Turn** | 一次用户输入的工作单元 | start_turn（agent 标记）|
+| **Item** | 原子 I/O（user_message/agent_message/tool_call）| add_item（事件流）|
+
+**API**：
+- `POST /api/threads`（创建 Thread）
+- `GET /api/threads/<sid>`（列表）
+- `GET /api/threads/<sid>/<tid>/events`（SSE 事件流，Last-Event-ID 续传——Codex App Server 的 HTTP 等价物）
+- `POST /api/threads/<sid>/<tid>`（fork/archive/start_turn）
+
+**价值**：教学会话可跨课次恢复、前端可断线重连续传、同一协议未来可挂 CLI/小程序。
 
 ---
 
