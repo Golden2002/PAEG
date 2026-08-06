@@ -122,8 +122,16 @@ GUI_DIR = Path(__file__).parent.parent / "09_GUI前端"
 
 @app.route("/")
 def index():
-    """提供 GUI 主页。"""
-    return send_from_directory(str(GUI_DIR), "index.html")
+    """提供 GUI 主页。
+
+    v0.21.7：加 Cache-Control: no-cache——历史会话/新功能依赖最新前端，
+    浏览器缓存旧 index.html 会导致"功能没生效"（用户看不到历史会话的常见原因）。
+    """
+    resp = send_from_directory(str(GUI_DIR), "index.html")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @app.route("/<path:filename>")
@@ -136,7 +144,10 @@ def static_files(filename):
                 return "气象模块已下架（在 paeg_modules.json 中启用）", 403
         except Exception:
             pass
-    return send_from_directory(str(GUI_DIR), filename)
+    resp = send_from_directory(str(GUI_DIR), filename)
+    # v0.21.7：静态资源也 no-cache（前端功能更新频繁，避免旧 JS 缓存）
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 @app.route("/api/modules", methods=["GET"])
@@ -2197,7 +2208,24 @@ def method_advice():
             return _correct
     except Exception:
         pass
-    return _handle_method_advice(learner, concept, subject)
+    result = _handle_method_advice(learner, concept, subject)
+    # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
+    try:
+        if CONV_STORE is not None and USER_STORE is not None \
+                and str(learner_id).startswith('u') and learner_id[1:].isdigit():
+            cid = SESSIONS.get(f"conv_method_{learner_id}")
+            _content = ""
+            if isinstance(result, dict):
+                _content = (result.get("presentations") or [{}])[0].get("content", "")
+            elif hasattr(result, "get_json"):
+                _rd = result.get_json()
+                _content = (_rd.get("presentations") or [{}])[0].get("content", "")
+            cid = CONV_STORE.add_message(learner_id, "method", concept[:30], "user", concept, conv_id=cid)
+            cid = CONV_STORE.add_message(learner_id, "method", concept[:30], "assistant", _content, conv_id=cid)
+            SESSIONS[f"conv_method_{learner_id}"] = cid
+    except Exception as _e:
+        print(f"[PAEG] method 保存会话失败: {_e}")
+    return result
 
 
 @app.route("/api/knowledge", methods=["POST"])
@@ -2230,7 +2258,21 @@ def knowledge_query():
                 return _correct
     except Exception:
         pass
-    return jsonify(_handle_knowledge_query(learner, subject))
+    result = _handle_knowledge_query(learner, subject)
+    # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
+    try:
+        if CONV_STORE is not None and USER_STORE is not None \
+                and str(learner_id).startswith('u') and learner_id[1:].isdigit():
+            _q = data.get("text") or data.get("concept") or "知识库"
+            cid = SESSIONS.get(f"conv_knowledge_{learner_id}")
+            _content = (result.get("presentations") or [{}])[0].get("content", "") \
+                if isinstance(result, dict) else ""
+            cid = CONV_STORE.add_message(learner_id, "knowledge", _q[:30], "user", _q, conv_id=cid)
+            cid = CONV_STORE.add_message(learner_id, "knowledge", _q[:30], "assistant", _content, conv_id=cid)
+            SESSIONS[f"conv_knowledge_{learner_id}"] = cid
+    except Exception as _e:
+        print(f"[PAEG] knowledge 保存会话失败: {_e}")
+    return jsonify(result)
 
 
 @app.route("/api/affection", methods=["POST"])
@@ -2269,6 +2311,16 @@ def affection_support():
     _chat_hist = SESSIONS.get(f"chat_hist_{learner_id}", [])
     _emo_result = _emo.run(llm, text, learner, history=_chat_hist)
     _emo_content = _polish_text(_emo_result.get("content", ""), context=f"affection:{text[:30]}")
+    # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
+    try:
+        if CONV_STORE is not None and USER_STORE is not None \
+                and str(learner_id).startswith('u') and learner_id[1:].isdigit():
+            cid = SESSIONS.get(f"conv_affection_{learner_id}")
+            cid = CONV_STORE.add_message(learner_id, "affection", text[:30], "user", text, conv_id=cid)
+            cid = CONV_STORE.add_message(learner_id, "affection", text[:30], "assistant", _emo_content, conv_id=cid)
+            SESSIONS[f"conv_affection_{learner_id}"] = cid
+    except Exception as _e:
+        print(f"[PAEG] affection 保存会话失败: {_e}")
     return jsonify({
         "session_id": f"affection_{learner_id}",
         "summary": {"avg_score": 0},
