@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.19.19（2026-08-06）
+> **版本**：v0.19.20（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -19,6 +19,8 @@
 8. [关机/断连后的恢复](#8-关机断连后的恢复)
 9. [如何升级与扩展](#9-如何升级与扩展)
 10. [附录：文件地图 & 测试](#10-附录文件地图--测试)
+    - [10.7 自检复盘与未来优化任务列表](#107-自检复盘与未来优化任务列表v01920--阶段性总结)
+    - [10.8 设计背景与材料存放位置索引](#108-设计背景与材料存放位置索引v01920--供下次-llm-读取)
 
 ---
 
@@ -193,6 +195,126 @@ Agent 指挥 LLM 的循环（run_agent_loop）：
 
 ---
 
+# 1.6 项目最大亮点：教育者 Agent 的基础架构定义（⭐ 阶段性总结）
+
+> 本项目的最大功用，不在于"做了一个能聊天的教学机器人"，而在于**完整回答了"一个作为教育者的智能体，需要怎样的基础架构"这个问题**——从教学设计与循环、子代理体系、执行引擎（harness）、工具调用系统、子代理连通，到角色设定与预置提示词如何保证教育价值观与教育能力，以及自我更新机制。以下基于当前代码（05_实现原型/）逐层说明。
+
+## 1.6.1 教学设计：一次教学如何完成"设计与循环"
+
+PAEG 的核心循环定义在 `paeg.py: PAEG.teach()`（paeg.py:84-232），是一个**六阶段闭环**：
+
+```
+诊断 → 计划 → [呈现 → 评估 → (条件)调整]×N步 → 反思 → 自检 → 自我更新
+  1       2            3          4        5        6      6.5      7
+```
+
+| 阶段 | 子代理/模块 | 职责 | 代码位置 |
+|---|---|---|---|
+| 1 诊断 | `Diagnostor` | 基于知识库前置知识 + LLM 判断教学深度与缺口（不回退教不教，教学智能体默认可教） | subagents.py:72 |
+| 2 计划 | `Planner` | 结合诊断 + 学科选择教学策略（pedagogy.py），生成差异化步骤（含 Bloom 层级） | subagents.py:121 |
+| 3 呈现 | `Presenter` | 每步真实 LLM 生成讲解（学科专属 persona + 教学策略注入），无 LLM 回退规则模板 | subagents.py:152 |
+| 4 评估 | `Evaluator` | 确定性启发式评分（长度+结构+语气+知识库契合，区间 0.4-0.95，**无随机**） | subagents.py:256 |
+| 5 调整 | `Adapter` | score<0.6 换风格 / <0.7 强化 / 否则继续 | subagents.py:317 |
+| 6 反思 | `PAEG._reflect` | 基于平均分判定 success（≥0.7），写入反思历史 | paeg.py:234 |
+| 6.5 自检 | `PAEG._self_reflect` | Actor-Critic 三轴自检：薇依对齐 + AI 味检测 + 教学有效性 | paeg.py:249 |
+| 7 自我更新 | `SelfUpdater` | 反思/策略/画像落盘 + 版本快照（保留 10 版可回滚） | self_update.py:100 |
+
+**教学设计的本质**：不是"一次性问答"，而是**先评估学生 → 定制路径 → 分步呈现 → 每步评估 → 必要时调整 → 事后反思 → 沉淀经验**的完整教学循环——这是本项目区别于普通 Chatbot 的核心。
+
+## 1.6.2 子代理架构：哪些职责拆分出去，为什么
+
+**6 个子代理**（subagents.py），按"职责单一、LLM 只做它擅长的事"原则拆分：
+
+| 子代理 | 是否用 LLM | 原则 |
+|---|---|---|
+| Diagnostor（诊断） | LLM 判断深度/缺口，规则兜底 | 评估是专业活，但"可不可教"不交给模型（默认可教） |
+| Planner（计划） | 规则驱动（策略库+步骤模板） | 教学路径设计是确定性工程，不交给 LLM 发挥 |
+| Presenter（呈现） | **LLM 生成**（核心价值处） | 讲解语言是 LLM 最擅长的 |
+| Evaluator（评估） | 确定性启发式 | **避免随机**（v0.2 设计决策）——评分必须可复现 |
+| Adapter（调整） | 确定性决策 | 调整策略固定，不需要 LLM |
+| AnswerSolver（找答案） | LLM 直接输出完整答案 | 与教学范式（引导式）**根本区分**：学生要答案就给答案 |
+
+**关键架构原则（v0.19.15）**：
+- **只有"生成讲解内容"这种真正需要 LLM 能力的地方才用 LLM**；诊断深度、评估分数、调整决策都尽量确定性——保证可测试、可复现、不随机。
+- **AnswerSolver 与 Presenter 的区分**是教育智能体的重要设计：教学要"由浅入深、提问引导"，找答案要"直接完整规范"——同一个 Agent 根据学生意图切换范式。
+
+## 1.6.3 执行引擎（Harness）：Agent 如何指挥 LLM 完成一次真实思考
+
+两层执行引擎：
+
+**① 教学层 harness（paeg.py teach）**：上面 §1.6.1 的六阶段循环，是"教学设计"的执行器。
+
+**② 对话层 harness（agent_engine.py + tool_registry.run_agent_loop）**：`AgentEngine` 实现 **Plan-Act-Observe-Reflect 主循环**（agent_engine.py:32-151）：
+```
+Plan（LLM 决定是否需要工具/计划）→ Act（调 run_agent_loop）→ Observe（记录工具调用）→ Reflect（判断是否完成/改进）→ 必要时 Replan
+```
+
+**Agent 指挥 LLM 的完整链路**（run_agent_loop, tool_registry.py:288-350）：
+```
+LLM 调用（带 tools+tool_choice）→ LLM 决定调哪些工具 → 逐个执行 → 结果回传 → LLM 基于结果继续生成 → 超迭代上限停止
+```
+
+## 1.6.4 工具调用系统（Tool Use）：真实、可靠、可恢复
+
+**5 个内置工具**（tool_registry.py:47-84，OpenAI/DeepSeek Function Calling 原生格式）：
+
+| 工具 | 用途 | 反幻觉价值 |
+|---|---|---|
+| web_search | 联网搜索最新/外部信息 | 不凭记忆编造事实 |
+| verify_math | SymPy 符号计算验证 | **计算题反幻觉** |
+| fetch_page | 抓网页正文 | 搜索结果不足时读全文 |
+| daily_quote | 每日一句（薇依/约纳斯等） | 真实语料 |
+| get_time | 当前日期时间 | 时效性问题 |
+
+**可靠性三层保障**：
+1. **缓存**（tool_cache.py）：TTL 分级（daily_quote 24h / verify_math 30 天 / web_search 5min），线程安全，dict 顺序无关键
+2. **错误恢复**（tool_recovery.py）：错误分类（瞬时/永久/限流/配额）→ 智能重试 + 指数退避 → **优雅降级**（"工具不可用，请基于已有知识回答"）
+3. **工具真实性**：工具调用记录（calls_log）回传前端可视化（GUI 显示工具调用轨迹）——用户能看到 Agent 真的调了工具，不是假装联网
+
+## 1.6.5 子代理之间的连通：上下文如何流转
+
+- **会话上下文对象** `SessionContext`（paeg.py:35-47）是连通枢纽：`diagnosis → plan → history(逐步呈现) → evaluations → reflections` 全部挂在 session 上，子代理之间**不直接互相调用，通过 session 流转数据**——低耦合、可测试。
+- **共享知识库** `KnowledgeBase`：所有子代理注入同一个 kb 实例，`Presenter.resolve_node` 带缓存（v0.15 避免重复检索）。
+- **用户模型**：`infer_user_model + infer_bdi`（agent_core.py）挂到 `learner._user_model`，Presenter 读取——**对象意识**贯穿教学。
+- **三层记忆**（memory_system.py）：短期（当前对话）→ 中期（LLM 摘要压缩）→ 长期（跨会话画像 + 对话摘要，users_data/<id>/）。
+
+## 1.6.6 角色设定与预置提示词：如何保证教育价值观与教育能力
+
+**顶层人格（prompts.py）**：
+- **对外身份**：Émile Novis（老师），不自称 AI
+- **人格内核**：薇依教育哲学——"爱是一种朝向，而不是一种灵魂状态"；注意力是最稀有的慷慨；不评判学生
+- **最高原则**："**先做人，再教书**"（v0.19.12）——所有结构/规范服务于帮助眼前的学生，不机械套模板；规范与"说人话"冲突时说人话
+- **请求类型判断**（v0.19.11）：先判断学生要"直接答案"还是"一堂课"，直接请求直接答，不绕弯子开场
+
+**教育能力预置**：
+- **19 个学科专属风格**（SUBJECT_STYLES，prompts.py）+ 63 个别名（_SUBJECT_ALIASES）——每学科独立 persona + 语言风格 + 教学结构
+- **4 个学段分层**（_GRADE_GUIDE）：初中（生活化现象）→ 高中（直觉+严谨+例题）→ 大学（严格定义）→ 考研（考点导向）
+- **教学策略库**（pedagogy.py）：按诊断结果选择策略
+- **价值观护栏**（safety.py + ai_taste_detector.py + 反浮夸约束）：禁止低劣网络用语、空洞套话、廉价鼓励（"你真棒"——薇依反对：它不是注意力的替代品）、评判性语言
+- **语言优化**（language_refiner.py）：生成后薇依式改写去 AI 味（Actor-Critic 自检 + 优化）
+
+## 1.6.7 自我更新能力：现状确认（对话级真实运行，周期级待接调度器）⭐
+
+> 用户要求确认"周期性自我更新能力是否真的有"。**基于代码与运行数据如实回答**：
+
+**✅ 对话级自我更新——真实运行（每次对话后触发）**：
+
+| 机制 | 触发点 | 落盘 | 运行证据 |
+|---|---|---|---|
+| 教学反思+策略提炼+画像EMA | `SelfUpdater.incremental_update`（paeg.teach 第 7 阶段） | data/reflections.json、strategies.json、profiles.json、versions/ 版本快照 | reflections.json 1297KB、profiles.json 22KB |
+| 对话案例反思 | `SelfImprover.record`（server.py 聊天后） | memory/cases.jsonl | 21KB 真实案例 |
+| Reflexion 失败反思 | `SelfEvolver.on_session_end`（EMA 下降时诊断） | evolve_data/reflection_log.json | 机制已接入 paeg.teach（7.5 阶段） |
+| 可编辑教学记忆 | `load_teaching_memory`（每次对话注入 system） | memory/PAEG_PEDAGOGY.md（可人工编辑） | 存在且生效 |
+
+**⚠️ 周期级自我更新——机制已写、API 已暴露，但缺少定时调度器**：
+- `SelfEvolver.weekly_insight_update()`（ExpeL 风格：从近期反思提取教学洞察，含 Library Drift 防护 cap=50）——**代码就绪，但 server.py 中 0 调用**
+- `SelfUpdater.batch_update()`（每周批处理）——只暴露为 `/api/batch` 端点，**无定时任务调用**
+- `SelfImprover.analyze_failures()`（分析失败案例生成改进建议写入 improvements.md）——**0 调用**
+
+**结论**：PAEG 的"自我更新"目前是**对话驱动的增量自我更新**（每次对话后反思沉淀，下一次对话自动注入），而非**时间驱动的周期性自我更新**。周期级进化（周度洞察提取、批量策略清洗、失败共性分析）的**机制已经全部实现并有防护设计（Library Drift cap/min_evidence/贡献分淘汰），只差一个调度器把它们跑起来**——这是明确的下一步（见 §10.7 优化任务 #1）。
+
+---
+
 # 2. 大模型知识（LLM 基础）
 
 ## 2.1 我们用的模型：DeepSeek
@@ -312,7 +434,7 @@ PAEG 的"大脑"由 6 个子代理构成，分两类：**5 个教学子代理**�
 - **不评分、不催促、不煽情**：热情、同情、鼓励话术都不是注意力的替代品
 - **谦逊是注意力的耐心**：不假装全知
 
-### 3.3.2 学科风格：SUBJECT_STYLES（25 个）
+### 3.3.2 学科风格：SUBJECT_STYLES（19 个基础学科 + 63 个别名）
 
 ```python
 SUBJECT_STYLES = {
@@ -1265,6 +1387,104 @@ python arch_check.py          # 输出连通性报告 + arch_report.json
 - **连通率 < 100%**：说明有模块没被调用（可能新加模块未接入）→ 立即排查
 - **关键链路缺失**：对话功能会静默失效 → 用 `arch_check.py` 的报告定位
 - 检测输出保存在 `05_实现原型/arch_report.json`，可纳入 CI
+
+---
+
+# 10.7 自检复盘与未来优化任务列表（v0.19.20 ⭐ 阶段性总结）
+
+> 本节与 CHANGELOG 中的 v0.19.20 记录同步。**下次启动开发时先读本节**——
+> 它列出了已知缺口与待办，避免重复探索。
+
+## 10.7.1 机制层优化（按优先级）
+
+| # | 任务 | 现状 | 目标 | 工作量 |
+|---|---|---|---|---|
+| 1 | **周期级自我更新调度器** | weekly_insight_update / batch_update / analyze_failures 已实现但 0 调用（见 §1.6.7） | 加定时调度（threading.Timer / APScheduler / 启动时后台线程），周期运行并注入 results | 中 |
+| 2 | SelfImprover 改进建议闭环 | analyze_failures 生成 improvements.md 但无人读 | 把 improvements.md 注入 system prompt（get_improvements 已实现，仅需接线） | 小 |
+| 3 | SelfEvolver 接入聊天模式 | on_session_end 只在 paeg.teach（教学模式）调用，闲聊模式未接 | 闲聊对话后也调用 on_session_end 做失败反思 | 小 |
+| 4 | 对话级记忆未完全落地 | MemorySystem 在 chat_stream 中构造但 long_term 读写链路待确认 | 确认/完善长期记忆跨会话读取 | 中 |
+| 5 | 学科数文档与实际不一致 | 实际 19 个基础学科（已修正 §3.3.2），文档其他处如"26 学科"需核对 | 全文核对统一 | 小 |
+| 6 | 工具调用前端可视化增强 | 已有 tool 事件但前端展示简单 | 展示工具名+参数+耗时，失败工具高亮 | 小 |
+| 7 | 固定域名方案 | 临时隧道 URL 每次重启变化（用户暂缓，见 02_用户决策记录） | 有预算后升级（§6.3 方案 B 已写好） | 待用户确认 |
+| 8 | 评估 harness 增强 | eval_harness 7 案例 | 扩充到学科×场景矩阵，接入 CI | 中 |
+
+## 10.7.2 内容层扩充（按优先级）
+
+| # | 任务 | 现状 | 目标 |
+|---|---|---|---|
+| 1 | 学科覆盖 | 19 个基础学科（数学/物理/化学/生物/地理/语文/英语/政治/历史/法学/哲学/美学/现象学/伦理/文学/法语/德语/日语/考研数学） | 按需扩充（如经济学、计算机、心理学）——新增只需在 SUBJECT_STYLES 加条目 |
+| 2 | 每日一句语料库 | quotes.py 88 行 | 扩充名言库，覆盖更多哲学家/教育者 |
+| 3 | Library 资料 | 语言 13 份/数学 2 份/哲学 5 份/薇依 9 份 + 用户上传 | 持续上传（用户可通过 GUI 书本图标上传） |
+| 4 | 词汇库 | Language 词汇表 1-8 + 高阶 + GRAMMAR | 可继续按 7 天×30 词节奏扩充 |
+| 5 | 教学策略库 | pedagogy.py 若干策略 | 补充更多学习困难场景的策略 |
+| 6 | 测试用例 | 59 个（单元+集成+验收） | 为新增功能补充测试 |
+| 7 | 法语/德语/日语内容 | 只有学科风格，无具体资料 | 有需求时补 Library |
+
+---
+
+# 10.8 设计背景与材料存放位置索引（v0.19.20 ⭐ 供下次 LLM 读取）
+
+> 本节告诉"下一个开发者/LLM"：项目的历史背景、设计文档、参考材料都在哪，
+> 启动工作前先读哪些文件。
+
+## 10.8.1 快速启动路径（读这些就能开工）
+
+| 文件 | 作用 |
+|---|---|
+| `PAEG技术全景文档.md`（本文档） | 系统全貌：架构、数据流、API、部署、测试 |
+| `CHANGELOG.md` | 版本历史：每个迭代改了什么 |
+| `05_实现原型/README.md` | 原型代码导读 |
+| `00_Gap与行动清单.md` | 已知缺口（最早的自检清单） |
+| `07_参考与勘误/00_项目自检报告.md` | 自检报告 |
+
+## 10.8.2 设计背景与决策记录
+
+| 材料 | 位置 |
+|---|---|
+| 需求规格说明书 v1.0/v2.0 | `01_需求文档/` |
+| 用户决策记录 v1.0/v2.0（含"不买域名先保公网方案"等决策） | `02_用户决策记录/` |
+| 架构设计 v1.0 草图/定稿、v2.0、v3.0 迭代 | `03_架构设计_迭代/` |
+| 最终设计 v3.1 | `04_最终设计/PAEG最终设计_v3.1.md` |
+| 第一轮开发 Loop 总结 | `08_Loop记录/01_Loop第一轮总结.md` |
+| 断点续传/状态评估/公网部署过程记录 | `intermediate/`（00_断点续传_状态评估、02_v08_公网部署_过程记录 等） |
+| API 契约 | `07_参考与勘误/01_API契约.md` |
+
+## 10.8.3 代码与数据
+
+| 材料 | 位置 |
+|---|---|
+| 核心实现（40 个 .py 模块） | `05_实现原型/` |
+| 子代理（6 个） | `05_实现原型/subagents.py` |
+| 主类/教学循环 | `05_实现原型/paeg.py` |
+| 提示词中心（人格/学科/学段） | `05_实现原型/prompts.py` |
+| 工具注册表/缓存/恢复 | `tool_registry.py` / `tool_cache.py` / `tool_recovery.py` |
+| 自我更新三模块 | `self_update.py` / `self_evolve.py` / `self_improve.py` |
+| 可编辑教学记忆 | `05_实现原型/memory/PAEG_PEDAGOGY.md`（人工可编辑）+ cases.jsonl |
+| 运行时数据 | `data/`（画像/反思/策略）、`users_data/<user_id>/`（长期记忆）、`evolve_data/`、`downloads/` |
+| 前端 GUI | `09_GUI前端/index.html` + `assets/` |
+| 测试 | `05_实现原型/tests/` + `06_测试与验证/` |
+| 评估 harness | `05_实现原型/eval_harness.py` + eval_report.json |
+
+## 10.8.4 知识库（Library）——PAEG"学过什么"的真实来源
+
+| 领域 | 内容 |
+|---|---|
+| `Library/Language/` | 英语词汇扩充 1-8（7天×30词）、GRAMMAR大观、德语A1手册（pdf+docx）、高阶词汇表 |
+| `Library/Math/` | 数理统计讲义（在线资源）、简明数据结构 PDF |
+| `Library/Philosophy/` | 汉斯·约纳斯《责任原理》《生命现象》等 PDF |
+| `Library/Simone Weil/` | 薇依著作：《重负与神恩》《科学与我们》《超自然认识》等 PDF + 文选 docx |
+| `Library/KnowledgeBase/` | 结构化知识（subjects/facts，JSON/MD） |
+| `Library/user_qa_lib/` | 用户上传的资料（傅里叶笔记等） |
+
+## 10.8.5 外部环境与工具
+
+| 项 | 位置/值 |
+|---|---|
+| GitHub 仓库 | `https://github.com/Golden2002/PAEG`（Golden2002 个人 token） |
+| 公网入口 | 临时隧道 `https://girlfriend-object-combines-paragraphs.trycloudflare.com`（重启会变） |
+| 本地服务 | `http://localhost:5000`，重启脚本 `C:\Users\团聚体\AppData\Local\Temp\opencode\restart_paeg.py` |
+| 微信远程指挥 | wbo（详见 `D:\wbo-workspace\README.md`） |
+| 启动脚本 | `D:\wbo-workspace\start-paeg-public.ps1`（公网一键重启） |
 
 ---
 
