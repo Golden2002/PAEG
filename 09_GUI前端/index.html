@@ -278,6 +278,28 @@ body {
 .conv-item:hover .conv-del { opacity: 1; }
 .conv-item .conv-del:hover { color: #c0392b; background: rgba(192,57,43,.1); }
 
+/* v0.19：工具调用可视化卡片 */
+.tool-card {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 3px 10px; margin: 2px 4px 2px 0;
+  font-size: 12px; color: var(--text-dim);
+}
+.tool-card .tool-icon { font-size: 11px; }
+.tool-card .tool-name { font-weight: 600; color: var(--text); }
+.tool-card .tool-args { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* v0.19 P2-10：上传按钮 */
+.upload-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+  background: var(--surface-2); color: var(--text-dim);
+  font-size: 18px; line-height: 1; flex-shrink: 0; transition: all .15s;
+}
+.upload-btn:hover { background: var(--border); color: var(--accent); }
+.upload-msg { font-size: 12px; color: var(--text-dim); margin-left: 8px; }
+.upload-preview img { max-height: 120px; border-radius: 8px; border: 1px solid var(--border); }
+
 /* ─── 输入区 ─── */
 .input-bar {
   display: flex; gap: 10px; margin-top: 14px;
@@ -552,11 +574,13 @@ body {
       <div class="msg paeg">
         <div class="msg-avatar">É</div>
         <div class="msg-bubble">
-          你好，我是 <b>Émile Novis</b>，你的老师。<br>
-          我可以教授 <b>学科知识</b>（高中/本科/考研）、<b>实用技能</b>，并陪你探讨
-          <b>审美 · 道德 · 思辨 · 生命现象学</b> 等素养话题。<br><br>
-          试着问我一个问题，比如：
-          <br>「什么是熵？」「为什么负负得正？」「电车难题该拉开关吗？」
+          你好，我是 <b>Émile Novis</b>，你的老师。<br><br>
+          我可以陪你：<br>
+          · <b>学知识</b> —— 数学、物理、哲学……从初高中到考研<br>
+          · <b>做题目</b> —— 说"给我一道经典题"，我给你出题并讲解<br>
+          · <b>聊想法</b> —— 困惑、焦虑、好奇，都可以跟我说<br><br>
+          如果你想让我记住你的情况，点左上角「告诉老师你是谁」。<br>
+          试着问我：「什么是熵？」或「给我一道考研数学经典题」。
         </div>
       </div>
     </div>
@@ -590,6 +614,11 @@ body {
         <option value="kaoyan_politics">考研政治</option>
       </select>
       <input class="question-input" id="question-input" type="text" placeholder="输入你想学习的内容…" autocomplete="off" />
+      <!-- v0.19 P2-10：图片/文件上传 -->
+      <label class="upload-btn" id="upload-btn" title="上传图片/文件">
+        <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.md,.txt" style="display:none" />
+        <span>＋</span>
+      </label>
       <button class="ask-btn" id="ask-btn">发送</button>
     </div>
 
@@ -684,6 +713,28 @@ function fixBracketedFormulas(text) {
   const len = text.length;
   while (i < len) {
     const ch = text[i];
+    // 跳过已存在的 $...$ 或 $$...$$（已被 MathJax 渲染，不二次处理）
+    if (ch === '$') {
+      // 判断是 $$ 还是 $
+      if (text[i + 1] === '$') {
+        // $$...$$ 块级公式
+        let j = i + 2;
+        while (j < len && !(text[j] === '$' && text[j + 1] === '$')) j++;
+        if (j < len) { out += text.slice(i, j + 2); i = j + 2; continue; }
+      } else {
+        // $...$ 行内公式
+        let j = i + 1;
+        let found = false;
+        while (j < len) {
+          if (text[j] === '$') { found = true; break; }
+          if (text[j] === '\n') break;
+          j++;
+        }
+        if (found) { out += text.slice(i, j + 1); i = j + 1; continue; }
+      }
+      out += ch; i++;
+      continue;
+    }
     if (ch === '(' || ch === '（') {
       // 找匹配右括号（支持一层嵌套）
       let depth = 1, j = i + 1, inner = '';
@@ -728,6 +779,18 @@ function fixMathCodeBlocks(text) {
   });
 }
 
+// v0.19.1：最终公式消毒——处理不成对/错位的 $（LLM 偶发输出问题）
+function sanitizeFormulas(text) {
+  if (!text) return text;
+  // 计算 $ 总数，若为奇数，说明有未闭合的公式（多半是 LLM 少写了一个 $）
+  // 策略：不强行配对（可能误伤），只修复明显的 `$$` 后跟单个 `$` 的错位
+  // 1) `$$...$$$` → `$$...$$`（块级后多一个 $）
+  text = text.replace(/\$\$([\s\S]*?)\$\$\$/g, '$$$1$$');
+  // 2) `$...$$` → `$...$`（行内闭合符写成了两个）
+  text = text.replace(/(?<!\$)\$([^$\n]{1,120}?)\$\$/g, '$$1$');
+  return text;
+}
+
 function addMsg(role, html, tone, intent, preHtml) {
   const div = document.createElement('div');
   div.className = 'msg ' + role;
@@ -740,10 +803,12 @@ function addMsg(role, html, tone, intent, preHtml) {
   // v0.16：preHtml（如 step-tag）不进入 markdown 渲染，避免被转义
   // v0.17：渲染前修复括号包住的公式（如 "函数 (f(x)=x^2)" → "函数 $f(x)=x^2$"）
   // v0.17.2：修复 ```math 代码块
+  // v0.19.1：最终公式消毒
   let fixed = role === 'paeg' ? html : html;
   if (role === 'paeg') {
     fixed = fixMathCodeBlocks(fixed);
     fixed = fixBracketedFormulas(fixed);
+    fixed = sanitizeFormulas(fixed);
   }
   let contentHtml;
   if (role === 'paeg' && typeof marked !== 'undefined' && !fixed.startsWith('出错了')) {
@@ -943,12 +1008,17 @@ function updateStats() {
     ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '-';
 }
 
-// ─── 教学主流程 ───
+// ─── 教学主流程（v0.19：流式输出） ───
 async function teach(question, subject) {
   const thinking = addThinking('teach');
   askBtn.disabled = true;
+  const STEP_LABELS = {
+    question: '先看一个问题', present: '讲给你听', guide: '我们慢慢来',
+    practice: '你来试试', feedback: '这里要注意', evaluate: '想一想',
+    meta: '',
+  };
   try {
-    const result = await api('/api/teach', {
+    const resp = await fetch(API_BASE + '/api/teach/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -959,41 +1029,60 @@ async function teach(question, subject) {
         concept: question,
       }),
     });
+    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let stepIdx = 0;
+    // 当前正在流式输出的消息
+    let curBubble = null;
+    let curAcc = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf('\n\n')) !== -1) {
+        const raw = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const evtLine = raw.split('\n')[0] || '';
+        const event = evtLine.startsWith('event:') ? evtLine.slice(6).trim() : 'message';
+        const dataLine = raw.split('\n').find(l => l.startsWith('data:')) || '';
+        const data = dataLine.slice(5).trim();
+        if (!data) continue;
+        let obj;
+        try { obj = JSON.parse(data); } catch (e) { continue; }
+
+        if (event === 'presentation') {
+          // 新的教学步骤开始 → 流式显示
+          if (curBubble) {
+            // 渲染上一步（标记完成）
+            renderStepBubble(curBubble, curAcc, stepIdx);
+          }
+          stepIdx++;
+          curAcc = obj.content || obj.text || '';
+          curBubble = makeStepBubble(stepIdx);
+          // 模拟流式：分块逐字显示
+          await streamIntoBubble(curBubble, curAcc);
+          curBubble = null;
+        } else if (event === 'step') {
+          // 步骤状态
+        } else if (event === 'diagnosis' || event === 'plan' || event === 'evaluation') {
+          // 忽略中间状态
+        } else if (event === 'summary') {
+          if (curBubble) renderStepBubble(curBubble, curAcc, stepIdx);
+          const avg = obj.avg_score || 0;
+          addMsg('paeg', `本次教学完成，平均掌握度 <b style="color:var(--accent)">${avg.toFixed ? avg.toFixed(2) : avg}</b>`);
+        } else if (event === 'done') {
+          if (curBubble) renderStepBubble(curBubble, curAcc, stepIdx);
+          break;
+        }
+      }
+    }
 
     removeThinking(thinking);
     STATE.sessions++;
-
-    // 逐步呈现（v0.17.2：不再显示"步骤 N"，用自然过渡标签）
-    const steps = result.presentations || [];
-    const planSteps = (result.plan && result.plan.steps) || [];
-    const STEP_LABELS = {
-      question: '先看一个问题', present: '讲给你听', guide: '我们慢慢来',
-      practice: '你来试试', feedback: '这里要注意', evaluate: '想一想',
-      meta: '',  // 元问题回答无标签
-    };
-    for (let i = 0; i < steps.length; i++) {
-      const p = steps[i];
-      const planStep = planSteps[i] || {};
-      const stype = planStep.type || p.step_type || 'present';
-      const label = STEP_LABELS[stype] || (i === steps.length - 1 ? '小结' : '');
-      // preHtml：自然过渡标签（step_id 仍保留在数据里，但不再显示"步骤 N"）
-      const preHtml = label ? `<span class="step-tag">${label}</span>` : '';
-      addMsg('paeg', p.content || p.text || '', result.worldview_used,
-            stype, preHtml);
-      await new Promise(r => setTimeout(r, 120));
-    }
-
-    // 总结
-    const avg = (result.summary && result.summary.avg_score) || 0;
-    addMsg('paeg', `本次教学完成，平均掌握度 <b style="color:var(--accent)">${avg.toFixed(2)}</b>`);
-
-    // 更新画像与统计
-    if (result.learner) {
-      STATE.masteries = result.learner.subjects_mastery || {};
-      renderMastery(STATE.masteries);
-      document.getElementById('learner-name').textContent = result.learner.nickname || STATE.nickname;
-    }
-    STATE.versions = result.summary && result.summary.self_update_versions || STATE.versions;
     updateStats();
     loadMetaLog();
   } catch (e) {
@@ -1004,12 +1093,58 @@ async function teach(question, subject) {
   }
 }
 
+// 创建步骤气泡（占位）
+function makeStepBubble(idx) {
+  const div = document.createElement('div');
+  div.className = 'msg paeg';
+  div.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><span class="step-tag">讲解</span><div class="md-content"></div></div>`;
+  chatWin.appendChild(div);
+  chatWin.scrollTop = chatWin.scrollHeight;
+  return div;
+}
+
+// 流式逐字显示
+async function streamIntoBubble(bubble, fullText) {
+  const contentDiv = bubble.querySelector('.md-content');
+  const step = 12;  // 每步字符数
+  let shown = 0;
+  while (shown < fullText.length) {
+    shown = Math.min(shown + step, fullText.length);
+    contentDiv.textContent = fullText.slice(0, shown);
+    chatWin.scrollTop = chatWin.scrollHeight;
+    await new Promise(r => setTimeout(r, 16));
+  }
+}
+
+// 步骤完成：用 marked + 公式修复渲染最终内容
+function renderStepBubble(bubble, text, idx) {
+  if (!bubble) return;
+  const contentDiv = bubble.querySelector('.md-content');
+  const label = idx === 1 ? '先看一个问题' : (idx === 2 ? '讲给你听' : (idx >= 3 ? '深入一些' : ''));
+  contentDiv.innerHTML = `<div class="md-content">${
+    typeof marked !== 'undefined' ? marked.parse(fixMathCodeBlocks(fixBracketedFormulas(text))) : escapeHtml(text)
+  }</div>`;
+  if (window.MathJax && window.MathJax.typesetPromise) {
+    try { window.MathJax.typesetPromise([contentDiv]); } catch (e) {}
+  }
+  chatWin.scrollTop = chatWin.scrollHeight;
+}
+
 // ─── 一般对话（闲聊~） ───
+// v0.19：P1-5/6 流式对话 + 工具调用可视化
 async function generalChat(text) {
   const thinking = addThinking('chat');
   askBtn.disabled = true;
+  // 流式消息气泡（累积显示）
+  const bubble = document.createElement('div');
+  bubble.className = 'msg paeg';
+  bubble.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble md-content"></div>`;
+  const bubbleBody = bubble.querySelector('.msg-bubble');
+  let accText = '';
+  let toolCards = [];
+
   try {
-    const result = await api('/api/chat', {
+    const resp = await fetch(API_BASE + '/api/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1019,16 +1154,66 @@ async function generalChat(text) {
         text: text,
       }),
     });
-    removeThinking(thinking);
-    // v0.17：按 segments 错时显示（核心回应→自我迭代补充→推荐询问）
-    const segs = Array.isArray(result.segments) && result.segments.length > 0
-      ? result.segments : [result.reply || '……'];
-    for (let i = 0; i < segs.length; i++) {
-      addMsg('paeg', segs[i]);
-      if (i < segs.length - 1) {
-        // 段间停顿（让 ta 有时间阅读）
-        await new Promise(r => setTimeout(r, 1800 + Math.min(segs[i].length * 25, 1200)));
+    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    // 读取 SSE 流
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // 解析 SSE 事件
+      let idx;
+      while ((idx = buffer.indexOf('\n\n')) !== -1) {
+        const raw = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const evtLine = raw.split('\n')[0] || '';
+        const event = evtLine.startsWith('event:') ? evtLine.slice(6).trim() : 'message';
+        const dataLine = raw.split('\n').find(l => l.startsWith('data:')) || '';
+        const data = dataLine.slice(5).trim();
+        if (!data) continue;
+        let obj;
+        try { obj = JSON.parse(data); } catch (e) { continue; }
+
+        if (event === 'tool') {
+          // 工具调用可视化卡片
+          const nameCn = { web_search: '搜索网络', verify_math: '数学验证', fetch_page: '抓取网页',
+                           daily_quote: '每日一句', get_time: '获取时间' }[obj.name] || obj.name;
+          const card = document.createElement('div');
+          card.className = 'tool-card';
+          card.innerHTML = `<span class="tool-icon">⚙</span><span class="tool-name">${nameCn}</span><span class="tool-args">${escapeHtml(JSON.stringify(obj.arguments || {}).slice(0, 60))}</span>`;
+          toolCards.push(card);
+          if (!bubbleBody.parentNode) chatWin.appendChild(bubble);
+          bubbleBody.appendChild(card);
+          chatWin.scrollTop = chatWin.scrollHeight;
+        } else if (event === 'seg') {
+          // 流式文本累积
+          if (!bubbleBody.parentNode) chatWin.appendChild(bubble);
+          accText += obj.text || '';
+          bubbleBody.lastChild && bubbleBody.lastChild.classList && bubbleBody.lastChild.classList.contains('tool-card')
+            ? null : null;
+          // 只渲染文本部分（移除工具卡片后的纯文本）
+          const textDiv = document.createElement('span');
+          textDiv.textContent = obj.text || '';
+          bubbleBody.appendChild(textDiv);
+          chatWin.scrollTop = chatWin.scrollHeight;
+        } else if (event === 'done') {
+          break;
+        }
       }
+    }
+    removeThinking(thinking);
+    // 用 marked 渲染最终累积文本（替换纯文本为 markdown）
+    const textParts = Array.from(bubbleBody.querySelectorAll('span')).map(s => s.textContent).join('');
+    if (textParts) {
+      bubbleBody.innerHTML = toolCards.map(c => c.outerHTML).join('') +
+        '<div class="md-content">' + (typeof marked !== 'undefined' ? marked.parse(fixMathCodeBlocks(fixBracketedFormulas(textParts))) : escapeHtml(textParts)) + '</div>';
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        try { window.MathJax.typesetPromise([bubbleBody]); } catch (e) {}
+      }
+      chatWin.scrollTop = chatWin.scrollHeight;
     }
   } catch (e) {
     removeThinking(thinking);
@@ -1256,6 +1441,36 @@ document.getElementById('auth-submit').addEventListener('click', async () => {
 
 // ─── 事件 ───
 let currentMode = 'teach';
+
+// v0.19 P2-10：图片/文件上传
+document.getElementById('file-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('learner_id', STATE.learnerId);
+  try {
+    const r = await fetch(API_BASE + '/api/upload', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) { alert('上传失败: ' + (j.error || '')); return; }
+    // 显示图片预览消息
+    const isImg = /\.(png|jpg|jpeg|gif|webp)$/i.test(file.name);
+    const msgHtml = isImg
+      ? `<div class="upload-preview"><img src="${j.url}" alt="上传图片"/></div>`
+      : `📄 ${escapeHtml(file.name)}`;
+    addMsg('user', msgHtml);
+    // 发送附带文件说明的对话
+    const note = `（我上传了一个${isImg ? '图片' : '文件'}：${file.name}，URL: ${j.url}。请结合它回答）`;
+    const q = questionInput.value.trim() || `请看看我上传的${isImg ? '图片' : '文件'}`;
+    addMsg('user', q);
+    questionInput.value = '';
+    if (currentMode === 'chat') generalChat(note + ' ' + q);
+    else teach(note + ' ' + q, subjectSelect.value);
+  } catch (err) {
+    alert('上传失败: ' + err.message);
+  }
+  e.target.value = '';
+});
 
 askBtn.addEventListener('click', () => {
   const q = questionInput.value.trim();
