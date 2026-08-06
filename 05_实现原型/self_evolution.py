@@ -256,6 +256,52 @@ class SelfEvolution:
             "memory_dir": self.memory_dir,
         }
 
+    # ─────────────────────────────────────
+    # 5. 新学科需求记录（v0.19.26）：用户问了清单外的学科
+    # ─────────────────────────────────────
+    def record_subject_request(self, subject: str, concept: str,
+                               learner_id: str = "") -> Dict[str, Any]:
+        """记录"用户问了但 SUBJECT_STYLES 未收录的学科"到需求池。
+
+        去重 + 计数（同一学科被问多次 → 周度任务按 count 排序生成待新增学科建议）。
+        无需过 QualityGate（这是用户原始需求，不是 LLM 提炼内容）。
+        """
+        if not subject or not concept:
+            return {"recorded": 0, "rejected": ["缺少学科/概念"]}
+        fpath = os.path.join(os.path.dirname(self.insights_path),
+                             'subject_requests.json')
+        data = []
+        if os.path.isfile(fpath):
+            try:
+                with open(fpath, encoding='utf-8') as f:
+                    data = json.load(f)
+            except Exception:
+                data = []
+        hit = False
+        for entry in data:
+            if entry.get("subject") == subject:
+                entry["count"] = entry.get("count", 1) + 1
+                entry["last_seen"] = datetime.now().isoformat()
+                if concept and concept not in entry.get("concepts", []):
+                    entry.setdefault("concepts", []).append(concept[:40])
+                hit = True
+                break
+        if not hit:
+            data.append({
+                "subject": subject,
+                "count": 1,
+                "first_seen": datetime.now().isoformat(),
+                "last_seen": datetime.now().isoformat(),
+                "concepts": [concept[:40]] if concept else [],
+                "learner_id": str(learner_id)[:12] if learner_id else "",
+            })
+        tmp = fpath + ".tmp"
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, fpath)
+        self._log(f"新学科需求记录: {subject}（累计 {data[-1].get('count', 1)} 次）")
+        return {"recorded": 1, "total": len(data)}
+
 
 if __name__ == "__main__":
     import sys, io
