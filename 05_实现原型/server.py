@@ -419,22 +419,22 @@ def teach():
     except Exception:
         pass
 
-    # v0.19.27：情绪与心理支持拦截——情绪/心理/人生困惑走 EmotionSupportor
+    # v0.19.27：情绪与心理支持拦截——情绪/心理/人生困惑走 AffectionSupportor
     try:
-        from meta_router import is_emotion_expression
-        if is_emotion_expression(concept):
-            from subagents import EmotionSupportor
-            _emo = EmotionSupportor()
+        from meta_router import is_affection_expression
+        if is_affection_expression(concept):
+            from subagents import AffectionSupportor
+            _emo = AffectionSupportor()
             _emo_result = _emo.run(llm, concept, learner)
-            _emo_content = _polish_text(_emo_result.get("content", ""), context=f"emotion:{concept[:30]}")
+            _emo_content = _polish_text(_emo_result.get("content", ""), context=f"affection:{concept[:30]}")
             return jsonify({
-                "session_id": f"emotion_{learner_id}",
+                "session_id": f"affection_{learner_id}",
                 "summary": {"avg_score": 0},
                 "worldview_used": "weil",
                 "tone_ratio": 0,
                 "presentations": [
                     {"step_id": 1, "content": _emo_content,
-                     "step_type": "emotion"}
+                     "step_type": "affection"}
                 ],
                 "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
                 "reflections": [],
@@ -670,17 +670,17 @@ def teach_stream():
 
     # v0.19.27：情绪与心理支持拦截（流式版本）
     try:
-        from meta_router import is_emotion_expression
-        if is_emotion_expression(concept):
-            from subagents import EmotionSupportor
-            _emo = EmotionSupportor()
+        from meta_router import is_affection_expression
+        if is_affection_expression(concept):
+            from subagents import AffectionSupportor
+            _emo = AffectionSupportor()
             _emo_result = _emo.run(llm, concept, learner)
-            _emo_content = _polish_text(_emo_result.get("content", ""), context=f"emotion:{concept[:30]}")
+            _emo_content = _polish_text(_emo_result.get("content", ""), context=f"affection:{concept[:30]}")
 
             def gen_emo():
                 for i in range(0, len(_emo_content), 60):
-                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _emo_content[i:i+60], 'step_type': 'emotion'}, ensure_ascii=False)}\n\n"
-                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'emotion'}, ensure_ascii=False)}\n\n"
+                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _emo_content[i:i+60], 'step_type': 'affection'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'affection'}, ensure_ascii=False)}\n\n"
             return Response(gen_emo(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
@@ -1243,18 +1243,18 @@ def general_chat_stream():
         import time as _time
         from subagents import _safe_chat
 
-        # v0.19.27：情绪与心理支持——闲聊模式下表达情绪/心理/人生困惑走 EmotionSupportor
+        # v0.19.27：情绪与心理支持——闲聊模式下表达情绪/心理/人生困惑走 AffectionSupportor
         try:
-            from meta_router import is_emotion_expression
-            if is_emotion_expression(text):
-                from subagents import EmotionSupportor
-                _emo = EmotionSupportor()
+            from meta_router import is_affection_expression
+            if is_affection_expression(text):
+                from subagents import AffectionSupportor
+                _emo = AffectionSupportor()
                 _emo_result = _emo.run(llm, text, learner)
-                _emo_content = _polish_text(_emo_result.get("content", ""), context=f"emotion:{text[:30]}")
+                _emo_content = _polish_text(_emo_result.get("content", ""), context=f"affection:{text[:30]}")
                 for _c in [_emo_content[i:i+60] for i in range(0, len(_emo_content), 60)] or [_emo_content]:
                     yield f"event: seg\ndata: {json.dumps({'text': _c}, ensure_ascii=False)}\n\n"
                     _time.sleep(0.02)
-                yield f"event: done\ndata: {json.dumps({'ok': True, 'mode': 'emotion'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'ok': True, 'mode': 'affection'}, ensure_ascii=False)}\n\n"
                 return
         except Exception:
             pass
@@ -1956,11 +1956,11 @@ def knowledge_query():
     return jsonify(_handle_knowledge_query(learner, subject))
 
 
-@app.route("/api/emotion", methods=["POST"])
-def emotion_support():
+@app.route("/api/affection", methods=["POST"])
+def affection_support():
     """情绪与心理支持（独立对话类型 v0.19.29）。
 
-    用户显式选择"倾诉"模式时的端点：走 EmotionSupportor 子代理，
+    用户显式选择"倾诉"模式时的端点：走 AffectionSupportor 子代理，
     以注意力陪伴（胡塞尔悬置 + 薇依注意力 + 尼采自我克服），不教不答不解决。
     """
     data = request.get_json(force=True)
@@ -1980,18 +1980,18 @@ def emotion_support():
     text = data.get("text") or data.get("concept") or ""
     if not text:
         return jsonify({"error": "text is required"}), 400
-    from subagents import EmotionSupportor
-    _emo = EmotionSupportor()
+    from subagents import AffectionSupportor
+    _emo = AffectionSupportor()
     _emo_result = _emo.run(llm, text, learner)
-    _emo_content = _polish_text(_emo_result.get("content", ""), context=f"emotion:{text[:30]}")
+    _emo_content = _polish_text(_emo_result.get("content", ""), context=f"affection:{text[:30]}")
     return jsonify({
-        "session_id": f"emotion_{learner_id}",
+        "session_id": f"affection_{learner_id}",
         "summary": {"avg_score": 0},
         "worldview_used": "weil",
         "tone_ratio": 0,
         "presentations": [
             {"step_id": 1, "content": _emo_content,
-             "step_type": "emotion"}
+             "step_type": "affection"}
         ],
         "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
         "reflections": [],
@@ -2000,7 +2000,7 @@ def emotion_support():
             "grade_level": learner.grade_level,
             "subjects_mastery": learner.subjects_mastery,
         },
-        "mode": "emotion",
+        "mode": "affection",
     })
 
 
