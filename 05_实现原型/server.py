@@ -372,6 +372,71 @@ def teach_stream():
     concept = data["concept"]
     subject = data["subject"]
 
+    # v0.19.22：知识库查询拦截必须先于 meta（流式版本）——"知识库/你学过什么"应清点 Library
+    try:
+        from meta_router import is_knowledge_query
+        if is_knowledge_query(concept):
+            _kb = _handle_knowledge_query(learner, subject)
+            _kb_content = _kb.get("presentations", [{}])[0].get("content", "")
+
+            def gen_kb():
+                for i in range(0, len(_kb_content), 60):
+                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _kb_content[i:i+60], 'step_type': 'knowledge'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            return Response(gen_kb(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception:
+        pass
+
+    # v0.19.22：意向性层（流式版本）——非教学意图走一般化响应
+    try:
+        from meta_router import is_teaching_intent
+        if not is_teaching_intent(concept, llm):
+            from prompts import build_general_chat_system, build_general_chat_user
+            from subagents import _safe_chat
+            g_sys = build_general_chat_system(learner)
+            g_usr = build_general_chat_user(concept)
+            g_reply = _safe_chat(llm, g_sys, g_usr, max_tokens=700) or \
+                f"嗯，我听着。你想聊{subject}之外的什么，我都在。"
+
+            def gen_intent():
+                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': g_reply, 'step_type': 'chat'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            return Response(gen_intent(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception:
+        pass
+
+    # v0.19.7：学习方法咨询拦截（流式版本）
+    try:
+        from meta_router import is_method_advice
+        if is_method_advice(concept):
+            _ma = _handle_method_advice(learner, concept, subject)
+            _ma_content = _ma.get_json().get("presentations", [{}])[0].get("content", "")
+
+            def gen_ma():
+                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _ma_content, 'step_type': 'method'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            return Response(gen_ma(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception:
+        pass
+
+    # v0.19：出题意图拦截（流式版本）
+    try:
+        from meta_router import is_problem_request
+        if is_problem_request(concept):
+            _pr = _handle_problem_request(learner, concept, subject)
+            _pr_content = _pr.get_json().get("presentations", [{}])[0].get("content", "")
+
+            def gen_pr():
+                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _pr_content, 'step_type': 'problem'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            return Response(gen_pr(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception:
+        pass
+
     # v0.17.1：元问题/寒暄走闲聊（流式版本直接返回单段回答）
     try:
         from meta_router import is_meta_question, is_greeting
