@@ -254,6 +254,30 @@ body {
 }
 .quote-card .q-source { font-size: 11px; color: var(--text-dim); opacity: .7; }
 
+/* v0.18.1：历史会话列表 */
+.conv-list { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+.conv-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  background: var(--surface-2); transition: background .15s;
+}
+.conv-item:hover { background: var(--border); }
+.conv-item .conv-mode {
+  font-size: 10.5px; padding: 1px 6px; border-radius: 4px;
+  background: var(--surface); color: var(--text-dim); flex-shrink: 0;
+}
+.conv-item .conv-title {
+  flex: 1; font-size: 13px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.conv-item .conv-del {
+  font-size: 12px; color: var(--text-dim); padding: 2px 6px;
+  border-radius: 4px; flex-shrink: 0; opacity: 0;
+  transition: opacity .15s;
+}
+.conv-item:hover .conv-del { opacity: 1; }
+.conv-item .conv-del:hover { color: #c0392b; background: rgba(192,57,43,.1); }
+
 /* ─── 输入区 ─── */
 .input-bar {
   display: flex; gap: 10px; margin-top: 14px;
@@ -498,6 +522,14 @@ body {
       <h3>元认知日志</h3>
       <div class="log-list" id="log-list">
         <div class="log-item"><div class="txt" style="color:var(--text-dim)">等待教学记录…</div></div>
+      </div>
+    </div>
+
+    <!-- v0.18.1：历史会话（登录后可用） -->
+    <div class="card" id="conv-card">
+      <h3>历史会话 <button class="desc-toggle" id="conv-clear" title="清空全部会话" style="display:none">清空</button></h3>
+      <div class="conv-list" id="conv-list">
+        <div class="log-item"><div class="txt" style="color:var(--text-dim)">登录后自动保存对话，可在这里恢复</div></div>
       </div>
     </div>
 
@@ -789,13 +821,23 @@ async function loadDailyQuote() {
 }
 
 // ─── 后端调用 ───
-async function api(path, options) {
-  const resp = await fetch(API_BASE + path, options);
+async function api(path, options, method) {
+  const opts = options || {};
+  if (method) opts.method = method;
+  if (opts.body && typeof opts.body !== 'string') opts.body = JSON.stringify(opts.body);
+  const resp = await fetch(API_BASE + path, opts);
   if (!resp.ok) {
     const errText = await resp.text();
     throw new Error(`API ${resp.status}: ${errText.slice(0, 200)}`);
   }
   return resp.json();
+}
+
+// 转义 HTML（防止会话标题中的特殊字符破坏 DOM）
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
 }
 
 async function checkHealth() {
@@ -1061,9 +1103,84 @@ function applyLogin(result) {
   document.getElementById('user-badge').style.display = '';
   document.getElementById('user-btn').textContent = '退出';
   document.getElementById('learner-name').textContent = STATE.nickname;
-  // 加载持久化的自我描述
+  document.getElementById('conv-clear').style.display = '';
+  // 加载持久化的自我描述 + 历史会话（v0.18.1）
   loadProfile();
+  loadConversations();
 }
+
+// v0.18.1：加载历史会话列表
+async function loadConversations() {
+  const list = document.getElementById('conv-list');
+  if (!STATE.learnerId.startsWith('u')) {
+    list.innerHTML = `<div class="log-item"><div class="txt" style="color:var(--text-dim)">登录后自动保存对话，可在这里恢复</div></div>`;
+    document.getElementById('conv-clear').style.display = 'none';
+    return;
+  }
+  try {
+    const r = await api(`/api/conversations/${STATE.learnerId}`);
+    const convs = r.conversations || [];
+    if (!convs.length) {
+      list.innerHTML = `<div class="log-item"><div class="txt" style="color:var(--text-dim)">暂无历史对话</div></div>`;
+      return;
+    }
+    const MODE_CN = { teach: '教学', chat: '闲聊', solve: '做题' };
+    list.innerHTML = convs.map(c => `
+      <div class="conv-item" data-cid="${c.id}">
+        <span class="conv-mode">${MODE_CN[c.mode] || c.mode}</span>
+        <span class="conv-title">${escapeHtml(c.title || '对话')}</span>
+        <span class="conv-del" data-cid="${c.id}" title="删除">✕</span>
+      </div>`).join('');
+    // 点击会话恢复
+    list.querySelectorAll('.conv-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.classList.contains('conv-del')) return;
+        restoreConversation(item.dataset.cid);
+      });
+    });
+    // 删除按钮
+    list.querySelectorAll('.conv-del').forEach(del => {
+      del.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const cid = del.dataset.cid;
+        if (!confirm('删除这个会话？')) return;
+        await api(`/api/conversations/${STATE.learnerId}/${cid}`, {}, 'DELETE');
+        loadConversations();
+      });
+    });
+  } catch (e) {
+    list.innerHTML = `<div class="log-item"><div class="txt" style="color:var(--text-dim)">加载失败</div></div>`;
+  }
+}
+
+// 恢复会话：把历史消息渲染到对话窗口
+async function restoreConversation(cid) {
+  try {
+    const conv = await api(`/api/conversations/${STATE.learnerId}/${cid}`);
+    const msgs = conv.messages || [];
+    if (!msgs.length) return;
+    // 清空当前窗口，重新渲染历史
+    chatWin.innerHTML = '';
+    msgs.forEach(m => {
+      addMsg(m.role === 'user' ? 'user' : 'paeg', m.content);
+    });
+    chatWin.scrollTop = chatWin.scrollHeight;
+  } catch (e) {
+    console.error('恢复会话失败', e);
+  }
+}
+
+// 清空全部会话
+document.getElementById('conv-clear').addEventListener('click', async () => {
+  if (!confirm('确定清空全部会话？此操作不可恢复。')) return;
+  try {
+    await api(`/api/conversations/${STATE.learnerId}`, {}, 'DELETE');
+    loadConversations();
+    chatWin.innerHTML = '';
+  } catch (e) {
+    console.error('清空失败', e);
+  }
+});
 
 document.getElementById('user-btn').addEventListener('click', () => {
   if (document.getElementById('user-btn').textContent === '退出') {
@@ -1074,6 +1191,8 @@ document.getElementById('user-btn').addEventListener('click', () => {
     document.getElementById('user-btn').textContent = '登录/注册';
     document.getElementById('learner-name').textContent = '学习者';
     document.getElementById('desc-textarea').value = '';
+    document.getElementById('conv-clear').style.display = 'none';
+    loadConversations();  // 恢复匿名提示
     return;
   }
   document.getElementById('auth-modal').classList.add('open');
