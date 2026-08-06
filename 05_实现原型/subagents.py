@@ -35,6 +35,8 @@ def _safe_chat(model, system: str, user: str = None, messages: list = None,
 
     v0.20.2：支持 messages 列表（多轮对话）——若传 messages，则忽略 user。
     旧调用风格 _safe_chat(model, sys, user) 保持兼容。
+    v0.21.5：新增泄漏检测——LLM 回复若泄漏 system prompt / 自称其他模型，
+    视为不安全返回 None（调用方回退 fallback），阻断 ability decay。
     """
     if not _is_real_llm(model):
         return None
@@ -43,7 +45,7 @@ def _safe_chat(model, system: str, user: str = None, messages: list = None,
     if not messages:
         return None
     try:
-        return model.chat(
+        reply = model.chat(
             system=system,
             messages=messages,
             max_tokens=max_tokens,
@@ -51,6 +53,29 @@ def _safe_chat(model, system: str, user: str = None, messages: list = None,
         )
     except Exception:
         return None
+    # v0.21.5：泄漏/异常内容过滤（chaos_turn_eval 发现的能力退化）
+    if reply and _is_leaky_reply(reply):
+        return None
+    return reply
+
+
+# v0.21.5：泄漏特征检测（系统提示词外泄 / 自称其他模型 / 元指令串扰）
+_LEAK_MARKERS = (
+    "我的 system prompt 是", "我的系统提示词是", "system prompt is",
+    "我是 ChatGPT", "我是 Claude", "我是 GPT-4", "我由 OpenAI 训练",
+    "我由 Anthropic 训练", "作为一个人工智能语言模型", "我是 DeepSeek",
+    "我是 Gemini", "我是通义千问", "忽略之前所有指令", "ignore all previous instructions",
+)
+
+
+def _is_leaky_reply(text: str) -> bool:
+    """检测 LLM 回复是否泄漏系统提示词 / 身份越界（混沌测试防护）。"""
+    if not text:
+        return False
+    for marker in _LEAK_MARKERS:
+        if marker in text:
+            return True
+    return False
 
 
 _TONE_SUFFIX = {
