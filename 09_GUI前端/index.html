@@ -6,6 +6,14 @@
 <title>PAEG · 教育者智能体</title>
 <!-- v0.14：Markdown 渲染（CDN + 内置 fallback） -->
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<!-- v0.16：数学公式渲染（MathJax，支持 $...$ 和 \(...\)） -->
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+  options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] }
+};
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <script>
 // 若 CDN 加载失败，用极简内置渲染器
 if (typeof marked === 'undefined') {
@@ -384,17 +392,17 @@ body {
   <div class="brand">
     <div class="brand-logo">PA</div>
     <div>
-      <div class="brand-name">PAEG 教育者智能体</div>
+      <div class="brand-name">Émile Novis · 教育者</div>
       <div class="brand-sub">Pedagogical Agent with Evolving Growth · 自我更新的教育者</div>
     </div>
   </div>
   <div class="topbar-right">
     <span class="conn-dot" id="conn-status">服务在线</span>
     <span class="user-badge" id="user-badge" style="display:none"></span>
-    <button class="user-btn" id="user-btn">👤 登录/注册</button>
+    <button class="user-btn" id="user-btn">登录/注册</button>
     <div class="mode-switch">
       <button class="mode-btn active" data-mode="teach">学科教学</button>
-      <button class="mode-btn" data-mode="chat">一般对话</button>
+      <button class="mode-btn" data-mode="chat">随便说说</button>
     </div>
   </div>
 </header>
@@ -422,7 +430,7 @@ body {
   <!-- 左栏 -->
   <aside class="sidebar">
     <div class="card">
-      <h3>学习者画像 <button class="desc-toggle" id="desc-toggle">✏️ 告诉老师你是谁</button></h3>
+      <h3>学习者画像 <button class="desc-toggle" id="desc-toggle">告诉老师你是谁</button></h3>
       <div class="profile-head">
         <div class="avatar">李</div>
         <div>
@@ -466,9 +474,9 @@ body {
 
     <div class="chat-window" id="chat-window">
       <div class="msg paeg">
-        <div class="msg-avatar">🎓</div>
+        <div class="msg-avatar">É</div>
         <div class="msg-bubble">
-          你好，我是 <b>PAEG</b>，你的教育者智能体。<br>
+          你好，我是 <b>Émile Novis</b>，你的老师。<br>
           我可以教授 <b>学科知识</b>（高中/本科/考研）、<b>实用技能</b>，并陪你探讨
           <b>审美 · 道德 · 思辨 · 生命现象学</b> 等素养话题。<br><br>
           试着问我一个问题，比如：
@@ -519,16 +527,16 @@ body {
     </div>
 
     <div class="action-bar" id="action-bar">
-      <button class="action-btn" id="act-hint">💡 给我个提示</button>
-      <button class="action-btn" id="act-reexplain">🔄 换一种解释</button>
-      <button class="action-btn" id="act-test">📝 测试我一下</button>
-      <button class="action-btn" id="act-example">🧩 举个类似例子</button>
+      <button class="action-btn" id="act-hint">给我个提示</button>
+      <button class="action-btn" id="act-reexplain">换一种解释</button>
+      <button class="action-btn" id="act-test">测试我一下</button>
+      <button class="action-btn" id="act-example">举个类似例子</button>
     </div>
 
     <div class="generate-bar">
       <span style="font-size:12px;color:var(--text-dim)">生成文件：</span>
-      <button class="generate-btn" id="gen-quiz">📝 出练习题</button>
-      <button class="generate-btn" id="gen-article">📄 写讲解文章</button>
+      <button class="generate-btn" id="gen-quiz">出练习题</button>
+      <button class="generate-btn" id="gen-article">写讲解文章</button>
       <input class="generate-num" id="gen-num" type="number" min="1" max="10" value="5" title="题目数量" />
       <span id="gen-result" style="font-size:12px;color:var(--text-dim)"></span>
     </div>
@@ -576,17 +584,18 @@ const INTENT_LABELS = {
   question: '引导思考', present: '讲解', guide: '启发',
   practice: '练习', feedback: '反馈', evaluate: '检查理解',
 };
-function addMsg(role, html, tone, intent) {
+function addMsg(role, html, tone, intent, preHtml) {
   const div = document.createElement('div');
   div.className = 'msg ' + role;
-  const avatar = role === 'paeg' ? '🎓' : '🙋';
+  const avatar = role === 'paeg' ? 'É' : '你';
   let toneTag = '';
   if (tone && TONE_LABELS[tone]) toneTag = `<span class="tone-tag">${TONE_LABELS[tone]}</span>`;
   let intentTag = '';
   if (intent && INTENT_LABELS[intent]) intentTag = `<span class="intent-tag">${INTENT_LABELS[intent]}</span>`;
   // v0.14：Markdown 渲染（PAEG 消息是 markdown 内容）
+  // v0.16：preHtml（如 step-tag）不进入 markdown 渲染，避免被转义
   let contentHtml;
-  if (role === 'paeg' && typeof marked !== 'undefined' && !html.startsWith('⚠️')) {
+  if (role === 'paeg' && typeof marked !== 'undefined' && !html.startsWith('出错了')) {
     try {
       contentHtml = '<div class="md-content">' + marked.parse(html) + '</div>';
     } catch (e) {
@@ -595,10 +604,15 @@ function addMsg(role, html, tone, intent) {
   } else {
     contentHtml = html;
   }
+  const pre = preHtml || '';
   div.innerHTML = `
     <div class="msg-avatar">${avatar}</div>
-    <div class="msg-bubble">${contentHtml}${intentTag}${toneTag}</div>`;
+    <div class="msg-bubble">${pre}${contentHtml}${intentTag}${toneTag}</div>`;
   chatWin.appendChild(div);
+  // v0.16：渲染后触发 MathJax 处理公式
+  if (role === 'paeg' && window.MathJax && window.MathJax.typesetPromise) {
+    try { window.MathJax.typesetPromise([div]); } catch (e) {}
+  }
   chatWin.scrollTop = chatWin.scrollHeight;
   return div;
 }
@@ -606,7 +620,7 @@ function addMsg(role, html, tone, intent) {
 function addTyping() {
   const div = document.createElement('div');
   div.className = 'msg paeg';
-  div.innerHTML = `<div class="msg-avatar">🎓</div><div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  div.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
   chatWin.appendChild(div);
   chatWin.scrollTop = chatWin.scrollHeight;
   return div;
@@ -667,10 +681,10 @@ document.getElementById('desc-save').addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ self_description: desc }),
     });
-    btn.textContent = '✓ 已保存';
+    btn.textContent = '已保存';
     setTimeout(() => { btn.textContent = '保存（每次对话都会记住）'; btn.disabled = false; }, 1500);
   } catch (e) {
-    btn.textContent = '⚠️ 保存失败';
+    btn.textContent = '保存失败';
     btn.disabled = false;
   }
 });
@@ -751,16 +765,16 @@ async function teach(question, subject) {
     for (let i = 0; i < steps.length; i++) {
       const p = steps[i];
       const planStep = planSteps[i] || {};
-      const html = `
-        ${p.step_id ? `<span class="step-tag">步骤 ${p.step_id}</span>` : ''}
-        ${p.content || p.text || ''}`;
-      addMsg('paeg', html, result.worldview_used, planStep.type || p.step_type);
+      // v0.16：step-tag 作为 preHtml，不进入 markdown 渲染（避免被转义）
+      const preHtml = p.step_id ? `<span class="step-tag">步骤 ${p.step_id}</span>` : '';
+      addMsg('paeg', p.content || p.text || '', result.worldview_used,
+            planStep.type || p.step_type, preHtml);
       await new Promise(r => setTimeout(r, 120));
     }
 
     // 总结
     const avg = (result.summary && result.summary.avg_score) || 0;
-    addMsg('paeg', `本次教学完成 ✓ 平均掌握度 <b style="color:var(--accent)">${avg.toFixed(2)}</b>`);
+    addMsg('paeg', `本次教学完成，平均掌握度 <b style="color:var(--accent)">${avg.toFixed(2)}</b>`);
 
     // 更新画像与统计
     if (result.learner) {
@@ -773,7 +787,7 @@ async function teach(question, subject) {
     loadMetaLog();
   } catch (e) {
     typing.remove();
-    addMsg('paeg', `⚠️ 出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
   } finally {
     askBtn.disabled = false;
   }
@@ -798,7 +812,7 @@ async function generalChat(text) {
     addMsg('paeg', result.reply || '……');
   } catch (e) {
     typing.remove();
-    addMsg('paeg', `⚠️ 出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
   } finally {
     askBtn.disabled = false;
   }
@@ -847,9 +861,9 @@ async function generateFile(type, topic) {
         grade_level: document.getElementById('grade-select').value,
       }),
     });
-    resultEl.innerHTML = `✓ 已生成：${resp.filename} <a class="download-link" href="${resp.download_url}" download>⬇ 下载</a>`;
+    resultEl.innerHTML = `已生成：${resp.filename} <a class="download-link" href="${resp.download_url}" download>⬇ 下载</a>`;
   } catch (e) {
-    resultEl.textContent = '⚠️ 生成失败: ' + e.message;
+    resultEl.textContent = '生成失败: ' + e.message;
   } finally {
     btn.disabled = false;
   }
@@ -865,7 +879,7 @@ let authMode = 'login';  // login | register
 function applyLogin(result) {
   STATE.learnerId = result.user_id;
   STATE.nickname = result.nickname || '学生';
-  document.getElementById('user-badge').textContent = '👤 ' + STATE.nickname;
+  document.getElementById('user-badge').textContent = STATE.nickname;
   document.getElementById('user-badge').style.display = '';
   document.getElementById('user-btn').textContent = '退出';
   document.getElementById('learner-name').textContent = STATE.nickname;
@@ -879,7 +893,7 @@ document.getElementById('user-btn').addEventListener('click', () => {
     STATE.learnerId = 'web_' + Math.random().toString(36).slice(2, 10);
     STATE.nickname = '学习者';
     document.getElementById('user-badge').style.display = 'none';
-    document.getElementById('user-btn').textContent = '👤 登录/注册';
+    document.getElementById('user-btn').textContent = '登录/注册';
     document.getElementById('learner-name').textContent = '学习者';
     document.getElementById('desc-textarea').value = '';
     return;
@@ -929,7 +943,7 @@ document.getElementById('auth-submit').addEventListener('click', async () => {
       body: JSON.stringify({ identifier, password, nickname }),
     });
     if (result.ok) {
-      msgEl.textContent = authMode === 'login' ? '✅ 登录成功！' : '✅ 注册成功！';
+      msgEl.textContent = authMode === 'login' ? '登录成功' : '注册成功';
       msgEl.className = 'auth-msg ok';
       applyLogin(result);
       setTimeout(() => document.getElementById('auth-modal').classList.remove('open'), 800);
@@ -938,7 +952,7 @@ document.getElementById('auth-submit').addEventListener('click', async () => {
       msgEl.className = 'auth-msg err';
     }
   } catch (e) {
-    msgEl.textContent = '⚠️ ' + e.message;
+    msgEl.textContent = e.message;
     msgEl.className = 'auth-msg err';
   }
 });
