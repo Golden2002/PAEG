@@ -4,17 +4,40 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PAEG · 教育者智能体</title>
-<!-- v0.14：Markdown 渲染（CDN + 内置 fallback） -->
-<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<!-- v0.19.6：Markdown 渲染（本地优先 + CDN 兜底，摆脱国内 CDN 不稳定） -->
+<script src="assets/vendor/marked.min.js"></script>
+<script>
+// 本地 marked 加载失败 → CDN 兜底
+if (typeof marked === 'undefined') {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"><\/script>');
+}
+</script>
 <!-- v0.16：数学公式渲染（MathJax，支持 $...$ 和 \(...\)） -->
 <script>
 window.MathJax = {
   tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']],
         processEscapes: true },
-  options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] }
+  options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] },
+  loader: { load: ['[tex]/html', '[tex]/ams', '[tex]/newcommand'] },
+  startup: { typeset: true }
 };
 </script>
-<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<script>
+// MathJax 本地优先，失败则 CDN 兜底（动态加载）
+(function () {
+  var src = 'assets/vendor/mathjax/tex-chtml.js';
+  var el = document.createElement('script');
+  el.src = src;
+  el.async = true;
+  el.onerror = function () {
+    var cdn = document.createElement('script');
+    cdn.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js';
+    cdn.async = true;
+    document.head.appendChild(cdn);
+  };
+  document.head.appendChild(el);
+})();
+</script>
 <script>
 // v0.19.5：marked 公式保护扩展——$...$ / $$...$$ / \(...\) / \[...\] 原样保留给 MathJax。
 // 参考 marked 官方 extension 模式 + MathJax 集成最佳实践：
@@ -1267,11 +1290,6 @@ function updateStats() {
 async function teach(question, subject) {
   const thinking = addThinking('teach');
   askBtn.disabled = true;
-  const STEP_LABELS = {
-    question: '先看一个问题', present: '讲给你听', guide: '我们慢慢来',
-    practice: '你来试试', feedback: '这里要注意', evaluate: '想一想',
-    meta: '',
-  };
   try {
     const resp = await fetch(API_BASE + '/api/teach/stream', {
       method: 'POST',
@@ -1288,10 +1306,10 @@ async function teach(question, subject) {
     const reader = resp.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
-    let stepIdx = 0;
-    // 当前正在流式输出的消息
-    let curBubble = null;
-    let curAcc = '';
+    // v0.19.6：单个连续气泡（像 deepseek 网页端一样完整回答，不拆多个气泡）
+    let allText = '';
+    let mainBubble = null;
+    let lastSummary = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1310,32 +1328,57 @@ async function teach(question, subject) {
         try { obj = JSON.parse(data); } catch (e) { continue; }
 
         if (event === 'presentation') {
-          // 新的教学步骤开始 → 流式显示
-          if (curBubble) {
-            // 渲染上一步（标记完成）
-            renderStepBubble(curBubble, curAcc, stepIdx);
+          // 追加到同一气泡（步骤间加空行分隔，不拆气泡）
+          const content = obj.content || obj.text || '';
+          if (allText && !allText.endsWith('\n\n')) allText += '\n\n';
+          allText += content;
+          // 创建或更新单个气泡
+          if (!mainBubble) {
+            mainBubble = document.createElement('div');
+            mainBubble.className = 'msg paeg';
+            mainBubble.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><div class="md-content"></div>
+              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button></div></div>`;
+            chatWin.appendChild(mainBubble);
           }
-          stepIdx++;
-          curAcc = obj.content || obj.text || '';
-          curBubble = makeStepBubble(stepIdx);
-          // 模拟流式：分块逐字显示
-          await streamIntoBubble(curBubble, curAcc);
-          curBubble = null;
-        } else if (event === 'step') {
-          // 步骤状态
-        } else if (event === 'diagnosis' || event === 'plan' || event === 'evaluation') {
-          // 忽略中间状态
+          // 流式显示累积内容
+          const contentDiv = mainBubble.querySelector('.md-content');
+          const step = 12;
+          let shown = contentDiv.textContent.length;
+          while (shown < allText.length) {
+            shown = Math.min(shown + step, allText.length);
+            contentDiv.textContent = allText.slice(0, shown);
+            chatWin.scrollTop = chatWin.scrollHeight;
+            await new Promise(r => setTimeout(r, 10));
+          }
+          mainBubble._rawText = allText;
         } else if (event === 'summary') {
-          if (curBubble) renderStepBubble(curBubble, curAcc, stepIdx);
-          const avg = obj.avg_score || 0;
-          addMsg('paeg', `本次教学完成，平均掌握度 <b style="color:var(--accent)">${avg.toFixed ? avg.toFixed(2) : avg}</b>`);
+          lastSummary = obj.avg_score || 0;
+        } else if (event === 'doc') {
+          // v0.19.6：关键词触发文档 → 显示下载链接
+          const typeCn = { 讲义: '讲义', 要点: '要点', 例题: '例题', 笔记: '笔记' }[obj.type] || '文档';
+          addMsg('paeg', `已生成${typeCn}：<b>${escapeHtml(obj.filename || '')}</b><br><br>` +
+            `<a class="download-link" href="${obj.md_url}" download><img class="link-icon" src="assets/icons/download.svg" alt="下载"/> 下载 ${typeCn}</a>` +
+            (obj.html_url ? ` <a class="download-link" href="${obj.html_url}" target="_blank" style="margin-left:10px">预览</a>` : ''));
         } else if (event === 'done') {
-          if (curBubble) renderStepBubble(curBubble, curAcc, stepIdx);
           break;
         }
       }
     }
 
+    // 最终渲染（marked + 公式修复 + MathJax）
+    if (mainBubble && allText) {
+      const contentDiv = mainBubble.querySelector('.md-content');
+      const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(allText)));
+      contentDiv.innerHTML = typeof marked !== 'undefined'
+        ? marked.parse(fixedText) : escapeHtml(allText);
+      mainBubble._rawText = allText;
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        try { window.MathJax.typesetPromise([contentDiv]); } catch (e) {}
+      }
+    }
+    if (lastSummary) {
+      addMsg('paeg', `本次教学完成，平均掌握度 <b style="color:var(--accent)">${Number(lastSummary).toFixed(2)}</b>`);
+    }
     removeThinking(thinking);
     STATE.sessions++;
     updateStats();
