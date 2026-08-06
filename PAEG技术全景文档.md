@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.20（2026-08-06）
+> **版本**：v0.20.3（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -749,6 +749,60 @@ LLM 中文输出常出现：
 | 禁词/省略句未查 | 规则检测 8 样本零误报 |
 
 **实现位置**：`prompts.py`（L1）+ `language_refiner.py`（L2/L3）+ `server.py _polish_text`（全局接入）。
+
+---
+
+# 1.13 上下文打包契约 + 模式自动纠正（v0.20.3 ⭐ 关键技术）
+
+> 对话连贯性的完整解决方案：**每次 LLM 调用都回传完整上下文**（历史+画像+自我陈述+用户建模+模式+学科+学段+subagent背景），且**用户选错模式时后端自动纠正**。
+
+## 1.13.1 上下文打包器（context_bundle.py）
+
+**问题**：各端点上下文注入不一致（chat_stream 完整，affection/knowledge/method 缺失画像/BDI；teach_stream 主循环漏 user_model）。
+
+**ContextBundle 四函数**：
+
+| 函数 | 作用 |
+|---|---|
+| `build_user_model_bundle(history, description)` | infer_user_model + infer_bdi（对象意识核心）|
+| `build_learner_context(learner)` | 昵称/学段/自我陈述/掌握度/BDI 画像段 |
+| `build_meta_context(mode, subject, grade)` | 模式/学科/学段元信息段 |
+| `assemble_messages(history, current, max=10)` | 多轮 messages 列表（历史+当前句）|
+
+**注入矩阵（修复后）**：
+
+| 端点 | 历史 | 画像 | 自我陈述 | BDI/建模 | 学科/学段/模式 |
+|---|---|---|---|---|---|
+| teach | ✅ | ✅ | ✅ | ✅ | ✅ |
+| teach_stream 主循环 | ✅ | ✅ | ✅ | ✅（v0.20.3 修复）| ✅ |
+| chat_stream | ✅ | ✅ | ✅ | ✅ | ✅ |
+| affection | ✅ | ✅ | ✅ | ✅（v0.20.3 修复）| ✅ |
+| knowledge | ✅ | ✅ | ✅（v0.20.3 修复）| ✅ | ✅ |
+| method | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+**关键技术点**：
+- `_safe_chat` 支持 messages 列表（多轮历史真正进入 LLM）
+- `inject_user_model` 懒推断（learner._user_model 已有则跳过）
+- teach_stream 是"手动教学循环"，曾漏 user_model——现已在 generate() 开头补推断
+
+## 1.13.2 模式自动纠正（_mode_auto_correct）
+
+**问题**：method/knowledge/affection/answer 端点无拦截——用户选错模式（如选"倾诉"问数学题）后端不纠正。
+
+**修复**：`_mode_auto_correct(text, requested_mode, learner, ...)` 在各独立端点开头调用：
+
+```
+优先级：情绪(affection) > 知识库(knowledge) > 学习方法(method) > 出题(problem)
+```
+
+响应携带：`actual_mode`（后端真正用的模式）/ `requested_mode`（前端选的）/ `was_redirected`（是否纠正）。
+
+**实测**：
+- 选"学习方法"实际倾诉 → 纠正到 affection（"老师不催你解释什么"）
+- 选"倾诉"问知识库 → 纠正到 knowledge
+- 选"知识库"问数学题 → 保留知识库（不误伤）
+
+**为什么这是关键技术**：对话连贯性（记忆上文）+ 语义正确性（选对模式）是"像真人老师"的两大支柱——前者靠上下文打包，后者靠模式纠正。二者结合，PAEG 才能做到"无论用户怎么操作，Agent 都理解 ta 真正想要什么"。
 
 ---
 
