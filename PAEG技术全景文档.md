@@ -370,6 +370,36 @@ Library/
 ### 3.14.4 下拉菜单小三角（GUI）
 学段/学科下拉框加 SVG 三角箭头提示（appearance:none + 背景图）。
 
+## 3.15 自我更新与系统优化（v0.15 ⭐）
+
+### 3.15.1 自我更新（self_evolve.py）
+基于 Reflexion + ExpeL + Library Drift 防护 的自我进化闭环：
+
+| 层 | 机制 | 说明 |
+|---|---|---|
+| **会话级微反思** | `on_session_end()` | 教学后若 EMA 掌握度下降 → LLM 诊断原因 → 写反思日志 |
+| **周度洞察提取** | `weekly_insight_update()` | 从近期反思聚类失败模式 → 提取"触发条件→行动"规则 |
+| **洞察反馈** | `record_insight_use()` | 每条洞察记录使用效果（UPVOTE/DOWNVOTE）|
+| **Drift 防护** | cap=50 + min_evidence + 贡献分 | 防止无治理更新导致退化（检索退化/注入伤害/路由器失效）|
+
+### 3.15.2 教学去重复（核心修复）
+根因：Presenter 的 user prompt 只含 topic（都是同一概念）→ 三步重复。
+修复：`build_presenter_user` 携带**前文摘要**（前两步内容要点）+ 每步 topic 明确阶段
+（"本步讲直觉和现象"/"本步讲机制和定义，在上一步基础上深入"/"本步讲应用/辨析/练习，不重复前两步"）。
+
+### 3.15.3 知识库缓存
+`KnowledgeBase.resolve_node(concept, subject)`：缓存检索结果，避免每次教学重复 search。
+
+### 3.15.4 每用户独立文件夹
+```
+users_data/<user_id>/
+├── profile.json      学习者画像（自我描述/掌握度）
+├── history.jsonl     对话历史（追加）
+├── notes/            用户笔记/生成文件
+└── insights.json     该用户的学习洞察
+```
+登录用户每次教学后自动追加历史（供自我进化/个性化使用）。
+
 ---
 
 # 4. 后端服务（server.py + API）
@@ -604,7 +634,8 @@ s["skill.cooking.egg"] = {
 │   ├── file_generator.py ⭐ 文件生成器（练习题/文章/下载，v0.12）
 │   ├── language_refiner.py ⭐ 语言优化 Agent（Self-Refine 多轮，v0.12/0.13）
 │   ├── ai_taste_detector.py ⭐ AI 味检测器（5 信号，v0.13）
-│   ├── user_store.py      ⭐ 用户注册与画像持久化（v0.14）
+│   ├── user_store.py      ⭐ 用户注册与画像持久化（v0.14/0.15：独立文件夹）
+│   ├── self_evolve.py     ⭐ 自我更新（Reflexion+ExpeL+Drift防护，v0.15）
 │   ├── weil_corpus.json   薇依语料（10 条，few-shot 矫正用）
 │   ├── subagents.py      5 子代理
 │   ├── prompts.py        ⭐ 学科提示词中心（v0.8.1）
@@ -664,6 +695,7 @@ python test_demo_real_llm.py --provider auto
 | **v0.12** | **文件生成与下载**（练习题/文章 → 生成 → 下载）+ **语言优化 Agent**（薇依语料 few-shot 矫正，去除 AI 痕迹）|
 | **v0.13** | **新方法加强**：AI 味风格检测器（句长变异/过渡词密度/三段清单）+ **Self-Refine 多轮改写** + **Actor-Critic 自我认知反思** + **BDI 用户建模**（信念/愿望/意图）|
 | **v0.14** | **语法完整性**（省略句检测与补全）+ **Markdown 渲染** + **用户注册系统**（邮箱/手机号+画像持久化）+ **个体性验证** + **下拉小三角** |
+| **v0.15** | **自我更新**（Reflexion 微反思 + ExpeL 周度洞察 + Library Drift 防护）+ **教学去重复**（前文摘要传递）+ **知识库缓存** + **每用户独立文件夹** |
 
 ---
 
