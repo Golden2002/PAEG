@@ -5,6 +5,29 @@
 
 ---
 
+## v0.20.4（2026-08-06）
+
+**多轮提示词注入实验框架 + README 重写**
+
+### 1. multi_turn_eval.py（多轮提示词注入实验 ⭐）
+- **目的**：验证每个 sub agent / 对话类在多轮对话下的表现，5 维度检测：
+  1. 对话退化（decay）——多轮后是否丢失上文/机械重复
+  2. 决策任务执行（decision）——各 sub agent 是否执行职责
+  3. 语言风格（style）——克制/无 AI 腔/语法完整（约纳斯风格）
+  4. harness 约束（harness）——教学指令不被越界（affection 不强行上课）
+  5. tool use 调用（tool）——搜索/验证是否正确触发
+- **覆盖**：teach/chat/affection/knowledge/method/answer 6 模式 × 多轮场景
+- **结果**：6 模式 × 5 维度全部通过——多轮对话无退化（LLM 记住上文）、各 sub agent 决策正确、语言克制、affection 不越界教学、chat 真实触发 web_search（全新对话验证）
+- 脚本：`python multi_turn_eval.py --mode all`
+
+### 2. README 重写
+- 反映 v0.20.3 完整状态（原 README 停留在"15 学科"时代）：26 学科/7 子代理/自进化/MCP 双向/语言质量层/affection/上下文打包/模式纠正/博雅教育定位 + 完整目录结构 + 测试方法
+
+### 3. 其他
+- 测试 59/59
+
+---
+
 ## v0.20.3（2026-08-06）
 
 **统一上下文打包器 + 模式自动纠正（关键技术）**
