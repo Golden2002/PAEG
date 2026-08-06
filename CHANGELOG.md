@@ -5,6 +5,32 @@
 
 ---
 
+## v0.21.1（2026-08-06）
+
+**知识导图上下文修复 + 卷首语提示 + 历史验证 + Thread/Turn/Item 会话模型**
+
+### 1. 知识导图遗忘上文修复（问题3 ⭐）
+- **根因**：handle_knowledge_map 只传 (concept, subject, learner, llm)，无历史——"先问知识点再问知识框架图"时 LLM 看不到上文
+- **修复**：加 history 参数 + server 两处（teach/teach_stream）传 chat_hist
+- **实测**：先 chat"讲导数的几何意义"→ 再 teach"帮我做成知识框架图"→ step_type=knowledge_map 且内容为"导数的几何意义"（正确记住上文，提到几何/斜率/函数）✓
+
+### 2. 卷首语加知识导图提示（问题1）
+- 欢迎气泡新增："画知识导图 —— 说「思维导图」或「知识框架」，我把知识整理成结构图给你"
+- 关键词扩展：知识图谱/知识树/概念图/脑图/认知地图/mindmap/全景图/总览/鸟瞰/体系图 + 动词"梳理"
+
+### 3. 历史记录登录退出保留验证（问题2）
+- 端到端：注册→教学→"退出"→重新登录→ conversations.json 持久化 + 列表可查 + 会话恢复（4 条消息）✓
+
+### 4. Thread/Turn/Item 三层会话模型（问题4 ⭐ 借鉴 Codex App Server）
+- **session_model.py（新）**：Thread（持久容器可 fork/archive）+ Turn（工作单元）+ Item（原子 I/O 事件流）
+- **API**：POST /api/threads（创建）、GET /api/threads/<sid>（列表）、GET /api/threads/<sid>/<tid>/events（SSE 事件流，Last-Event-ID 续传）、POST .../<tid>（fork/archive/start_turn）
+- **实测**：创建/start_turn/列表/fork 全部工作 ✓
+
+### 5. 其他
+- 测试 59/59
+
+---
+
 ## v0.21（2026-08-06）
 
 **模块化架构 + 元能力文档 + 可观测性（架构成熟化 ⭐）**
