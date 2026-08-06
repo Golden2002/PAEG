@@ -83,6 +83,10 @@ body {
   color: #fff; font-weight: 700; font-size: 15px;
   box-shadow: 0 2px 8px rgba(79,124,255,.35);
 }
+.logo-svg {
+  width: 20px; height: 20px; filter: brightness(0) invert(1);
+  display: block;
+}
 .brand-name { font-size: 17px; font-weight: 650; letter-spacing: .02em; }
 .brand-sub { font-size: 12px; color: var(--text-dim); margin-top: -2px; }
 .topbar-right { display: flex; align-items: center; gap: 12px; }
@@ -286,8 +290,15 @@ body {
   font-size: 12px; color: var(--text-dim);
 }
 .tool-card .tool-icon { font-size: 11px; }
+.tool-card .tool-icon-svg { width: 13px; height: 13px; opacity: .65; }
 .tool-card .tool-name { font-weight: 600; color: var(--text); }
 .tool-card .tool-args { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* v0.19.2：SVG 图标统一样式（替代 emoji） */
+.link-icon { width: 13px; height: 13px; vertical-align: -2px; display: inline-block; }
+.upload-btn-icon { width: 17px; height: 17px; opacity: .7; display: block; }
+.file-chip { display: inline-flex; align-items: center; gap: 5px; }
+.file-chip-icon { width: 14px; height: 14px; opacity: .7; }
 
 /* v0.19 P2-10：上传按钮 */
 .upload-btn {
@@ -337,6 +348,7 @@ body {
 
 /* ─── 学科快速入口 ─── */
 .subject-chips { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.chips-icon { width: 14px; height: 14px; opacity: .6; align-self: center; }
 .chip {
   border: 1px solid var(--border); background: var(--surface);
   padding: 6px 14px; border-radius: 20px; font-size: 12.5px; color: var(--text-dim);
@@ -473,7 +485,7 @@ body {
 <!-- 顶栏 -->
 <header class="topbar">
   <div class="brand">
-    <div class="brand-logo">É</div>
+    <div class="brand-logo"><img src="assets/icons/graduation-cap.svg" alt="毕业帽" class="logo-svg" /></div>
     <div>
       <div class="brand-name">Émile Novis · 教育者</div>
       <div class="brand-sub">Pedagogical Agent with Evolving Growth · 自我更新的教育者</div>
@@ -617,12 +629,13 @@ body {
       <!-- v0.19 P2-10：图片/文件上传 -->
       <label class="upload-btn" id="upload-btn" title="上传图片/文件">
         <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.md,.txt" style="display:none" />
-        <span>＋</span>
+        <img class="upload-btn-icon" src="assets/icons/upload.svg" alt="上传" />
       </label>
       <button class="ask-btn" id="ask-btn">发送</button>
     </div>
 
     <div class="subject-chips">
+      <img src="assets/icons/sparkles.svg" alt="" class="chips-icon" />
       <span style="font-size:12px;color:var(--text-dim);line-height:26px">试试：</span>
       <button class="chip" data-q="什么是熵？">什么是熵？</button>
       <button class="chip" data-q="为什么负负得正？">为什么负负得正？</button>
@@ -1183,7 +1196,7 @@ async function generalChat(text) {
                            daily_quote: '每日一句', get_time: '获取时间' }[obj.name] || obj.name;
           const card = document.createElement('div');
           card.className = 'tool-card';
-          card.innerHTML = `<span class="tool-icon">⚙</span><span class="tool-name">${nameCn}</span><span class="tool-args">${escapeHtml(JSON.stringify(obj.arguments || {}).slice(0, 60))}</span>`;
+          card.innerHTML = `<img class="tool-icon-svg" src="assets/icons/settings.svg" alt=""/><span class="tool-name">${nameCn}</span><span class="tool-args">${escapeHtml(JSON.stringify(obj.arguments || {}).slice(0, 60))}</span>`;
           toolCards.push(card);
           if (!bubbleBody.parentNode) chatWin.appendChild(bubble);
           bubbleBody.appendChild(card);
@@ -1266,7 +1279,7 @@ async function generateFile(type, topic) {
         grade_level: document.getElementById('grade-select').value,
       }),
     });
-    resultEl.innerHTML = `已生成：${resp.filename} <a class="download-link" href="${resp.download_url}" download>⬇ 下载</a>`;
+    resultEl.innerHTML = `已生成：${resp.filename} <a class="download-link" href="${resp.download_url}" download><img class="link-icon" src="assets/icons/download.svg" alt="下载"/> 下载</a>`;
   } catch (e) {
     resultEl.textContent = '生成失败: ' + e.message;
   } finally {
@@ -1457,7 +1470,7 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
     const isImg = /\.(png|jpg|jpeg|gif|webp)$/i.test(file.name);
     const msgHtml = isImg
       ? `<div class="upload-preview"><img src="${j.url}" alt="上传图片"/></div>`
-      : `📄 ${escapeHtml(file.name)}`;
+      : `<span class="file-chip"><img class="file-chip-icon" src="assets/icons/file-text.svg" alt=""/> ${escapeHtml(file.name)}</span>`;
     addMsg('user', msgHtml);
     // 发送附带文件说明的对话
     const note = `（我上传了一个${isImg ? '图片' : '文件'}：${file.name}，URL: ${j.url}。请结合它回答）`;
