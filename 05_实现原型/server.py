@@ -141,6 +141,37 @@ def static_files(filename):
 # v0.19.26：Agent Steering — 学科自动识别层
 # ─────────────────────────────────────
 
+def _polish_text(text: str, context: str = "") -> str:
+    """全局语言质量修正（v0.20）：所有输出端点统一过 LanguageRefiner。
+
+    修正：无主语短语（不催你/先不急）、动宾搭配不当（带着重量）、
+    AI 腔、省略句——保持风格的最小改动。
+    纯规则生成/预存文本跳过 LLM 改写（成本考虑）。
+    """
+    if not text or not text.strip():
+        return text
+    try:
+        if paeg is not None and paeg.refiner is not None:
+            # 仅对可能有问题的文本触发（AI 味 or 省略句 or 动宾搭配）
+            from ai_taste_detector import detect_ai_taste
+            try:
+                sig = detect_ai_taste(text)
+                ai_prob = sig.ai_likelihood
+            except Exception:
+                ai_prob = 0.2
+            has_issues = False
+            try:
+                has_issues = len(paeg.refiner._check_ellipsis(text)) > 0
+            except Exception:
+                pass
+            if ai_prob >= 0.4 or has_issues:
+                refined = paeg.refiner.refine(text, context=context)
+                if refined:
+                    return refined
+    except Exception:
+        pass
+    return text
+
 def _steer_subject(concept: str, subject: str, learner, learner_id: str) -> dict:
     """根据问题内容自动判断学科，覆盖用户手动设定。
 
@@ -395,13 +426,14 @@ def teach():
             from subagents import EmotionSupportor
             _emo = EmotionSupportor()
             _emo_result = _emo.run(llm, concept, learner)
+            _emo_content = _polish_text(_emo_result.get("content", ""), context=f"emotion:{concept[:30]}")
             return jsonify({
                 "session_id": f"emotion_{learner_id}",
                 "summary": {"avg_score": 0},
                 "worldview_used": "weil",
                 "tone_ratio": 0,
                 "presentations": [
-                    {"step_id": 1, "content": _emo_result.get("content", ""),
+                    {"step_id": 1, "content": _emo_content,
                      "step_type": "emotion"}
                 ],
                 "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
@@ -643,7 +675,7 @@ def teach_stream():
             from subagents import EmotionSupportor
             _emo = EmotionSupportor()
             _emo_result = _emo.run(llm, concept, learner)
-            _emo_content = _emo_result.get("content", "")
+            _emo_content = _polish_text(_emo_result.get("content", ""), context=f"emotion:{concept[:30]}")
 
             def gen_emo():
                 for i in range(0, len(_emo_content), 60):
@@ -697,6 +729,17 @@ def teach_stream():
                 concept=concept,
                 subject=subject,
             )
+            # v0.20：teach_stream 补 LanguageRefiner（原漏洞——手动教学循环跳过了 paeg.teach 的 refiner 钩子）
+            if paeg.refiner and presentation.get("llm_generated"):
+                try:
+                    _r_content = presentation.get("content", "")
+                    if _r_content:
+                        _refined = paeg.refiner.refine(_r_content, context=f"教学：{subject} - {concept}")
+                        if _refined and _refined != _r_content:
+                            presentation["content"] = _refined
+                            presentation["refined"] = True
+                except Exception:
+                    pass
             yield f"event: presentation\ndata: {json.dumps(presentation, ensure_ascii=False)}\n\n"
 
             # 评估
@@ -1207,7 +1250,7 @@ def general_chat_stream():
                 from subagents import EmotionSupportor
                 _emo = EmotionSupportor()
                 _emo_result = _emo.run(llm, text, learner)
-                _emo_content = _emo_result.get("content", "")
+                _emo_content = _polish_text(_emo_result.get("content", ""), context=f"emotion:{text[:30]}")
                 for _c in [_emo_content[i:i+60] for i in range(0, len(_emo_content), 60)] or [_emo_content]:
                     yield f"event: seg\ndata: {json.dumps({'text': _c}, ensure_ascii=False)}\n\n"
                     _time.sleep(0.02)
@@ -1940,13 +1983,14 @@ def emotion_support():
     from subagents import EmotionSupportor
     _emo = EmotionSupportor()
     _emo_result = _emo.run(llm, text, learner)
+    _emo_content = _polish_text(_emo_result.get("content", ""), context=f"emotion:{text[:30]}")
     return jsonify({
         "session_id": f"emotion_{learner_id}",
         "summary": {"avg_score": 0},
         "worldview_used": "weil",
         "tone_ratio": 0,
         "presentations": [
-            {"step_id": 1, "content": _emo_result.get("content", ""),
+            {"step_id": 1, "content": _emo_content,
              "step_type": "emotion"}
         ],
         "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
