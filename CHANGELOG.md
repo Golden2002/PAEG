@@ -5,6 +5,33 @@
 
 ---
 
+## v0.19.25（2026-08-06）
+
+**经济学学科 + 学习方法/知识库独立对话类型 + MCP 双向打通 ⭐**
+
+### 1. 经济学学科
+- prompts.py 新增 SUBJECT_STYLES["economics"]（persona/language/structure/emphasis）+ 别名（经济学/经济）
+- 前端 subject-select 加 option
+- 实测：教学"什么是机会成本"→ 一百块钱买书/看电影的直觉引入 ✓
+
+### 2. 学习方法 + 知识库独立对话类型
+- 新增 `/api/method` 端点：显式选择"学习方法"模式时，无论输入什么（不必命中 is_method_advice）都走学习方法指导，step_type=method
+- 新增 `/api/knowledge` 端点：显式选择"知识库"模式时清点 Library，step_type=knowledge
+- 前端加 2 个模式按钮（学习方法/知识库）+ methodChat/knowledgeChat 函数 + mode-tag 样式
+- 实测："/api/method 怎么复习经济学"→ 先讲通病再给方法；"/api/knowledge"→ 清点资料库 ✓
+
+### 3. MCP 双向打通（借鉴 oh-my-opencode/opencode ⭐ 核心）
+- **现状**：PAEG 只是 MCP Server（对外暴露 7 个工具），内部 LLM/subagent 无法调外部 MCP
+- **调研**：oh-my-opencode 的 Skill-Embedded MCP + opencode 的 mcp 配置（npx 启动 @modelcontextprotocol/server-*）
+- **新增 mcp_client.py**（fastmcp.Client）：连接外部标准 MCP server（filesystem 14 工具 + memory 9 工具），mcp_servers.json 配置
+- **改造 tool_registry**：get_all_tool_defs 合并 MCP 工具（mcp__server__tool 命名）；execute_tool fallback 到 MCP 客户端
+- **同步 MCP-only 工具**：solve_problem/save_document 加入 FC 端（内部 LLM 也能用）
+- **结果**：服务端 34 个工具（内置 FC 11 + 外部 MCP 23），LLM/subagent 可通过 Function Calling 调文件系统/记忆等标准化工具
+- 实测：execute_tool("mcp__filesystem__list_directory") → 返回真实目录列表 ✓
+- 测试 59/59 通过
+
+---
+
 ## v0.19.24（2026-08-06）
 
 **关键修复：闲聊模式气泡不显示的 JS bug（Playwright 实测定位）**
