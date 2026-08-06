@@ -1230,6 +1230,8 @@ async function checkHealth() {
     const h = await api('/api/health');
     document.getElementById('conn-status').textContent = '服务在线';
     document.getElementById('conn-status').className = 'conn-dot';
+    // v0.21.3：恢复持久化登录态（刷新后保持登录，历史会话可用）
+    restoreLoginState();
     // 同步学习者画像
     loadProfile();
     return h;
@@ -1237,6 +1239,27 @@ async function checkHealth() {
     document.getElementById('conn-status').textContent = '服务离线';
     document.getElementById('conn-status').className = 'conn-dot offline';
     return null;
+  }
+}
+
+// v0.21.3：从 localStorage 恢复登录态（解决刷新后登出、历史会话看不到的问题）
+function restoreLoginState() {
+  try {
+    const raw = localStorage.getItem('paeg-user');
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (!saved || !saved.learnerId || !String(saved.learnerId).startsWith('u')) return;
+    STATE.learnerId = saved.learnerId;
+    STATE.nickname = saved.nickname || '学生';
+    document.getElementById('user-badge').textContent = STATE.nickname;
+    document.getElementById('user-badge').style.display = '';
+    document.getElementById('user-btn').textContent = '退出';
+    document.getElementById('learner-name').textContent = STATE.nickname;
+    document.getElementById('conv-clear').style.display = '';
+    // 历史会话列表（不重复调 loadProfile，checkHealth 已调用）
+    loadConversations();
+  } catch (e) {
+    console.error('[restoreLoginState]', e);
   }
 }
 
@@ -1804,6 +1827,10 @@ function applyLogin(result) {
   document.getElementById('user-btn').textContent = '退出';
   document.getElementById('learner-name').textContent = STATE.nickname;
   document.getElementById('conv-clear').style.display = '';
+  // v0.21.3：持久化登录态（刷新后仍保持登录，历史会话可恢复）
+  try {
+    localStorage.setItem('paeg-user', JSON.stringify({ learnerId: STATE.learnerId, nickname: STATE.nickname }));
+  } catch (e) { /* 隐私模式等场景忽略 */ }
   // 加载持久化的自我描述 + 历史会话（v0.18.1）
   loadProfile();
   loadConversations();
@@ -1887,6 +1914,8 @@ document.getElementById('user-btn').addEventListener('click', () => {
     // 退出登录（回到匿名模式）
     STATE.learnerId = 'web_' + Math.random().toString(36).slice(2, 10);
     STATE.nickname = '学习者';
+    // v0.21.3：清除持久化登录态
+    try { localStorage.removeItem('paeg-user'); } catch (e) { /* 忽略 */ }
     document.getElementById('user-badge').style.display = 'none';
     document.getElementById('user-btn').textContent = '登录/注册';
     document.getElementById('learner-name').textContent = '学习者';
