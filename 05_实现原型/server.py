@@ -168,6 +168,40 @@ def teach():
     concept = data["concept"]
     subject = data["subject"]
 
+    # v0.17.1：元问题/寒暄拦截——用户问"你是谁/能做什么/能调用知识库吗"或打招呼，
+    # 走闲聊模式回答，避免被当成学科概念去教学（幻觉/答非所问）。
+    try:
+        from meta_router import is_meta_question, is_greeting
+        if is_meta_question(concept) or is_greeting(concept):
+            from prompts import build_general_chat_system, build_general_chat_user
+            from subagents import _safe_chat
+            m_sys = build_general_chat_system(learner)
+            m_usr = build_general_chat_user(concept)
+            m_reply = _safe_chat(llm, m_sys, m_usr, max_tokens=700)
+            if not m_reply:
+                m_reply = "我是 Émile Novis，你的老师。关于我、我的能力或知识库，你可以具体问我。"
+            return jsonify({
+                "session_id": f"meta_{learner_id}",
+                "summary": {"avg_score": 0},
+                "worldview_used": "weil",
+                "tone_ratio": 0,
+                "presentations": [
+                    {"step_id": 1, "content": m_reply, "step_type": "meta"}
+                ],
+                "evaluations": [],
+                "diagnosis": {},
+                "plan": {"steps": []},
+                "reflections": [],
+                "learner": {
+                    "id": learner.id,
+                    "nickname": learner.nickname,
+                    "grade_level": learner.grade_level,
+                    "subjects_mastery": learner.subjects_mastery,
+                },
+            })
+    except Exception:
+        pass  # 元问题路由失败不影响正常教学
+
     try:
         result = paeg.teach(learner, concept, subject)
         # 序列化
@@ -235,6 +269,25 @@ def teach_stream():
 
     concept = data["concept"]
     subject = data["subject"]
+
+    # v0.17.1：元问题/寒暄走闲聊（流式版本直接返回单段回答）
+    try:
+        from meta_router import is_meta_question, is_greeting
+        if is_meta_question(concept) or is_greeting(concept):
+            from prompts import build_general_chat_system, build_general_chat_user
+            from subagents import _safe_chat
+            m_sys = build_general_chat_system(learner)
+            m_usr = build_general_chat_user(concept)
+            m_reply = _safe_chat(llm, m_sys, m_usr, max_tokens=700) or \
+                "我是 Émile Novis，你的老师。关于我、我的能力或知识库，你可以具体问我。"
+
+            def gen_meta():
+                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': m_reply, 'step_type': 'meta'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            return Response(gen_meta(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception:
+        pass
 
     def generate():
         # 诊断
@@ -419,6 +472,17 @@ def library_info():
     })
 
 
+@app.route("/api/quote", methods=["GET"])
+def daily_quote():
+    """每日一句（v0.17）：薇依/约纳斯/胡塞尔/维特根斯坦/斯宾诺莎/怀特海。"""
+    try:
+        from quotes import quote_of_the_day
+        return jsonify(quote_of_the_day())
+    except Exception as e:
+        return jsonify({"text": "教育不在于往头脑里装东西，而在于点亮对真理的渴望。",
+                        "author": "西蒙娜·薇依", "source": "", "error": str(e)})
+
+
 @app.route("/api/generate", methods=["POST"])
 def generate_file():
     """生成文件内容（v0.12：练习题/文章/讲义）。
@@ -575,17 +639,27 @@ def general_chat():
         user = f"【最近对话】\n{hist_str}\n\n【学生现在说】\n{text}"
 
     from subagents import _safe_chat
-    reply = _safe_chat(llm, system, user, max_tokens=600)
+    # v0.17：增加 max_tokens 以支持多段输出（自我迭代 + 推荐）
+    reply = _safe_chat(llm, system, user, max_tokens=1500)
     if not reply:
         reply = f"我听到你说：{text}。想多说说吗？我会认真听。"
 
-    # 记录对话历史
+    # v0.17：按 【NEXT】 切分为多段（自我反思与迭代：核心回应→补充→推荐）
+    import re as _re
+    raw_segments = _re.split(r'【NEXT】', reply)
+    segments = [s.strip() for s in raw_segments if s.strip()]
+    # 若 LLM 没按要求用 【NEXT】（只用一段），保留单段
+    if not segments:
+        segments = [reply.strip()]
+
+    # 记录对话历史（用完整 reply，便于后续上下文连贯）
     chat_hist.append({'role': 'user', 'content': text})
     chat_hist.append({'role': 'assistant', 'content': reply})
     SESSIONS[f"chat_hist_{learner_id}"] = chat_hist[-20:]
 
     return jsonify({
-        "reply": reply,
+        "reply": reply,            # 兼容旧前端
+        "segments": segments,       # v0.17：多段输出
         "learner": {
             "id": learner.id,
             "nickname": learner.nickname,
