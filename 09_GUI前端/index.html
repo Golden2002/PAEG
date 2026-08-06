@@ -1310,7 +1310,9 @@ async function teach(question, subject) {
 function makeStepBubble(idx) {
   const div = document.createElement('div');
   div.className = 'msg paeg';
-  div.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><span class="step-tag">讲解</span><div class="md-content"></div></div>`;
+  div.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><span class="step-tag">讲解</span><div class="md-content"></div>
+    <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button></div>
+  </div>`;
   chatWin.appendChild(div);
   chatWin.scrollTop = chatWin.scrollHeight;
   return div;
@@ -1329,14 +1331,17 @@ async function streamIntoBubble(bubble, fullText) {
   }
 }
 
-// 步骤完成：用 marked + 公式修复渲染最终内容
+// 步骤完成：用 marked + 公式修复渲染最终内容（v0.19.4：加 sanitize + 复制/选择）
 function renderStepBubble(bubble, text, idx) {
   if (!bubble) return;
   const contentDiv = bubble.querySelector('.md-content');
   const label = idx === 1 ? '先看一个问题' : (idx === 2 ? '讲给你听' : (idx >= 3 ? '深入一些' : ''));
+  const fixed = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(text)));
   contentDiv.innerHTML = `<div class="md-content">${
-    typeof marked !== 'undefined' ? marked.parse(fixMathCodeBlocks(fixBracketedFormulas(text))) : escapeHtml(text)
+    typeof marked !== 'undefined' ? marked.parse(fixed) : escapeHtml(text)
   }</div>`;
+  // 保存原始文本（复制用）
+  bubble._rawText = text;
   if (window.MathJax && window.MathJax.typesetPromise) {
     try { window.MathJax.typesetPromise([contentDiv]); } catch (e) {}
   }
@@ -1421,8 +1426,12 @@ async function generalChat(text) {
     // 用 marked 渲染最终累积文本（替换纯文本为 markdown）
     const textParts = Array.from(bubbleBody.querySelectorAll('span')).map(s => s.textContent).join('');
     if (textParts) {
+      const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(textParts)));
       bubbleBody.innerHTML = toolCards.map(c => c.outerHTML).join('') +
-        '<div class="md-content">' + (typeof marked !== 'undefined' ? marked.parse(fixMathCodeBlocks(fixBracketedFormulas(textParts))) : escapeHtml(textParts)) + '</div>';
+        '<div class="md-content">' + (typeof marked !== 'undefined' ? marked.parse(fixedText) : escapeHtml(textParts)) + '</div>' +
+        '<div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button></div>';
+      // 保存原始文本（复制/文档用）
+      bubble._rawText = textParts;
       if (window.MathJax && window.MathJax.typesetPromise) {
         try { window.MathJax.typesetPromise([bubbleBody]); } catch (e) {}
       }
