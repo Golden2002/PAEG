@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.19.11（2026-08-06）
+> **版本**：v0.19.12（2026-08-06）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -737,39 +737,10 @@ python eval_harness.py
 
 ## 10.3 版本历史
 
-| 版本 | 内容 |
-|---|---|
-| v0.1 | 原型物化：6 个 .py 从 README 落地 |
-| v0.2/v0.3 | 历史迭代（评估器确定性、会话 ID）|
-| v0.5 | 真实 LLM + 55 节点 + CLI + 安全中间件 + 持久化 |
-| v0.8 | GUI 重写（真实对接 API）+ G4 技能教学（6 技能节点）+ 公网部署 |
-| **v0.8.1** | **学科提示词中心（prompts.py）—— 教学语言"人话化"** |
-| **v0.8.2** | **薇依画像教师**（注意力/爱/真理）+ **4 学段分层** + **15 学科体系** + **一般对话模式**（/api/chat）|
-| **v0.9** | **语言风格强化**（朴素/平实/有力量/温柔/循循善诱）+ **薇依画像深化**（真实生平）+ **教学策略库**（pedagogy.py）+ **GUI 教学动作按钮与意图标签** |
-| **v0.10** | **智能体基础架构**（agent_core.py：Tool/AgentLoop/Context）+ **用户自我描述功能**（每次对话自动注入）|
-| **v0.11** | **薇依思想深化**（文库一手文本：爱是朝向/移情/注意力）+ **语言规范**（防怪动词短语/滥比喻/语气词）+ **对象意识**（用户建模，不同用户不同反应）+ **知识库扩展接口**（Library/KnowledgeBase）|
-| **v0.12** | **文件生成与下载**（练习题/文章 → 生成 → 下载）+ **语言优化 Agent**（薇依语料 few-shot 矫正，去除 AI 痕迹）|
-| **v0.13** | **新方法加强**：AI 味风格检测器（句长变异/过渡词密度/三段清单）+ **Self-Refine 多轮改写** + **Actor-Critic 自我认知反思** + **BDI 用户建模**（信念/愿望/意图）|
-| **v0.14** | **语法完整性**（省略句检测与补全）+ **Markdown 渲染** + **用户注册系统**（邮箱/手机号+画像持久化）+ **个体性验证** + **下拉小三角** |
-| **v0.15** | **自我更新**（Reflexion 微反思 + ExpeL 周度洞察 + Library Drift 防护）+ **教学去重复**（前文摘要传递）+ **知识库缓存** + **每用户独立文件夹** |
-| **v0.16** | **名字 Émile Novis** + **词汇排斥策略**（稳了等 AI 味词）+ **公式渲染（MathJax）+ HTML 修复** + **随便说说模式**（带历史+画像）+ **去除 Emoji** |
-| **v0.17** | **每日一句库**（quotes.py：薇依/约纳斯/胡塞尔/维特根斯坦/斯宾诺莎/怀特海 47 句按日轮换 + /api/quote + 页面卡片）+ **"随便说说"→"闲聊~"** + **身份三层**（Émile Novis 对外 / 薇依内在 / PAEG 工程代号不对外）+ **阶段化思考动画**（理解→检索→构思→撰写）+ **低劣网络用语排除库**（AI_MARKERS 483 条 + AI_TELLS 406 条 + prompts 禁令）|
-| **v0.17.1** | **幻觉修复（meta_router.py）**：元问题拦截（"你是谁/能做什么/能调用知识库吗"不再被当学科概念教学，走闲聊回答）+ **公式渲染增强**（fixBracketedFormulas 支持嵌套括号/希腊字母/方括号长公式/单变量自动转 $...$）+ **多段对话流**（【NEXT】分段：核心回应→自我迭代补充→推荐询问，前端错时显示）|
-| **v0.17.2** | **寒暄拦截**（"你好/hi"等不再当教学概念，走闲聊）+ **```math 代码块修复**（fixMathCodeBlocks 清理错乱 $ 转 $$...$$）+ **讲解深度提升**（presenter prompt 由浅入深四层次：看见→理解→深入→把握）+ **步骤标签自然化**（"步骤 N"→"先看一个问题/讲给你听/你来试试"）+ **昵称使用**（对象意识，不刻板）|
-| **v0.18** | **五大模块**：①专业深度守门员（expert_guard.py：深度评分/套话检测/理科公式检查/自我修订）②联网搜索工具（web_search_tool.py：Bing 免key 默认 + Tavily/Serper 可选，搜索结果注入 prompt 标注 [来源 N]，防 prompt injection）③文档生成增强（save_answer：任意回答→Markdown+HTML 双格式下载；对话中"生成文档/保存"指令自动触发）④做题模块（problem_solver.py：题型识别 论述/计算/证明 → 三套标准答案模板对齐高考/考研评分标准，计算题 SymPy 验证）⑤对话历史持久化（ConversationStore：保存/读取/删除/定期清理 30 天 + LRU 50 会话上限 + 线程锁原子写；API：GET/DELETE /api/conversations）|
-| **v0.18.1** | **前端历史会话 GUI**：侧栏"历史会话"卡片（教学/闲聊/做题标签）+ 点击恢复历史消息 + 单会话删除 + 清空全部（带确认）+ 登录/退出自动显隐；api() 支持 DELETE 方法；escapeHtml 安全转义 |
-| **v0.19** | **P0/P1/P2 全优化**：①Function Calling（tool_registry.py：web_search/verify_math/fetch_page/daily_quote/get_time + run_agent_loop 工具循环）②三层记忆（memory_system.py：短期对话+摘要压缩+长期画像）③MCP 网关（mcp_gateway.py：FastMCP 暴露教育工具，外部智能体可连接 :8765/mcp）④Skills 体系（skill_registry.py：4 技能 SKILL.md 三级加载）⑤chat 流式输出（/api/chat/stream SSE + 教学流式 teach/stream）⑥工具调用可视化（前端 tool-card）⑦Agent 主循环（agent_engine.py：Plan→Act→Observe→Reflect）⑧自我改进（self_improve.py：反思+失败案例库）⑨可编辑教学记忆（teaching_memory.py：memory/PAEG_PEDAGOGY.md CLAUDE.md 风格）⑩多模态（/api/upload 图片上传）|
-| **v0.19.1** | **公式渲染修复**：fixBracketedFormulas 跳过已存在的 $...$/$$...$$（不再二次包裹破坏公式）+ sanitizeFormulas 消毒错位$ + **出题意图拦截**（is_problem_request："给我一道经典题目"→结合学段/学科/画像生成题目，不答非所问）+ **教学流式输出**（teach 改 SSE 逐字显示）+ **登录默认输出优化** + **评估 harness**（eval_harness.py：单元测试+LLM 输出质量评估两层，7/7 通过，含意图/公式/深度评分）|
-| **v0.19.2** | **工具调用错误恢复**（tool_recovery.py：错误分类[瞬时/永久/限流/配额] + 指数退避重试 + 失败降级信号[防 LLM 编造] + 每工具指标；接入 tool_registry 5 工具）+ **harness 加 tool-use 维度**（正常/隐式乘法重试/错误恢复 5 项测试全过）+ **SVG 资源替换 emoji**（16 个 Lucide/Heroicons 图标存 assets/icons，工具卡片/下载/上传/文件 全部用 SVG）+ **文档完善**（§10.4 GitHub 部署指南 + §10.5 可扩充资源清单 + 评估 harness 说明）|
-| **v0.19.3** | **对话交互三原则**：①准确性（build_general_chat_user 打包页面设定[模式/学段/学科]+历史+身份，要求先理解再输出）②组织性（输出像教学讲义：观点明确/层次清晰/内容详实）③功能性（前端复制按钮 + 多选回复生成文档下载，msg-copy/msg-select/select-bar）+ **记忆机制检查**（短时/长期/压缩均规范）+ **上下文管理**（context_manager.py：滑动窗口 window_k + token 预算 System15%/History60%/Response25% + 摘要降级，长对话降本 ~40%）+ **前端个性化**（暖白画布 #FAF8F4 + 深色模式[data-theme] + 玻璃顶栏 backdrop-filter + 撕角便签每日一句 + 主题切换按钮 + 渐变背景）|
-| **v0.19.4** | **三问题修复**：①**偏离提问根因**（chat_stream 的 run_agent_loop 之前传原始 text，改为传打包后的 user[含当前设定/历史/身份]）+ **三段收紧**（prompts 默认 1 段、最多 2 段、强调段间承接，不再固定三段各说各的）②**公式渲染补齐**（教学 renderStepBubble + chat 流式 bubble 补上 sanitizeFormulas + MathJax.typesetPromise，$ 包裹公式正确渲染）③**复制/多选全挂载**（教学 makeStepBubble + chat 流式 bubble 都加 msg-copy 复制按钮 + msg-select 复选框 + 保存 _rawText，copyMsg/genSelectedDoc 逻辑齐全）|
-| **v0.19.5** | **教学针对性优化**：①**公式渲染彻底修复**（marked 公式保护 extension：$...$/$$...$$/\(...\)/\[...\] 在 tokenizer 阶段原样保留，防 _/* 被转成 em；renderer 原样输出让 MathJax 识别；MathJax 加 processEscapes）+ **讲义式输出**（presenter prompt 加"讲义式组织"：小标题/公式规范/内容详实/可直接复用）②**关键词系统**（_handle_keyword_doc：用户输入"讲义/要点/例题/笔记"→ 生成对应格式文档下载，SSE 推送 doc 事件 + 前端显示下载链接）③**关键词提示 UI**（欢迎语提示可用关键词）|
-| **v0.19.6** | **三大根因修复**：①**公式渲染**——marked + MathJax **本地化**（assets/vendor/ 本地优先 + CDN 兜底，摆脱国内 jsdelivr 不稳定导致公式完全不渲染）②**三段式→完整回答**——教学模式改为**单个连续气泡**（所有教学步骤内容累积到一个气泡，像 deepseek 网页端，不再每步拆新气泡）③**讲义主题错位**——_handle_keyword_doc 主题提取优先用教学 concept（修复"输入讲义生成'本次讨论'而非讨论主题"），teach_stream 也接入关键词检测 + 前端 teach 处理 doc 事件显示下载链接|
-| **v0.19.7** | **四大问题修复**：①**答非所问**——新增"学习方法咨询"意图（is_method_advice + _handle_method_advice："如何学习线性代数"走学习指导而非教学/出题）②**讲义修复**——同步 /api/chat 也接入 _handle_keyword_doc + 修复 fgen 变量作用域 bug（讲义文件成功生成：`数学讲义：线性代数的特征值.md` 实测）③**闲聊模式学段**——mode 切换同时隐藏学段下拉框（闲聊不需要学段）+ chat_stream 实测正常回复 ④**架构连通性**——检查全部模块调用链：tool_recovery/tool_cache/skill_registry 经 tool_registry 间接调用 ✓；接入 teaching_memory（system 注入教学记忆）+ self_improve（对话后记录案例）；**公式渲染竞态**——统一 renderMath() 等待 MathJax startup 完成（修复异步加载竞态导致公式不显示）|
-| **v0.19.8** | **提升 Agent 指导大模型能力**：①**架构连通性指标**——新增 arch_check.py 自动检测 16 模块连通率（100%）+ 8 条关键调用链，作为关键技术指标写入 §10.6 ②**教学对话全面提升**——presenter 加"好讲解的质量标准"（7 条：具体>抽象/有为什么/建直觉/像人话/有层次/能带走/有余味）+ "学科黄金法则"（数学物理=直觉→严格桥、语文=回文本、历史=前因后果、哲学=论证+反例、外语=可用法、编程=最小示例）③**"接住"类动词屏蔽**——调研业界 prompt 工程共识（Memex/SullyOS/CipherTalk/AI-Novel-Writing 等 7 项目），AI_MARKERS 扩至 612 词 + AI_TELLS 556 词（接住/托住/抱抱/我懂你/赋能/点亮/你很棒等 150 个伪共情/AI腔词）+ prompts 三条语言铁律（动词要小/副词全去/不用动词包住对方/评价换描述）|
-| **v0.19.9** | **公式渲染彻底修复（KaTeX 替代 MathJax）**：根因=MathJax 3 tex-chtml.js 内置 autoload 按需加载 input/tex/extensions/*.js（如 html.js），本地缺失 → 404 → startup.promise reject → **公式全部不渲染**。方案=切换到 **KaTeX**（完全自包含 18 文件：katex.min.js/css + auto-render + 16 字体 woff2，本地加载无 CDN 依赖；同步渲染无竞态；throwOnError:false 天然降级显示原始 LaTeX）。renderMath() 改为 KaTeX renderMathInElement（支持 $...$/$$...$$/\(...\)/\[...\]）|
-| **v0.19.10** | **Agent 指导 LLM 工作能力全面强化**：①**工具调用修复**——llm_adapter.py 透传 tools/tool_choice 参数（修复 run_agent_loop 报错）；实测 LLM 自主触发 web_search（"2026诺贝尔奖"）与 verify_math（等式验证）②**Agent 工作协议**——chat_stream 注入完整协议（先理解→需时调工具→自我检查 loop→输出高质量），杜绝编造 ③**讲义级结构**——学习《数理统计讲义》(bookdown) 的教科书范式（为什么→定义/定理→生活案例→证明思路→反例边界→思考题）融入 presenter ④**在线资源入库**——数理统计讲义 URL 加入 Library/Math/（library_loader 已扫描识别）|
-| **v0.19.11** | **答非所问根治 + 用户资料库**：①**指令类型判断**——presenter 最前加"第一步：判断请求类型"（直接请求类[给公式/推荐/你的看法]→直接回答不绕弯；概念疑问类→深度讲解；做题类→解题），实测"给我一个你喜欢的数学公式"→直接给欧拉公式（不再"我们先来做"）②**打包上传完整性**——chat_stream 打包：当前设定(模式/学段/学科)+用户画像+BDI+教学记忆+三层记忆(历史/摘要)+**用户资料库** ③**用户资料上传模块**——/api/upload 支持 purpose=library（存 Library/user_<id>/）+ get_user_library 注入 system + /api/user-library 列表 + 前端书图标按钮 ④**Agent 连通性文档**——arch_check.py + §10.6 记录模块调用链与指挥能力|
+> 完整修改日志已拆分至独立文档：**[CHANGELOG.md](./CHANGELOG.md)**（v0.1 → v0.19.12 全部记录）。
+> 本文档只保留当前版本摘要。
+
+**当前版本 v0.19.12**：回到初衷——"人的基础上更具教育专业性"。新增 presenter 总原则"先做人，再教书"（所有结构/规范指令服务于帮助眼前的学生，不机械套模板），卷首语优化（去重复、更自然、留白收尾）。上一版 v0.19.11 完成答非所问根治 + 用户资料上传模块。
 
 ---
 
