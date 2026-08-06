@@ -15,6 +15,38 @@ class KnowledgeBase:
         self.cases = {}        # 案例
         self.skills = {}       # 技能（G4：编程/写作/思辨/问题解决/表达/学习法）
         self._load_demo_data()
+        # v0.15：检索缓存（避免每次 Presenter 都重新 search）
+        self._search_cache = {}
+        self._resolve_cache = {}
+
+    # ------------------------------------------------------------------
+    # v0.15：检索缓存
+    # ------------------------------------------------------------------
+    def resolve_node(self, concept: str, subject: str = None):
+        """解析概念对应的知识节点（带缓存）。
+
+        优先精确匹配，其次检索。缓存同一 (concept, subject) 的结果，
+        避免每次教学都重新 search（节省时间）。
+        """
+        if not concept:
+            return None
+        key = f"{concept}::{subject or ''}"
+        if key in self._resolve_cache:
+            return self._resolve_cache[key]
+
+        node = (self.get_subject(concept) or self.get_humanity(concept)
+                or self.get_skill(concept))
+        if node is None:
+            hits = self.search(concept, subject=subject, top_k=1)
+            if hits:
+                cid = hits[0]["concept_id"]
+                node = (self.get_subject(cid) or self.get_humanity(cid)
+                        or self.get_skill(cid))
+        if node is None and subject:
+            node = self.get_skill_by_name(subject)
+
+        self._resolve_cache[key] = node
+        return node
 
     # ------------------------------------------------------------------
     # 数据
