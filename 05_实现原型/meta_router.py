@@ -20,8 +20,8 @@ META_PATTERNS = [
     # 能力（一般性）
     r"你能(做什么|干什么|干嘛)|你(会|能)做什么|你的能力|你有什么能力",
     r"你有什么(功能|用处|本领)|你会什么|你能帮(我|人)做什么",
-    # 知识库
-    r"知识库|资料库|你(有|能)(调用|用|查|找|读|看).*(库|资料)|能不能(调用|查|找).*库",
+    # 知识库（v0.19.21：裸"知识库/资料库"移交给 knowledge 专用检测，这里只拦"调用/查"类动词）
+    r"你(有|能)(调用|用|查|找|读|看).*(库|资料)|能不能(调用|查|找).*库",
     r"你能调用.*吗|调用知识库|检索.*知识|有没有知识库|你的知识(库|来源)",
     # 模型/技术
     r"你(是|用).*(模型|大模型|gpt|llm|deepseek|ai)|基于什么(模型|技术)|谁做的|谁开发",
@@ -128,6 +128,62 @@ def is_meta_question(text: str) -> bool:
             return True
         return False
     return any(p.search(t) for p in COMPILED)
+
+
+# ─────────────────────────────────────────────
+# v0.19.21：意向性层（Intentionality Layer）⭐
+# ─────────────────────────────────────────────
+# 问题：教学模式问"你今天怎么样"会被强行变成数学课（水杯/导数隐喻）——
+# 教学 harness 的指令覆盖了用户提问的出发点与目的。
+# 解法：在进入教学 harness 前，用 LLM 判断用户输入是否为"教学意图"。
+#   教学意图   → 正常走教学（学科知识/概念/题目/方法）
+#   非教学意图 → 一般化响应（寒暄/情感/生活话题/非学科闲聊），不套教学模板
+# 原则：规则拦截（is_knowledge_query/meta/greeting/method/problem）永远优先且廉价；
+#       LLM 意向性判断是"兜底"，只对规则没拦住的输入启用。
+
+# 缓存：同一句输入 10 分钟内不重复调用 LLM（教学场景重复问同一概念很常见）
+_INTENT_CACHE = {}
+_INTENT_CACHE_TTL = 600
+
+
+def is_teaching_intent(text: str, llm=None) -> bool:
+    """LLM 判断用户输入是否为教学意图（默认 True——教学模式假设可教）。
+
+    返回 True（教学） / False（一般性对话，走闲聊响应）。
+    规则已拦截的输入不应到这里（调用方保证）；此函数只兜底。
+    """
+    t = (text or "").strip()
+    if not t or len(t) > 120:
+        return True  # 超长输入按教学处理（安全默认）
+    # 缓存
+    import time as _t
+    now = _t.time()
+    if t in _INTENT_CACHE and now - _INTENT_CACHE[t][1] < _INTENT_CACHE_TTL:
+        return _INTENT_CACHE[t][0]
+
+    intent = True  # 默认教学
+    if llm is not None:
+        try:
+            from subagents import _safe_chat
+            system = (
+                "你是意图判断器。判断学生的这句话是不是想学习学科知识。\n"
+                "返回严格 JSON：{\"teaching\": true/false, \"reason\": \"简短原因\"}\n"
+                "teaching=true：涉及学科知识/概念/题目/解题/学习方法/复习备考等。\n"
+                "teaching=false：寒暄/情感倾诉/生活闲聊/非学科话题/问老师近况/感谢/告别等。\n"
+                "只输出 JSON。"
+            )
+            user = f"学生说：{t}"
+            r = _safe_chat(llm, system, user, max_tokens=80)
+            if r:
+                import json as _json, re as _re
+                m = _re.search(r'\{.*\}', r, _re.S)
+                if m:
+                    parsed = _json.loads(m.group(0))
+                    intent = bool(parsed.get("teaching", True))
+        except Exception:
+            intent = True  # LLM 失败安全默认教学
+    _INTENT_CACHE[t] = (intent, now)
+    return intent
 
 
 if __name__ == "__main__":
