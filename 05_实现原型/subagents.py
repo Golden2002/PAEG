@@ -420,16 +420,26 @@ class AffectionSupportor:
         # 加载情绪支持原则
         core = self._load_principles()
         grade_cn = ""
+        learner_ctx = ""
         if learner is not None:
             grade_cn = getattr(learner, "grade_level", "high_school")
             grade_cn = {"middle_school": "初中", "high_school": "高中",
                         "undergraduate": "大学本科", "graduate_exam": "考研"}.get(grade_cn, grade_cn)
             desc = getattr(learner, "self_description", "") or ""
             desc_line = f"\n学生自我描述：{desc}" if desc else ""
+            # v0.20.3：注入 user_model/BDI（对象意识——情绪场景尤其需要）
+            try:
+                from context_bundle import build_user_model_bundle, build_learner_context
+                if not getattr(learner, "_user_model", None):
+                    learner._user_model = build_user_model_bundle([{"content": text}], desc)
+                learner_ctx = build_learner_context(learner)
+            except Exception:
+                pass
 
         system = (
             "你是 Émile Novis，一位以注意力陪伴学生的老师。学生带着情绪/心理/人生困惑来找你。\n\n"
-            f"学生情况：{('学段：' + grade_cn) if grade_cn else ''}{desc_line or ''}\n\n"
+            f"学生情况：{('学段：' + grade_cn) if grade_cn else ''}{desc_line or ''}\n"
+            f"{('【对象意识】' + learner_ctx) if learner_ctx else ''}\n\n"
             f"## 你的情绪支持原则（必须遵守）\n{core}\n\n"
             "## 回复要求\n"
             "1. **先悬置判断**（胡塞尔）：不贴标签、不诊断、不急于解释原因\n"
