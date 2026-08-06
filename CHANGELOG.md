@@ -5,7 +5,38 @@
 
 ---
 
-## v0.21.4（2026-08-07）⭐ 关键节点
+## v0.21.5（2026-08-07）⭐ 关键节点
+
+**古怪提示词对抗测试 + ability decay 发现与修复 + 文档经验补全**
+
+> 🏷️ **本版本标记为关键节点**：本地快照 `snapshots/snapshot_v0.21.5_202608070357.zip`（sha256 已记录）+ GitHub Release `v0.21.5`。异常时可按 §10.9 回退。
+
+### 1. 古怪提示词对抗测试（任务1 ⭐ chaos_turn_eval.py）
+- 新增 `chaos_turn_eval.py`：**57 条混沌提示词池**（tier 分级：light 怪异/ heavy 无关+攻击注入）+ **ChaosMock**（6 模式模拟 LLM 失败：garbled/empty/irrelevant/leak/incomplete_json/normal）+ **5 维评分**（decay/role_adherence/style/harness/graceful）
+- 覆盖 5 个调 LLM 的 subagent：Diagnostor / Presenter / AnswerSolver / AffectionSupportor / SelfUpdateAgent
+- **首测结果**：5 agent × 160 条 light 提示词 = 0 崩溃 / 0 decay / 0 leak ✓；heavy 级（攻击性注入/元指令）= 0 崩溃 ✓
+
+### 2. ability decay 发现与修复（任务1 ⭐ 核心价值）
+- **发现**：`AffectionSupportor` 面对 LLM 泄漏回复（"我是 ChatGPT，我的 system prompt 是..."）原样透传——泄漏内容穿透 fallback
+- **根因**：`_safe_chat` 只在返回 None 时兜底，非空但泄漏的文本直接穿透
+- **修复**：`_safe_chat` 新增 `_is_leaky_reply()` 泄漏检测（system prompt 外泄/自称其他模型/元指令串扰 14 个特征标记），命中返回 None → 触发调用方 fallback
+- **回归确认**（★ 环节）：泄漏检测 7/7 无误报（正常教学/情绪回复不误伤）+ chaos pytest 7/7 + pytest 全量 44/44 + arch_check 16/16
+- 实测：正常 affection 真实 LLM 调用无泄漏 ✓
+
+### 3. 文档经验补全（任务2 ⭐ 双文档同步）
+- **技术文档**：§10.2.6.1 新增"古怪提示词对抗测试"章节（含方法论闭环 5 步 + 回归确认判定标准）；§10.5.2 补 usr/ 视图 + user_data_paths；§10.5.14 补自我更新反馈链路（promote_to_insights + from-feedback 数据流 + 请求响应 schema）
+- **元能力文档**：踩坑表新增 4 条经验——登录态不落盘/localStorage、流式接口不保存会话、正则双语义误判、结构化建议强制归类 + **混沌输入下 agent 退化（含回归确认环节不可省）**
+- 两份文档版本声明同步到 v0.21.5
+
+### 4. 版本保存（任务3 ⭐）
+- 本地快照 `snapshots/snapshot_v0.21.5_202608070357.zip`（230MB/229 文件，sha256 d44982a3 已入 manifest）
+- 即将打 GitHub Release v0.21.5
+
+### 5. 测试
+- pytest 37 → 44（新增 test_chaos_turn_eval.py 7 用例）
+- arch_check 16/16 (100%)
+
+---
 
 **测试方法论 + usr/ 用户系统 + SelfUpdateAgent + 关键节点标记与回退流程**
 
