@@ -746,6 +746,43 @@ flowchart LR
 - `depth`：讲解深度（初中生活化/高中严谨+例题/大学严格定义/考研考点导向）
 - `tone_extra`：额外语气
 
+## 1.7.6 充分发挥、增益 LLM 能力 + 规则链兜底（v0.26 ⭐ 架构原则）
+
+> **用户指正**："agent 对 LLM 的限制过于强，没有利用好 LLM 的能力。把充分发挥、增益 LLM 的能力为原则。"
+
+**核心原则**：**LLM 是语义理解的主力，规则是廉价兜底**——不是"规则优先、LLM 兜底"，而是"**充分发挥、增益 LLM 能力——LLM 优先判断、规则快速拦截/兜底**"。
+
+### 演进历程
+- **v0.19-0.25**：规则优先——meta_router 用 7 个正则检测器（is_knowledge_query/is_method_advice 等）优先拦截，LLM 只对"teaching"意图兜底。问题：规则误判语境（"有什么思路"被当知识库清点），LLM 语义能力未充分利用。
+- **v0.26**：LLM 优先——`route()` 在规则 1-7 全部未命中后，先让 LLM 综合判断意图（`_llm_route_intent`），规则作为快速路径。
+
+### 三处"LLM 优先"落地
+
+```mermaid
+flowchart LR
+    IN["用户输入"] --> R["规则链快速路径<br/>affection/composite/meta/greeting/knowledge/method/problem"]
+    R -->|"未命中"| L["LLM 综合意图判断<br/>_llm_route_intent<br/>(9 类意图语义判断)"]
+    L -->|"非教学意图"| A["直接路由到对应模式<br/>answer/affection/knowledge/method/meta"]
+    L -->|"教学意图"| T["教学模式判断<br/>_detect_teaching_mode<br/>(easy/normal/deep)"]
+    R -->|"命中"| B["规则快速响应"]
+    T --> P["Presenter 按模式注入深度指令"]
+```
+
+| 层 | 机制 | 原则 |
+|---|---|---|
+| **意图理解** | `meta_router._llm_route_intent`：LLM 综合判断 9 类意图（teach/answer/affection/knowledge/method/problem/meta/greeting/non_teaching） | **LLM 优先**——规则 1-7 未命中时信任 LLM 语义判断，而非默认 teaching |
+| **教学模式** | `subagents._detect_teaching_mode`：LLM 判断 easy/normal/deep | **LLM 优先**——不用关键词匹配"简单了解"，LLM 语义理解用户要什么深度 |
+| **学科识别** | `subject_detector`：LLM 判断学科 + 学段拦截 | LLM 优先，规则关键词兜底 |
+
+### 设计要点
+1. **规则仍是快速路径**：affection（危机优先）、composite（指令+资料）、greeting 等确定性高的场景，规则直接命中（廉价、零延迟、可复现）。
+2. **LLM 处理模糊场景**：规则 1-7 都未命中的输入，交给 LLM 综合判断——它能理解"帮我算一下 2 的 10 次方"是 answer 而非 teach。
+3. **关键词仅作兜底**：教学模式的关键词（"简单讲讲"）在 LLM 失败时回退，不作为主判断。
+4. **可观测**：route() 返回 reason 标注"LLM 综合意图判断"或"规则命中"，便于审计。
+5. **不退化**：LLM 异常时回退规则/默认值（不崩、不静默错误）。
+
+**元技能（v0.26 新增）**：教育智能体的意图理解，**把语义判断交给 LLM，把确定性判断交给规则**——规则负责"快、准、廉价"的场景，LLM 负责"懂、细、语境"的场景。两者互补，不是替代。**LLM 不是被约束的工具，而是被充分调用、被增益的智能主体**——agent 的职责是指引 LLM 更好地发挥，而不是限制它。
+
 ## 1.8.2 归一化路由
 
 ```
