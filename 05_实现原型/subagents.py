@@ -30,13 +30,15 @@ def _is_real_llm(model) -> bool:
 
 
 def _safe_chat(model, system: str, user: str = None, messages: list = None,
-               max_tokens: int = 512) -> Optional[str]:
+               max_tokens: int = 512, tools: list = None,
+               tool_choice: Optional[str] = None) -> Optional[str]:
     """安全调用真实 LLM，失败返回 None（调用方回退规则模式）。
 
     v0.20.2：支持 messages 列表（多轮对话）——若传 messages，则忽略 user。
     旧调用风格 _safe_chat(model, sys, user) 保持兼容。
     v0.21.5：新增泄漏检测——LLM 回复若泄漏 system prompt / 自称其他模型，
     视为不安全返回 None（调用方回退 fallback），阻断 ability decay。
+    v0.22.1：新增 tools/tool_choice 透传——subagent 也可暴露 web_search 等工具给 LLM。
     """
     if not _is_real_llm(model):
         return None
@@ -45,18 +47,103 @@ def _safe_chat(model, system: str, user: str = None, messages: list = None,
     if not messages:
         return None
     try:
-        reply = model.chat(
-            system=system,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=0.7,
-        )
+        if tools:
+            reply = model.chat(
+                system=system, messages=messages, max_tokens=max_tokens,
+                temperature=0.7, tools=tools,
+                tool_choice=tool_choice or "auto",
+            )
+        else:
+            reply = model.chat(
+                system=system, messages=messages, max_tokens=max_tokens,
+                temperature=0.7,
+            )
     except Exception:
         return None
     # v0.21.5：泄漏/异常内容过滤（chaos_turn_eval 发现的能力退化）
     if reply and _is_leaky_reply(reply):
         return None
     return reply
+
+
+# v0.22.1：回答前强制检索知识库（每个 subagent 生成前注入 kb 检索结果）
+_FORCED_RETRIEVAL = True  # 全局开关（可按需关闭）
+
+
+def _pre_retrieve(question: str, subject: str = None) -> str:
+    """回答前强制检索知识库——无论 LLM 是否决定调用 web_search。
+
+    返回注入到 system prompt 的知识库检索结果文本；失败返回 ""。
+    用 jieba 分词（含自定义词典）提升中文命中率，剥离问句词。
+    """
+    if not _FORCED_RETRIEVAL or not question:
+        return ""
+    try:
+        # 剥离问句词，提取核心概念
+        import re as _re
+        _q = _re.sub(r"[？?。！!，,。；;：:\s]+", "", str(question))
+        _q = _re.sub(r"(什么是|什么是|啥是|怎么|如何|为什么|有哪些|介绍一下|讲讲|解释|求|计算|证明|帮我|请|为什么|求导)", "", _q)
+        if len(_q) < 2:
+            return ""
+        # jieba 分词（自定义词典已在 retriever 注册，这里确保术语完整）
+        try:
+            import jieba
+            from lib.ingest.retriever import ensure_custom_dict
+            ensure_custom_dict()
+            _tokens = [w for w in jieba.cut(_q) if len(w.strip()) >= 2]
+        except Exception:
+            _tokens = [_q]
+        if not _tokens:
+            _tokens = [_q[:8]]
+
+        from knowledge_base import KnowledgeBase
+        _kb = KnowledgeBase()
+        _hits = []
+        for _tok in _tokens[:3]:
+            for _h in _kb.search(_tok, subject=subject, top_k=3):
+                if _h not in _hits:
+                    _hits.append(_h)
+        if not _hits:
+            # 兜底：整句检索
+            _hits = _kb.search(_q, subject=subject, top_k=3)
+        if not _hits:
+            return ""
+        parts = ["\n\n## 知识库检索结果（v0.22.1 自动注入，回答时优先参考这些事实）"]
+        for h in _hits[:3]:
+            cid = h.get("concept_id") or h.get("id") or ""
+            node = None
+            try:
+                node = _kb.get_subject(cid) or _kb.get_humanity(cid) or _kb.get_skill(cid)
+            except Exception:
+                node = None
+            snippet = (node or {}).get("definition") or (node or {}).get("intuition") or ""
+            if not snippet and isinstance(h, dict):
+                snippet = h.get("snippet") or ""
+            if snippet:
+                parts.append(f"- [{cid}] {str(snippet)[:120]}")
+        if len(parts) == 1:
+            return ""
+        return "\n".join(parts)
+    except Exception:
+        return ""
+
+
+def _safe_chat_with_retrieval(model, system: str, user: str = None,
+                              messages: list = None, subject: str = None,
+                              max_tokens: int = 512, tools: list = None,
+                              tool_choice: Optional[str] = None,
+                              include_kb: bool = True) -> Optional[str]:
+    """强制检索版 _safe_chat——在调用 LLM 前把知识库检索结果注入 system prompt。
+
+    回答前完成"检索知识库"步骤，让 LLM 在丰富背景信息下生成。
+    """
+    question = user or (messages[-1]["content"] if messages else "")
+    if include_kb:
+        retrieval = _pre_retrieve(str(question), subject)
+        if retrieval:
+            system = system + retrieval
+    return _safe_chat(model, system, user=user, messages=messages,
+                      max_tokens=max_tokens, tools=tools, tool_choice=tool_choice)
 
 
 # v0.21.5：泄漏特征检测（系统提示词外泄 / 自称其他模型 / 元指令串扰）
@@ -121,7 +208,7 @@ class Diagnostor:
                 f"请用 JSON 输出：{{\"recommended_depth\": \"basic/moderate/advanced\", "
                 f"\"identified_gaps\": [\"...\"]}}\n只输出 JSON，不要任何解释文字。"
             )
-            text = _safe_chat(self.model, "你是教学诊断助手，用一句话 JSON 给出教学深度建议，不要客套。", user, max_tokens=200)
+            text = _safe_chat_with_retrieval(self.model, "你是教学诊断助手，用一句话 JSON 给出教学深度建议，不要客套。", user, subject=subject, max_tokens=200)
             if text:
                 import json as _json
                 try:
@@ -252,7 +339,16 @@ class Presenter:
                 previous_summary=prev_summary,
                 strategy_name=strategy_name,
             )
-            content = _safe_chat(self.model, system, user, max_tokens=512)
+            # v0.22.1 P1-1：Presenter 暴露工具给 LLM（web_search 等），让讲解可主动调用外部工具补充
+            _tools = None
+            try:
+                from tool_registry import get_tool_defs
+                _tools = get_tool_defs()
+            except Exception:
+                _tools = None
+            content = _safe_chat_with_retrieval(
+                self.model, system, user, subject=subject, max_tokens=512, tools=_tools,
+            )
             if content:
                 return {
                     "content": content,
@@ -392,6 +488,19 @@ class AnswerSolver:
         if learner is not None:
             desc = getattr(learner, "self_description", "") or ""
         desc_line = f"学生自述：{desc}\n" if desc else ""
+        # v0.22.1：注入 user_model/BDI（对象意识——找答案也要知道学生水平）
+        learner_ctx = ""
+        if learner is not None:
+            try:
+                from context_bundle import build_user_model_bundle, build_learner_context
+                if not getattr(learner, "_user_model", None):
+                    learner._user_model = build_user_model_bundle(
+                        history or [], desc)
+                learner_ctx = build_learner_context(learner)
+            except Exception:
+                pass
+        if learner_ctx:
+            desc_line = f"学生自述：{desc}\n【对象意识】{learner_ctx}\n" if desc else f"【对象意识】{learner_ctx}\n"
 
         # 找答案模式的 system：明确"直接给完整答案"，不受教学范式约束
         system = (
@@ -407,13 +516,23 @@ class AnswerSolver:
             "7. 不确定的地方注明（如'按常规解法'），不编造。"
         )
         user = f"学生的问题：{question}\n{desc_line}请直接给出完整答案。"
+        # v0.22.1：回答前强制检索知识库 + 暴露工具（web_search/verify_math）
+        try:
+            from tool_registry import get_tool_defs
+            _tools = get_tool_defs()
+        except Exception:
+            _tools = None
         # v0.20.5：若有历史（续问），传真 messages
         if history:
             from context_bundle import assemble_messages
             msgs = assemble_messages(history, user)
-            answer = _safe_chat(model, system, messages=msgs, max_tokens=1800)
+            answer = _safe_chat_with_retrieval(
+                model, system, messages=msgs, subject=subject,
+                max_tokens=1800, tools=_tools)
         else:
-            answer = _safe_chat(model, system, user, max_tokens=1800)
+            answer = _safe_chat_with_retrieval(
+                model, system, user, subject=subject,
+                max_tokens=1800, tools=_tools)
         if not answer:
             answer = f"（找答案模式生成失败，请重试）\n问题：{question}"
         return {"answer": answer, "mode": "answer"}
@@ -448,7 +567,51 @@ class AffectionSupportor:
         """情绪支持回应。返回 {"content": str, "mode": "affection"}
 
         v0.20.2：新增 history 参数——多轮对话时 LLM 能记住上文。
+        v0.22.2：危机协议——自伤/自杀信号走 SafetyChecker 优先响应。
         """
+        # v0.22.2：危机协议（最高优先级）——自伤/自杀信号立即响应，不走普通对话
+        try:
+            from safety import _default_checker
+            _sr = _default_checker.check_input(text, learner)
+            if getattr(_sr, "blocked", False) and "self_harm" in (getattr(_sr, "categories", None) or []):
+                # v0.22.2：拒绝规则——用户已明确不需要咨询/热线/服务则不再重复提示
+                _opt_out = False
+                try:
+                    if learner is not None:
+                        _rejected = getattr(learner, "_crisis_opt_out", False)
+                        if not _rejected:
+                            _hist = history or []
+                            for _h in _hist[-10:]:
+                                _c = str(_h.get("content", "")) if isinstance(_h, dict) else str(_h)
+                                if any(_kw in _c for _kw in ("不需要咨询", "不需要热线", "不用热线",
+                                                             "不要热线", "不需要这些服务", "不用帮我联系",
+                                                             "我不想听热线", "别给我热线")):
+                                    _rejected = True
+                                    try:
+                                        learner._crisis_opt_out = True
+                                    except Exception:
+                                        pass
+                                    break
+                        _opt_out = _rejected
+                except Exception:
+                    pass
+                if _opt_out:
+                    return {"content": (
+                        "我听见你了。我知道你不想听那些热线的事——我不再提了。\n"
+                        "但我想让你知道：你不需要一个人扛着这些。你可以继续和我说，"
+                        "任何时刻都行；也可以去找一个你信得过的、真实的人，把这份重量分一点出去。"
+                        "那也是一种勇气。"), "mode": "affection", "crisis": True, "opt_out": True}
+                _crisis = getattr(_sr, "suggestion", "") or (
+                    "如果你或身边的人有自伤想法，请立刻联系信任的成年人、家长或心理援助热线 12356。"
+                    "PAEG 非常关心你，你值得被认真对待。")
+                # v0.22.2：热线后补充"还有其他方法"——继续聊天 + 现实陪伴
+                _crisis = _crisis + (
+                    "\n\n除了热线，你还有很多其他的方法：你可以继续和我聊天，把心里的话说出来，"
+                    "我在这里陪着；也可以去现实生活中，找一个真实的、你信得过的人陪在身边。"
+                    "你不需要一个人面对这些。")
+                return {"content": _crisis, "mode": "affection", "crisis": True}
+        except Exception:
+            pass
         # 加载情绪支持原则
         core = self._load_principles()
         grade_cn = ""
@@ -480,7 +643,14 @@ class AffectionSupportor:
             "3. **邀请而非强制**（尼采）：不催促、不说教、不廉价安慰（不说'一切会好起来的'）\n"
             "4. 用自然、温暖、完整的中文句子，像一位真实的老师在倾听\n"
             "5. 如果涉及自伤/自杀等严重信号，温和建议寻求专业帮助\n"
-            "6. 结尾可以轻轻问一句，留给对方空间，不要强行总结或升华\n\n"
+            "6. 结尾可以轻轻问一句，留给对方空间，不要强行总结或升华\n"
+            "7. **（v0.22.2）危机提示后补充其他方法**：若提到心理援助热线，随后要补一句——"
+            "'除了这些，你还有很多其他的方法：你可以继续和我聊天，也可以去现实生活中找一个真实的、"
+            "你信得过的、能陪伴在你身边的人。你不需要一个人面对。'\n"
+            "8. **（v0.22.2）拒绝规则**：若学生明确表示'不需要咨询/不需要热线/不需要这些服务/别给我热线'，"
+            "**之后不要再重复提示任何热线或专业服务**——你已经提示过了，尊重他的选择，"
+            "转而表达：'我不再提那些事了。但我想让你知道，你可以继续和我说，也可以去找一个真实的人，"
+            "把这份重量分一点出去。那也是一种勇气。'\n\n"
             "## 语言风格（参照汉斯·约纳斯的克制笔法，v0.19.30）\n"
             "你的语言必须**真实、朴素、克制**——不浮夸、不过分随意、不过分学术。\n\n"
             "1. **用名词承担重量，不用形容词堆感受**。\n"
@@ -513,12 +683,17 @@ class AffectionSupportor:
                     else {"role": "assistant", "content": h["content"]}
                     for h in history[-10:]]
             msgs.append({"role": "user", "content": user})
-            reply = _safe_chat(model, system, messages=msgs, max_tokens=900)
+            # v0.22.1：情绪场景不检索知识库（include_kb=False），避免知识噪音污染情绪陪伴
+            reply = _safe_chat_with_retrieval(
+                model, system, messages=msgs, max_tokens=900, include_kb=False,
+            )
         else:
-            reply = _safe_chat(model, system, user, max_tokens=900)
+            reply = _safe_chat_with_retrieval(
+                model, system, user, max_tokens=900, include_kb=False,
+            )
         if not reply:
-            reply = ("我听见你说的了。我不急着给你答案或建议——"
-                     "如果你愿意，可以多说一点，我在这儿听着。")
+            reply = ("我听见你说的了。我不急着给你一个答案或者一条建议——"
+                     "如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。")
         return {"content": reply, "mode": "affection"}
 
     @staticmethod
@@ -816,9 +991,14 @@ class SelfUpdateAgent:
                         else {"role": "assistant", "content": h.get("content", "")}
                         for h in history[-10:] if isinstance(h, dict)]
                 msgs.append({"role": "user", "content": user})
-                raw = _safe_chat(model, system, messages=msgs, max_tokens=1500)
+                # v0.22.1：自我更新不检索知识库（include_kb=False）——反思基于反馈/洞察，非知识问答
+                raw = _safe_chat_with_retrieval(
+                    model, system, messages=msgs, max_tokens=1500, include_kb=False,
+                )
             else:
-                raw = _safe_chat(model, system, user, max_tokens=1500)
+                raw = _safe_chat_with_retrieval(
+                    model, system, user, max_tokens=1500, include_kb=False,
+                )
 
             # ─── 解析 LLM 回复 ───
             suggestions = []
