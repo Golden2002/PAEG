@@ -2182,12 +2182,62 @@ python stress_turn_eval.py --suite relevance --mode teach   # 只跑相关性（
 
 **分层方法论**：输入 <800 字 → 结构化模板直接送 LLM；800-4000 字 → LLM 分类切分；>4000 字 → 摘要后处理。正则只做第一层触发，语义区分交给 LLM 注意力。
 
+### 10.2.6.7 Skills 生态增强 + 用户文件 4 能力（v0.22.0 ⭐）
+
+#### Skills 生态（10 个技能，LLM 可调用）
+
+> **定位**：PAEG 通过 **skill_registry.py → tool_registry.py** 把技能暴露为 LLM 的 function calling 工具（`load_skill__<名称>`），LLM 自主决定何时加载技能工作流。v0.22.0 从市场下载 5 个成熟 skills 增强能力。
+
+**Skills 清单（10 个）**：
+
+| 技能 | 来源 | 用途 | 触发 |
+|---|---|---|---|
+| concept-explainer | 自建 | 讲解概念 | "什么是X/解释一下" |
+| essay-feedback | 自建 | 评改论述/作文 | "点评/批改作文" |
+| knowledge-map | 自建 | 知识导图 | "画思维导图" |
+| math-step-solver | 自建 | 分步解题 | "求/解/证明" |
+| study-planner | 自建 | 学习计划 | "怎么学/备考" |
+| **pdf** | anthropics/skills | PDF 提取/表单/OCR | "处理 PDF" |
+| **docx** | anthropics/skills | Word 创建/编辑 | "生成 Word" |
+| **xlsx** | anthropics/skills | Excel 分析 | "做表格" |
+| **doc-coauthoring** | anthropics/skills | 文档协作 | "写文档" |
+| **teach** | mattpocock/skills | 多会话教学/间隔重复 | "系统学X/备考" |
+
+**验证**：SkillRegistry 加载 10/10 → `tool_defs()` 暴露 10 个 `load_skill__*` → `activate()` 成功 → pytest（test_skill_registry_v022.py 6 用例）。
+
+#### 基于用户上传文件的 4 能力
+
+> **定位**：用户上传资料（`Library/usr_knowledge/<uid>/` 或旧 `user_<uid>/`）后，对话中可基于文件操作。v0.22.0 从"摘要注入"升级为"BM25 检索 + 4 能力"。
+
+**技术栈**（`lib/ingest/` 模块）：
+
+```
+readers.py（多格式全文提取 md/txt/pdf/docx/csv/json）
+  → chunker.py（中文按句分块 400 字/50 重叠）
+  → retriever.py（BM25 + jieba 155 教育术语词典；pip 失败降级 TF 关键词）
+  → intent_router.py（4 意图路由 34/34 准确 + 文件名提取）
+  → handlers/（file_qa / file_explain / file_quote / file_restructure）
+```
+
+**4 能力**：
+
+| 能力 | 触发词 | 处理 |
+|---|---|---|
+| file_qa 找答案 | "我的资料里关于X怎么说" | BM25 检索 → LLM 严格基于内容回答 |
+| file_explain 讲解 | "按我上传的讲义讲X" | 基于文件讲解（【原文】/【讲解】分层）|
+| file_quote 输出原文 | "把文件里X的原文给我" | **逐字输出原文（不依赖 LLM）** |
+| file_restructure 重组 | "把讲义整理成提纲" | 重组为大纲/表格/思维导图 |
+
+**端到端实测**：上传"导数笔记.md" → 4 种操作全部正确路由 + 原文输出含"x^n 导数是 nx^(n-1)"。
+
+**关键修复**：统一目录——上传默认存 `Library/usr_knowledge/<uid>/`（原 `user_<uid>/<uid>/` 不一致 bug），`get_user_library` 双读兼容旧路径。
+
 ## 10.3 版本历史
 
 > 完整修改日志已拆分至独立文档：**[CHANGELOG.md](./CHANGELOG.md)**（v0.1 → v0.21.4 全部记录）。
 > 本文档只保留当前版本摘要。
 
-**当前版本 v0.21.9**：指令 vs 资源区分（agent 指引 LLM 提升注意力）+ 问题驱动调研方法论 + 成熟项目借鉴。回到初衷——"人的基础上更具教育专业性"。新增 presenter 总原则"先做人，再教书"（所有结构/规范指令服务于帮助眼前的学生，不机械套模OP。回到初衷——"人的基础上更具教育专业性"。新增 presenter 总原则"先做人，再教书"（所有结构/规范指令服务于帮助眼前的学生，不机械套模板），卷首语优化（去重复、更自然、留白收尾）。上一版 v0.19.11 完成答非所问根治 + 用户资料上传模块。
+**当前版本 v0.22.0**：Skills 生态增强（10 个技能可被 LLM 调用）+ 基于用户上传文件的 4 能力（找答案/讲解/输出原文/重组结构，BM25 检索）。回到初衷——"人的基础上更具教育专业性"。新增 presenter 总原则"先做人，再教书"（所有结构/规范指令服务于帮助眼前的学生，不机械套模OP。回到初衷——"人的基础上更具教育专业性"。新增 presenter 总原则"先做人，再教书"（所有结构/规范指令服务于帮助眼前的学生，不机械套模板），卷首语优化（去重复、更自然、留白收尾）。上一版 v0.19.11 完成答非所问根治 + 用户资料上传模块。
 
 ---
 
