@@ -65,6 +65,58 @@ except Exception as _e:
 
 paeg = PAEG(llm, kb, enable_self_update=True, verbose=False)
 
+# v0.24 ⭐ 工具链修复：SkillRegistry 注入 system prompt（MCP/AgentEngine 同源）
+# —— 之前 SkillRegistry 扫描了 skills/ 下 10 个 SKILL.md 但从未被任何调用方注入；
+# —— 这里实例化一份全局单例，供 /api/chat、/api/chat/stream、/api/skills、/api/health 复用。
+try:
+    from skill_registry import SkillRegistry
+    SKILL_REGISTRY = SkillRegistry()
+    _sr_stats = SKILL_REGISTRY.stats()
+    print(f"[PAEG Server] SkillRegistry 就绪：{_sr_stats['count']} 个技能 (L1 目录将注入 system prompt)")
+except Exception as _e:
+    SKILL_REGISTRY = None
+    print(f"[PAEG Server] SkillRegistry 初始化失败（不影响主服务）: {_e}")
+
+
+# v0.24 ⭐ 工具链修复：MCP 客户端按需连接（启动期容错，不阻塞 server）
+# —— 修复前 server.py 完全没调用 MCPClientManager（连接数/health 一片空白）；
+# —— /api/health 用 HEALTH_MCP_STATS 字段呈现真实连接状态。
+try:
+    from mcp_client import get_mcp_client
+    MCP_CLIENT = get_mcp_client()
+    # 启动期尝试 connect_all（npx 不可用时静默降级，不影响主流程）
+    HEALTH_MCP_STATS = {"configured": 0, "connected": 0, "tools": 0, "last_error": ""}
+    try:
+        n = MCP_CLIENT.connect_all()
+        HEALTH_MCP_STATS["connected"] = n
+        HEALTH_MCP_STATS["configured"] = sum(1 for c in MCP_CLIENT.config.values() if c.get("enabled", True))
+        HEALTH_MCP_STATS["tools"] = len(MCP_CLIENT._tools)
+        HEALTH_MCP_STATS["last_error"] = MCP_CLIENT._last_error
+        print(f"[PAEG Server] MCP 连接：成功 {n}/{HEALTH_MCP_STATS['configured']} 个 server, "
+              f"暴露 {HEALTH_MCP_STATS['tools']} 个工具")
+        if n == 0 and HEALTH_MCP_STATS["last_error"]:
+            print(f"[PAEG Server] MCP 提示：{HEALTH_MCP_STATS['last_error'][:200]}（容错继续）")
+    except Exception as _me:
+        HEALTH_MCP_STATS["last_error"] = f"connect_all 异常: {str(_me)[:120]}"
+        print(f"[PAEG Server] MCP connect_all 异常（容错继续）: {_me}")
+except Exception as _e:
+    MCP_CLIENT = None
+    HEALTH_MCP_STATS = {"configured": 0, "connected": 0, "tools": 0, "last_error": f"导入失败: {str(_e)[:120]}"}
+    print(f"[PAEG Server] MCP 客户端初始化失败（不影响主服务）: {_e}")
+
+
+# v0.24 ⭐ 工具链修复：AgentEngine 实例化（Plan→Act→Observe→Reflect 主循环）
+# —— 修复前 agent_engine.py 整个工程 0 调用，这里暴露全局单例；
+# —— /api/chat/stream 可选 mode=agent 走 AgentEngine.run_agent；现有 run_agent_loop 路径不变。
+try:
+    from agent_engine import AgentEngine
+    AGENT_ENGINE = AgentEngine(llm=llm, max_iterations=3, replan_limit=2)
+    print("[PAEG Server] AgentEngine 就绪（Plan→Act→Observe→Reflect 循环 max_iter=3）")
+except Exception as _e:
+    AGENT_ENGINE = None
+    print(f"[PAEG Server] AgentEngine 初始化失败（不影响主服务）: {_e}")
+
+
 # v0.19.22：自进化模块（知识提炼/提示词进化/工具经验，全部经 QualityGate 过滤）
 try:
     from self_evolution import SelfEvolution
@@ -73,6 +125,28 @@ try:
 except Exception as _e:
     EVOLVER = None
     print(f"[PAEG Server] 自进化模块初始化失败（不影响主服务）: {_e}")
+
+
+def _inject_skill_catalog(system: str) -> str:
+    """v0.24 修复 1：把 SkillRegistry 的 L1 技能目录注入 system prompt。
+
+    - SKILL_REGISTRY 未初始化（None）或扫描结果为空 → 原样返回（容错）
+    - 已有 system 含相同 catalog_prompt 标记时跳过重复注入
+    """
+    if not system:
+        return system
+    if SKILL_REGISTRY is None:
+        return system
+    try:
+        catalog = SKILL_REGISTRY.catalog_prompt()
+    except Exception:
+        catalog = ""
+    if not catalog:
+        return system
+    # 幂等性：避免 stream 多次进入 generate 时重复注入
+    if "## 可用技能" in system:
+        return system
+    return system + "\n\n" + catalog
 
 # v0.12：文件生成器（练习题/文章/讲义下载）
 try:
@@ -438,13 +512,48 @@ def _steer_unknown_response(concept: str, learner, learner_id: str,
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    """健康检查。"""
+    """健康检查（v0.24 修复 3 ⭐）：增加 mcp_connected / skill_count / agent_engine 字段。"""
+    # MCP：尝试懒连接（npx 不可用时静默容错，不影响响应）
+    mcp_stats = dict(HEALTH_MCP_STATS)
+    try:
+        if MCP_CLIENT is not None and mcp_stats.get("connected", 0) == 0 \
+                and mcp_stats.get("last_error", "").startswith("连接异常"):
+            # 异常态时再尝试一次（启动期失败后用户可能安装了 npx）
+            try:
+                n = MCP_CLIENT.connect_all()
+                mcp_stats["connected"] = n
+                mcp_stats["tools"] = len(MCP_CLIENT._tools)
+                mcp_stats["last_error"] = MCP_CLIENT._last_error
+            except Exception:
+                pass
+    except Exception:
+        pass
+    mcp_status = "ok" if mcp_stats.get("connected", 0) > 0 else (
+        "degraded" if mcp_stats.get("configured", 0) > 0 else "not_configured")
+
+    # Skill Registry
+    skill_count = 0
+    if SKILL_REGISTRY is not None:
+        try:
+            skill_count = SKILL_REGISTRY.stats().get("count", 0) or 0
+        except Exception:
+            pass
+
+    # AgentEngine
+    agent_engine_ok = AGENT_ENGINE is not None
+
     return jsonify({
         "status": "ok",
-        "version": "0.3",
+        "version": "0.24",
         "llm_provider": LLM_PROVIDER,
         "llm_model": LLM_MODEL,
         "kb_stats": kb.stats(),
+        "mcp": mcp_stats,
+        "mcp_status": mcp_status,
+        "mcp_connected": f"{mcp_stats.get('connected', 0)}/{mcp_stats.get('configured', 0)}",
+        "skill_count": skill_count,
+        "skill_registry_ready": SKILL_REGISTRY is not None,
+        "agent_engine_ready": agent_engine_ok,
         "timestamp": datetime.now().isoformat(),
     })
 
@@ -983,7 +1092,9 @@ def teach_stream():
         # v0.20.3：补 user_model/BDI 推断（原漏洞——手动教学循环没走 paeg.teach 的注入）
         try:
             from context_bundle import inject_user_model
-            inject_user_model(learner, [{"content": concept}], getattr(learner, "self_description", ""))
+            # v0.22.1：用完整对话历史推 user_model（原只用当前 concept 单条，质量差——Presenter/Diagnostor 依赖）
+            inject_user_model(learner, SESSIONS.get(f"chat_hist_{learner_id}", []),
+                              getattr(learner, "self_description", ""))
         except Exception:
             pass
         # 诊断
@@ -1051,6 +1162,69 @@ def teach_stream():
         summary = paeg._summarize(_FakeSession(learner, concept, subject, plan, []))
         yield f"event: summary\ndata: {json.dumps(summary, ensure_ascii=False)}\n\n"
 
+        # v0.24 修复 5：teach_stream 补 SelfEvolution.evolve_prompt + SelfEvolver.on_session_end
+        # —— 之前 paeg.teach（206-243）已包含 evolve_prompt + on_session_end 钩子，
+        # —— 但 teach_stream 走手写循环完全跳过这些钩子；这里直接复用 paeg 实例的同款组件，
+        # —— 与 sync 路径的 paeg.teach 行为对齐，确保 stream 路径也触发自我进化。
+        _ev_stream_events = []
+        try:
+            # (a) SelfEvolution.evolve_prompt（提示词自进化）
+            _summary_avg = (summary or {}).get("avg_score", 0.5)
+            _improvements = ""
+            if reflection and isinstance(reflection, dict):
+                _improvements = str(reflection.get("improvements", ""))
+            if float(_summary_avg or 0.5) < 0.7 or _improvements:
+                from self_evolution import SelfEvolution as _SE_check
+                # 复用 paeg 自带的 _prompt_evolver（如果有） 或新创建一个
+                _prompt_evolver = getattr(paeg, "_prompt_evolver", None)
+                if _prompt_evolver is None:
+                    try:
+                        from self_evolution import SelfEvolution as _SE
+                        _prompt_evolver = _SE(llm=llm)
+                        paeg._prompt_evolver = _prompt_evolver
+                    except Exception:
+                        _prompt_evolver = None
+                if _prompt_evolver is not None:
+                    _note = (f"教学平均分 {_summary_avg:.2f}；改进点：{_improvements[:200]}"
+                             if _improvements else f"教学平均分 {_summary_avg:.2f}，低于 0.7")
+                    _ev = _prompt_evolver.evolve_prompt(
+                        subject, _note, strategic=(float(_summary_avg or 0.5) < 0.5))
+                    if _ev.get("evolved", 0) > 0:
+                        _ev_stream_events.append({
+                            "type": "prompt_evolved",
+                            "evolved": _ev.get("evolved"),
+                        })
+        except Exception as _se_e:
+            print(f"[PAEG] teach_stream 提示词自进化跳过: {_se_e}")
+
+        try:
+            # (b) SelfEvolver.on_session_end（Reflexion 微反思）
+            if getattr(paeg, "evolver", None) is not None:
+                ema_delta = 0.0
+                try:
+                    ema_delta = float(_summary_avg or 0.5) - 0.7
+                except Exception:
+                    ema_delta = 0.0
+                dialogue_summary = "；".join(
+                    (p.get("content") or "")[:100] for p in (_assistant_parts[:2])
+                ) or concept
+                _entry = paeg.evolver.on_session_end(
+                    student_id=learner.id,
+                    dialogue_summary=dialogue_summary,
+                    ema_delta=ema_delta,
+                    subject=subject,
+                )
+                if _entry:
+                    _ev_stream_events.append({
+                        "type": "reflexion_entry",
+                        "ema_delta": round(ema_delta, 2),
+                    })
+        except Exception as _rse:
+            print(f"[PAEG] teach_stream on_session_end 跳过: {_rse}")
+
+        if _ev_stream_events:
+            yield f"event: self_evolution\ndata: {json.dumps({'events': _ev_stream_events}, ensure_ascii=False)}\n\n"
+
         # v0.21.3：流式教学也保存会话到 CONV_STORE（修复前端历史会话列表为空）
         try:
             if USER_STORE is not None and str(learner_id).startswith('u') \
@@ -1097,9 +1271,19 @@ class _FakeSession:
 @app.route("/api/profile/<learner_id>", methods=["GET"])
 def profile(learner_id):
     """获取学习者画像。"""
+    # v0.22.2：按需创建（匿名 web_xxx 首次访问无 SESSIONS 条目——原 404 导致前端画像消失）
     learner = SESSIONS.get(f"learner_{learner_id}")
     if not learner:
-        return jsonify({"error": "learner not found"}), 404
+        from paeg import LearnerProfile
+        learner = LearnerProfile(
+            id=learner_id,
+            nickname="学习者",
+            grade_level="high_school",
+            age=17,
+            cognitive_style="visual",
+            self_description="",
+        )
+        SESSIONS[f"learner_{learner_id}"] = learner
 
     return jsonify({
         "id": learner.id,
@@ -1119,9 +1303,19 @@ def profile(learner_id):
 def profile_update(learner_id):
     """更新学习者画像（v0.10：支持 self_description 等字段）。"""
     data = request.get_json(force=True)
+    # v0.22.2：按需创建（修复"告诉老师你是谁"保存失败——匿名用户首次保存 404）
     learner = SESSIONS.get(f"learner_{learner_id}")
     if not learner:
-        return jsonify({"error": "learner not found"}), 404
+        from paeg import LearnerProfile
+        learner = LearnerProfile(
+            id=learner_id,
+            nickname=data.get("nickname", "学习者"),
+            grade_level=data.get("grade_level", "high_school"),
+            age=data.get("age", 17),
+            cognitive_style=data.get("cognitive_style", "visual"),
+            self_description=data.get("self_description", ""),
+        )
+        SESSIONS[f"learner_{learner_id}"] = learner
 
     editable = {
         "nickname": "nickname",
@@ -1184,17 +1378,58 @@ def knowledge_search():
 
 @app.route("/api/skills", methods=["GET"])
 def skills_list():
-    """列出全部技能节点（G4 技能教学）。"""
+    """v0.24 修复 2：列出全部技能节点（统一以 SkillRegistry 为准，向下兼容 kb.skills）。
+
+    v0.24 之前：仅返回 kb.skills（硬编码 6 个），前端看不到 SkillRegistry 真正的 10 个技能。
+    v0.24 之后：优先返回 SkillRegistry（含 name/description/source=skills_dir），
+              SkillRegistry 扫描为空时回退 kb.skills，保持向下兼容。
+    """
     skills = []
-    for sid, node in kb.skills.items():
-        skills.append({
-            "id": sid,
-            "category": node.get("category", "other"),
-            "name": node.get("name", sid),
-            "definition": node.get("definition", ""),
-            "steps_count": len(node.get("steps", [])),
-        })
-    return jsonify({"skills": skills, "total": len(skills)})
+    source = "knowledge_base.skills"  # 默认兜底
+    if SKILL_REGISTRY is not None:
+        try:
+            stats = SKILL_REGISTRY.stats() or {}
+            sr_skills = stats.get("skills") or []
+        except Exception:
+            sr_skills = []
+        if sr_skills:
+            for name in sr_skills:
+                sk = SKILL_REGISTRY.skills.get(name)
+                if not sk:
+                    continue
+                skills.append({
+                    "id": name,
+                    "category": "skill_registry",
+                    "name": name,
+                    "definition": sk.description,
+                    "steps_count": 0,  # SkillRegistry 暴露的"技能元数据"，不含 steps
+                    "source": "skills_dir",
+                })
+            source = "skill_registry"
+        else:
+            # 回退到 kb.skills（保持旧前端兼容）
+            for sid, node in kb.skills.items():
+                skills.append({
+                    "id": sid,
+                    "category": node.get("category", "other"),
+                    "name": node.get("name", sid),
+                    "definition": node.get("definition", ""),
+                    "steps_count": len(node.get("steps", [])),
+                    "source": "knowledge_base.skills",
+                })
+            source = "knowledge_base.skills"
+    else:
+        # 无 SkillRegistry 时仍兜底 kb.skills
+        for sid, node in kb.skills.items():
+            skills.append({
+                "id": sid,
+                "category": node.get("category", "other"),
+                "name": node.get("name", sid),
+                "definition": node.get("definition", ""),
+                "steps_count": len(node.get("steps", [])),
+                "source": "knowledge_base.skills",
+            })
+    return jsonify({"skills": skills, "total": len(skills), "source": source})
 
 
 @app.route("/api/upload", methods=["POST"])
@@ -1504,6 +1739,31 @@ def general_chat_stream():
     except Exception:
         pass
 
+    # v0.22.3：个体化注入（Individuality subagent——16 维画像 + LLM 建模 + 母语控制）
+    _ind = None  # v0.23.0：闭包传给 generate() 用于 persist()
+    _ind_run_ok = False
+    try:
+        from subagents import Individuality
+        _ind = Individuality()
+        # v0.23.0：把本轮用户消息临时加到 history 末尾，让 LLM 建模看到最新输入
+        _ind_history = list(SESSIONS.get(f"chat_hist_{learner_id}", []))
+        _ind_history.append({"role": "user", "content": text})
+        _ind_result = _ind.run(
+            model=llm, learner=learner,
+            history=_ind_history,
+            subject=data.get("subject", "general"))
+        if _ind_result.get("profile_prompt"):
+            system = system + "\n\n" + _ind_result["profile_prompt"]
+        system = _ind.inject_control(system, _ind_result.get("control"))
+        _ind_run_ok = True
+    except Exception as _ie:
+        print(f"[PAEG] 个体化注入跳过: {_ie}")
+
+    # v0.24 修复 1：技能 L1 目录注入 system prompt（chat_stream）
+    # —— 之前 SkillRegistry 扫描了 10 个 SKILL.md 但从未被注入，技能功能上等价于不存在；
+    # —— 现在把技能目录（name + description）一次性注入，LLM 知道何时用 load_skill__<name>。
+    system = _inject_skill_catalog(system)
+
     # v0.22.0：基于用户上传文件的 4 能力（找答案/讲解/输出原文/重组结构）
     # 触发：用户输入含"我的资料/上传的文件/讲义/笔记/文件里/原文"等文件操作信号
     # 流程：意图路由 → BM25 检索用户文件 → 对应 handler → SSE 返回
@@ -1733,6 +1993,15 @@ def general_chat_stream():
                 mem.compress_if_needed()
             except Exception:
                 pass
+        # v0.23.0 ⭐ 个体化画像持久化闭环——把本轮 LLM 建模结果写回 learner
+        # 并落盘（仅注册用户 u<digits>；匿名 web_xxx 仅内存保留）
+        if _ind_run_ok and _ind is not None:
+            try:
+                _persisted = _ind.persist(learner, str(learner_id))
+                if _persisted:
+                    print(f"[PAEG] 个体化画像已持久化: learner_id={learner_id}")
+            except Exception as _pe:
+                print(f"[PAEG] 个体化持久化失败（不影响主流程）: {_pe}")
         # v0.19.7：自我改进——记录对话案例（轻量，不阻塞）
         try:
             from self_improve import SelfImprover
@@ -1820,6 +2089,30 @@ def general_chat():
     except Exception:
         pass
 
+    # v0.24 修复 6：/api/chat 补 Individuality 注入（与 chat_stream 行为对齐）
+    # —— 修复前 general_chat 缺个体化注入，与 chat_stream 行为分叉；
+    # —— 复制 chat_stream 1530-1621 一致逻辑：Individuality.run + inject_control + persist()。
+    _ind = None
+    _ind_run_ok = False
+    try:
+        from subagents import Individuality
+        _ind = Individuality()
+        _ind_history = list(SESSIONS.get(f"chat_hist_{learner_id}", []))
+        _ind_history.append({"role": "user", "content": text})
+        _ind_result = _ind.run(
+            model=llm, learner=learner,
+            history=_ind_history,
+            subject=data.get("subject", "general"))
+        if _ind_result.get("profile_prompt"):
+            system = system + "\n\n" + _ind_result["profile_prompt"]
+        system = _ind.inject_control(system, _ind_result.get("control"))
+        _ind_run_ok = True
+    except Exception as _ie:
+        print(f"[PAEG] general_chat 个体化注入跳过: {_ie}")
+
+    # v0.24 修复 1：技能 L1 目录注入 system prompt（general_chat 同 chat_stream）
+    system = _inject_skill_catalog(system)
+
     # v0.16：携带最近对话历史（连续对话，非单轮）
     # v0.19：P0-2 三层记忆——短期对话 + 摘要压缩 + 长期画像
     mem = None
@@ -1852,8 +2145,12 @@ def general_chat():
 
     # v0.19：P0-1 DeepSeek 原生 Function Calling——LLM 自主决策调用工具
     # （搜索/数学验证/抓网页/每日一句/时间），比启发式检测更智能
+    # v0.24 修复 4：当请求带 mode=agent 或问题明显需多步推理时，用 AgentEngine.run_agent
+    # —— 之前 agent_engine 整个工程零调用；现在 mode=agent 走 Plan→Act→Observe→Reflect 显式循环。
     agent_reply = None
     tool_log = []
+    _agent_trace = None  # 仅 mode=agent 时填充（前端可视化）
+    _use_agent_engine = bool(data.get("mode") == "agent") or bool(data.get("agent_engine"))
     try:
         from tool_registry import run_agent_loop
         _agent_sys = (
@@ -1864,9 +2161,25 @@ def general_chat():
             + "规则：需要最新/外部信息时用 web_search；数学答案可先用 verify_math 验证再回答；"
             + "其余情况直接回答，不要滥用工具。"
         )
-        _ar = run_agent_loop(llm, _agent_sys, text, max_iterations=3)
-        agent_reply = _ar.get("answer")
-        tool_log = _ar.get("tool_calls", [])
+        if _use_agent_engine and AGENT_ENGINE is not None:
+            # Plan→Act→Observe→Reflect 显式循环（最多 3 次迭代 + 2 次 replan）
+            try:
+                _ae = AGENT_ENGINE.run(_agent_sys, text)
+                agent_reply = _ae.get("answer")
+                # 将 AgentEngine 的 trace 转成前端 tool_log 可视化格式
+                _agent_trace = _ae.get("trace") or []
+                tool_log = _ae.get("tool_calls", []) or []
+                _plan = _ae.get("plan", {}) or {}
+            except Exception as _ae_e:
+                # 失败时降级到原 run_agent_loop，不破坏现有路径
+                print(f"[PAEG] AgentEngine.run 失败（降级 run_agent_loop）: {_ae_e}")
+                _ar = run_agent_loop(llm, _agent_sys, text, max_iterations=3)
+                agent_reply = _ar.get("answer")
+                tool_log = _ar.get("tool_calls", [])
+        else:
+            _ar = run_agent_loop(llm, _agent_sys, text, max_iterations=3)
+            agent_reply = _ar.get("answer")
+            tool_log = _ar.get("tool_calls", [])
     except Exception:
         agent_reply = None
 
@@ -1958,6 +2271,16 @@ def general_chat():
         except Exception as _e:
             print(f"[Server] 对话保存失败: {_e}")
 
+    # v0.24 修复 6：注册用户（u<digits>）持久化个体化画像（与 chat_stream 一致）
+    if _ind_run_ok and _ind is not None and str(learner_id).startswith('u') \
+            and learner_id[1:].isdigit():
+        try:
+            _persisted = _ind.persist(learner, str(learner_id))
+            if _persisted:
+                print(f"[PAEG] general_chat 个体化已持久化: learner_id={learner_id}")
+        except Exception as _pe:
+            print(f"[PAEG] general_chat 个体化持久化失败（不影响主流程）: {_pe}")
+
     # v0.19.7：同步 chat 也接关键词触发（讲义/要点/例题/笔记）——之前只在 stream
     try:
         _doc = _handle_keyword_doc(text, reply, learner, data)
@@ -1971,6 +2294,7 @@ def general_chat():
         "segments": segments,       # v0.17：多段输出
         "doc": doc_urls,            # v0.18：若生成了文档则返回下载链接
         "tools": tool_log,          # v0.19：工具调用记录（前端可视化）
+        "agent_trace": _agent_trace,  # v0.24：AgentEngine trace（仅 mode=agent 填充）
         "learner": {
             "id": learner.id,
             "nickname": learner.nickname,
@@ -2728,7 +3052,11 @@ def self_update_from_feedback():
                 print(f"[PAEG] 读取 insights.json 失败: {_e}")
 
         # 2) 读取外部反馈文件（线下用户测试反馈）
+        # v0.24 增强：
+        #   - 不仅枚举路径，还在 server 侧预读前 2000 字符作为兜底（即使 SelfUpdateAgent 内部读失败也有内容）
+        #   - 在 result 中暴露 feedback_files_preview（运维/测试可见的反馈文本前 200 字）
         library_paths = []
+        feedback_text_aggregate = ""
         if data.get("include_feedback_files", True):
             _base = os.path.dirname(os.path.abspath(__file__))
             _cands = [
@@ -2741,10 +3069,39 @@ def self_update_from_feedback():
                     for _f in sorted(os.listdir(_fd)):
                         if _f.endswith((".md", ".txt", ".jsonl", ".json")):
                             library_paths.append(os.path.join(_fd, _f))
+            # v0.24：预读反馈文件前 2000 字符，给 SelfUpdateAgent 当兜底原料
+            # 同时拼到反馈文本里（避免依赖 subagents 的内部实现细节）
+            for _fp in library_paths[:5]:
+                try:
+                    with open(_fp, encoding='utf-8') as _fb:
+                        _content = _fb.read()[:2000]
+                    if _content:
+                        feedback_text_aggregate += f"\n\n--- 反馈文件: {_fp} ---\n{_content}\n--- end ---\n"
+                except Exception:
+                    continue
 
         # 3) 调用 SelfUpdateAgent 驱动 LLM
-        result = _su.run(llm, text, learner=None, history=[],
+        # v0.22.1：传 learner + chat_hist（原 learner=None/history=[] 导致画像上下文丢失）
+        # v0.24：把预读的反馈文件内容并入 text（双保险：既传 library_paths 让子代理读，
+        #                  又把内容直接拼到 text 上，避免依赖子代理内部实现细节）
+        _su_learner = SESSIONS.get(f"learner_{learner_id}") if learner_id else None
+        _su_hist = SESSIONS.get(f"chat_hist_{learner_id}", []) if learner_id else []
+        _combined_text = text
+        if feedback_text_aggregate:
+            _combined_text = text + "\n\n## 用户提供的反馈文件原文（v0.24 预读）\n" + \
+                             feedback_text_aggregate
+        result = _su.run(llm, _combined_text, learner=_su_learner, history=_su_hist,
                          insights=insights, library_paths=library_paths)
+        # v0.24：把预读的反馈原文前 200 字塞到 result，便于运维/测试观察实际读取情况
+        if feedback_text_aggregate:
+            try:
+                result["feedback_files_preview"] = feedback_text_aggregate[:200]
+                result["feedback_files_loaded"] = [
+                    p for p in library_paths
+                    if os.path.isfile(p)
+                ][:5]
+            except Exception:
+                pass
 
         # 4) 追加建议记录（供人工/调度器后续处理）
         try:
@@ -2756,6 +3113,8 @@ def self_update_from_feedback():
                     "timestamp": datetime.now().isoformat(),
                     "learner_id": learner_id,
                     "text": text,
+                    "library_paths_count": len(library_paths),
+                    "feedback_bytes": len(feedback_text_aggregate),
                     "suggestions": result.get("suggestions", []),
                     "sources_used": result.get("sources_used", []),
                 }, ensure_ascii=False) + "\n")
