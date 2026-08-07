@@ -421,11 +421,51 @@ def _steer_subject(concept: str, subject: str, learner, learner_id: str) -> dict
         from subject_detector import detect_subject
         from prompts import normalize_subject
         norm_subject = normalize_subject(subject)
-        det = detect_subject(concept, llm, user_subject=norm_subject)
+        _grade = ""
+        try:
+            _grade = getattr(learner, "grade_level", "") or ""
+        except Exception:
+            _grade = ""
+        det = detect_subject(concept, llm, user_subject=norm_subject, grade=_grade)
 
         # 未收录学科：记录需求 + 反馈用户
         if det.get("unknown"):
             uname = det.get("unknown_name") or "该学科"
+            # v0.25 学段-学科联动：区分"学科需更高学段"与"真未收录"
+            if det.get("grade_blocked"):
+                need_grade = det.get("grade_name") or "大学本科"
+                reply = (
+                    f"我注意到你问的是「{uname}」领域的问题。\n\n"
+                    f"「{uname}」通常需要<b>{need_grade}</b>及以上学段才适合系统学习，"
+                    f"当前你的学段设置还未覆盖它。\n\n"
+                    f"你可以：\n"
+                    f"· 在左上角把<b>学段切换为「{need_grade}」</b>，就能正式学习这门学科\n"
+                    f"· 或者先问我当前学段的<b>其他学科</b>（如物理、数学、语文……）\n"
+                    f"· 或者把资料上传给我（点右下角输入栏旁的书本图标），我就能基于你给的资料回答\n\n"
+                    f"教学讲究循序渐进，先把基础打牢，更高的学科随时欢迎你。"
+                )
+                return {"subject": subject, "unknown": True, "unknown_name": uname,
+                        "grade_blocked": True,
+                        "switched": False, "response": jsonify({
+                            "session_id": f"grade_blocked_{learner_id}",
+                            "summary": {"avg_score": 0},
+                            "worldview_used": "weil",
+                            "tone_ratio": 0,
+                            "presentations": [
+                                {"step_id": 1, "content": reply,
+                                 "step_type": "grade_blocked_subject"}
+                            ],
+                            "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
+                            "reflections": [],
+                            "learner": {
+                                "id": learner.id, "nickname": learner.nickname,
+                                "grade_level": learner.grade_level,
+                                "subjects_mastery": learner.subjects_mastery,
+                            },
+                            "grade_blocked": True,
+                            "subject_requested": uname,
+                            "required_grade": det.get("grade_name", ""),
+                        })}
             if EVOLVER is not None:
                 try:
                     EVOLVER.record_subject_request(uname, concept, learner_id)
