@@ -123,6 +123,36 @@ PAEG/
 └── CHANGELOG.md          # 版本历史
 ```
 
+## Skills 生态（v0.22.0）
+
+PAEG 有 **10 个技能**（skill_registry.py 注册，经 tool_registry 暴露为 LLM function calling）：
+
+| 技能 | 用途 |
+|---|---|
+| concept-explainer | 讲解概念（由浅入深）|
+| essay-feedback | 评改论述题/作文 |
+| knowledge-map | 生成知识导图 |
+| math-step-solver | 分步求解数学题 |
+| study-planner | 制定学习计划 |
+| **pdf**（下载）| PDF 提取/表单/合并/OCR |
+| **docx**（下载）| Word 创建/编辑/提取 |
+| **xlsx**（下载）| Excel 创建/编辑/分析 |
+| **doc-coauthoring**（下载）| 文档协作工作流 |
+| **teach**（下载）| 多会话教学/间隔重复/回忆练习 |
+
+## 用户文件 4 能力（v0.22.0）
+
+上传资料到 `Library/usr_knowledge/<uid>/`（或旧 `user_<uid>/`），对话中可触发 4 种操作：
+
+| 操作 | 触发词 | 能力 |
+|---|---|---|
+| 找答案 | "我的资料里关于X怎么说" | BM25 检索文件 → LLM 严格基于内容回答 |
+| 讲解 | "按我上传的讲义讲X" | 基于文件讲解（区分【原文】/【讲解】）|
+| 输出原文 | "把文件里X的原文给我" | 逐字输出原文（不依赖 LLM）|
+| 重组结构 | "把讲义整理成提纲" | 重组为大纲/表格/思维导图 |
+
+技术：`lib/ingest/`（readers 多格式提取 → chunker 中文分块 → retriever BM25+jieba → intent_router 路由 → handlers 4 能力）。
+
 ## 文档
 
 - **PAEG技术全景文档.md** —— 完整技术文档（架构/数据流/API/部署/测试/亮点）
