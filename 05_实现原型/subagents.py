@@ -269,6 +269,26 @@ class Presenter:
     def __init__(self, model, kb):
         self.model = model
         self.kb = kb
+        # v0.24 ⭐ 适配决策注入槽——PAEG 可在调用 run() 前设置、consume 一次性应用。
+        # 仅用于让上一轮 Adapter.switch_style/reinforce 真正影响本次讲解。
+        self._pending_style_override = None
+        self._pending_reinforce_note = None
+        self._individuality_control = None
+        self._individuality_profile_prompt = ""
+
+    def set_pending_overrides(self, style_override: dict = None,
+                              reinforce_note: str = None,
+                              individuality_control: dict = None,
+                              individuality_profile_prompt: str = None):
+        """PAEG 调用：在 Presenter.run() 之前把上游决策推进槽里。"""
+        if style_override is not None:
+            self._pending_style_override = style_override
+        if reinforce_note is not None:
+            self._pending_reinforce_note = reinforce_note
+        if individuality_control is not None:
+            self._individuality_control = individuality_control
+        if individuality_profile_prompt is not None:
+            self._individuality_profile_prompt = individuality_profile_prompt
 
     def run(self, step: dict, learner, previous: list,
             tone_info: Optional[dict] = None, concept: Optional[str] = None,
@@ -284,6 +304,16 @@ class Presenter:
             tone_info = select_tone(subject or "default")
         topic = step.get("topic", concept or "该主题")
         wv_ratio = tone_info.get("ratio", {1: 0.20, 2: 0.35, 3: 0.35, 4: 0.10})
+
+        # v0.24 ⭐ 消费上游注入（一次性，仅供本次讲解）。
+        # 这些来自 PAEG 在 run() 前调 set_pending_overrides(...) 推入。
+        style_override = getattr(self, "_pending_style_override", None)
+        reinforce_note = getattr(self, "_pending_reinforce_note", None)
+        ind_control = getattr(self, "_individuality_control", None) or {}
+        ind_profile = getattr(self, "_individuality_profile_prompt", "") or ""
+        # 用后即清（一次性）
+        self._pending_style_override = None
+        self._pending_reinforce_note = None
 
         # 知识库上下文（v0.15：用缓存 resolve_node，避免重复检索）
         kb_node = None
@@ -317,6 +347,31 @@ class Presenter:
                 strategy_line=teaching_line,
                 user_model=getattr(learner, "_user_model", None),
             )
+            # v0.24 ⭐ 把上游注入的真接到 system（让 LLM 真正按上游决策改写）
+            if ind_profile:
+                system = system + "\n\n## 个体化学生画像（v0.24）\n" + ind_profile
+            if ind_control.get("style"):
+                system = system + f"\n- 讲解方式：{ind_control['style']}"
+            if ind_control.get("depth"):
+                system = system + f"\n- 讲解深度：{ind_control['depth']}"
+            if ind_control.get("rhythm"):
+                system = system + f"\n- 节奏：{ind_control['rhythm']}"
+            if ind_control.get("emotion_sensitive") == "是":
+                system = system + "\n- 情绪敏感：学生在情绪较脆弱时，教学时更温和、多确认、避免施压。"
+            if style_override and style_override.get("override_system_line"):
+                # v0.24 ★ 关键：Adapter.switch_style 决策真正改变本次讲解
+                system = system + (
+                    f"\n\n## v0.24 适配决策注入（来自上一轮 Adapter 反馈，必须遵守）\n"
+                    f"{style_override.get('override_system_line')}\n"
+                    f"（本轮教学策略被 Adapter 调整为：{style_override.get('new_style', 'analogy')}）"
+                )
+            if reinforce_note:
+                # v0.24 ★ 关键：Adapter.reinforce 决策真正追加补例子
+                system = system + (
+                    "\n\n## v0.24 适配决策注入（必须遵守）\n"
+                    f"{reinforce_note}\n"
+                    "请给出一个与之前不同角度的例子，让学生从例子反推概念。"
+                )
             # v0.15：生成前文摘要（避免重复）——取前几步内容的核心要点
             prev_summary = ""
             if previous:
@@ -359,18 +414,35 @@ class Presenter:
                     "kb_node_id": kb_node.get("id") if kb_node else None,
                 }
 
-        # 规则回退模板
+        # 规则回退模板（v0.24 ⭐ 适配决策也应用在规则回退里 —— 让端到端测试可观测风格变化）
         if kb_node:
             base = (kb_node.get("intuition") or kb_node.get("definition") or "关于该主题的讲解")
         else:
             base = f"关于 '{topic}' 的讲解"
+        # v0.24：在规则回退里也体现风格切换/强化决策（可观测）
+        appendix = ""
+        style_label = tone
+        if style_override and style_override.get("new_style"):
+            style_label = f"{tone}+adapted({style_override['new_style']})"
+            appendix = f"\n\n[v0.24 适配决策：switch_style→{style_override['new_style']}] {style_override.get('override_system_line','')}"
+        elif reinforce_note:
+            appendix = f"\n\n[v0.24 适配决策：reinforce 追加补例子] {reinforce_note[:120]}"
+        if appendix:
+            base = base + appendix
         return {
-            "content": f"[{tone}] {base}",
+            "content": f"[{style_label}] {base}",
             "visual_description": "（v0.1 无图像）",
-            "tone_used": tone,
+            "tone_used": style_label,
             "worldview_ratio": wv_ratio,
             "llm_generated": False,
             "kb_node_id": kb_node.get("id") if kb_node else None,
+            # v0.24：把注入额外交付到返回里，供上层审计 / 端到端测试断言
+            "_injected": {
+                "style_override": style_override,
+                "reinforce_note": reinforce_note,
+                "individuality_control": ind_control,
+                "had_individuality_profile": bool(ind_profile),
+            },
         }
 
 
@@ -379,25 +451,144 @@ class Presenter:
 # ---------------------------------------------------------------------------
 
 class Evaluator:
+    """评估子代理（v0.24 ⭐ 区分讲解质量与学生状态）。
+
+    设计核心：避免"评讲 AI 自己的讲解"造成闭环虚假信号——
+    最终合成 ``score = 0.6 * presentation_quality + 0.4 * learner_state``
+    （讲解质量为主，学生状态为重要修正）。
+    ``ready_to_advance`` 优先看 student_state；若 student_state 缺失（无学生数据）
+    则保守返回 False，并在 reason 注明。
+    """
+
     def __init__(self, model, kb):
         self.model = model
         self.kb = kb
 
+    # ────────────────────────────────────────────────
+    # 学生状态信号提取（v0.24 新增）
+    # ────────────────────────────────────────────────
+
+    @staticmethod
+    def _extract_student_text(learner, step: dict, presentation: dict) -> str:
+        """从 learner / step / presentation 中找学生输入文本。
+
+        优先级：step["student_reply"] > presentation["student_reply"] >
+        learner._last_student_reply。无则返回 ""——表示无学生数据可评。
+        """
+        for src in (step, presentation):
+            if isinstance(src, dict):
+                v = src.get("student_reply")
+                if isinstance(v, str) and v.strip():
+                    return v
+        try:
+            v = getattr(learner, "_last_student_reply", None)
+            if isinstance(v, str) and v.strip():
+                return v
+        except Exception:
+            pass
+        return ""
+
+    @staticmethod
+    def _student_signal(student_text: str) -> dict:
+        """对一段学生输入做确定性浅层语义分析。
+
+        返回：
+          - understanding: 0~1（理解度信号：含肯定词、会解释、举例 → 高）
+          - confusion:    0~1（困惑信号：含困惑词、反问、否定 → 高）
+          - engagement:   0~1（参与信号：长度 + 问号密度）
+          - emotion:      "neutral"/"curious"/"frustrated"/"engaged"
+          - quality:      "none"（无学生数据时）/ "low"（短/含糊）/ "normal"
+        """
+        if not student_text:
+            return {
+                "understanding": 0.0, "confusion": 0.0, "engagement": 0.0,
+                "emotion": "neutral", "quality": "none",
+            }
+        t = student_text.strip()
+        n = len(t)
+        # 参与度：长度归一 + 问号密度
+        engagement = min(1.0, n / 200.0 + (0.15 if "？" in t or "?" in t else 0.0))
+        # 肯定词（理解）
+        pos_kw = ("明白了", "懂了", "理解了", "原来如此", "所以是", "got it", "我懂了",
+                  "i see", "这样啊", "原来是这样", "知道为什么")
+        # 困惑词
+        neg_kw = ("不懂", "为什么", "怎么会", "什么意思", "听不懂", "没听懂",
+                  "太难了", "为什么是", "怎么会呢", "don", "confused",
+                  "不明白", "搞不清楚")
+        pos_hits = sum(1 for k in pos_kw if k in t.lower() if isinstance(k, str))
+        neg_hits = sum(1 for k in neg_kw if k in t.lower() if isinstance(k, str))
+        # 倾向：肯定 vs 困惑
+        understanding = min(1.0, 0.5 + 0.2 * pos_hits - 0.15 * neg_hits)
+        confusion = min(1.0, 0.1 * neg_hits + 0.05 * (1 if "?" in t or "？" in t else 0))
+        if n < 6:
+            quality = "low"
+        elif n < 30:
+            quality = "normal"
+        else:
+            quality = "normal"
+        # 情绪
+        if neg_hits >= 2:
+            emotion = "frustrated"
+        elif neg_hits >= 1 or ("?" in t or "？" in t) and pos_hits == 0 and n >= 12:
+            emotion = "curious"
+        elif pos_hits >= 1:
+            emotion = "engaged"
+        else:
+            emotion = "neutral"
+        return {
+            "understanding": round(understanding, 3),
+            "confusion": round(confusion, 3),
+            "engagement": round(engagement, 3),
+            "emotion": emotion,
+            "quality": quality,
+        }
+
+    @staticmethod
+    def _learner_state_summary(learner) -> dict:
+        """从 LearnerProfile + learner 上的动态属性拼学生状态。"""
+        sm = getattr(learner, "subjects_mastery", None)
+        mastery = None
+        subj = getattr(learner, "_current_subject", None) or getattr(learner, "subjects_mastery", None)
+        if isinstance(sm, dict):
+            for k, v in sm.items():
+                # 取一个整数 level（不强求 current_subject）
+                lvl = v.get("level") if isinstance(v, dict) else None
+                if isinstance(lvl, (int, float)):
+                    mastery = (k, float(lvl))
+                    break
+        trait = getattr(learner, "_individuality_trait", None) or {}
+        emo = trait.get("emotional_tendency") or ""
+        ls = trait.get("learning_style") or ""
+        ks = trait.get("knowledge_gaps") or []
+        return {
+            "mastery": mastery,
+            "emotional_tendency": emo,
+            "learning_style": ls,
+            "knowledge_gaps": list(ks) if isinstance(ks, list) else [],
+        }
+
+    # ────────────────────────────────────────────────
+
     def run(self, step: dict, learner, presentation: dict) -> dict:
-        """确定性评分：长度 + 结构关键词 + 语气契合度，区间 (0.4, 0.95)。"""
+        """评分：区分讲解质量（presentation_quality）与学生状态（learner_state）。
+
+        返回：
+          score / sub_scores (clarity / completeness) / ready_to_advance /
+          emotion_signal / evaluated_by（保留兼容）+ presentation_quality
+          / learner_state / has_student_data / score_composition / reason
+        """
         content = str(presentation.get("content", ""))
         length = len(content)
 
-        # 长度分（0~0.5）：>=200 字满分，不足按比例
-        length_score = min(0.5, length / 400.0)
-
+        # ── 1. presentation_quality（讲解质量分，0~0.95）──
+        # 长度分（0~0.35）：>=200 字满分，不足按比例
+        length_score = min(0.35, length / 600.0)
         # 结构分（0~0.3）：定义/例子/误区关键词
         structure_score = 0.0
         for kw in ("定义", "definition", "比如", "例如", "例子", "example"):
             if kw in content:
                 structure_score += 0.1
         structure_score = min(0.3, structure_score)
-
         # 语气分（0~0.15）：内容体现教学语气标记
         tone_used = presentation.get("tone_used", "balanced")
         tone_markers = {
@@ -408,15 +599,72 @@ class Evaluator:
         }
         markers = tone_markers.get(tone_used, ())
         tone_score = min(0.15, sum(0.05 for m in markers if m in content))
-
         # 知识库契合分（0~0.1）：有 kb_node_id 视为有据可依
         kb_score = 0.1 if presentation.get("kb_node_id") else 0.0
+        # 思考性问题（0~0.05）：讲解中含有引导思考的问句
+        inquiry_score = 0.05 if ("?" in content or "？" in content) else 0.0
 
-        raw = 0.4 + length_score + structure_score + tone_score + kb_score
-        score = round(min(0.95, max(0.4, raw)), 3)
+        presentation_quality = round(
+            min(0.95, max(0.4, 0.4 + length_score + structure_score + tone_score + kb_score + inquiry_score)),
+            3,
+        )
 
-        # 情绪信号（确定性关键词）
-        if "？" in content or "?" in content:
+        # ── 2. learner_state（学生状态分，0~0.95）──
+        student_text = self._extract_student_text(learner, step, presentation)
+        sig = self._student_signal(student_text)
+        lstate = self._learner_state_summary(learner)
+
+        has_student_data = bool(student_text.strip()) or bool(lstate.get("mastery")) \
+            or bool(lstate.get("emotional_tendency")) or bool(lstate.get("learning_style")) \
+            or bool(lstate.get("knowledge_gaps"))
+
+        # 计算 student_state_score
+        if not has_student_data:
+            student_state_score = 0.5  # 默认中性（无数据时给中性，不给高分）
+            student_data_quality = "none"
+        else:
+            base = 0.5 + 0.3 * sig["understanding"] - 0.2 * sig["confusion"] + 0.1 * sig["engagement"]
+            # 若 learner 该学科 mastery 极低（<0.4），扣分（前置不足）
+            mastery_penalty = 0.0
+            if lstate.get("mastery"):
+                m_level = lstate["mastery"][1]
+                if m_level < 0.4:
+                    mastery_penalty = 0.1
+            student_state_score = round(
+                min(0.95, max(0.2, base - mastery_penalty)), 3,
+            )
+            student_data_quality = sig["quality"] if student_text else "metadata_only"
+
+        # ── 3. 合成最终 score（讲解 0.6 + 学生状态 0.4）──
+        # 若有学生数据，按合成；若完全无学生数据，降权讲解为主
+        if student_data_quality == "none":
+            score = round(presentation_quality * 0.95 + student_state_score * 0.05, 3)
+            reason = "no_student_data"
+        else:
+            score = round(presentation_quality * 0.6 + student_state_score * 0.4, 3)
+            reason = "ok"
+
+        # ── 4. ready_to_advance：基于 student_state 为主 ──
+        # 旧版用讲解分数 ≥ 0.7 推进；新版保守：用学生状态分 ≥ 0.55（情绪 + 理解）
+        # 学生困惑或缺数据 → 拒绝推进，等修复 2 的 Adapter 干预
+        if not has_student_data:
+            ready_to_advance = False
+            reason = "no_student_data"
+        elif sig["confusion"] >= 0.2 or student_state_score < 0.55:
+            ready_to_advance = False
+            reason = "learner_state_low"
+        elif score < 0.7:  # 综合分仍不达标也暂缓
+            ready_to_advance = False
+            reason = "composite_low"
+        else:
+            ready_to_advance = True
+            reason = "ok"
+
+        # ── 5. 情绪信号（确定性）──
+        # 优先级：学生情绪 > 讲解语气推断
+        if has_student_data and sig["emotion"] != "neutral":
+            emotion_signal = sig["emotion"]
+        elif "？" in content or "?" in content:
             emotion_signal = "curious"
         elif any(m in content for m in tone_markers.get(tone_used, ())):
             emotion_signal = "engaged"
@@ -426,39 +674,122 @@ class Evaluator:
         return {
             "score": score,
             "sub_scores": {
-                "clarity": round(min(1.0, 0.5 + length_score), 3),
+                "clarity": round(min(1.0, 0.5 + length_score + 0.1 * (1 if structure_score > 0 else 0)), 3),
                 "completeness": round(structure_score / 0.3 if structure_score else 0.5, 3),
             },
-            "ready_to_advance": score >= 0.7,
+            "ready_to_advance": ready_to_advance,
             "emotion_signal": emotion_signal,
-            "evaluated_by": "heuristic",
+            "evaluated_by": "heuristic_v024",
+            # ── v0.24 新增字段（不删除既有）──
+            "presentation_quality": presentation_quality,
+            "learner_state": {
+                "student_state_score": student_state_score,
+                "has_student_data": has_student_data,
+                "data_quality": student_data_quality,
+                "understanding": sig["understanding"],
+                "confusion": sig["confusion"],
+                "engagement": sig["engagement"],
+                "emotion": sig["emotion"],
+                "quality": sig["quality"],
+                "student_text_len": len(student_text) if student_text else 0,
+                "profile_summary": lstate,
+            },
+            "score_composition": {
+                "presentation_weight": 0.6 if has_student_data else 0.95,
+                "learner_state_weight": 0.4 if has_student_data else 0.05,
+            },
+            "reason": reason,
         }
 
 
 # ---------------------------------------------------------------------------
-# 5. 调整子代理
+# 5. 调整子代理（v0.24 ⭐ 决策真正可执行化）
 # ---------------------------------------------------------------------------
 
 class Adapter:
+    """调整子代理（v0.24 ⭐ 决策携带可执行细节）。
+
+    输出 decision + 可执行参数（含原因/风格建议/强化内容示例），
+    供 PAEG 主循环根据 decision 真正干预下一次 Presenter 调用。
+    """
+
+    # 风格映射：switch_style 给 Presenter 一份明确的讲解风格 override
+    STYLE_OPTIONS = {
+        "analogy": "请用日常生活的类比讲这个概念，避免抽象公式（学生当前理解度低）。",
+        "example_first": "请先给一个具体例子，让学生从例子反推概念，再讲抽象定义。",
+        "socratic": "请连续提问 2-3 个引导性问题让学生自己推导出结论，不要直接给答案。",
+        "visual": "请重点描述可视化（图形/流程图/类比图像），帮助学生先建立画面感。",
+        "step_by_step": "请把这一步拆成 3-4 个小步，每步举一个数字例子，每步结束停顿让 ta 跟上。",
+        "minimal": "把讲解精简到最核心的一句话 + 一个例子，不扩展、不补充、不举例超过 1 个。",
+    }
+
     def __init__(self, model, kb):
         self.model = model
         self.kb = kb
 
     def run(self, evaluation: dict, learner, step: dict) -> dict:
-        """调整：确定性决策。score<0.7 换风格/强化，否则继续。"""
-        score = evaluation.get("score", 1.0)
-        if score < 0.6:
-            return {"decision": "switch_style",
-                    "action": {"type": "switch_style",
-                               "details": "换类比讲法，降低难度",
-                               "parameters": {"difficulty_delta": -1}}}
-        if score < 0.7:
-            return {"decision": "reinforce",
-                    "action": {"type": "reinforce",
-                               "details": "补充一个例子再讲一遍",
-                               "parameters": {"difficulty_delta": 0}}}
-        return {"decision": "continue", "action": {"type": "continue"}}
+        """确定性决策：根据最终 score / student_state 输出可执行调整指令。
 
+        决策维度：
+          - score < 0.55 或 learner_state.confusion 高 → switch_style
+          - 0.55 <= score < 0.7  → reinforce（仍可附带小风格调整）
+          - 0.7 <= score         → continue
+        """
+        score = evaluation.get("score", 1.0)
+        ls = evaluation.get("learner_state") or {}
+        confused = bool(ls.get("confusion", 0) >= 0.2)
+        mastery_penalty = (ls.get("profile_summary") or {}).get("mastery")
+        mastery_low = bool(isinstance(mastery_penalty, tuple) and mastery_penalty[1] < 0.4)
+
+        style_hint = "analogy"
+        if mastery_low:
+            style_hint = "step_by_step"
+        elif confused:
+            style_hint = "example_first"
+
+        if score < 0.55 or confused and mastery_low:
+            return {
+                "decision": "switch_style",
+                "action": {
+                    "type": "switch_style",
+                    "details": f"换 {style_hint} 讲法：{self.STYLE_OPTIONS[style_hint]}",
+                    "parameters": {
+                        "difficulty_delta": -1,
+                        "new_style": style_hint,
+                        "override_system_line": self.STYLE_OPTIONS[style_hint],
+                    },
+                },
+                "score": score,
+                "learner_state": ls,
+            }
+        if score < 0.7:
+            return {
+                "decision": "reinforce",
+                "action": {
+                    "type": "reinforce",
+                    "details": f"补一个例子/换一个角度再讲：{self.STYLE_OPTIONS.get('example_first', '')}",
+                    "parameters": {
+                        "difficulty_delta": 0,
+                        "reinforce_mode": "extra_example",
+                        "override_system_line": self.STYLE_OPTIONS.get("example_first", ""),
+                    },
+                },
+                "score": score,
+                "learner_state": ls,
+            }
+        return {
+            "decision": "continue",
+            "action": {"type": "continue",
+                       "details": "学生状态良好，按计划继续",
+                       "parameters": {"difficulty_delta": 0}},
+            "score": score,
+            "learner_state": ls,
+        }
+
+
+# ---------------------------------------------------------------------------
+# 6. 答案子代理（v0.19.14 ⭐）
+# ---------------------------------------------------------------------------
 
 class AnswerSolver:
     """找答案模式（v0.19.14 ⭐ 第 6 个子代理）。
@@ -704,10 +1035,21 @@ class AffectionSupportor:
                 "把这份重量分一点出去。那也是一种勇气。'"
             )
         # v0.20.2：若有历史，传真 messages（多轮连贯性）
+        # v0.24 ⭐ 健壮性：与 SelfUpdateAgent 1029-1031 同等标准——
+        # isinstance(h, dict) 守护 + h.get("role")/h.get("content")，
+        # 跳过缺 key / 非字典条目，不再因下标访问而崩溃。
         if history:
-            msgs = [{"role": "user", "content": h["content"]} if h["role"] == "user"
-                    else {"role": "assistant", "content": h["content"]}
-                    for h in history[-10:]]
+            msgs = []
+            for h in history[-10:]:
+                if not isinstance(h, dict):
+                    continue
+                role = h.get("role")
+                content_h = h.get("content", "")
+                if role in ("user", "assistant"):
+                    msgs.append({"role": role, "content": content_h})
+                else:
+                    # 角色未知条目降级为 user（保留上下文，但不假设方向）
+                    msgs.append({"role": "user", "content": content_h})
             msgs.append({"role": "user", "content": user})
             # v0.22.1：情绪场景不检索知识库（include_kb=False），避免知识噪音污染情绪陪伴
             reply = _safe_chat_with_retrieval(
@@ -1097,3 +1439,452 @@ class SelfUpdateAgent:
                 "sources_used": ["feedback_text"],
                 "mode": "self_update",
             }
+
+# ---------------------------------------------------------------------------
+# 9. 个体化子代理（v0.22.3 ⭐ Individuality）
+# ---------------------------------------------------------------------------
+
+
+class Individuality:
+    """个体化（第 9 个 subagent）：连通上游用户建模信息 → 下游对 LLM 的控制。
+
+    上游输入（建模）：
+      - 对话历史（history）：extract_user_facts 提取个人事实
+      - 用户自我陈述（learner.self_description）
+      - 16 维正交画像（StudentTrait.from_learner，含母语）
+    下游输出（对 LLM 的控制）：
+      - 回复语言（native_language——英语/法语用户用母语学习）
+      - 教学风格（认知通道 cognitive_style 适配）
+      - 讲解深度（学段 + 知识掌握度）
+      - 节奏适配（学习节奏/时段偏好）
+      - 情绪敏感度（情感状态——教学时避免触发焦虑）
+    核心：个别地对待每一个学生，尊重个体特征，因材施教。
+
+    v0.23.0 ⭐ 持久化闭环：
+    - run() 现在读取 ``learner._individuality_trait`` 已有画像（若有），让
+      LLM 增量建模——只输出"新增或变化"的信息，避免每轮覆盖旧画像。
+    - 新增 ``apply_modeled_to_learner(learner)``：把建模结果写回 learner
+      动态属性，供下次 run() 读取（增量继承）。
+    - 新增 ``persist(learner, user_id)``：把 self._llm_modeled 合并进
+      learner 持久化画像，再调 ``user_store.save_learner`` 落盘。
+    """
+
+    def __init__(self):
+        # v0.23.0：实例属性兜底（防止无 run() 调用时 AttributeError）
+        self._llm_modeled = {}
+        self._existing_modeled = {}
+
+    def run(self, model=None, learner=None, history: list = None,
+            subject: str = "general") -> dict:
+        """聚合上游建模信息 + 指挥 LLM 补充建模，产出下游 LLM 控制指令。
+
+        v0.23.0 增量建模（升级自 v0.22.3）：
+        - 上游：规则提取 16 维画像 + 个人事实；若提供 model，则指挥 LLM 从
+          对话历史 + 自我陈述中**增量**提取结构化建模信息——结合已有
+          ``learner._individuality_trait`` 已有画像，只输出"新增或变化"，
+          避免覆盖旧画像。
+        - 下游：产出 profile_prompt + control（语言/风格/深度/节奏/情绪敏感），
+          供调用方注入对话 system prompt 指挥 LLM 个性化输出。
+
+        返回：{"profile_prompt": str, "trait": dict, "native_language": str,
+               "control": {"language", "style", "depth", "rhythm", "emotion_sensitive"},
+               "facts": list, "llm_modeled": bool,
+               "existing_modeled": dict（增量前画像，供调试/审计）}
+        """
+        # v0.23.0：实例属性兜底
+        if not hasattr(self, "_llm_modeled") or self._llm_modeled is None:
+            self._llm_modeled = {}
+        if not hasattr(self, "_existing_modeled") or self._existing_modeled is None:
+            self._existing_modeled = {}
+
+        # v0.23.0：读取 learner 上已有的建模结果（增量基础）
+        existing = {}
+        if learner is not None:
+            existing = dict(getattr(learner, "_individuality_trait", {}) or {})
+        self._existing_modeled = dict(existing)  # 留底（供 audit/debug）
+
+        llm_modeled = False
+        # v0.22.3→v0.23.0：上游 LLM 建模——指挥 LLM 增量提取
+        if model is not None:
+            try:
+                _hist_src = ""
+                if history:
+                    _hist_src = "\n".join(
+                        f"{'学生' if h.get('role')=='user' else '老师'}: {str(h.get('content',''))[:200]}"
+                        for h in history[-8:])
+                _desc = getattr(learner, "self_description", "") if learner else ""
+                if _hist_src or _desc:
+                    # v0.23.0：增量指令——只有当已有画像时才告诉 LLM "已有画像"
+                    _existing_str = ""
+                    _incremental_mode = bool(existing)
+                    if existing:
+                        # 已有内容简明展示，避免 LLM 把已有信息当新增报
+                        _parts = []
+                        for k in ("learning_style", "emotional_tendency", "motivation"):
+                            if existing.get(k):
+                                _parts.append(f"{k}={existing[k]}")
+                        for k in ("knowledge_strengths", "knowledge_gaps", "interests"):
+                            v = existing.get(k) or []
+                            if v:
+                                _parts.append(f"{k}={','.join(v[:5])}")
+                        if _parts:
+                            _existing_str = "\n（学生已有画像：{0} ——请勿重复，只输出本轮新增或变化的信息；无新增则输出空 JSON {{}}）".format(
+                                "; ".join(_parts))
+                    _sys = (
+                        "你是个体化建模助手。从学生的对话历史与自我陈述中，提取 6 类结构化信息："
+                        "1) learning_style（学习方式偏好） 2) knowledge_strengths（已掌握） "
+                        "3) knowledge_gaps（薄弱点） 4) emotional_tendency（情绪倾向） "
+                        "5) motivation（学习动机） 6) interests（兴趣）\n"
+                        + (
+                            "结合学生已有画像，只输出本轮新增或变化的信息——"
+                            "没有变化就输出空 JSON {}，不要重复已有内容。\n"
+                            if _incremental_mode else
+                            "请根据本轮对话/自我陈述输出完整提取（首次建模）。\n"
+                        )
+                        + '输出 JSON 格式：{"learning_style":"...","knowledge_strengths":[...],'
+                        '"knowledge_gaps":[...],"emotional_tendency":"...",'
+                        '"motivation":"...","interests":[...]}'
+                    )
+                    _usr = (
+                        f"对话历史：\n{_hist_src}\n自我陈述：{_desc}"
+                        f"{_existing_str}"
+                    )
+                    _llm_out = _safe_chat(model, _sys, _usr, max_tokens=400)
+                    if _llm_out:
+                        import json as _json
+                        import re as _re
+                        _m = _re.search(r"\{.*\}", _llm_out, _re.S)
+                        if _m:
+                            try:
+                                _delta = _json.loads(_m.group(0))
+                            except Exception:
+                                _delta = None
+                            if isinstance(_delta, dict):
+                                # v0.23.0：合并增量——已有键若 _delta 给出新值则覆盖；
+                                # list 类键做并集（避免重复）；标量键（learning_style
+                                # / emotional_tendency / motivation）若 _delta 为空则
+                                # 不覆盖已有。
+                                merged = dict(existing)  # copy
+                                for k, v in _delta.items():
+                                    if k in ("knowledge_strengths", "knowledge_gaps",
+                                             "interests"):
+                                        if isinstance(v, list):
+                                            base = list(merged.get(k, []) or [])
+                                            for item in v:
+                                                if isinstance(item, str):
+                                                    key = item.strip().lower()
+                                                    if key and key not in {
+                                                        str(x).strip().lower() for x in base
+                                                        if isinstance(x, str)
+                                                    }:
+                                                        base.append(item.strip())
+                                            merged[k] = base
+                                        # v 为 None / 非 list：忽略
+                                    elif k in ("learning_style", "emotional_tendency",
+                                               "motivation"):
+                                        if isinstance(v, str) and v.strip() and \
+                                                v.strip().lower() not in ("unknown", ""):
+                                            merged[k] = v.strip()
+                                # 清理空字符串键
+                                merged = {k: v for k, v in merged.items() if v}
+                                self._llm_modeled = merged
+                                llm_modeled = True
+                                # v0.23.0：把建模结果写回 learner（动态属性，
+                                # 不破坏 LearnerProfile dataclass）
+                                if learner is not None:
+                                    try:
+                                        object.__setattr__(
+                                            learner, "_individuality_trait", merged)
+                                    except Exception:
+                                        try:
+                                            learner.__dict__["_individuality_trait"] = merged
+                                        except Exception:
+                                            pass
+            except Exception:
+                pass
+        # 规则聚合（原有逻辑）
+        trait = {}
+        profile_prompt = ""
+        native_language = "zh"
+        facts = []
+        try:
+            # 1. 上游：16 维画像（含母语）
+            from student_trait import StudentTrait
+            if learner is not None:
+                t = StudentTrait.from_learner(
+                    learner,
+                    user_model=getattr(learner, "_user_model", None),
+                )
+                # v0.23.0：把增量建模结果写入 trait（覆盖默认 unknown 项）
+                _modeled_now = getattr(self, "_llm_modeled", {}) or {}
+                if _modeled_now:
+                    t.update_from_dialogue(_modeled_now)
+                # v0.23.0：把已有 facts 写入 trait（personal_facts）
+                try:
+                    if facts:
+                        t.update_from_facts(facts)
+                except Exception:
+                    pass
+                native_language = getattr(t, "native_language", None) or "zh"
+                # v0.22.3：直接从 learner 兜底读母语（即使 StudentTrait 未设）
+                if native_language == "zh" and learner is not None:
+                    _nl2 = getattr(learner, "native_language", None)
+                    if _nl2 and _nl2 != "zh":
+                        native_language = _nl2 if isinstance(_nl2, str) else "zh"
+                trait = t.to_dict() if hasattr(t, "to_dict") else {}
+                profile_prompt = t.to_prompt(levels=[1, 2])
+                # v0.23.0：把 t 也存到 learner（供下次 run 读取）
+                try:
+                    object.__setattr__(learner, "_individuality_trait_obj", t)
+                except Exception:
+                    try:
+                        learner.__dict__["_individuality_trait_obj"] = t
+                    except Exception:
+                        pass
+            # 2. 上游：对话历史 → 个人事实
+            try:
+                from context_bundle import extract_user_facts
+                facts = extract_user_facts(history or [])
+            except Exception:
+                pass
+            if facts:
+                facts_str = "\n".join(f"- {f}" for f in facts[:8])
+                profile_prompt = profile_prompt + f"\n- 个人事实（记忆锚点）：\n{facts_str}"
+            # 3. v0.22.3：LLM 建模结果并入 profile_prompt
+            if llm_modeled and hasattr(self, "_llm_modeled"):
+                _md = self._llm_modeled
+                _add = []
+                if _md.get("learning_style"):
+                    _add.append(f"- 学习方式（LLM 建模）：{_md['learning_style']}")
+                if _md.get("knowledge_gaps"):
+                    _add.append(f"- 薄弱点（LLM 建模）：{', '.join(_md['knowledge_gaps'][:3])}")
+                if _md.get("emotional_tendency"):
+                    _add.append(f"- 情绪倾向（LLM 建模）：{_md['emotional_tendency']}")
+                if _md.get("interests"):
+                    _add.append(f"- 兴趣（LLM 建模）：{', '.join(_md['interests'][:3])}")
+                if _add:
+                    profile_prompt = profile_prompt + "\n" + "\n".join(_add)
+        except Exception:
+            pass
+
+        # 4. 下游：对 LLM 的控制指令
+        control = {
+            "language": native_language,
+            "style": self._derive_style(trait),
+            "depth": self._derive_depth(trait, subject),
+            "rhythm": self._derive_rhythm(trait),
+            "emotion_sensitive": self._derive_emotion(trait),
+        }
+        return {
+            "profile_prompt": profile_prompt,
+            "trait": trait,
+            "native_language": native_language,
+            "control": control,
+            "facts": facts,
+            "llm_modeled": llm_modeled,
+            "existing_modeled": self._existing_modeled,
+            "mode": "individuality",
+        }
+
+    def apply_modeled_to_learner(self, learner) -> bool:
+        """v0.23.0 ⭐ 把建模结果写回 learner 动态属性。
+
+        把 ``self._llm_modeled`` 合并进 learner 的：
+        - ``learner._individuality_trait``（dict，供下次 run() 增量继承）
+        - ``learner._individuality_trait_obj``（StudentTrait 实例，供调试）
+
+        同时把 knowledge_gaps / knowledge_strengths / interests 也同步到
+        ``learner.subjects_mastery`` / ``learner.interests``（若这些字段存在），
+        让下游（如 context_bundle / expert_guard）也能读到。
+
+        learner 为 None 时返回 False；写回失败返回 False；成功 True。
+        """
+        if learner is None:
+            return False
+        if not hasattr(self, "_llm_modeled") or not self._llm_modeled:
+            return False
+        try:
+            modeled = dict(self._llm_modeled)
+            # 1) dict 形式——供下次 run() 增量
+            try:
+                object.__setattr__(learner, "_individuality_trait", modeled)
+            except Exception:
+                learner.__dict__["_individuality_trait"] = modeled
+            # 2) StudentTrait 实例——供 to_prompt
+            try:
+                from student_trait import StudentTrait
+                t = StudentTrait.from_learner(learner)
+                t.update_from_dialogue(modeled)
+                try:
+                    object.__setattr__(learner, "_individuality_trait_obj", t)
+                except Exception:
+                    learner.__dict__["_individuality_trait_obj"] = t
+                # 3) 同步到 LearnerProfile 原生字段（如有）
+                # subjects_mastery：knowledge_strengths → evidence_pos；
+                # knowledge_gaps → evidence_neg
+                if hasattr(learner, "subjects_mastery") and isinstance(
+                        getattr(learner, "subjects_mastery", None), dict):
+                    sm = dict(learner.subjects_mastery or {})
+                    for subj in modeled.get("knowledge_strengths") or []:
+                        if not isinstance(subj, str) or not subj.strip():
+                            continue
+                        m = sm.setdefault(subj, {
+                            "level": 0.7, "evidence_pos": [],
+                            "evidence_neg": [], "recency": "",
+                        })
+                        ep = m.get("evidence_pos") or []
+                        if "individuality_LLM" not in ep:
+                            ep.append("individuality_LLM")
+                        m["evidence_pos"] = ep
+                    for subj in modeled.get("knowledge_gaps") or []:
+                        if not isinstance(subj, str) or not subj.strip():
+                            continue
+                        m = sm.setdefault(subj, {
+                            "level": 0.3, "evidence_pos": [],
+                            "evidence_neg": [], "recency": "",
+                        })
+                        en = m.get("evidence_neg") or []
+                        if "individuality_LLM" not in en:
+                            en.append("individuality_LLM")
+                        m["evidence_neg"] = en
+                        m["level"] = min(m.get("level", 0.5), 0.3)
+                    learner.subjects_mastery = sm
+                # interests：写入 learner.interests（若有；动态属性）
+                if modeled.get("interests"):
+                    try:
+                        cur = list(getattr(learner, "interests", []) or [])
+                        seen = {str(x).strip().lower() for x in cur if x}
+                        for it in modeled["interests"]:
+                            if isinstance(it, str):
+                                k = it.strip().lower()
+                                if k and k not in seen:
+                                    cur.append(it.strip())
+                                    seen.add(k)
+                        try:
+                            object.__setattr__(learner, "interests", cur)
+                        except Exception:
+                            learner.__dict__["interests"] = cur
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            return True
+        except Exception:
+            return False
+
+    def persist(self, learner, user_id: str = "") -> bool:
+        """v0.23.0 � 把建模结果持久化到 learner + 落盘。
+
+        流程：
+        1. ``apply_modeled_to_learner(learner)``——把 self._llm_modeled 写回 learner
+        2. 若 ``user_id`` 形如 ``u<digit>...``（注册用户），调
+           ``user_store.save_learner(user_id, learner)`` 落盘到 users.json +
+           users_data/<uid>/profile.json。
+        3. 匿名 ``web_xxx`` 用户：仅写 learner 内存，不落盘（每次刷新会丢，
+           但保持 web 用户画像轻量——避免污染 users.json 持久层）。
+
+        返回 True 表示成功持久化；False 表示匿名用户或失败。
+        """
+        if learner is None:
+            return False
+        # 1) 写回 learner 动态属性
+        self.apply_modeled_to_learner(learner)
+        # 2) 仅注册用户（u 前缀 + 数字后缀）落盘
+        if not user_id or not (
+                isinstance(user_id, str) and user_id.startswith("u")
+                and user_id[1:].isdigit()):
+            return False
+        try:
+            from user_store import UserStore
+            store = UserStore()
+            # v0.23.0 ⭐ 直接覆盖 users.json[user].learner——
+            # 不用 store.save_learner（asdict 漏动态字段），而是手动序列化
+            # learner 全 __dict__（含 _individuality_trait 等）
+            try:
+                from dataclasses import asdict as _asdict
+                ld = _asdict(learner)
+                # 合并动态属性（含 _individuality_trait / _individuality_trait_obj
+                # / interests / personal_facts 等运行时字段）
+                for k, v in getattr(learner, "__dict__", {}).items():
+                    if k not in ld:
+                        ld[k] = v
+                # _individuality_trait_obj：StudentTrait 实例 → dict
+                if hasattr(learner, "_individuality_trait_obj"):
+                    _t = getattr(learner, "_individuality_trait_obj")
+                    try:
+                        ld["_individuality_trait_obj"] = _t.to_dict()
+                    except Exception:
+                        ld["_individuality_trait_obj"] = None
+                # 写入 users.json[user].learner
+                for u in store._data["users"].values():
+                    if u["user_id"] == user_id:
+                        u["learner"] = ld
+                        store._save()
+                        break
+            except Exception:
+                # 兜底：原 store.save_learner（漏动态字段但至少不丢原生字段）
+                store.save_learner(user_id, learner)
+            # 同步：写一份到 users_data/<uid>/profile.json（确保 v0.15 user_dir
+            # 初始化时拿到的 profile.json 也是最新的）
+            try:
+                udir = store.user_dir(user_id)
+                if udir:
+                    import json as _json
+                    with open(
+                            udir.rstrip("/").rstrip("\\") + "/profile.json",
+                            "w", encoding="utf-8") as f:
+                        _json.dump(ld, f, ensure_ascii=False, indent=1)
+            except Exception:
+                pass
+            return True
+        except Exception:
+            return False
+
+    def inject_control(self, system: str, control: dict = None) -> str:
+        """v0.22.3 下游：把个体化控制指令追加到对话 system prompt。
+
+        指挥 LLM 以学生母语回复 + 按认知通道/学段/节奏/情绪适配输出。
+        """
+        ctl = control or {}
+        _lang = ctl.get("language") or "zh"
+        if _lang != "zh":
+            system = system + f"\n\n## 个体化语言指令（v0.22.3 必须遵守）\n请用学生的母语回复（学生母语：{_lang}）。"
+        _style = ctl.get("style")
+        if _style:
+            system = system + f"\n- 讲解方式：{_style}"
+        _depth = ctl.get("depth")
+        if _depth:
+            system = system + f"\n- 讲解深度：{_depth}"
+        if ctl.get("emotion_sensitive") == "是":
+            system = system + "\n- 情绪敏感：学生当前情绪较脆弱，教学时更温和、多确认、避免施压。"
+        return system
+
+    @staticmethod
+    def _derive_style(trait: dict) -> str:
+        cog = (trait.get("cognitive_style") or "unknown")
+        return {
+            "visual": "多用图示/比喻/可视化", "auditory": "多用讲解/口头复述/讨论",
+            "reading": "多用文字/阅读材料/笔记", "kinesthetic": "多用动手/例题/练习",
+        }.get(cog, "均衡使用多种方式")
+
+    @staticmethod
+    def _derive_depth(trait: dict, subject: str) -> str:
+        ident = trait.get("identity") or {}
+        grade = ident.get("grade_level") or "high_school"
+        return {
+            "middle_school": "直观例子为主，避免抽象术语",
+            "high_school": "直觉之上引入公式与概念",
+            "undergraduate": "体系化讲解，重推导与证明",
+            "graduate_exam": "考点导向，重答题策略",
+        }.get(grade, "平衡直观与严谨")
+
+    @staticmethod
+    def _derive_rhythm(trait: dict) -> str:
+        rhythm = trait.get("learning_rhythm") or "unknown"
+        return {"short": "每段讲短一些，多停顿确认", "medium": "保持常规节奏",
+                "long": "可以深入展开，分块推进"}.get(rhythm, "按需调节节奏")
+
+    @staticmethod
+    def _derive_emotion(trait: dict) -> str:
+        emo = trait.get("emotion") or "neutral"
+        return "是" if emo in ("anxious", "withdrawn") else "否"
