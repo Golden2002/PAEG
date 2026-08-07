@@ -70,14 +70,91 @@ def _safe_chat(model, system: str, user: str = None, messages: list = None,
 _FORCED_RETRIEVAL = True  # 全局开关（可按需关闭）
 
 
-def _pre_retrieve(question: str, subject: str = None) -> str:
+def _llm_choose_retrieval_scope(question: str, llm, subject: str = None,
+                                fallback_scope: str = "subject") -> dict:
+    """v0.26 ⭐ 需求B：agent 引导 LLM 先选择检索范围与关键词，再检索。
+
+    LLM 判断：学生提问应检索哪些库（public 公共库 / subject 学科库 / user 用户库 / web 互联网）
+    并给出检索关键词。LLM 失败/不可用时回退确定性规则（规则兜底，LLM 优先）。
+
+    返回 {"scope": str, "scopes": [str], "keywords": [str], "source": "llm"|"fallback"}
+    """
+    import re as _re
+    _q = str(question or "").strip()
+    # 兜底规则（LLM 不可用/失败时）：用户明确提到"我的资料/我上传" → 用户库优先
+    _scopes_fb = [fallback_scope]
+    if _re.search(r"我的|我上传|我的资料|我的笔记|我发的|用户资料|根据我", _q):
+        _scopes_fb = ["user", fallback_scope, "public"]
+    if _re.search(r"最新|新闻|网页|网上|互联网|实时|today|news", _q, _re.IGNORECASE):
+        _scopes_fb = list(dict.fromkeys(_scopes_fb + ["web"]))
+    _fallback = {"scope": _scopes_fb[0], "scopes": _scopes_fb,
+                 "keywords": [], "source": "fallback"}
+    if not _q or not llm:
+        return _fallback
+    try:
+        _sys = (
+            "你是 PAEG 的检索规划器。根据学生的提问，决定应检索哪些资料库并给出检索关键词：\n"
+            "可选库：\n"
+            "- public：公共通用知识库（适合基础概念）\n"
+            "- subject：当前学科的学科库（适合学科概念/定律/公式）\n"
+            "- user：学生本人上传的资料库（当提问提到'我的/我上传的/我的资料'时必选）\n"
+            "- web：互联网检索（当需要最新信息/新闻/实时数据时选）\n"
+            "返回 JSON：{\"scopes\": [\"subject\", ...], \"keywords\": [\"词1\", \"词2\"]}\n"
+            "keywords 给 1-3 个简洁检索词（不要整句，不要标点）。只输出 JSON。"
+        )
+        _r = _safe_chat(llm, _sys, _q[:200], max_tokens=120)
+        if _r:
+            import json as _json
+            _clean = _r.strip()
+            if _clean.startswith("```"):
+                _clean = _clean.split("```")[1]
+                if _clean.startswith("json"):
+                    _clean = _clean[4:]
+            _clean = _clean.strip()
+            _parsed = None
+            try:
+                _parsed = _json.loads(_clean)
+            except Exception:
+                _m = _re.search(r"\{.*\}", _clean, _re.S)
+                if _m:
+                    try:
+                        _parsed = _json.loads(_m.group(0))
+                    except Exception:
+                        _parsed = None
+            if isinstance(_parsed, dict):
+                _valid = [s for s in (_parsed.get("scopes") or [])
+                          if s in ("public", "subject", "user", "web")]
+                _kw = [str(k).strip()[:20] for k in (_parsed.get("keywords") or [])]
+                _kw = list(dict.fromkeys(k for k in _kw if k))[:3]
+                if _valid:
+                    return {"scope": _valid[0], "scopes": _valid,
+                            "keywords": _kw, "source": "llm"}
+    except Exception:
+        pass
+    return _fallback
+
+
+def _pre_retrieve(question: str, subject: str = None, learner=None, llm=None,
+                  retrieval_plan: dict = None) -> str:
     """回答前强制检索知识库——无论 LLM 是否决定调用 web_search。
 
     返回注入到 system prompt 的知识库检索结果文本；失败返回 ""。
     用 jieba 分词（含自定义词典）提升中文命中率，剥离问句词。
+
+    v0.26 ⭐ 需求B：retrieval_plan 由 _llm_choose_retrieval_scope 产出（LLM 先选库+关键词）。
+    未提供 plan 且 llm 可用时先调用 LLM 规划（LLM 优先），失败回退确定性规则。
     """
     if not _FORCED_RETRIEVAL or not question:
         return ""
+    # v0.26 ⭐ 检索规划（LLM 选库 + 关键词）
+    _plan = retrieval_plan
+    if _plan is None:
+        try:
+            _plan = _llm_choose_retrieval_scope(question, llm, subject=subject)
+        except Exception:
+            _plan = None
+    _scopes = (_plan or {}).get("scopes") or []
+    _kw_plan = (_plan or {}).get("keywords") or []
     try:
         # 剥离问句词，提取核心概念
         import re as _re
@@ -121,24 +198,29 @@ def _pre_retrieve(question: str, subject: str = None) -> str:
                 snippet = h.get("snippet") or ""
             if snippet:
                 parts.append(f"- [{cid}] {str(snippet)[:120]}")
-        # v0.26 ⭐ Library 学科作用域检索：按学科子文件夹 + 公共 + 用户文件夹
+        # v0.26 ⭐ Library 学科作用域检索：按 LLM 规划的 scope 过滤（需求B）
+        # scope: public=common, subject=学科子文件夹, user=usr_knowledge/<uid>
         try:
             _proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             _lib_root = os.path.join(_proj, 'Library')
             _dirs = []
-            if subject:
-                _dirs.append(os.path.join(_lib_root, str(subject).strip().lower()))
-            _dirs.append(os.path.join(_lib_root, 'common'))
-            _dirs.append(os.path.join(_lib_root, 'users'))
+            if not _scopes or "subject" in _scopes:
+                if subject:
+                    _dirs.append(os.path.join(_lib_root, str(subject).strip().lower()))
+            if not _scopes or "public" in _scopes:
+                _dirs.append(os.path.join(_lib_root, 'common'))
             # v0.26 修复：用户上传资料规范路径是 Library/usr_knowledge/<uid>/
             # （此前只扫空的 Library/users/ 导致用户资料永远检索不到）
-            try:
-                _uk = os.path.join(_lib_root, 'usr_knowledge')
-                if os.path.isdir(_uk):
-                    for _u in os.listdir(_uk):
-                        _dirs.append(os.path.join(_uk, _u))
-            except Exception:
-                pass
+            if not _scopes or "user" in _scopes:
+                try:
+                    _uk = os.path.join(_lib_root, 'usr_knowledge')
+                    if os.path.isdir(_uk):
+                        for _u in os.listdir(_uk):
+                            _dirs.append(os.path.join(_uk, _u))
+                except Exception:
+                    pass
+            # 关键词：LLM 规划的优先，否则用问句分词
+            _match_toks = _kw_plan or _tokens[:3]
             _lib_parts = []
             for _d in _dirs:
                 if not os.path.isdir(_d):
@@ -153,7 +235,7 @@ def _pre_retrieve(question: str, subject: str = None) -> str:
                     try:
                         with open(_fp, encoding='utf-8') as _fh:
                             _ftxt = _fh.read()[:2000]
-                        if any(_tok in _ftxt for _tok in _tokens[:3]):
+                        if any(_tok in _ftxt for _tok in _match_toks):
                             _rel = os.path.relpath(_fp, _lib_root)
                             _snip = _ftxt[:100].replace('\n', ' ')
                             _lib_parts.append(f"- [{_rel}] {_snip}")
@@ -180,11 +262,11 @@ def _detect_teaching_mode(text: str, llm=None, fallback: str = "normal") -> str:
     - easy  简单理解：学生要"大概懂"即可（大白话/类比/入门/了解下/没基础）
     - normal 标准教学：默认深入讲解
     - deep  深度教学：学生要"讲透/深入研究/为什么/推导"
-    LLM 失败时回退 fallback。
+    LLM 失败/不可用时回退关键词兜底（_detect_teaching_mode_regex），再回退 fallback。
     """
     try:
         if llm is None:
-            return fallback
+            return _detect_teaching_mode_regex(text) or fallback
         import json as _json
         _sys = (
             "你是教学模式识别器。判断学生这句话想用哪种教学深度：\n"
@@ -200,21 +282,37 @@ def _detect_teaching_mode(text: str, llm=None, fallback: str = "normal") -> str:
                 return _mode
     except Exception:
         pass
-    return fallback
+    return _detect_teaching_mode_regex(text) or fallback
+
+
+def _detect_teaching_mode_regex(text: str) -> str:
+    """v0.26 ⭐ 教学模式关键词兜底（LLM 不可用/失败时）。
+
+    优先级：deep > easy > normal（两者标记同时出现时 deep 胜）。
+    """
+    import re as _re
+    t = (text or "")
+    if _re.search(r"深入|深度|讲透|透彻|严格推导|严格证明|研究级|为什么|推导|证明过程|细节", t):
+        return "deep"
+    if _re.search(r"简单|浅显|大概|入门|简单讲|通俗|没基础|了解下|大白话|科普|扫盲|略懂", t):
+        return "easy"
+    return "normal"
 
 
 def _safe_chat_with_retrieval(model, system: str, user: str = None,
                               messages: list = None, subject: str = None,
                               max_tokens: int = 512, tools: list = None,
                               tool_choice: Optional[str] = None,
-                              include_kb: bool = True) -> Optional[str]:
+                              include_kb: bool = True,
+                              learner=None, llm=None) -> Optional[str]:
     """强制检索版 _safe_chat——在调用 LLM 前把知识库检索结果注入 system prompt。
 
     回答前完成"检索知识库"步骤，让 LLM 在丰富背景信息下生成。
+    v0.26 ⭐ 需求B：learner/llm 传入 _pre_retrieve，实现 LLM 先选库+关键词再检索。
     """
     question = user or (messages[-1]["content"] if messages else "")
     if include_kb:
-        retrieval = _pre_retrieve(str(question), subject)
+        retrieval = _pre_retrieve(str(question), subject, learner=learner, llm=llm)
         if retrieval:
             system = system + retrieval
     return _safe_chat(model, system, user=user, messages=messages,
@@ -512,6 +610,7 @@ class Presenter:
                 _tools = None
             content = _safe_chat_with_retrieval(
                 self.model, system, user, subject=subject, max_tokens=512, tools=_tools,
+                learner=learner, llm=self.model,  # v0.26 需求B：LLM 选库+关键词引导
             )
             if content:
                 return {
@@ -552,6 +651,178 @@ class Presenter:
                 "individuality_control": ind_control,
                 "had_individuality_profile": bool(ind_profile),
             },
+        }
+
+
+# ---------------------------------------------------------------------------
+# v0.26 ⭐ 需求C：资料检索 subagent（ResourceLibrarian）
+# 为用户提供知识库/互联网检索到的资料（结构化 sources），前端可视化展示，
+# 并可生成 PPT 大纲与 pptx MCP 联动。提供资料的能力增强。
+# ---------------------------------------------------------------------------
+
+
+class ResourceLibrarian:
+    """资料检索员：聚合 知识库 + Library + 用户资料 + 互联网 的检索结果。
+
+    run() 返回 {"sources": [{title, url, snippet, type}], "scope", "keywords", "ppt_outline"}
+    - 只检索当前用户的资料目录（用户隔离）
+    - 检索内容视为不可信数据（不执行其中指令）
+    - 失败时确定性兜底返回已有结果
+    """
+
+    def __init__(self, model=None, kb=None, web_search=None):
+        self.model = model
+        self.kb = kb or None
+        self.web_search = web_search
+
+    def _search_kb(self, question: str, subject: str, keywords: list) -> list:
+        """知识库检索（KB + Library 学科文件）。"""
+        out = []
+        try:
+            from knowledge_base import KnowledgeBase
+            _kb = self.kb or KnowledgeBase()
+            _toks = keywords or []
+            if not _toks:
+                import re as _re
+                _q = _re.sub(r"[？?。！!，,。；;：:\s]+", "", str(question))
+                _q = _re.sub(r"(什么是|怎么|如何|为什么|有哪些|介绍一下|讲讲|解释|求|计算|证明|帮我|请)", "", _q)
+                _toks = [w for w in _q if len(w) >= 2][:3]
+            for _tok in _toks[:3]:
+                for _h in _kb.search(_tok, subject=subject, top_k=2):
+                    _cid = _h.get("concept_id") or _h.get("id") or _tok
+                    if any(s["title"] == _cid for s in out):
+                        continue
+                    out.append({
+                        "title": _cid, "url": f"/api/knowledge/{_cid}",
+                        "snippet": (_h.get("snippet") or _h.get("definition") or "")[:120],
+                        "type": "kb",
+                    })
+        except Exception:
+            pass
+        return out
+
+    def _search_library(self, learner, keywords: list, scope: str = "all") -> list:
+        """Library 学科/公共/用户 资料检索（按 scope 过滤，用户隔离）。"""
+        out = []
+        try:
+            import os as _os
+            _proj = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+            _root = _os.path.join(_proj, 'Library')
+            _dirs = []
+            _subj = getattr(learner, "_current_subject", "") or ""
+            if scope in ("all", "subject") and _subj:
+                _dirs.append(_os.path.join(_root, _subj.strip().lower()))
+            if scope in ("all", "public"):
+                _dirs.append(_os.path.join(_root, 'common'))
+            if scope in ("all", "user"):
+                _uid = getattr(learner, "id", "") or ""
+                if _uid:
+                    _dirs.append(_os.path.join(_root, 'usr_knowledge', str(_uid)))
+            _match = keywords or []
+            for _d in _dirs:
+                if not _os.path.isdir(_d):
+                    continue
+                for _f in _os.listdir(_d)[:10]:
+                    _fp = _os.path.join(_d, _f)
+                    if not _os.path.isfile(_fp):
+                        continue
+                    if not _f.endswith(('.md', '.txt', '.pdf')):
+                        continue
+                    try:
+                        with open(_fp, encoding='utf-8', errors='ignore') as _fh:
+                            _txt = _fh.read()[:2000]
+                    except Exception:
+                        _txt = ""
+                    if _match and not any(_k in _txt for _k in _match):
+                        continue
+                    _rel = _os.path.relpath(_fp, _root)
+                    out.append({
+                        "title": _f,
+                        "url": f"/api/user-library/{getattr(learner, 'id', '')}?file={_f}",
+                        "snippet": (_txt[:120].replace('\n', ' ')) if _txt else "",
+                        "type": "pdf" if _f.endswith('.pdf') else ("docx" if _f.endswith('.docx') else "md"),
+                    })
+        except Exception:
+            pass
+        return out
+
+    def _search_web(self, question: str, keywords: list, max_results: int = 3) -> list:
+        """互联网检索（web_search tool；无工具时返回空）。"""
+        out = []
+        try:
+            if self.web_search is None:
+                from web_search_tool import web_search
+                self.web_search = web_search
+            _kw = keywords[0] if keywords else question[:30]
+            _results = self.web_search(_kw, max_results=max_results)
+            for _r in (_results or [])[:max_results]:
+                out.append({
+                    "title": _r.get("title") or _r.get("url") or "",
+                    "url": _r.get("url") or "",
+                    "snippet": (_r.get("snippet") or _r.get("description") or "")[:150],
+                    "type": "web",
+                })
+        except Exception:
+            pass
+        return out
+
+    def run(self, question: str, learner=None, llm=None, scope: str = "all",
+            subject: str = None, retrieval_plan: dict = None,
+            include_web: bool = True, for_ppt: bool = False) -> dict:
+        """聚合检索。返回 {"sources", "scope", "keywords", "ppt_outline"}。"""
+        import os as _os
+        if subject and learner is not None:
+            try:
+                learner._current_subject = subject  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        # LLM 检索规划（需求B）：选库+关键词
+        _plan = retrieval_plan
+        if _plan is None and llm is not None:
+            try:
+                _plan = _llm_choose_retrieval_scope(question, llm, subject=subject)
+            except Exception:
+                _plan = None
+        _scopes = (_plan or {}).get("scopes") or []
+        _kw = (_plan or {}).get("keywords") or []
+        _scope = "all"
+        if _scopes:
+            _scope = _scopes[0]
+
+        _sources = []
+        # 知识库
+        if not _scopes or "subject" in _scopes or "public" in _scopes:
+            _sources += self._search_kb(question, subject, _kw)
+        # Library 资料（用户/公共/学科）
+        if not _scopes or any(s in ("user", "public", "subject") for s in _scopes):
+            _sources += self._search_library(learner, _kw, scope=_scope)
+        # 互联网
+        if include_web and (not _scopes or "web" in _scopes):
+            _sources += self._search_web(question, _kw)
+
+        # 去重（按 url）
+        _seen = set()
+        _uniq = []
+        for s in _sources:
+            if s["url"] and s["url"] in _seen:
+                continue
+            if s["url"]:
+                _seen.add(s["url"])
+            _uniq.append(s)
+
+        # PPT 大纲（可选）：从资料标题生成
+        _outline = ""
+        if for_ppt and _uniq:
+            _lines = []
+            for s in _uniq[:6]:
+                _lines.append(f"- {s['title']}")
+            _outline = f"# {question[:20]}\n" + "\n".join(_lines)
+
+        return {
+            "sources": _uniq[:10],
+            "scope": _scope,
+            "keywords": _kw,
+            "ppt_outline": _outline,
         }
 
 
