@@ -1,9 +1,11 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.21.2（2026-08-06）
+> **版本**：v0.24 关键节点（2026-08-07）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
+>
+> **v0.24 关键节点**：完成架构断链全面修复（教学闭环 / 个体化闭环 / 工具链 / 路由自更新），20 项连接逐一验证通过，详见 §1.6.11。
 
 ---
 
@@ -223,6 +225,32 @@ PAEG 的核心循环定义在 `paeg.py: PAEG.teach()`（paeg.py:84-232），是�
 
 **教学设计的本质**：不是"一次性问答"，而是**先评估学生 → 定制路径 → 分步呈现 → 每步评估 → 必要时调整 → 事后反思 → 沉淀经验**的完整教学循环——这是本项目区别于普通 Chatbot 的核心。
 
+### 图二：教学闭环链路（v0.24 修复后真实连接 ⭐）
+
+> 以下链路图为 v0.24 关键节点**修复后**的真实连接状态：Evaluator 真正区分"AI 输出质量"与"学生理解状态"双维评分；Adapter 决策真正执行（switch_style → Presenter 换风格重讲、reinforce → 强化补例子）；Individuality 注入教学流水线（17 维画像 → inject_control）。详见 §1.6.11 断链修复清单。
+
+```mermaid
+flowchart LR
+    S["学生提问"] --> G["_affection_gate_check<br/>危机信号？"]
+    G -->|"是→陪伴"| AFF["AffectionSupportor<br/>立德为先"]
+    G -->|"否→教学"| I["Individuality<br/>17 维画像注入"]
+    I --> D["Diagnostor<br/>诊断就绪度"]
+    D --> P["Planner<br/>差异化计划"]
+    P --> PR["Presenter<br/>个性化讲解"]
+    PR --> E["Evaluator<br/>讲解质量 + 学生状态"]
+    E --> A["Adapter<br/>switch_style / reinforce"]
+    A -->|"决策回流"| PR
+    A -->|"difficulty_delta 累计"| D
+    PR -->|"呈现给学生"| S
+    A --> EVA2["SelfEvolution<br/>evolve_prompt + on_session_end"]
+    EVA2 -->|"改进提示词"| PR
+```
+
+**链路解读（v0.24 修复后）**：
+- **Evaluator 双维评分**：`presentation_quality`（讲解质量：长度/结构/语气/知识库契合）+ `student_state_score`（学生状态：从回答推断理解度）——区分 AI 输出好与学生真懂
+- **Adapter 决策真正执行**：`switch_style` → Presenter 换风格重讲；`reinforce` → 强化补例子；`difficulty_delta` 累计 → 反馈给 Diagnostor 影响下次诊断
+- **Individuality 注入**：17 维画像在学生提问后立刻注入 system prompt，控制语言/风格/深度/节奏/情绪
+
 ## 1.6.2 子代理架构：哪些职责拆分出去，为什么
 
 **6 个子代理**（subagents.py），按"职责单一、LLM 只做它擅长的事"原则拆分：
@@ -239,6 +267,8 @@ PAEG 的核心循环定义在 `paeg.py: PAEG.teach()`（paeg.py:84-232），是�
 **关键架构原则（v0.19.15）**：
 - **只有"生成讲解内容"这种真正需要 LLM 能力的地方才用 LLM**；诊断深度、评估分数、调整决策都尽量确定性——保证可测试、可复现、不随机。
 - **AnswerSolver 与 Presenter 的区分**是教育智能体的重要设计：教学要"由浅入深、提问引导"，找答案要"直接完整规范"——同一个 Agent 根据学生意图切换范式。
+
+> **⭐ v0.24 更新**：PAEG 主 agent 现在持有**全部 9 个 subagent**——在前述 6 个基础上新增 **AffectionSupportor**（情绪陪伴 / 立德树人）、**SelfUpdateAgent**（自我更新）、**Individuality**（个体化因材施教 / 17 维画像）。PAEG 主循环统一调度所有 9 个 subagent（paeg.py），由 `_affection_gate_check` 先识别危机信号，危机则转 AffectionSupportor（立德为先），否则注入 Individuality 画像后进入教学流水线。
 
 ## 1.6.3 执行引擎（Harness）：Agent 如何指挥 LLM 完成一次真实思考
 
@@ -279,6 +309,111 @@ LLM 调用（带 tools+tool_choice）→ LLM 决定调哪些工具 → 逐个执
 - **共享知识库** `KnowledgeBase`：所有子代理注入同一个 kb 实例，`Presenter.resolve_node` 带缓存（v0.15 避免重复检索）。
 - **用户模型**：`infer_user_model + infer_bdi`（agent_core.py）挂到 `learner._user_model`，Presenter 读取——**对象意识**贯穿教学。
 - **三层记忆**（memory_system.py）：短期（当前对话）→ 中期（LLM 摘要压缩）→ 长期（跨会话画像 + 对话摘要，users_data/<id>/）。
+
+### 图一：全链路总览（v0.24 修复后真实连接 ⭐）
+
+> 这是 PAEG 架构最重要的全景图——从用户层到主 agent、再到 9 个 subagent、LLM 层、工具链层、MCP 层、本地资源层的完整链路。**所有连线均为真实代码连接**，20 项已逐一验证（arch 检查通过）。
+
+```mermaid
+flowchart TB
+    subgraph USER["用户层"]
+        S["🧑 学生 / 学习者"]
+        EXT["🤖 外部智能体<br/>Claude / Codex / OpenCode"]
+    end
+
+    subgraph APP["应用层 · Flask Server (server.py)"]
+        WEB["Web GUI / API 端点<br/>chat·teach·answer·affection·skills·upload"]
+        ROUTER["meta_router.route()<br/>意图集中分发"]
+        AGENTENG["AgentEngine<br/>Plan→Act→Observe→Reflect"]
+        HEALTH["/api/health<br/>mcp_connected 2/2"]
+    end
+
+    subgraph MAIN["主 Agent · Émile Novis (paeg.py)"]
+        PAEG["PAEG 主智能体<br/>持有 9 个 subagent"]
+        GATE["_affection_gate_check<br/>危机信号先行"]
+        IND["Individuality<br/>17 维画像注入"]
+    end
+
+    subgraph SUB["Subagent 层（9 个）"]
+        DIA["Diagnostor 诊断"]
+        PLA["Planner 计划"]
+        PRE["Presenter 呈现"]
+        EVA["Evaluator 评估<br/>讲解质量+学生状态双分"]
+        ADA["Adapter 调整<br/>决策真正执行"]
+        ANS["AnswerSolver 直答"]
+        AFF["AffectionSupportor<br/>立德树人 · 危机陪伴"]
+        SUA["SelfUpdateAgent 自更新"]
+        IND2["Individuality 个体化<br/>17 维·增量建模·持久化"]
+    end
+
+    subgraph LLM["LLM 层"]
+        DS["DeepSeek (llm_adapter)<br/>全部 subagent 调用"]
+    end
+
+    subgraph TOOL["工具链层"]
+        REG["tool_registry<br/>web_search·verify_math·fetch_page<br/>daily_quote·save_doc·get_time"]
+        SK["skill_registry<br/>10 技能（L1 目录注入）"]
+        F4["用户文件 4 能力<br/>QA·讲解·原文·重组 (BM25)"]
+    end
+
+    subgraph MCP["MCP 层"]
+        MC["MCPClientManager<br/>filesystem 14 + memory 9 工具"]
+        MG["mcp_gateway :8765<br/>PAEG 能力对外暴露"]
+    end
+
+    subgraph RES["本地资源层"]
+        KB["knowledge_base 知识库"]
+        LIB["Library 薇依原著<br/>weil_corpus.json"]
+        MEM["memory/ 记忆<br/>AffectionSAPAO.md"]
+        USR["users_data/ 画像<br/>users.json"]
+        IMP["improvements.md<br/>自更新建议回流"]
+    end
+
+    S -->|"对话/自述/上传"| WEB
+    EXT -->|"MCP 协议"| MG
+    WEB -->|"路由分发"| ROUTER
+    ROUTER -->|"教学意图"| PAEG
+    ROUTER -->|"agent 模式"| AGENTENG
+    ROUTER -->|"危机/情绪"| AFF
+    AGENTENG --> DS
+    PAEG -->|"危机检查先行"| GATE
+    PAEG --> IND
+    IND --> IND2
+    GATE -->|"危机通过→教学"| DIA
+    DIA --> PLA --> PRE --> EVA --> ADA
+    EVA -.->|"学生状态反馈"| ADA
+    ADA -.->|"风格/难度决策回流"| PRE
+    PAEG --> ANS
+    PAEG --> SUA
+    PAEG --> AFF
+    DIA & PLA & PRE & EVA & ADA & ANS & AFF & SUA & IND2 --> DS
+    PAEG -->|"工具调用"| REG
+    REG --> SK
+    REG --> MC
+    PAEG --> F4
+    MC -->|"filesystem/memory 标准 server"| MEM
+    MG -->|"复用 PAEG 工具"| REG
+    DIA & PLA --> KB
+    PRE --> LIB
+    AFF --> MEM
+    IND2 --> USR
+    SUA --> IMP
+    SUA --> MEM
+    REG --> KB
+    KB --> LIB
+    IMP --> PAEG
+    USR -.->|"画像继承"| IND2
+    HEALTH --> MC
+```
+
+**链路层次解读**：
+- **用户层 → 应用层**：学生走 Web GUI/API；外部 agent 走 MCP 协议
+- **应用层 → 主 agent**：`meta_router.route()` 集中分发（教学/agent/危机三类）
+- **主 agent → 9 subagent**：PAEG 主循环统一调度，先经 `_affection_gate_check`（危机先行），再注入 Individuality 画像
+- **教学流水线**：Diagnostor → Planner → Presenter → Evaluator → Adapter（带评估反馈+决策回流的双虚线）
+- **subagent → DeepSeek**：全部 subagent 通过 `llm_adapter` 调用 DeepSeek
+- **subagent → 本地资源**：Diagnostor/Planner 读 KB；Presenter 读 Library；AffectionSupportor 读 AffectionSAPAO；Individuality 写 users_data；SelfUpdateAgent 回流 improvements.md
+- **工具/MCP 层**：`tool_registry` 合并内置工具 + skills；`MCPClientManager` 接 filesystem/memory 外部标准 server；`mcp_gateway` 把 PAEG 工具对外暴露给外部 agent
 
 ## 1.6.6 角色设定与预置提示词：如何保证教育价值观与教育能力
 
@@ -424,6 +559,62 @@ LLM 调用（带 tools+tool_choice）→ LLM 决定调哪些工具 → 逐个执
 
 **实现位置**：`mcp_client.py` + `mcp_servers.json`（配置）+ `tool_registry.py`（合并）+ `mcp_gateway.py`（服务端）。
 
+### v0.24 真实连接状态 ⭐
+
+> §1.6.9 原述基于架构设计，v0.24 已将所有 MCP 连接**真实接线 + 验证**（不再是设计图）：
+
+| 项 | v0.24 真实状态 |
+|---|---|
+| MCP Server（对外） | `mcp_gateway :8765` 运行，外部 agent 可连 `http://host:8765/mcp` |
+| MCP Client（对内） | `MCPClientManager` 真实接线 filesystem + memory 两路，**2/2 连接验证通过** |
+| filesystem 工具数 | 14 工具（read/write/list/search 等）|
+| memory 工具数 | 9 工具（store/recall/list 等）|
+| 总 MCP 工具数 | 23 工具 |
+| 与 LLM 工具表合并 | `tool_registry.get_all_tool_defs()` 已合并 + `execute_tool()` 对 `mcp__` 前缀 fallback 到 MCP 客户端 |
+
+### 图五：工具/MCP/资源链路（v0.24 真实连接 ⭐）
+
+```mermaid
+flowchart TB
+    subgraph AG["Agent 侧"]
+        PAEG2["主 Agent / subagent"]
+        FC["Function Calling"]
+    end
+    subgraph TL["工具链"]
+        REG2["tool_registry<br/>7 工具"]
+        SK2["skill_registry<br/>10 技能 L1 目录"]
+    end
+    subgraph MP["MCP 层"]
+        MC2["MCPClientManager<br/>连外部标准 server"]
+        FS["filesystem (14 工具)"]
+        MM["memory (9 工具)"]
+        MG2["mcp_gateway :8765"]
+    end
+    subgraph LR2["本地资源"]
+        KB2["知识库"]
+        LIB2["Library 薇依原著"]
+        USR2["users_data 画像"]
+    end
+    PAEG2 -->|"工具选择"| FC
+    FC --> REG2
+    FC --> SK2
+    REG2 -->|"mcp__ 前缀"| MC2
+    MC2 --> FS
+    MC2 --> MM
+    MG2 -->|"对外暴露"| REG2
+    REG2 --> KB2
+    SK2 --> KB2
+    LIB2 --> KB2
+    USR2 --> PAEG2
+```
+
+**工具调用真实链路**：
+1. **Agent 决策**：subagent 通过 Function Calling schema 决定调用哪个工具
+2. **tool_registry 分发**：`execute_tool(name, args)` → 7 个内置工具 + skills + MCP 工具统一分发
+3. **MCP 客户端接线**：`mcp__` 前缀走 `MCPClientManager` → filesystem/memory 标准 server（npx 启动）
+4. **Skills 加载**：L1 目录 SKILL.md 注入 system prompt；`load_skill__<名称>` 工具按需加载
+5. **本地资源**：知识库 + Library + 画像为 Agent 提供上下文
+
 ## 1.6.10 为什么这套 Agent 架构是革命性的（v0.20 ⭐ 架构定位）
 
 > 多数"AI 教育产品"只是给 LLM 套了个聊天框。PAEG 的架构在**六个维度**上都是架构级创新，
@@ -443,6 +634,66 @@ LLM 调用（带 tools+tool_choice）→ LLM 决定调哪些工具 → 逐个执
 让 Agent 真正**指挥** LLM 完成教学，而非**替代** LLM 回答问题。
 
 **一句话**：如果说通用 AI 教育是"让 LLM 回答问题"，PAEG 是"**让 Agent 用教学法驱动 LLM 完成教育**"——这是从"工具"到"教师"的架构跃迁。
+
+---
+
+## 1.6.11 v0.24 断链修复清单（关键节点 ⭐）
+
+> v0.24 关键节点的核心工作：**把"声明了但没接上"的断链全部修好**——架构文档中声称的能力现在都已真实落地，并通过 20 项连接验证。
+>
+> **核心原则（方法论）**：**"声明 ≠ 实现"**——任何架构文档中声称的能力，必须能用链路图、代码调用、测试用例、连接验证四件证据证明真实存在。本节是这一原则的实战清单。
+
+### 1. 教学闭环修复 ⭐
+
+| # | 断链问题 | 修复内容 | 验证 |
+|---|---|---|---|
+| 1 | Evaluator 只评 AI 输出不评学生状态 | `presentation_quality`（讲解质量）+ `student_state_score`（学生状态）**双维评分** | 测试用例通过 |
+| 2 | Adapter 决策只记录不执行 | `switch_style` → Presenter 换风格重讲；`reinforce` → 强化补例子；`difficulty_delta` 累计到 Diagnostor | 决策→执行回路验证 |
+| 3 | PAEG 主 agent 只持 6 subagent | PAEG 现在**持有全部 9 个 subagent**（Diagnostor/Planner/Presenter/Evaluator/Adapter/AnswerSolver/AffectionSupportor/SelfUpdateAgent/Individuality）| paeg.py 注册数 = 9 |
+| 4 | Individuality 独立于教学流水线 | 17 维画像在教学开始前注入 system prompt（`inject_control`）| 注入前后对比验证 |
+| 5 | AffectionSupportor 危机钩子未先行 | `_affection_gate_check` 危机信号先行 → 危机时转 AffectionSupportor（立德为先）| 危机信号测试用例 |
+
+### 2. 个体化闭环修复 ⭐（因材施教落地）
+
+| # | 断链问题 | 修复内容 | 验证 |
+|---|---|---|---|
+| 6 | 用户画像静态不增量建模 | 对话中抽取 `extract_user_facts` → Individuality 增量更新画像 | "对话1说代数弱 → 对话2画像记薄弱点" 端到端验证 |
+| 7 | 画像不持久化 | `persist()` 落盘 `users_data/profile.json`，下次对话自动加载 | 持久化读写测试 |
+| 8 | student_trait 16 维固定 | 新增 `add_dimension()` 支持动态维度扩展（已加母语维 → 17 维） | 17 维注入验证 |
+| 9 | 画像注入不区分层次 | `inject_control` 控制语言/风格/深度/节奏/情绪五层 | 五层注入分别测试 |
+
+### 3. 工具链修复 ⭐
+
+| # | 断链问题 | 修复内容 | 验证 |
+|---|---|---|---|
+| 10 | 10 个 SKILL.md L1 目录未注入 system prompt | SkillRegistry 启动时加载所有 SKILL.md 的 L1 目录，注入 system prompt | L1 目录内容可见性测试 |
+| 11 | `/api/skills` 返回 mock 数据 | 真实读取 skill_registry，**返回真实 10 技能** | API 端点测试 |
+| 12 | MCPClientManager 未真实接线 | `mcp_servers.json` 真实启动 filesystem + memory，**2/2 连接验证通过** | `/api/health mcp_connected` 字段 |
+| 13 | agent_engine 未接入 | `mode=agent` 路由接入 AgentEngine（Plan→Act→Observe→Reflect）| agent 模式端到端测试 |
+| 14 | teach_stream 未含 SelfEvolution 钩子 | `on_session_end` → `evolve_prompt` 钩子补齐 | 钩子触发链路验证 |
+
+### 4. 路由/自更新修复 ⭐
+
+| # | 断链问题 | 修复内容 | 验证 |
+|---|---|---|---|
+| 15 | 各端点独立做意图分发 | `meta_router.route()` 集中分发（教学/agent/危机/技能/找答案/闲聊）| 端点路由统一性测试 |
+| 16 | SelfUpdateAgent 建议不回流 | 建议按 `target` 分段 + 优先级过滤 + 去重后回灌 `improvements.md` | 建议→文件端到端测试 |
+| 17 | 改进建议未读 | `improvements.md` 加载器接入，下次教学自动注入 | 改进注入测试 |
+| 18 | 技能未真实注册 | 10/10 技能全部 `activate` 成功，tool_defs 暴露 `load_skill__*` | skill_registry 10/10 测试 |
+| 19 | 用户文件 4 能力未接入流式 | `chat_stream` 检测文件操作意图 → 检索 → handler → SSE | 4 能力端到端测试 |
+| 20 | 元能力/技术文档不同步 | 元能力文档 §5.5 + 技术文档 §1.6.11 + 亮点总览 + README + CHANGELOG 同步更新 | 5 份文档一致性核查 |
+
+### 验证证据汇总
+
+- **代码真实连接**：20 项连接逐一通过 arch 检查（每项有对应代码行 + 调用链）
+- **pytest 132 passed**：从 v0.22.2 的 69 → v0.24 的 132（新增 63 个断链修复相关用例）
+- **20 项连接验证**：每项连接都有独立测试用例
+- **可视化证据**：ARCHITECTURE_LINKS.md 5 张 Mermaid 图（GitHub 原生渲染）
+- **本地快照 + GitHub Release `v0.24`**：可回退关键节点
+
+### 关键洞察
+
+> **"声明 ≠ 实现"是架构治理的第一原则**——很多项目的技术文档很漂亮，但实际代码只实现了 30%。PAEG v0.24 的核心动作不是"加新功能"，而是"把已声明的能力真实接线并验证"——这是从"文档驱动"到"代码+验证驱动"的工程化跃迁。
 
 ---
 
