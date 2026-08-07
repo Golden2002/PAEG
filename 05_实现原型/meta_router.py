@@ -38,6 +38,8 @@ COMPILED = [re.compile(p, re.IGNORECASE) for p in META_PATTERNS]
 
 
 # 寒暄/问候（v0.17.2）：用户打招呼时绝不能当学科概念教学
+# v0.27 设计原则 ⭐：正则只做"快准廉"的确定场景（纯寒暄），模糊意图（天气/闲聊/近况）
+# 一律交给 LLM 综合判断（_llm_route_intent）——遵循"LLM 优先、规则兜底"。
 GREETING_PATTERNS = [
     r"^(你好|您好|你们好|大家好|嗨|哈喽|hello|hi|hey|hi~|在吗|在么|早上好|下午好|晚上好|早安|午安|晚安|你好呀|你好啊|您好呀)[!！。~～]*$",
     r"^(hello|hi|hey)[!！。~～\s]*$",
@@ -323,7 +325,10 @@ def _llm_route_intent(text: str, llm) -> Optional[str]:
             "6. problem：给一道题求解决（'解这个方程'）\n"
             "7. meta：问你是谁/怎么用（'你是什么''你叫什么'）\n"
             "8. greeting：打招呼（'你好''hi'）\n"
-            "9. non_teaching：其他/闲聊\n"
+            "9. non_teaching：其他/闲聊/日常话题（'今天天气怎么样''最近好吗''随便聊聊''现在几点''你吃饭了吗'）\n"
+            "判断规则：\n"
+            "- **无关话题/闲聊/寒暄性提问必须归 non_teaching**，绝不能因含名词（如'天气'）就当 teach——那是答非所问\n"
+            "- 只有学生明确表达'想学/讲讲/什么是'某学科概念时才算 teach\n"
             "只输出一个词：teach/answer/affection/knowledge/method/problem/meta/greeting/non_teaching。不要多余文字。"
         )
         r = _safe_chat(llm, _sys, str(text)[:200], max_tokens=20)
