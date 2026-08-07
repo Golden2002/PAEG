@@ -19,7 +19,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, List
+from functools import wraps
+from typing import Any, Callable, Dict, List
 
 # 模块清单（id → 元信息）
 MODULE_CATALOG: Dict[str, Dict[str, Any]] = {
@@ -74,6 +75,38 @@ def module_status() -> Dict[str, Dict[str, Any]]:
         mid: {"enabled": is_enabled(mid), "desc": info["desc"]}
         for mid, info in MODULE_CATALOG.items()
     }
+
+
+def require_module(module_id: str) -> Callable:
+    """路由门控装饰器：当模块被禁用时返回 HTTP 403 + JSON 错误。
+
+    用法：
+        @app.route("/api/chat", methods=["POST"])
+        @require_module("chat")
+        def general_chat():
+            ...
+
+    行为：
+        - 模块启用 → 原样调用被装饰函数（行为零变化）
+        - 模块禁用 → 立刻返回 (jsonify({...}), 403)；不进入业务逻辑
+        - 异常容错：is_enabled 内部读取配置文件失败时按"启用"处理（与原 _load_config 一致）
+
+    v0.27 ⭐ P0-1 模块化门控：让 paeg_modules.json 真正控制路由可达性。
+    """
+    def deco(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not is_enabled(module_id):
+                # 延迟导入：避免 module_registry 自身导入时硬依赖 flask
+                from flask import jsonify
+                return jsonify({
+                    "error": "该功能已下线",
+                    "module": module_id,
+                    "hint": "请联系管理员在 paeg_modules.json 中启用",
+                }), 403
+            return fn(*args, **kwargs)
+        return wrapper
+    return deco
 
 
 if __name__ == "__main__":
