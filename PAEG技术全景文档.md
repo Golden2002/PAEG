@@ -774,6 +774,23 @@ flowchart LR
 
 **压力测试**：120+ 提示词 × 10 套件 → **94/96（98%）**。
 
+
+### v0.26 连接完整性审计（第四轮 ⭐ 用户画像/资产/学科接口全链路）
+
+审计结论：核心链路全部联通 + 修复 2 处断链 + 补全学科接口。
+
+**修复的断链（P0）**：
+1. **teach_stream Adapter 决策未注入**：评估不达标时 adapter.run 只发 SSE 事件，switch_style/reinforce 决策不生效（GUI 主路径决策链断裂）→ 已补 set_pending_overrides 注入（server.py:1306-1328），与 paeg.teach 对齐
+2. **/api/chat 非流式缺用户资料注入**：chat_stream 有 get_user_library，chat 无 → 已补（server.py:2415-2421）
+
+**学科接口预留（⭐ 每学科二级学科增强能力接口）**：
+- 32/32 学科全部配置 subfield_guide（学科级教学法导航：层级组织/学段递进/误区防御），7 个含 code_ability（CS/AI 代码教学）
+- build_presenter_system 统一消费（prompts.py:872/874），全部注入成功
+- SUBFIELD_TREE 二级学科（普通物理/数学物理方法/四大力学等）通过 subtopic 通路注入 Presenter
+- 缺口记录：二级学科暂为学科级 subfield_guide + tip，无独立二级学科级提示词（P2 扩展点）
+
+**已验证联通（✓）**：subfield_guide/code_ability 注入、subtopic 通路、用户资料→Presenter（teach/teach_stream/chat_stream）、kb_node→Presenter、skill/MCP→LLM、非流式 paeg.teach 决策闭环（含 Verify Gate 重讲）
+
 ## 1.14.2 效能改进建议（P0 已落地 / P1 待做）
 
 | 建议 | 来源 | 状态 |
@@ -786,6 +803,36 @@ flowchart LR
 | 工具市场目录注册 | AutoGPT | P1（skills/ 已目录驱动，工具待目录化） |
 | hooks 注入反思/审计 | Claude Code | P1 |
 | Guardrail 输入/输出双保险 | OpenAI Agents | P1 |
+
+
+## 1.15 v0.27 增强（LLM 意图/检索引导/资料检索/PPT）
+
+### 1.15.1 需求A：教学模式一次识别（LLM 优先 + 关键词兜底）
+- `_detect_teaching_mode` 入口一次识别（用户原句），存 learner._teaching_mode 全程注入
+- LLM 优先语义判断（easy/normal/deep），失败回退 `_detect_teaching_mode_regex`（deep>easy 优先级）
+- 实测：简单讲讲→easy（system 含"简单理解+用大白话"）、深入讲讲→deep（"深度教学+推导思路"）
+
+### 1.15.2 需求B：检索引导（LLM 选库→关键词→tool→回答）
+- `_llm_choose_retrieval_scope`：LLM 判断检索范围（public/subject/user/web）+ 关键词（JSON 输出）
+- 集成 `_pre_retrieve`：按 scope 过滤 Library 目录，关键词用 LLM 规划的
+- 兜底规则：用户资料提问→user 库、最新新闻→web
+- 实测：用户资料提问 scopes[0]=user、普通提问=subject、LLM JSON 解析正常
+
+### 1.15.3 需求C：ResourceLibrarian 资料检索 subagent
+- 新 subagent 聚合 知识库+Library+用户资料+互联网 → {sources:[{title,url,snippet,type}]}
+- `POST /api/resources` 端点（@require_module knowledge）
+- 前端：查资料按钮 + 检索进度条 + 资料卡片（类型徽章/链接/PPT引导）+ XSS 防御（14/14）
+
+### 1.15.4 需求D：PPT MCP 物料提取 + 欢迎语
+- `generate_ppt(..., uid)`：从 Library/usr_knowledge/<uid>/ 提取 md/pdf/docx 文字补充内容
+- 路径穿越防御（realpath 校验）+ 向后兼容
+- 欢迎语提示"查资料/做 PPT"
+
+### 1.15.5 Oracle 架构审查修复（P0）
+- teach_stream 补 _affection_gate_check 危机短路（此前绕过 SafetyChecker）
+- server.py:866 _gsys 未定义 → composite 分支死代码修复
+- paeg.py affection_supportor history=[] → 传最近对话
+- build_general_chat_system 补 subjects_mastery 注入
 
 ## 1.8.1 数据源：prompts.py 两个核心字典
 
@@ -2779,6 +2826,26 @@ readers.py（多格式全文提取 md/txt/pdf/docx/csv/json）
 - **工具分层**（Anthropic ACI）：Presenter/AnswerSolver 暴露专用工具，高风险动作走确定性规则
 
 **架构匹配度**：技术文档 §1.6 声称能力现已 95%+ 真实落地（仅剩 P2 细节如向量检索待后续）。
+
+
+### 10.2.7 v0.26 完整测试体系（⭐ 六层金字塔）
+
+| 层 | 脚本 | 覆盖 | v0.26 实测 |
+|---|---|---|---|
+| ① 单元/集成 | pytest 132 用例（16 文件） | 9 subagent/路由/安全/工具链 | 全绿（多次回归） |
+| ② 架构连通 | arch_check.py（16 模块） | 模块存在+被调用 | 100% |
+| ③ API 全接口 | api_sweep.py（36 端点） | teach/chat/answer 等 | 2xx |
+| ④ 多轮质量 | multi_turn_eval.py（5 维） | decay/decision/style/harness/tool | 达标 |
+| ⑤ LLM 对抗 | eval_harness + chaos（5 维）+ stress_turn（4 套件） | LLM 质量+语义压力 | chaos 通过 |
+| ⑥ 压力+浏览器 | stress_eval_v26（120+ 提示词）+ Playwright | 全链路+真实浏览器 | **94/96（98%）**+ Playwright 通过 |
+
+**v0.26 新增测试资产**：
+- `stress_eval_v26.py`：120+ 提示词 × 10 套件（教学/答案/聊天/情绪/侵入/知识库/教学模式/边界/多轮/新学科）→ 94/96（98%）
+- 学科审计验证：17 条不一致修复后 132 pytest 保持 + subject-tree 端到端验证
+- 模块门控测试：chat=false → 403 实测（5 项验证：隔离性/可逆性）
+- Playwright 前端测试：三级级联下拉/通识素养过滤/拆键/头像渲染——全部通过
+
+**回归确认流程（v0.26 全程执行）**：专项测试 → pytest 全量（132 passed 保持）→ arch_check 100% → 端到端实测 → 压力测试（重大改动）→ Playwright（前端改动）
 
 ## 10.3 版本历史
 
