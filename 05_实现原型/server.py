@@ -1209,9 +1209,9 @@ def upload_file():
     learner_id = request.form.get("learner_id", "anonymous")
     f = request.files.get("file")
     purpose = request.form.get("purpose", "chat")
-    # v0.19.x：资料库根目录选择；默认 "user"（Library/user_<id>/），
-    # 设为 "usr_knowledge" 则保存到 Library/usr_knowledge/<id>/
-    library_root = request.form.get("library_root", "user")
+    # v0.21.4：资料库根目录选择；默认 "usr_knowledge"（规范路径 Library/usr_knowledge/<id>/），
+    # 旧值 "user" 仍兼容（内部统一存到规范路径，读取时双读旧路径保持向后兼容）
+    library_root = request.form.get("library_root", "usr_knowledge")
 
     # v0.19.11：资料上传 → Library/用户id/
     if purpose == "library":
@@ -1223,15 +1223,12 @@ def upload_file():
         if ext not in allowed:
             return jsonify({"error": f"不支持的格式 {ext}"}), 400
         try:
-            # 根据 library_root 选择目录：usr_knowledge 或 user（默认，向后兼容）
-            if library_root == "usr_knowledge":
-                sub_dir = "usr_knowledge"
-                note_text = "资料已存入 usr_knowledge，回答时会自动参考"
-            else:
-                sub_dir = f"user_{learner_id}"
-                note_text = "资料已存入你的专属资料库，回答时会自动参考"
-            lib_root = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
-                                     '..', 'Library', sub_dir, learner_id)
+            # v0.21.4：统一通过 lib.library_store 决定保存目录（规范路径）
+            from lib import library_store
+            lib_root_path = library_store.upload_save_dir(learner_id, library_root)
+            lib_root = str(lib_root_path)
+            sub_dir = library_store.CANONICAL_DIRNAME  # 始终是 "usr_knowledge"
+            note_text = "资料已存入 usr_knowledge，回答时会自动参考"
             _os.makedirs(lib_root, exist_ok=True)
             from datetime import datetime
             safe_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{_os.path.basename(f.filename)}"
@@ -1239,7 +1236,7 @@ def upload_file():
             return jsonify({
                 "ok": True, "filename": safe_name,
                 "url": f"/Library/{sub_dir}/{learner_id}/{safe_name}",
-                "library_root": library_root if library_root == "usr_knowledge" else "user",
+                "library_root": "usr_knowledge",
                 "library_path": f"Library/{sub_dir}/{learner_id}/{safe_name}",
                 "note": note_text,
             })
@@ -1279,45 +1276,34 @@ def uploaded_file(filename):
 
 
 def get_user_library(learner_id: str) -> str:
-    """v0.19.11：读取用户专属资料库内容（供 Agent 注入回答上下文）。
+    """v0.21.4：读取用户专属资料库内容（供 Agent 注入回答上下文）。
 
-    路径：Library/user_<learner_id>/
+    路径：Library/usr_knowledge/<learner_id>/（规范）
+         同时向兼容扫 Library/user_<learner_id>/ 及嵌套子目录
     返回：可注入 system 的资料摘要文本；无资料返回 ""。
     """
-    import os as _os
-    lib_root = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
-                             '..', 'Library', f'user_{learner_id}')
-    if not _os.path.isdir(lib_root):
+    try:
+        from lib import library_store
+        return library_store.read_user_corpus(learner_id, max_files=5, per_file=500)
+    except Exception:
         return ""
-    files = [f for f in _os.listdir(lib_root) if not f.startswith('.')]
-    if not files:
-        return ""
-    parts = [f"【用户上传的资料（{len(files)} 份，回答相关问题时请参考）】"]
-    for fn in files[:20]:
-        parts.append(f"- {fn}")
-    # 尝试读 md/txt 内容摘要（前 500 字）
-    for fn in files[:3]:
-        if fn.endswith(('.md', '.txt')):
-            try:
-                with open(_os.path.join(lib_root, fn), encoding='utf-8') as f:
-                    content = f.read(500)
-                if content.strip():
-                    parts.append(f"\n资料《{fn}》内容节选：{content.strip()[:400]}")
-            except Exception:
-                pass
-    return "\n".join(parts)
 
 
 @app.route("/api/user-library/<learner_id>", methods=["GET"])
 def user_library_info(learner_id):
-    """列出用户上传的资料。"""
-    import os as _os
-    lib_root = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
-                             '..', 'Library', f'user_{learner_id}')
-    if not _os.path.isdir(lib_root):
-        return jsonify({"files": [], "total": 0})
-    files = [f for f in _os.listdir(lib_root) if not f.startswith('.')]
-    return jsonify({"files": files, "total": len(files)})
+    """列出用户上传的资料（v0.21.4：含规范 + 兼容旧路径的完整文件信息）。"""
+    try:
+        from lib import library_store
+        items = library_store.list_user_file_info(learner_id)
+    except Exception as e:
+        return jsonify({"files": [], "total": 0, "error": str(e)})
+    return jsonify({
+        "files": [it["name"] for it in items],          # 向后兼容：纯名字列表
+        "items": items,                                  # 新增：完整信息
+        "total": len(items),
+        "canonical_root": str(library_store.resolve_library_root(learner_id)).replace("\\", "/"),
+        "legacy_paths": [str(p).replace("\\", "/") for p in library_store.legacy_paths(learner_id)],
+    })
 
 
 @app.route("/api/knowledge/library", methods=["GET"])
@@ -1517,6 +1503,51 @@ def general_chat_stream():
                 + _facts_str)
     except Exception:
         pass
+
+    # v0.22.0：基于用户上传文件的 4 能力（找答案/讲解/输出原文/重组结构）
+    # 触发：用户输入含"我的资料/上传的文件/讲义/笔记/文件里/原文"等文件操作信号
+    # 流程：意图路由 → BM25 检索用户文件 → 对应 handler → SSE 返回
+    try:
+        from lib.ingest.intent_router import is_file_operation, route_intent, extract_filename
+        if is_file_operation(text):
+            from lib.ingest.readers import read_corpus_full
+            from lib.ingest.chunker import chunk_documents
+            from lib.ingest.retriever import make_retriever
+            from lib.ingest import handlers as _fh
+            _docs = read_corpus_full(learner_id)
+            if _docs:
+                _chunks = chunk_documents(_docs, max_chars=400, overlap=50)
+                _retriever, _mode = make_retriever(_chunks)
+                _intent = route_intent(text)
+                _fname = extract_filename(text)
+                # 指定文件名则只检索该文件
+                _candidates = [c for c in _chunks if (not _fname) or (_fname.lower() in c.get("doc_name", "").lower())] \
+                    if _fname else _chunks
+                _hits = _retriever.search(text, top_k=4) if _candidates else []
+                # 组装 handler 需要的 chunks（含 doc_name 等元数据）
+                _hit_chunks = []
+                _hit_keys = set()
+                for h in _hits:
+                    _key = (h.get("doc_name"), h.get("chunk_index"))
+                    if _key not in _hit_keys:
+                        _hit_keys.add(_key)
+                        _hit_chunks.append(h)
+                if not _hit_chunks and _candidates:
+                    # 检索无命中 → 用候选块前 2 个兜底
+                    _hit_chunks = _candidates[:2]
+                _handler = {
+                    "file_qa": _fh.file_qa, "file_explain": _fh.file_explain,
+                    "file_quote": _fh.file_quote, "file_restructure": _fh.file_restructure,
+                }.get(_intent.value, _fh.file_qa)
+                _reply = _handler.handle(learner_id, text, _hit_chunks, llm)
+
+                def gen_file_op():
+                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _reply, 'step_type': 'file_' + _intent.value}, ensure_ascii=False)}\n\n"
+                    yield f"event: done\ndata: {json.dumps({'status': 'completed', 'file_op': _intent.value, 'retriever': _mode}, ensure_ascii=False)}\n\n"
+                return Response(gen_file_op(), mimetype="text/event-stream",
+                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception as _fe:
+        print(f"[PAEG] 文件操作处理失败（降级普通对话）: {_fe}")
 
     # 三层记忆
     mem_ctx = ""
