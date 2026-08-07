@@ -24,6 +24,7 @@ import threading
 import time
 import os
 import json
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -229,6 +230,8 @@ class PeriodicSelfUpdater:
                 _p0p1_lines = []      # 高优先级段（写入 improvements.md）
                 _all_summary = []     # 全量摘要段（给运维参考）
                 _new_processed = []
+                _exec_subjects = []   # v0.25：待落地的"新增学科"建议
+                _exec_library = []    # v0.25：待落地的"Library 扩充"建议
                 # 按时间段顺序消费（最新在尾部）
                 for _l in _lines:
                     try:
@@ -267,6 +270,13 @@ class PeriodicSelfUpdater:
                             # 高优 → 写 improvements.md 对应段
                             _p0p1_lines.append((_section, _line))
                             _consumed += 1
+                        # v0.25：可执行建议收集（subject_addition / library_update 落地）
+                        if _cat == "subject_addition":
+                            _exec_subjects.append({
+                                "target": _tar, "change": _chg, "evidence": _evi, "priority": _pri})
+                        elif _cat == "library_update":
+                            _exec_library.append({
+                                "target": _tar, "change": _chg, "evidence": _evi, "priority": _pri})
                 if _p0p1_lines or _all_summary:
                     with open(_imp_path, 'a', encoding='utf-8') as _f:
                         _today = datetime.now().strftime('%Y-%m-%d')
@@ -290,6 +300,71 @@ class PeriodicSelfUpdater:
                     results["su_total_processed"] = len(_new_processed)
                     self._log(f"[PAEG][periodic] SelfUpdateAgent 高优 {_consumed} 条已写入"
                               f" improvements.md（共处理 {len(_new_processed)} 条）")
+
+                # ─── v0.25：可执行建议落地执行器 ⭐ ───
+                # 1) subject_addition → 生成学科注册 JSON 到 Library/KnowledgeBase/subjects/
+                #    （library_loader 重启自动注册 → 学科真正入库）
+                if _exec_subjects:
+                    _subj_dir = os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        'Library', 'KnowledgeBase', 'subjects')
+                    try:
+                        os.makedirs(_subj_dir, exist_ok=True)
+                    except Exception:
+                        _subj_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                 'data', 'pending_subjects')
+                        os.makedirs(_subj_dir, exist_ok=True)
+                    _executed_subs = 0
+                    for _es in _exec_subjects[:5]:  # 最多落地 5 条
+                        _target = str(_es.get("target", "")).strip() or "new_subject"
+                        # target 形如 "linguistics" / "新增学科 linguistics" / "心理学"
+                        _name = re.sub(r'[^\w\u4e00-\u9fff]+', '', _target.split()[-1] if _target.split() else _target)[:30]
+                        _fname = f"pending_subject_{datetime.now().strftime('%Y%m%d%H%M%S')}_{_hl.md5(_target.encode('utf-8')).hexdigest()[:6]}.json"
+                        _node = {
+                            "pending_subject": _target,
+                            "change": str(_es.get("change", ""))[:500],
+                            "evidence": str(_es.get("evidence", ""))[:300],
+                            "priority": str(_es.get("priority", "P2")),
+                            "timestamp": datetime.now().isoformat(),
+                            "note": "SelfUpdateAgent 建议的新学科（需人工确认后转为正式 SUBJECT_STYLES 条目）",
+                        }
+                        try:
+                            with open(os.path.join(_subj_dir, _fname), 'w', encoding='utf-8') as _f:
+                                json.dump(_node, _f, ensure_ascii=False, indent=2)
+                            _executed_subs += 1
+                        except Exception:
+                            continue
+                    if _executed_subs:
+                        results["su_subjects_staged"] = _executed_subs
+                        self._log(f"[PAEG][periodic] 新增学科建议 {_executed_subs} 条已写入"
+                                  f" {os.path.relpath(_subj_dir)}（待确认入库）")
+
+                # 2) library_update → 记录到 data/pending_library.json（待人工/后续补充）
+                if _exec_library:
+                    _pend_lib = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                             'data', 'pending_library.json')
+                    _lib_records = []
+                    if os.path.isfile(_pend_lib):
+                        try:
+                            _lib_records = json.load(open(_pend_lib, encoding='utf-8'))
+                        except Exception:
+                            _lib_records = []
+                    for _el in _exec_library[:5]:
+                        _lib_records.append({
+                            "target": str(_el.get("target", ""))[:120],
+                            "change": str(_el.get("change", ""))[:300],
+                            "evidence": str(_el.get("evidence", ""))[:200],
+                            "timestamp": datetime.now().isoformat(),
+                        })
+                    try:
+                        os.makedirs(os.path.dirname(_pend_lib), exist_ok=True)
+                        with open(_pend_lib, 'w', encoding='utf-8') as _f:
+                            json.dump(_lib_records[-50:], _f, ensure_ascii=False, indent=2)
+                        results["su_library_staged"] = len(_exec_library)
+                        self._log(f"[PAEG][periodic] Library 扩充建议 {len(_exec_library)} 条"
+                                  f" 已记录 data/pending_library.json")
+                    except Exception:
+                        pass
         except Exception as e:
             self._log(f"[PAEG][periodic] 建议回流失败: {e}")
 
