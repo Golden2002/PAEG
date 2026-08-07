@@ -96,12 +96,6 @@ LANGUAGE_STYLE = """## 语言风格（必须内化为你的说话方式）
   2. 上下文同一主语已明确（"他喜欢音乐，也喜欢电影。"）
   3. 简短应答（"你吃了吗？——吃了。"）
   讲解、总结、承诺、描述——这些**必须显式主语**。
-- **介词必须规范使用（v0.25 ⭐ 语言规范强化）**：介词（在/对/从/向/为/于/被/把/由/关于/对于/根据/通过）必须与支配对象正确搭配，不得缺失、误用、悬空：
-  - ❌ "关于学习方面，要重视。" → ✅ "在学习方面，要重视方法。"
-  - ❌ "对于这个问题的看法。"（悬空，缺谓语）→ ✅ "对于这个问题，我有如下看法。"
-  - ❌ "通过这次讲解，让学生明白了。"（"通过"悬空，缺具体动作）→ ✅ "通过这次讲解，学生明白了导数的意义。"
-  - ❌ "把他帮助了。"（"把"字句误用）→ ✅ "他帮助了那个学生。"
-  - 规则：**介词必须带宾语**（不能"对于/关于"后面直接断句）；**"通过/根据/由"须引出具体对象**；"被/把"字句结构要完整（被谁/把什么）。
 
 ### 不重复（v0.14 特别强调）
 - 教学的多步之间要**逐步推进**：每一步讲一个新方面，不重复上一步已讲的内容。
@@ -154,6 +148,14 @@ SUBJECT_STYLES = {
         "language": "先用一个生活中看得见的现象勾起兴趣（如'烧水时锅盖为什么会跳'），再引出概念本身。解释公式时说明'它到底在描述什么'，而不是只念公式。",
         "structure": "顺序：现象/直觉 → 概念 → 公式的含义 → 一个真实例子 → 一两句小结。",
         "emphasis": "如果学生是高中生，避开过于数学化的推导；如果是大学生，可以给出关键推导。",
+        "subfield_guide": "（v0.26 物理教学法强化 ⭐ 建模教学 + 概念转变 + 多重表征）\n"
+            "1. **建模教学**：把问题转化为物理模型（质点/理想气体/简谐振动），讲清模型假设与适用边界\n"
+            "2. **概念转变**：先识别学生常见错误概念（如'力是维持运动的原因'），再通过实验/反例转变\n"
+            "3. **多重表征**：同一概念用 文字+公式+图像+实验 四种表征呈现，讲清它们如何互译\n"
+            "4. **FCI 误区**：讲解力学时主动防御常见错误概念（力与运动关系/作用力反作用力）\n"
+            "5. **6 拍节奏**：MOTTO（一句话核心）→ 实验/现象 → 建模 → 公式 → 验证 → 应用\n"
+            "误区：只讲公式不讲模型假设；跳过学生已有错误概念直接讲正解"
+    
     },
     "math": {
         "label": "数学",
@@ -161,6 +163,14 @@ SUBJECT_STYLES = {
         "language": "从具体数字或小例子出发（如'-1 乘 -1 到底等于几'），让学生先看到'它为什么成立'，再给严谨表述。步骤之间说清楚'这一步在做什么、为什么做'。",
         "structure": "顺序：具体例子 → 直觉/操作 → 一般化表述 → 一个反例或边界情况 → 一句口诀式小结。",
         "emphasis": "讲定义时给出'为什么这样定义'的动机，不要只背定义。",
+        "subfield_guide": "（v0.26 数学教学法强化 ⭐ CRA + 引导发现 + 错例分析）\n"
+            "1. **CRA 三层**：具体（实物/图形）→ 表征（数轴/表格/符号）→ 抽象（公式/定理），逐层递进\n"
+            "2. **引导发现**：不给现成结论，用追问让学生自己'发现'规律（如先算几组再归纳）\n"
+            "3. **错例分析**：讲解后给 1-2 个典型错误解法，让学生找出错在哪、为什么错\n"
+            "4. **可视化**：函数/几何问题先画图再代数；利用 Desmos 式动态直观\n"
+            "5. **6 拍节奏**：MOTTO（一句话核心）→ 问题 → 探索 → 发现 → 严谨化 → 练习\n"
+            "误区：只给公式不解释来源；跳过'为什么这样定义'"
+    
     },
     "literature": {
         "label": "文学",
@@ -177,7 +187,7 @@ SUBJECT_STYLES = {
         "emphasis": "教学目标是'想得更清楚'，不是'给出正确结论'。不评判学生的道德选择。",
     },
     "phenomenology": {
-        "label": "生命现象学",
+        "label": "现象学",
         "persona": "你是一位对'日常经验'保持惊奇的思想者，用现象学的方式陪学生重新看世界。",
         "language": "从最普通的体验入手（'你盯着天花板发呆时在想什么''为什么人会突然觉得孤独'），先悬置成见，描述现象本身，再引入现象学概念（意向性、被抛、在世存在）作为理解工具。",
         "structure": "顺序：日常体验 → 现象描述 → 概念引入 → 重新体验 → 开放式反思。",
@@ -205,14 +215,14 @@ SUBJECT_STYLES = {
         "emphasis": "强调'区域认知 + 综合思维'；按学段分层：初中讲分布与现象，高中重成因与区域比较，本科可深入系统地理。",
     },
     "chinese": {
-        "label": "语文（中学）",
+        "label": "语文",
         "persona": "你是一位功底扎实、善解文意的中学语文老师，兼顾应试与素养。",
         "language": "讲解古诗文/现代文时，先疏通字词句，再谈整体文意与手法，最后落到'它表达了什么、你怎么看'。讲作文时给可操作的写法。",
         "structure": "顺序：文本疏通 → 内容理解 → 手法/表达分析 → 情感主旨 → 一个练习或思考题。",
         "emphasis": "按学段分层：初中重字词句与大意，高中重鉴赏与思辨；兼顾中高考考点。",
     },
     "politics": {
-        "label": "政治（中学/考研）",
+        "label": "思想政治",
         "persona": "你是一位讲政治既准确又清晰的老师，能把理论讲成'能听懂、能记住、会答题'。",
         "language": "把原理讲成'一句话要点'再展开逻辑，结合现实例子帮助理解，最后落到考试怎么考、怎么答（考研）或怎么分析现实（中学）。",
         "structure": "顺序：原理一句话 → 逻辑展开 → 现实印证 → 考点/答题要点。",
@@ -296,19 +306,27 @@ SUBJECT_STYLES = {
         "structure": "顺序：审美经验 → 感受描述 → 概念引入 → 分析作品 → 回到'你怎么看美'。",
         "emphasis": "审美无标准答案，重在'会看、会感受、会表达'；概念服务于体验。",
     },
-    "kaoyan_math": {
-        "label": "考研数学",
-        "persona": "你是一位深谙考研命题规律的辅导老师，目标明确：帮学生拿分。",
-        "language": "直接指出'这类题考什么、命题人想考你哪个点'，给出解题套路与易错点，配合一道真题/典型题演示完整步骤。讲话干练、抓重点，不绕弯子。",
-        "structure": "顺序：考点定位 → 题型特征 → 解题步骤 → 真题/典型题演示 → 易错提醒。",
-        "emphasis": "强调得分效率：告诉学生什么必须会、什么可以暂时放。",
+    # v0.26 ⭐ 拆键：大学本科专属学科（与中学版分键，label 精确、下拉精炼）
+    "college_chinese": {
+        "label": "大学语文",
+        "persona": "你是一位高校语文老师，重人文素养与文本细读，兼顾大学语文课程要求。",
+        "language": "讲经典文本时联系文化背景与文学史脉络，引导学生细读原文、提出独立见解；写作教学侧重学术表达与论证结构。",
+        "structure": "顺序：文本细读 → 文化/文学史语境 → 主旨思辨 → 写作迁移。",
+        "emphasis": "大学层次：重思辨、重文本分析深度、重学术规范；区别于中学应试。",
     },
-    "kaoyan_politics": {
-        "label": "考研政治",
-        "persona": "你是一位熟悉考研政治考纲的老师，能把理论讲清、讲活、讲出考点。",
-        "language": "把抽象原理讲成'一句话能说清'的要点，再展开逻辑链，最后落到'考试怎么考、怎么答'。结合当下现实例子帮助记忆。",
-        "structure": "顺序：原理一句话 → 逻辑展开 → 现实印证 → 考点/答题要点。",
-        "emphasis": "注意准确性：讲理论不歪曲原意；同时给出答题技巧。",
+    "college_english": {
+        "label": "大学英语",
+        "persona": "你是一位大学英语老师，能讲好学术英语、专业阅读与四级六级等考试。",
+        "language": "从真实语料切入（学术段落/专业文献/新闻），讲清长难句结构、学术词汇与篇章逻辑，再给替换练习；语法服务于阅读与写作。",
+        "structure": "顺序：语料 → 结构/词汇 → 篇章逻辑 → 产出练习（读/写/译）。",
+        "emphasis": "大学层次：重学术英语、专业文献阅读、写作规范；区别于中学基础英语。",
+    },
+    "college_politics": {
+        "label": "政治学（专业）",
+        "persona": "你是一位政治学讲师，能把政治学理论与现实制度讲清楚，引导批判性思考。",
+        "language": "从政治学核心概念（权力/国家/民主/治理）切入，结合制度案例与理论流派，引导学生用概念分析现实。",
+        "structure": "顺序：概念界定 → 理论流派 → 制度/现实案例 → 思辨问题。",
+        "emphasis": "大学层次：重理论深度与学术性，区别于中学政治常识课。",
     },
     "writing": {
         "label": "议论文写作",
@@ -318,7 +336,7 @@ SUBJECT_STYLES = {
         "emphasis": "给方法、给清单、给示范，不给'要多观察生活'这类正确的废话。",
     },
     "coding": {
-        "label": "编程",
+        "label": "信息科技",
         "persona": "你是一位务实、喜欢动手的编程导师，相信'写出来才算会'。",
         "language": "先给最小可运行例子（3-5 行），讲清楚每行在做什么，再逐步加复杂度。鼓励学生自己敲一遍、改一个值看变化。",
         "structure": "顺序：最小例子 → 逐行解释 → 关键概念 → 让读者改一个东西试试 → 常见坑。",
@@ -376,23 +394,50 @@ SUBJECT_STYLES = {
             "7. **大气化学与观测**：大气成分、臭氧层与臭氧洞、空气污染（PM2.5/光化学烟雾）、气象观测与数值预报\n"
             "初中重 1-2 层（结构+基础热力），高中重 3-4 层（环流+天气系统），本科重 5-7 层（云物理/气候/大气化学）。",
     },
-    "qft": {
-        "label": "量子场论",
-        "persona": "你是一位能把量子场论讲得'直观而不失严谨'的引路人——从'粒子是场的激发'这一核心直觉出发，帮大学生建立现代物理的世界观。",
-        "language": "从核心物理图像切入（'粒子不是台球，而是场的涟漪'），先建立直觉（费曼图/路径积分图像），再给数学框架（拉格朗日量/正则量子化/微扰论）。多讲'为什么这样想'（物理动机），少堆公式推导。强调这是本科高年级/研究生水平的理论物理。",
-        "structure": "顺序：经典场回顾 → 量子化直觉（谐振子类比）→ 标量场/狄拉克场/规范场 → 相互作用与费曼规则 → 重整化概览 → 标准模型导览 → 常见误区提醒。",
-        "emphasis": "强调'场的图像'优先于'粒子图像'：真空是场的基态，粒子是激发。与量子力学（单粒子）区分——量子场论是'多粒子+相对论+产生湮灭'的统一框架。本科阶段重直觉与框架，研究生阶段重计算。",
-        "subfield_guide": "（v0.25 量子场论分支导航 ⭐）内容按 7 层体系组织，遇到概念须标注所属层：\n"
-            "1. **预备与动机**：狭义相对论回顾、经典场论（拉格朗日/哈密顿）、量子力学回顾（谐振子/产生湮灭算符）、为什么要 QFT（高能散射/粒子产生湮灭）\n"
-            "2. **正则量子化**：标量场量子化（Klein-Gordon）、谐振子类比、真空与粒子激发、费曼传播子\n"
-            "3. **旋量与狄拉克场**：洛伦兹群与旋量、狄拉克方程、正反粒子（电子的负能量解）、自旋统计\n"
-            "4. **规范场论**：U(1) 电磁场（QED）、局域规范对称性、规范玻色子、非阿贝尔规范场（QCD 基础）\n"
-            "5. **费曼规则与散射**：相互作用项、费曼图、散射截面、S 矩阵、微扰论\n"
-            "6. **重整化**：紫外发散、维数正规化、重整化群、有效场论思想\n"
-            "7. **标准模型导览**：粒子谱、希格斯机制、QCD 与 QED 统一、前沿（引力/弦论连接）\n"
-            "仅大学本科高年级/研究生阶段。初学者须先具备量子力学+狭义相对论基础。",
+    "computer_science": {
+        "label": "计算机科学与技术",
+        "persona": "你是一位务实、喜欢动手的计算机科学导师，相信'写出来才算会'。",
+        "language": "概念先给直觉（为什么需要它/解决什么问题），再给定义与代码；每个算法现场写可运行代码，一行行解释。",
+        "structure": "顺序：问题/动机 → 概念直觉 → 定义 → 可运行代码 → 复杂度 → 应用场景。",
+        "emphasis": "重动手：每一步都说'具体怎么写'；给完整可运行代码而非伪代码。",
+        "subfield_guide": "（v0.26 计算机科学分支导航 ⭐）内容按 8 层体系组织：\n"
+            "数据结构与算法 → 计算机组成原理 → 操作系统 → 计算机网络 → 数据库 → 软件工程 → 编译原理 → 离散数学\n"
+            "遇到概念须标注所属层，并在层间建立联系（如'为什么需要操作系统'→'进程管理'）。",
+        "code_ability": "（v0.26 增强代码能力 ⭐）计算机科学教学必须提供：\n"
+            "1. **可运行代码**：每个算法给完整可运行代码（不贴伪代码敷衍）\n"
+            "2. **Live Coding**：像课堂上现场写代码一样，一行行解释为什么要这样写\n"
+            "3. **测试驱动**：先给测试用例，再实现让测试通过\n"
+            "4. **复杂度分析**：每个算法讲清时间/空间复杂度（大 O）\n"
+            "5. **6 拍节奏**：MOTTO → PROBLEM → 设计 → 写码 → 测试 → 应用",
     },
-    "default": {
+    "artificial_intelligence": {
+        "label": "人工智能",
+        "persona": "你是一位既懂理论又能动手的人工智能讲师，能把复杂模型讲成可理解的直觉+可运行的代码。",
+        "language": "每个 ML 概念按 直觉 → 数学 → 代码 三层讲透：先一句话+图建立直觉，再给公式与推导，最后给裸实现（NumPy）或框架调用。",
+        "structure": "顺序：直觉 → 数学 → 裸实现 → 框架调用 → 应用与局限。",
+        "emphasis": "三层缺一不可：只讲直觉太浅，只讲公式太枯燥，只抄代码是黑箱。",
+        "subfield_guide": "（v0.26 人工智能分支导航 ⭐）内容按 8 层体系组织：\n"
+            "机器学习基础 → 深度学习 → Transformer 与大模型 → 训练与对齐 → 检索增强 → 智能体设计 → 强化学习\n"
+            "遇到概念须标注所属层，并在层间建立联系。",
+        "code_ability": "（v0.26 AI 代码教学能力 ⭐ 基于 Machine Learning Refined 三层教学法）\n"
+            "1. **三层教学**：每个 ML 概念按 直觉（一句话+图）→ 数学（公式+推导）→ 代码（30 行裸 NumPy 实现，不调 sklearn/torch）三层讲透\n"
+            "2. **可运行代码**：每个算法给完整可运行代码（线性回归/感知机/反向传播/注意力示例）\n"
+            "3. **可视化辅助**：损失函数像山（梯度下降=下山）、RNN 隐藏状态像人链传递\n"
+            "4. **6 拍节奏**：MOTTO → PROBLEM → CONCEPT（图表+直觉）→ BUILD IT（裸实现）→ USE IT（框架调用）→ SHIP IT\n"
+            "5. **LLM/Agent 教学**：拆 tokenization/embedding/attention/sampling 四步；用推理链可视化（think→act→observe→reflect）\n"
+            "误区：把 LLM 当黑箱（拆四步）；跳过数学只抄代码（三层缺一不可）",
+    },
+    "electronics": {
+        "label": "电子科学与技术",
+        "persona": "你是一位电子工程老师，能把电路与器件讲得既有物理直觉又有工程实操。",
+        "language": "从电路物理直觉切入（电流/电压/阻抗），讲清器件工作原理，再给实际电路分析与工程验证方法（如 SPICE 仿真思路）。",
+        "structure": "顺序：物理直觉 → 器件原理 → 电路分析 → 工程验证 → 应用。",
+        "emphasis": "理论-仿真-实物三层验证：能用 SPICE 仿真的给仿真思路。",
+        "subfield_guide": "（v0.26 电子科学与技术分支导航 ⭐）内容按 8 层体系组织：\n"
+            "电路分析基础 → 模拟电子技术 → 数字电子技术 → 信号与系统 → 电磁场与电磁波 → 微电子学\n"
+            "遇到概念须标注所属层。工程验证：能用 SPICE 仿真的给出仿真思路，讲清理论-仿真-实物三层验证。",
+    },
+"default": {
         "label": "通用",
         "persona": "你是一位认真、自然、不装腔作势的老师。",
         "language": "从具体例子或问题切入，讲清楚'是什么、为什么、怎么用'，最后给学生一个可以自己验证的小问题。",
@@ -422,8 +467,8 @@ _SUBJECT_ALIASES = {
     "literature": "literature", "文学": "literature",
     "ethics": "ethics", "道德": "ethics", "伦理": "ethics",
     "phenomenology": "phenomenology", "生命现象学": "phenomenology",
-    "kaoyan_math": "kaoyan_math", "考研数学": "kaoyan_math",
-    "kaoyan_politics": "kaoyan_politics", "考研政治": "kaoyan_politics",
+    "考研数学": "math", "考研数学（高等数学/线性代数/概率统计）": "math",
+    "考研政治": "politics", "思想政治（考研）": "politics",
     "writing": "writing", "写作": "writing", "议论文": "writing",
     "coding": "coding", "编程": "coding", "python": "coding",
     "thinking": "thinking", "批判性思维": "thinking", "思辨": "thinking",
@@ -439,8 +484,18 @@ _SUBJECT_ALIASES = {
     "天气学": "atmospheric_science", "气候学": "atmospheric_science",
     "atmospheric science": "atmospheric_science", "meteorology": "atmospheric_science",
     "气候": "atmospheric_science", "天气": "atmospheric_science",
-    "qft": "qft", "量子场论": "qft", "场论": "qft", "量子电动力学": "qft",
-    "量子色动力学": "qft", "QFT": "qft", "quantum field theory": "qft",
+    # v0.26 ⭐ qft 降级为 physics 二级学科：量子场论别名归入 physics
+    "qft": "physics", "量子场论": "physics", "场论": "physics", "量子电动力学": "physics",
+    "量子色动力学": "physics", "QFT": "physics", "quantum field theory": "physics",
+    # v0.26 ⭐ 拆键：大学本科专属学科别名 + 思想政治
+    "college_chinese": "college_chinese", "大学语文": "college_chinese", "语文（大学）": "college_chinese",
+    "college_english": "college_english", "大学英语": "college_english", "英语（大学）": "college_english",
+    "college_politics": "college_politics", "政治学": "college_politics", "政治（大学）": "college_politics",
+    "思想政治": "politics", "政治": "politics",
+    # v0.26 ⭐ 新学科别名（v0.25 快照恢复后补全）
+    "computer_science": "computer_science", "计算机科学与技术": "computer_science", "计算机科学": "computer_science",
+    "artificial_intelligence": "artificial_intelligence", "人工智能": "artificial_intelligence", "AI": "artificial_intelligence",
+    "electronics": "electronics", "电子科学与技术": "electronics", "电子科学": "electronics",
 }
 
 
@@ -462,28 +517,200 @@ SUBJECT_MIN_GRADE = {
     "english": "middle_school", "french": "middle_school", "german": "middle_school",
     "japanese": "middle_school",
     # 高中起（进阶学科）
-    "law": "high_school", "economics": "high_school", "philosophy": "high_school",
+    "law": "middle_school", "economics": "high_school", "philosophy": "high_school",
     "aesthetics": "high_school", "literature": "high_school", "ethics": "high_school",
-    "coding": "high_school", "thinking": "high_school", "learning": "high_school",
-    "expression": "high_school",
-    # 大学起（专业学科，v0.25 新增语言学/大气科学/量子场论）
+    # 通识素养（v0.26 ⭐ 跨学段技能/素养类，任意学段可选）
+    "coding": "all_grades", "thinking": "all_grades", "learning": "all_grades",
+    "expression": "all_grades", "writing": "all_grades",
+    # 大学起（专业学科，v0.25 新增语言学/大气科学/量子场论；v0.26 拆键 college_*）
     "phenomenology": "undergraduate", "linguistics": "undergraduate",
-    "atmospheric_science": "undergraduate", "qft": "undergraduate",
+    "atmospheric_science": "undergraduate",    "electronics": "undergraduate", "computer_science": "undergraduate",
+    "artificial_intelligence": "undergraduate",
+    "college_chinese": "undergraduate", "college_english": "undergraduate",
+    "college_politics": "undergraduate",
     # 仅考研
-    "kaoyan_math": "graduate_exam", "kaoyan_politics": "graduate_exam",
 }
 
-_GRADE_ORDER = {"middle_school": 0, "high_school": 1, "undergraduate": 2, "graduate_exam": 3}
+# v0.26 ⭐ SUBJECT_GRADES：学科 → 多学段集合（跨学段映射）
+SUBJECT_GRADES = {
+    # 跨学段学科（多学段可用）：
+    "math": ["middle_school", "high_school", "undergraduate", "graduate_exam"],
+    "physics": ["middle_school", "high_school", "undergraduate", "graduate_exam"],
+    "chemistry": ["middle_school", "high_school", "undergraduate"],
+    "biology": ["middle_school", "high_school", "undergraduate"],
+    "chinese": ["middle_school", "high_school"],
+    "politics": ["middle_school", "high_school", "undergraduate", "graduate_exam"],  # 中学/考研思想政治
+    "history": ["middle_school", "high_school", "undergraduate"],
+    "english": ["middle_school", "high_school", "graduate_exam"],
+    "geography": ["middle_school", "high_school", "undergraduate"],
+    "literature": ["high_school", "undergraduate"],
+    "economics": ["high_school", "undergraduate"],
+    "philosophy": ["high_school", "undergraduate"],
+    "ethics": ["high_school", "undergraduate"],
+    # 单学段学科（仅最低学段）：
+    "law": ["middle_school", "high_school", "undergraduate"],
+    "aesthetics": ["high_school", "undergraduate"],
+    "french": ["middle_school", "high_school", "undergraduate"],
+    "german": ["middle_school", "high_school", "undergraduate"],
+    "japanese": ["middle_school", "high_school", "undergraduate"],
+    "phenomenology": ["undergraduate"],
+    "linguistics": ["undergraduate"],
+    "atmospheric_science": ["undergraduate"],
+    "electronics": ["undergraduate"],
+    "computer_science": ["undergraduate"],
+    "artificial_intelligence": ["undergraduate"],
+    # v0.26 ⭐ 拆键：大学本科专属学科（语文/英语/政治 本科版与中学版分键）
+    "college_chinese": ["undergraduate"],
+    "college_english": ["undergraduate"],
+    "college_politics": ["undergraduate"],
+    # v0.26 ⭐ 通识素养（跨学段技能/素养类，任意学段可选）
+    "coding": ["all_grades"],
+    "thinking": ["all_grades"],
+    "learning": ["all_grades"],
+    "expression": ["all_grades"],
+    "writing": ["all_grades"],
+}
+
+_GRADE_ORDER = {"middle_school": 0, "high_school": 1, "undergraduate": 2,
+                "graduate_exam": 3, "all_grades": 4}
 
 
 def get_subjects_for_grade(grade: str) -> list:
-    """返回某学段可教的学科 key 列表（学段-学科联动 v0.25）。"""
+    """返回某学段可教的学科 key 列表（v0.26 多学段映射升级）。
+
+    优先用 SUBJECT_GRADES（跨学段集合）；未定义的回退 SUBJECT_MIN_GRADE（最低学段）。
+    通识素养（all_grades）学科：任意学段都返回。
+    """
     grade = grade or "high_school"
+    if grade == "all_grades":
+        return [k for k, g in SUBJECT_GRADES.items() if "all_grades" in g] if SUBJECT_GRADES \
+            else [k for k, g in SUBJECT_MIN_GRADE.items() if g == "all_grades"]
+    # 跨学段：该学段在学科的多学段集合中即可教（all_grades 学科任意学段可教）
+    if SUBJECT_GRADES:
+        return [k for k, grades in SUBJECT_GRADES.items()
+                if grade in grades or "all_grades" in grades]
+    # 回退：v0.25 最低学段逻辑
     if grade == "graduate_exam":
         return [k for k, g in SUBJECT_MIN_GRADE.items() if g == "graduate_exam"]
     order = _GRADE_ORDER.get(grade, 1)
     return [k for k, g in SUBJECT_MIN_GRADE.items()
             if g != "graduate_exam" and _GRADE_ORDER.get(g, 1) <= order]
+
+
+def subject_available_for_grade(subject: str, grade: str) -> bool:
+    """判断学科在指定学段是否可用（v0.26 跨学段 + 通识素养）。"""
+    key = normalize_subject(subject)
+    grades = SUBJECT_GRADES.get(key)
+    if grades:
+        # v0.26：通识素养学科（all_grades）任意学段可用
+        if "all_grades" in grades:
+            return True
+        return grade in grades
+    # 回退：最低学段逻辑
+    min_g = SUBJECT_MIN_GRADE.get(key)
+    if not min_g or min_g == "graduate_exam":
+        return grade == "graduate_exam" or min_g == grade
+    return _GRADE_ORDER.get(grade, 1) >= _GRADE_ORDER.get(min_g, 1)
+
+
+# ════════════════════════════════════════════════════════════════
+# v0.26 ⭐ SUBFIELD_TREE：二级学科（学段 × 一级学科 过滤）
+# 结构：SUBFIELD_TREE[subject][grade] = [ {name, tip?}, ... ]
+#  - name 简洁（前端 select 显示，不冗余）
+#  - tip   细分说明（前端 title 悬浮提示）
+# 只有明确层级体系的大学学科配 subfields，避免臃肿。
+# ════════════════════════════════════════════════════════════════
+SUBFIELD_TREE = {
+    "physics": {
+        "undergraduate": [
+            {"name": "普通物理", "tip": "力学、热学、电磁学、光学、声学、原子物理、近代物理"},
+            {"name": "数学物理方法", "tip": "复变函数、数理方程、特殊函数"},
+            {"name": "四大力学", "tip": "理论力学、电动力学、热力学与统计物理、量子力学"},
+        ],
+        "graduate_exam": [
+            {"name": "量子场论", "tip": "经典场论预备、正则量子化、路径积分、重整化"},
+        ],
+    },
+    "math": {
+        "undergraduate": [
+            {"name": "数学分析", "tip": "极限、连续、微分、积分、级数"},
+            {"name": "高等代数", "tip": "多项式、矩阵、线性空间、线性变换"},
+            {"name": "解析几何", "tip": "空间直线与平面、二次曲面"},
+            {"name": "概率论与数理统计", "tip": "随机变量、分布、假设检验、回归"},
+            {"name": "常微分方程", "tip": "一阶、高阶、方程组、定性理论"},
+            {"name": "复变函数", "tip": "解析函数、留数、共形映射"},
+            {"name": "实变函数", "tip": "测度论、勒贝格积分"},
+            {"name": "近世代数", "tip": "群、环、域"},
+        ],
+        "graduate_exam": [
+            {"name": "考研数学", "tip": "高等数学、线性代数、概率统计"},
+        ],
+    },
+    
+    
+    "linguistics": {
+        "undergraduate": [
+            {"name": "音位学", "tip": "音素、音位变体、音系规则"},
+            {"name": "形态学", "tip": "词素、屈折、派生"},
+            {"name": "句法学", "tip": "短语结构、生成语法、依存语法"},
+            {"name": "语义学", "tip": "词义、真值条件、指称"},
+            {"name": "语用学", "tip": "言语行为、含义、预设"},
+            {"name": "社会语言学", "tip": "方言、语言变体、语码转换"},
+        ],
+    },
+    "computer_science": {
+        "undergraduate": [
+            {"name": "数据结构与算法", "tip": "线性表、树、图、排序、动态规划"},
+            {"name": "计算机组成原理", "tip": "运算器、存储器、指令系统、CPU"},
+            {"name": "操作系统", "tip": "进程、内存、文件、调度、死锁"},
+            {"name": "计算机网络", "tip": "TCP/IP、HTTP、路由、网络安全"},
+            {"name": "数据库系统", "tip": "关系模型、SQL、事务、索引"},
+            {"name": "软件工程", "tip": "需求、设计模式、测试、项目管理"},
+            {"name": "编译原理", "tip": "词法、语法、语义分析、代码生成"},
+            {"name": "离散数学", "tip": "数理逻辑、集合、图论、代数结构"},
+        ],
+    },
+    "electronics": {
+        "undergraduate": [
+            {"name": "电路分析基础", "tip": "基尔霍夫定律、戴维南、暂态分析"},
+            {"name": "模拟电子技术", "tip": "三极管、运放、放大电路、反馈"},
+            {"name": "数字电子技术", "tip": "逻辑门、组合逻辑、时序逻辑"},
+            {"name": "信号与系统", "tip": "傅里叶变换、拉普拉斯变换、卷积"},
+            {"name": "电磁场与电磁波", "tip": "麦克斯韦方程组、平面波、传输线"},
+            {"name": "微电子学", "tip": "半导体物理、器件、集成电路"},
+        ],
+    },
+    "artificial_intelligence": {
+        "undergraduate": [
+            {"name": "机器学习基础", "tip": "线性回归、决策树、支持向量机、聚类"},
+            {"name": "深度学习", "tip": "多层感知机、卷积神经网络、循环神经网络、训练技巧"},
+            {"name": "Transformer 与大模型", "tip": "注意力机制、预训练、微调"},
+            {"name": "训练与对齐", "tip": "监督微调、人类反馈强化学习、偏好优化"},
+            {"name": "检索增强", "tip": "检索增强生成、向量检索、知识注入"},
+            {"name": "智能体设计", "tip": "推理-行动循环、工具调用、规划"},
+            {"name": "强化学习", "tip": "马尔可夫决策过程、策略梯度、Q学习"},
+        ],
+    },
+}
+
+
+def get_subfields(subject: str, grade: str = "") -> list:
+    """返回某学科在某学段的二级学科列表（v0.26）。
+
+    - 学段为空：返回该学科全部学段的二级学科（扁平展开）
+    - 无二级学科：返回 []
+    """
+    key = normalize_subject(subject)
+    tree = SUBFIELD_TREE.get(key)
+    if not tree:
+        return []
+    if not grade:
+        out = []
+        for g, items in tree.items():
+            for it in items:
+                out.append({"grade": g, "name": it["name"], "tip": it.get("tip", "")})
+        return out
+    return [dict(it, grade=grade) for it in tree.get(grade, [])]
 
 
 def get_style(subject: str) -> dict:
@@ -494,7 +721,8 @@ def get_style(subject: str) -> dict:
 def build_presenter_system(subject: str, tone: str,
                            learner=None, kb_node: Optional[dict] = None,
                            strategy_line: str = "",
-                           user_model: Optional[dict] = None) -> str:
+                           user_model: Optional[dict] = None,
+                           subtopic: str = "") -> str:
     """构建 Presenter 的 system prompt。
 
     关键改进：不再把世界观比例数字字典塞给 LLM，而是用可读的教学风格描述。
@@ -615,6 +843,14 @@ def build_presenter_system(subject: str, tone: str,
 {tone_line}
 {kb_line}
 {strategy_line}
+
+{('## 学科分支导航（v0.26 ⭐ 本学科特有，若已定义则必须遵守）\n' + style['subfield_guide']) if style.get('subfield_guide') else ''}
+
+{('## 代码教学能力（v0.26 ⭐ 本学科特有，若已定义则必须遵守）\n' + style['code_ability']) if style.get('code_ability') else ''}
+
+{('## 当前讲授主题（v0.26 上下文锚定）\n'
+  '学生当前选择的子主题：' + subtopic + '\n'
+  '请围绕该子主题组织讲解，但内容归属其上一级学科框架，遇到跨子主题的联系要指出。') if subtopic else ''}
 
 ## 讲义式组织（v0.19.5 重要）
 你的每一段教学输出都应当**像一份优秀讲义的片段**——规范、清晰、内容详实，让人能直接抄下来当笔记：
@@ -826,6 +1062,11 @@ WEIL_CORE = """## 你的身份（三层）
 
 # 学段分层：同一学科在不同学段的讲解深度与方式
 _GRADE_GUIDE = {
+    "all_grades": {
+        "label": "通识素养",
+        "depth": "通识素养/技能类：不区分学段，按学生当前水平分层讲解，重可迁移的方法与能力。",
+        "tone_extra": "平等交流，像一位可信赖的成长教练。",
+    },
     "middle_school": {
         "label": "初中",
         "depth": "用最生活化的语言，从具体现象和例子入手，讲清核心概念'是什么、为什么重要'；少用术语，不展开高深推导；多给形象的类比和可操作的观察。",
