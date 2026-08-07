@@ -508,6 +508,7 @@ body {
 
 /* v0.19.2：SVG 图标统一样式（替代 emoji） */
 .link-icon { width: 13px; height: 13px; vertical-align: -2px; display: inline-block; }
+.action-btn .link-icon { width: 14px; height: 14px; vertical-align: -3px; }
 .upload-btn-icon { width: 17px; height: 17px; opacity: .7; display: block; }
 .file-chip { display: inline-flex; align-items: center; gap: 5px; }
 .file-chip-icon { width: 14px; height: 14px; opacity: .7; }
@@ -709,6 +710,109 @@ body {
 }
 .download-link:hover { text-decoration: underline; }
 
+/* ─── v0.x：资料检索（需求C）─── */
+/* 进度条 + 检索阶段提示 */
+.resource-progress {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px 16px; margin: 4px 0;
+  background: var(--surface-2); border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  font-size: 13px; color: var(--text-dim);
+}
+.resource-progress .rp-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.resource-progress .rp-spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  animation: resource-spin .9s linear infinite; flex-shrink: 0;
+}
+@keyframes resource-spin { to { transform: rotate(360deg); } }
+.resource-progress .rp-text {
+  color: var(--text); font-weight: 600; flex: 1;
+}
+.resource-progress .rp-stage {
+  font-size: 11.5px; color: var(--text-dim); font-weight: 400;
+  padding: 2px 8px; border-radius: 8px; background: var(--accent-soft); color: var(--accent);
+}
+.resource-progress .rp-bar {
+  width: 100%; height: 4px; background: var(--border);
+  border-radius: 2px; overflow: hidden;
+}
+.resource-progress .rp-bar > i {
+  display: block; height: 100%; width: 0%;
+  background: linear-gradient(90deg, #4f7cff, #7c5cff);
+  border-radius: 2px;
+  animation: resource-indeterminate 1.4s ease-in-out infinite;
+}
+@keyframes resource-indeterminate {
+  0%   { margin-left: -40%; width: 40%; }
+  50%  { width: 60%; }
+  100% { margin-left: 100%; width: 40%; }
+}
+
+/* 资料卡片列表（容器） */
+.resource-list {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-top: 4px;
+}
+.resource-list .rl-header {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 12px; color: var(--text-dim);
+  padding: 0 2px;
+}
+.resource-list .rl-header b { color: var(--text); font-size: 13.5px; font-weight: 600; }
+
+/* 单张资料卡片 */
+.resource-card {
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px;
+  transition: border-color .15s, transform .15s;
+}
+.resource-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.resource-card .rc-title {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.resource-card .rc-title-text {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  word-break: break-word; flex: 1; min-width: 0;
+}
+/* 类型徽章 */
+.resource-card .rc-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+  flex-shrink: 0; white-space: nowrap;
+}
+.resource-card .rc-badge.kb   { background: rgba(79,107,255,.12); color: #4f6bff; }
+.resource-card .rc-badge.lib  { background: rgba(16,185,129,.14); color: #059669; }
+.resource-card .rc-badge.web  { background: rgba(245,158,11,.16); color: #b45309; }
+.resource-card .rc-badge.unknown { background: var(--surface-2); color: var(--text-dim); }
+.resource-card .rc-snippet {
+  font-size: 12.5px; color: var(--text-dim); line-height: 1.6;
+  word-break: break-word;
+}
+.resource-card .rc-link {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12.5px; color: var(--accent); text-decoration: none;
+  font-weight: 600; align-self: flex-start; margin-top: 2px;
+}
+.resource-card .rc-link:hover { text-decoration: underline; }
+.resource-card .rc-link .link-icon { opacity: .8; }
+
+/* PPT 引导按钮 */
+.resource-card .rc-ppt-btn {
+  align-self: flex-start;
+  margin-top: 6px;
+  border: 1px solid var(--accent); background: var(--accent-soft);
+  color: var(--accent); font-size: 12px; font-weight: 600;
+  padding: 5px 12px; border-radius: 8px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: all .15s;
+}
+.resource-card .rc-ppt-btn:hover { background: var(--accent); color: #fff; }
+.resource-card .rc-ppt-btn:disabled { opacity: .5; cursor: not-allowed; }
+
 /* ─── 元认知日志 ─── */
 .log-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .log-item {
@@ -848,8 +952,10 @@ body {
           · <b>做题目</b> —— 说"给我一道经典题"，我给你出题并讲解<br>
           · <b>聊想法</b> —— 困惑、焦虑、好奇，都可以跟我说<br>
           · <b>看我的知识库</b> —— 问「<b>知识库</b>」或「<b>你学过什么</b>」，我把收着的资料清点给你看<br>
-          · <b>画知识导图</b> —— 说「<b>思维导图</b>」或「<b>知识框架</b>」，我把知识整理成结构图给你<br>
-          · <b>认识我</b> —— 问「<b>你是谁</b>」或「<b>你有哪些功能</b>」，我把我的身份和能做的事讲给你听<br><br>
+           · <b>画知识导图</b> —— 说「<b>思维导图</b>」或「<b>知识框架</b>」，我把知识整理成结构图给你<br>
+           · <b>查资料</b> —— 点输入框旁的「<b>查资料</b>」按钮，我把知识库和网上的资料整理成卡片给你，可点击查看<br>
+           · <b>做 PPT</b> —— 说「<b>根据这些资料制作 PPT</b>」或「<b>把这个主题整理成演示文稿</b>」，我把内容做成可下载的演示文稿<br>
+           · <b>认识我</b> —— 问「<b>你是谁</b>」或「<b>你有哪些功能</b>」，我把我的身份和能做的事讲给你听<br><br>
           <span style="font-size:12.5px;color:var(--text-dim)">想生成文档？对话里带上：<b>讲义</b> / <b>要点</b> / <b>例题</b> / <b>笔记</b>，我会把讨论内容整理成文件供你下载。想让我记住你的情况，点左侧栏「告诉老师你是谁」。</span><br><br>
           试着问我：「什么是熵？」——或者，就从你现在心里想的那件事开始。<br>
         </div>
@@ -900,6 +1006,10 @@ body {
       <button class="action-btn" id="act-reexplain">换一种解释</button>
       <button class="action-btn" id="act-test">测试我一下</button>
       <button class="action-btn" id="act-example">举个类似例子</button>
+      <!-- v0.x：资料检索（需求C） -->
+      <button class="action-btn" id="resource-btn" title="从知识库/资料库/互联网检索资料">
+        <img class="link-icon" src="assets/icons/search.svg" alt="" style="margin-right:4px"/>查资料
+      </button>
     </div>
 
     <div class="generate-bar">
@@ -2493,6 +2603,208 @@ document.getElementById('theme-btn').addEventListener('click', () => {
   const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
   applyTheme(cur === 'dark' ? 'light' : 'dark');
 });
+
+// ─── v0.x：资料检索（需求C）───
+// 后端：POST /api/resources → {sources, scope, keywords, ppt_outline}
+// 前端：复用现有视觉语言渲染卡片，按钮触发后端检索，支持 PPT 引导。
+const RESOURCE_STAGES = [
+  '正在拆解问题…',
+  '正在检索知识库…',
+  '正在检索个人资料库…',
+  '正在检索互联网…',
+  '正在整理结果…',
+];
+const RESOURCE_TYPE_LABEL = {
+  kb: '知识库', md: '资料', pdf: '资料', docx: '资料',
+  doc: '资料', web: '网页', library: '资料',
+};
+const RESOURCE_TYPE_BADGE = {
+  kb: 'kb', md: 'lib', pdf: 'lib', docx: 'lib',
+  doc: 'lib', web: 'web', library: 'lib',
+};
+// URL 白名单：仅允许 http(s) / 同源 /api/
+function safeResourceUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const s = url.trim();
+  if (s.startsWith('/api/')) return s;             // 同源后端 API
+  if (/^https?:\/\//i.test(s)) return s;           // 外部链接
+  return '';                                        // 拒绝 javascript:/data:/file: 等
+}
+function resourceTypeBadgeClass(t) {
+  return RESOURCE_TYPE_BADGE[(t || '').toLowerCase()] || 'unknown';
+}
+function resourceTypeLabel(t) {
+  return RESOURCE_TYPE_LABEL[(t || '').toLowerCase()] || '来源';
+}
+
+// 阶段式进度气泡（与 addThinking 视觉一致）
+function addResourceProgress(question) {
+  const div = document.createElement('div');
+  div.className = 'msg paeg';
+  div._isResourceProgress = true;
+  const inner = document.createElement('div');
+  inner.className = 'msg-bubble';
+  inner.innerHTML = `
+    <div class="resource-progress">
+      <div class="rp-row">
+        <span class="rp-spinner"></span>
+        <span class="rp-text">检索中</span>
+        <span class="rp-stage" data-stage>${RESOURCE_STAGES[0]}</span>
+      </div>
+      <div class="rp-bar"><i></i></div>
+      <div style="font-size:11.5px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        关键词：<span data-q>${escapeHtml(question || '')}</span>
+      </div>
+    </div>`;
+  div.appendChild(inner);
+  chatWin.appendChild(div);
+  chatWin.scrollTop = chatWin.scrollHeight;
+  let si = 0;
+  div._stageTimer = setInterval(() => {
+    si = Math.min(si + 1, RESOURCE_STAGES.length - 1);
+    const stageEl = div.querySelector('[data-stage]');
+    if (stageEl) stageEl.textContent = RESOURCE_STAGES[si];
+  }, 700);
+  return div;
+}
+function removeResourceProgress(div) {
+  if (div && div._stageTimer) { clearInterval(div._stageTimer); div._stageTimer = null; }
+  if (div) div.remove();
+  chatWin.scrollTop = chatWin.scrollHeight;
+}
+
+// 渲染资料卡片列表（新气泡），按钮 + 链接全部走 event delegation，不内联 onclick
+function renderResourceCards(payload, question) {
+  const sources = Array.isArray(payload && payload.sources) ? payload.sources : [];
+  const scope = (payload && payload.scope) || 'all';
+  const keywords = (payload && payload.keywords) || [];
+  const pptOutline = (payload && payload.ppt_outline) || null;
+
+  const div = document.createElement('div');
+  div.className = 'msg paeg resource-msg';
+  const inner = document.createElement('div');
+  inner.className = 'msg-bubble';
+
+  // 标题行：检索完成 + 来源说明
+  const scopeText = { kb: '知识库', library: '个人资料库', web: '互联网', all: '知识库 + 资料库 + 互联网' }[scope] || scope;
+  const kwLine = keywords.length
+    ? `<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px">关键词：${escapeHtml(keywords.join('、'))}</div>`
+    : '';
+
+  // 卡片列表
+  const cardsHtml = sources.length
+    ? sources.map((s, idx) => {
+        const title = escapeHtml(s.title || '(无标题)');
+        const snippet = escapeHtml(s.snippet || '');
+        const rawUrl = safeResourceUrl(s.url);
+        const typeBadge = resourceTypeBadgeClass(s.type);
+        const typeLabel = resourceTypeLabel(s.type);
+        const linkHtml = rawUrl
+          ? `<a class="rc-link" href="${escapeHtml(rawUrl)}" target="_blank" rel="noopener noreferrer" data-idx="${idx}">
+               <img class="link-icon" src="assets/icons/magnifying-glass.svg" alt=""/>
+               ${rawUrl.startsWith('/api/') ? '查看资料' : '打开链接'}
+             </a>`
+          : '<span class="rc-link" style="opacity:.5;cursor:default">无链接</span>';
+        return `
+        <div class="resource-card" data-idx="${idx}">
+          <div class="rc-title">
+            <span class="rc-badge ${typeBadge}">${escapeHtml(typeLabel)}</span>
+            <span class="rc-title-text">${title}</span>
+          </div>
+          ${snippet ? `<div class="rc-snippet">${snippet}</div>` : ''}
+          ${linkHtml}
+        </div>`;
+      }).join('')
+    : '<div style="font-size:12.5px;color:var(--text-dim);padding:8px 0">没有检索到相关资料。可以换个关键词，或在输入框追加"再试试互联网搜索"。</div>';
+
+  const pptBtnHtml = (sources.length || pptOutline)
+    ? `<button class="rc-ppt-btn" data-act="ppt">
+         <img class="link-icon" src="assets/icons/graduation-cap.svg" alt=""/>
+         用这些资料做 PPT
+       </button>`
+    : '';
+
+  inner.innerHTML = `
+    <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <span style="font-weight:600;color:var(--text)">检索完成</span>
+      <span style="font-size:12px;color:var(--text-dim)">来源：${escapeHtml(scopeText)} · 共 ${sources.length} 条</span>
+    </div>
+    ${kwLine}
+    <div class="resource-list">${cardsHtml}</div>
+    ${pptBtnHtml}`;
+  div.appendChild(inner);
+  chatWin.appendChild(div);
+
+  // PPT 引导按钮（事件代理，点击不刷新页面）
+  const pptBtn = inner.querySelector('[data-act="ppt"]');
+  if (pptBtn) {
+    pptBtn.addEventListener('click', () => {
+      const q = (question || '').trim() || questionInput.value.trim() || '这份资料';
+      const prompt = `根据资料制作 PPT：${q}`;
+      questionInput.value = prompt;
+      questionInput.focus();
+      // 闪一下输入框，提示用户确认发送
+      questionInput.style.transition = 'background-color .25s';
+      const prev = questionInput.style.backgroundColor;
+      questionInput.style.backgroundColor = 'var(--accent-soft)';
+      setTimeout(() => {
+        questionInput.style.backgroundColor = prev || '';
+        setTimeout(() => { questionInput.style.transition = ''; }, 260);
+      }, 260);
+      // 提示气泡
+      addMsg('paeg', `已填入引导语：<b>${escapeHtml(prompt)}</b><br><span style="font-size:12px;color:var(--text-dim)">点 <kbd style="padding:1px 6px;border:1px solid var(--border);border-radius:4px;background:var(--surface-2)">发送</kbd> 后，后端会调用 pptx MCP 制作演示文稿。</span>`);
+    });
+  }
+
+  chatWin.scrollTop = chatWin.scrollHeight;
+  return div;
+}
+
+// "查资料"按钮：调 /api/resources 并渲染结果
+async function fetchResources() {
+  const btn = document.getElementById('resource-btn');
+  const question = (questionInput.value || '').trim();
+  if (!question) {
+    addMsg('paeg', '请先在输入框写下你要查的主题，例如：<i>什么是贝叶斯定理？</i>');
+    questionInput.focus();
+    return;
+  }
+
+  // 学科 / 学段（从现有 select 读）
+  const gradeEl = document.getElementById('grade-select');
+  const subjectEl = document.getElementById('subject-select');
+  const subfieldEl = document.getElementById('subfield-select');
+
+  if (btn) btn.disabled = true;
+  // 用户问句（也作为新消息气泡，让对话流连贯）
+  addMsg('user', escapeHtml(question));
+  const progress = addResourceProgress(question);
+
+  try {
+    const resp = await api('/api/resources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        learner_id: STATE.learnerId,
+        question: question,
+        subject: subjectEl ? subjectEl.value : 'physics',
+        grade_level: gradeEl ? gradeEl.value : 'high_school',
+        subfield: subfieldEl ? subfieldEl.value : '',
+        include_web: true,
+        for_ppt: true,
+      }),
+    });
+    removeResourceProgress(progress);
+    renderResourceCards(resp || {}, question);
+  } catch (e) {
+    removeResourceProgress(progress);
+    addMsg('paeg', `资料检索失败：${escapeHtml(e.message || String(e))}<br><small>请确认后端已实现 POST /api/resources（ResourceLibrarian subagent）。</small>`);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+document.getElementById('resource-btn').addEventListener('click', fetchResources);
 
 // ─── 启动 ───
 checkHealth();
