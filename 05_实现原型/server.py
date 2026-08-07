@@ -852,6 +852,9 @@ def teach():
         if is_intent_with_material(concept):
             from prompts import build_general_chat_system, build_general_chat_user
             from subagents import _safe_chat
+            # v0.26 P0 修复（Oracle 审查发现）：此前 _gsys 未定义 → composite 分支静默死代码，
+            # "指令 vs 资源"结构化分隔从未在同步 /api/teach 生效。补定义。
+            _gsys = build_general_chat_system(learner)
             _instr, _material = split_intent_and_material(concept)
             if _material:
                 _gusr = build_general_chat_user(
@@ -1007,6 +1010,26 @@ def teach_stream():
     subject = data["subject"]
     # v0.26 ⭐ 二级学科/子主题（前端 SUBFIELD_TREE 三级选择；可空=未选）
     subtopic = (data.get("subtopic") or "").strip()
+
+    # v0.26 ⭐ P0 安全修复（Oracle 审查发现）：teach_stream 此前绕过 _affection_gate_check，
+    # 危机输入（"我想死"等）直接进 Diagnostor 当学科问题诊断，跳过 SafetyChecker 热线注入。
+    # 与 paeg.teach 行为对齐：危机/纯情绪在入口短路到 AffectionSupportor。
+    try:
+        _crisis, _emotion_only = paeg._affection_gate_check(learner, concept)
+        if _crisis or _emotion_only:
+            print(f"[PAEG] teach_stream 情绪支持钩子触发（crisis={_crisis}, emotion_only={_emotion_only}）")
+            _aff_reply = paeg.affection_supportor.run(
+                paeg.model, concept, learner=learner,
+                history=SESSIONS.get(f"chat_hist_{learner_id}", [])[-10:],  # v0.26 P0: 传历史（此前硬编码空）
+            )
+
+            def gen_aff():
+                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _aff_reply.get('content', ''), 'step_type': 'affection'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'affection'}, ensure_ascii=False)}\n\n"
+            return Response(gen_aff(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception as _e:
+        print(f"[PAEG] teach_stream 情绪支持钩子跳过: {_e}")
 
     # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（流式版本）
     try:
@@ -1222,6 +1245,12 @@ def teach_stream():
             pass
         # 诊断
         yield f"event: diagnosis\ndata: {json.dumps({'status': 'diagnosing'})}\n\n"
+        # v0.27 ⭐ 需求A：教学模式一次识别（入口用原句，存 learner 供 Presenter 全程消费）
+        try:
+            from subagents import _detect_teaching_mode
+            learner._teaching_mode = _detect_teaching_mode(concept, llm)  # type: ignore[attr-defined]
+        except Exception:
+            pass
         diagnosis = paeg.diagnostor.run(learner, concept, subject)
         yield f"event: diagnosis\ndata: {json.dumps(diagnosis, ensure_ascii=False)}\n\n"
 
@@ -1302,6 +1331,31 @@ def teach_stream():
             if not evaluation.get("ready_to_advance", True):
                 adjustment = paeg.adapter.run(evaluation, learner, step)
                 yield f"event: adjustment\ndata: {json.dumps(adjustment, ensure_ascii=False)}\n\n"
+                # v0.26 ⭐ 连接修复：Adapter 决策真正注入下一次 Presenter（此前只发事件不生效）
+                # 与 paeg.teach 的 set_pending_overrides 对齐——GUI 走 teach_stream，决策链必须闭环
+                try:
+                    _decision = adjustment.get('decision', 'continue')
+                    _params = (adjustment.get('action') or {}).get('parameters') or {}
+                    _so = None
+                    _rn = None
+                    if _decision == 'switch_style':
+                        _so = {
+                            "new_style": _params.get('new_style', 'analogy'),
+                            "override_system_line": _params.get('override_system_line', ''),
+                            "difficulty_delta": int(_params.get('difficulty_delta', 0) or 0),
+                        }
+                    elif _decision == 'reinforce':
+                        _rn = (f"学生该步理解度低，请补一个不同角度的例子或换切入方式复述。"
+                               f"当前 step 主题：{step.get('topic','')}")
+                    if _so or _rn:
+                        if hasattr(paeg.presenter, "set_pending_overrides"):
+                            paeg.presenter.set_pending_overrides(
+                                style_override=_so,
+                                reinforce_note=_rn,
+                            )
+                            print(f"[PAEG] teach_stream Adapter 决策已注入：{_decision}")
+                except Exception as _ae:
+                    print(f"[PAEG] teach_stream Adapter 注入失败: {_ae}")
 
         # 反思 + 自我更新
         from dataclasses import asdict
@@ -1858,6 +1912,47 @@ def daily_quote():
                         "author": "西蒙娜·薇依", "source": "", "error": str(e)})
 
 
+@app.route("/api/resources", methods=["POST"])
+@require_module("knowledge")
+def resource_lookup():
+    """v0.26 ⭐ 需求C：资料检索（ResourceLibrarian）。
+
+    请求：{learner_id, question, subject, grade_level, scope?, include_web?, for_ppt?}
+    响应：{"sources": [{title, url, snippet, type}], "scope", "keywords", "ppt_outline"}
+    前端可点击链接获取资料，或联动 PPT 制作。
+    """
+    data = request.get_json(force=True)
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
+    learner = SESSIONS.get(f"learner_{learner_id}")
+    if not learner:
+        from paeg import LearnerProfile
+        learner = LearnerProfile(
+            id=learner_id,
+            nickname=data.get("nickname", "学生"),
+            grade_level=data.get("grade_level", "high_school"),
+            age=data.get("age", 17),
+            cognitive_style=data.get("cognitive_style", "visual"),
+            self_description=data.get("self_description", ""),
+        )
+        SESSIONS[f"learner_{learner_id}"] = learner
+    question = (data.get("question") or "").strip()
+    if not question:
+        return jsonify({"error": "question is required"}), 400
+    subject = data.get("subject") or getattr(learner, "_current_subject", "") or "default"
+    try:
+        from subagents import ResourceLibrarian
+        _rl = ResourceLibrarian(model=llm)
+        _result = _rl.run(
+            question, learner=learner, llm=llm, subject=subject,
+            scope=data.get("scope", "all"),
+            include_web=bool(data.get("include_web", True)),
+            for_ppt=bool(data.get("for_ppt", False)),
+        )
+        return jsonify({**_result, "learner_id": learner_id})
+    except Exception as e:
+        return jsonify({"error": f"资料检索失败: {e}", "sources": []}), 500
+
+
 @app.route("/api/generate", methods=["POST"])
 @require_module("file_gen")
 def generate_file():
@@ -2384,6 +2479,14 @@ def general_chat():
         um['bdi'] = infer_bdi([{'content': text}], learner.self_description or "")
         learner._user_model = um  # type: ignore[attr-defined]
         system = _bgcs(learner)
+    except Exception:
+        pass
+
+    # v0.26 ⭐ 连接修复：/api/chat 非流式补用户资料注入（对齐 chat_stream 2046-2048）
+    try:
+        _ulib_chat = get_user_library(learner_id)
+        if _ulib_chat:
+            system = system + "\n\n" + _ulib_chat
     except Exception:
         pass
 
