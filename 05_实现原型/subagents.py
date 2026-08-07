@@ -1120,6 +1120,10 @@ _CATEGORY_KEYWORDS = {
                       "截断", "flaky"),
     "safety_guard": ("安全", "safety", "护栏", "注入", "injection", "隐私", "未成年人",
                      "自伤", "伦理"),
+    "subject_addition": ("新增学科", "新学科", "未收录", "建议新增", "加入学科",
+                         "把.*加.*学科", "subject_request"),
+    "library_update": ("Library", "library", "原著", "语料库", "补充薇依", "扩充书目",
+                        "参考资料", "文献", "添加资料", "扩充语料"),
 }
 
 
@@ -1222,6 +1226,8 @@ class SelfUpdateAgent:
     3. 工具调整（tool_adjustment）
     4. 错误模式（error_pattern）
     5. 安全护栏（safety_guard）
+    6. 新增学科（subject_addition，v0.25 ⭐）：用户问未收录学科/分支时，建议把该学科加入 SUBJECT_STYLES
+    7. 资料扩充（library_update，v0.25 ⭐）：用户反馈需要更多原著/语料/参考资料时，建议扩充 Library
 
     返回结构：{"suggestions": [...], "summary": str, "sources_used": [...], "mode": "self_update"}
     每条 suggestion 含 category/target/change/evidence/priority(P0/P1/P2)。
@@ -1338,7 +1344,7 @@ class SelfUpdateAgent:
                 "```json\n"
                 "[\n"
                 "  {\n"
-                "    \"category\": \"prompt_update|knowledge_update|tool_adjustment|error_pattern|safety_guard\",\n"
+                "    \"category\": \"prompt_update|knowledge_update|tool_adjustment|error_pattern|safety_guard|subject_addition|library_update\",\n"
                 "    \"target\": \"被改的对象（文件路径/类名/函数名）\",\n"
                 "    \"change\": \"一句话说明要改什么\",\n"
                 "    \"evidence\": \"本次反馈/洞察里支持这条建议的证据\",\n"
