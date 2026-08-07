@@ -1,4 +1,12 @@
 
+### v0.27 增强（LLM 意图/检索引导/资料检索/PPT）
+- 需求A：教学模式一次识别（LLM 优先+关键词兜底，入口用原句，全程注入）
+- 需求B：检索引导（LLM 选库 public/subject/user/web + 关键词 → tool → 回答）
+- 需求C：ResourceLibrarian 资料检索 subagent + /api/resources + 前端资料卡片（进度条/PPT引导/XSS防御）
+- 需求D：pptx MCP 从用户物料提取文字（md/pdf/docx + 路径防御）+ 欢迎语提示查资料/做PPT
+- Oracle 架构审查修复 4 项 P0（teach_stream 危机短路/composite _gsys/affection 历史/chat 上下文）
+- 意图识别测试：天气闲聊→non_teaching 简短；上下文记忆/个体性/Library 全链路验证
+
 ### v0.26 补充（学科架构审计 + 模块化 + 通识素养）
 - ⭐ 学科架构审计：对照 GB/T 13745/教育部课标/本科目录，修复 17 处不一致
   - law 补初中+本科（persona 矛盾）；english 补考研英语；politics 补本科；aesthetics 补本科
