@@ -46,6 +46,7 @@ class SessionContext:
     diagnosis: Optional[dict] = None
     evaluations: list = field(default_factory=list)
     reflections: list = field(default_factory=list)
+    teaching_mode: str = "normal"  # v0.26 ⭐ 入口一次识别，全程注入
     started_at: str = field(default_factory=lambda: datetime.now().isoformat())
     session_id: str = field(default_factory=lambda: "ses_" + datetime.now().strftime("%Y%m%d%H%M%S%f"))
 
@@ -115,8 +116,15 @@ class PAEG:
             crisis, emotion_only = self._affection_gate_check(learner, question)
             if crisis or emotion_only:
                 self._log(f"\n[0/6] 情绪支持钩子触发（crisis={crisis}, emotion_only={emotion_only}）")
+                # v0.26 P0 修复（Oracle 审查发现）：此前 history=[] 硬编码——危机支持 LLM
+                # 看不见学生前几轮倾诉，严重违反"注意力是连贯性命脉"。传 learner 最近对话。
+                _aff_hist = []
+                try:
+                    _aff_hist = (getattr(learner, "recent_history", None) or [])[-10:]
+                except Exception:
+                    _aff_hist = []
                 affection_reply = self.affection_supportor.run(
-                    self.model, question, learner=learner, history=[]
+                    self.model, question, learner=learner, history=_aff_hist
                 )
                 return {
                     "session": None,
@@ -141,6 +149,17 @@ class PAEG:
             concept=question,
             subject=subject
         )
+
+        # v0.26 ⭐ 需求A：教学模式一次识别（入口用原句，全程注入，不再每步重算）
+        # 存到 learner._teaching_mode 供 Presenter 全程消费
+        try:
+            from subagents import _detect_teaching_mode
+            _tm = _detect_teaching_mode(question, self.model)
+            learner._teaching_mode = _tm  # type: ignore[attr-defined]
+            session.teaching_mode = _tm
+            self._log(f"   ★ 教学模式（一次识别）：{_tm}（原句：{question[:30]}）")
+        except Exception as _e:
+            self._log(f"   (教学模式识别跳过: {_e})")
 
         # v0.26 D1 ⭐ 课堂记录（可回放）：记录本堂课完整过程
         try:
