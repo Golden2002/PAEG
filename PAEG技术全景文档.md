@@ -694,6 +694,7 @@ flowchart TB
   1. 学科 ≤ 学段 → 正常切换（switched）
   2. 学科 > 学段 → `grade_blocked` 话术（"需大学本科及以上学段，可切换学段"），**不记录**需求
   3. 真未收录 → 原"记录需求"话术
+- **teach_stream 拦截（v0.25 修复 ⭐）**：流式教学路径在 `_steer_subject` 后新增 `grade_blocked` 检查——跨学段学科走 SSE `grade_blocked_subject` 分支（提示切换学段），而非误报"未收录"（`unregistered_subject`）；同步 teach 路径行为一致
 - GUI：学科菜单按学段动态过滤（`refreshSubjectOptions()`），学段切换即刷新
 
 **学段分层**：初中 12 学科（基础）/ 高中 22（进阶）/ 本科 28（+语言学/大气科学/量子场论/现象学）/ 考研 2（政治/数学）。
