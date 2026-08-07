@@ -72,9 +72,34 @@ class MemorySystem:
         self.short_term = []
 
     # ─── 摘要压缩 ───
+    def _estimate_tokens(self, messages: List[Dict[str, str]]) -> int:
+        """粗略估算 token 数（中文约 1 字≈1 token，英文 4 字符≈1 token）。
+
+        v0.26 D2 ⭐：用 token 估算替代纯条数阈值——长消息比短消息更早触发压缩，
+        避免"12 条消息但每条 2000 字"导致上下文爆窗。
+        """
+        total = 0
+        for m in messages:
+            c = m.get("content", "")
+            if not c:
+                continue
+            cjk = sum(1 for ch in c if '\u4e00' <= ch <= '\u9fff')
+            other = max(0, len(c) - cjk)
+            total += int(cjk * 0.8 + other / 4)  # 中文系数 0.8，英文 4字符/token
+        return total
+
     def compress_if_needed(self, force: bool = False):
-        """短期记忆超限时，把最旧的若干条压缩进 summary。"""
-        if len(self.short_term) <= self.short_term_limit and not force:
+        """短期记忆超限时，把最旧的若干条压缩进 summary。
+
+        v0.26 D2 ⭐ 升级：
+        - 触发条件从"纯条数 > short_term_limit"升级为
+          "条数超限 **或** 估算 token 超 token_budget"双条件（更贴近真实上下文压力）
+        - 保留"最近 keep 条原文 + 旧消息摘要"双段（对标 Codex compact 的 summary+tail）
+        - 摘要时把结构化信号（学生问过/掌握/薄弱/情绪）显式提取，解决"再次回答推进就忘记题目"
+        """
+        est_tokens = self._estimate_tokens(self.short_term)
+        token_budget = getattr(self, "token_budget", 6000)  # 默认 6000 token 预算
+        if (len(self.short_term) <= self.short_term_limit and est_tokens <= token_budget) and not force:
             return
         # 保留最近 half_limit 条，更早的压缩
         keep = max(6, self.short_term_limit // 2)
@@ -89,14 +114,16 @@ class MemorySystem:
                 old_text = "\n".join(
                     f"{'学生' if m['role']=='user' else 'Émile'}: {m['content'][:200]}"
                     for m in old[-8:])
+                # v0.26 D2：显式提取"主题/掌握/薄弱/情感"四类信号（修复"忘记题目"）
                 new_summary = _safe_chat(
                     self.llm,
-                    "你是 PAEG 的记忆整理器。把下面的对话压缩成 2-3 句摘要，"
-                    "保留：学生问过的主题、掌握/薄弱点、情感状态。只输出摘要本身。",
-                    f"历史对话：\n{old_text}\n\n摘要：", max_tokens=200)
+                    "你是 PAEG 的记忆整理器。把下面的对话压缩成 3-5 句摘要，"
+                    "必须保留：①学生当前正在学/问的主题（原话复述）②掌握程度 ③薄弱点/卡住的地方 "
+                    "④情感状态。先写【当前主题】再写其余。只输出摘要本身。",
+                    f"历史对话：\n{old_text}\n\n摘要：", max_tokens=260)
                 if new_summary and len(new_summary) > 10:
                     merged = (self.summary + "；" + new_summary.strip()) if self.summary else new_summary.strip()
-                    self.summary = merged[-800:]  # 限制长度
+                    self.summary = merged[-900:]  # 限制长度（v0.26 放宽到 900，容纳主题保留）
             except Exception:
                 pass  # 压缩失败不阻塞
 
