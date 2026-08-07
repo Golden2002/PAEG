@@ -141,8 +141,42 @@ class PeriodicSelfUpdater:
         except Exception as e:
             self._log(f"[PAEG][periodic] 新学科需求读取失败: {e}")
 
+        # 5. v0.22.2：SelfUpdateAgent 建议回流（self_update_suggestions.jsonl → improvements.md）
+        try:
+            _mem = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'memory')
+            _su_path = os.path.join(_mem, 'self_update_suggestions.jsonl')
+            _imp_path = os.path.join(_mem, 'improvements.md')
+            if os.path.isfile(_su_path):
+                _new = 0
+                _lines = [l for l in open(_su_path, encoding='utf-8').read().splitlines() if l.strip()]
+                if _lines:
+                    _sug_lines = []
+                    for _l in _lines[-20:]:
+                        try:
+                            _d = json.loads(_l)
+                            for _s in (_d.get("suggestions") or [])[:3]:
+                                _chg = str(_s.get("change", ""))[:200]
+                                if _chg:
+                                    _sug_lines.append(f"- [{_s.get('category', '')}] {_chg}")
+                                    _new += 1
+                        except Exception:
+                            continue
+                    if _sug_lines:
+                        with open(_imp_path, 'a', encoding='utf-8') as _f:
+                            _f.write(f"\n## {datetime.now().strftime('%Y-%m-%d')} · SelfUpdateAgent 建议\n")
+                            _f.write("\n".join(_sug_lines) + "\n")
+                        # 清空已回流条目（保留最后 5 条防重复消费）
+                        _keep = _lines[-5:]
+                        with open(_su_path, 'w', encoding='utf-8') as _f:
+                            _f.write("\n".join(_keep) + ("\n" if _keep else ""))
+                    results["su_suggestions"] = _new
+                    self._log(f"[PAEG][periodic] SelfUpdateAgent 建议 {_new} 条已回流 improvements.md")
+        except Exception as e:
+            self._log(f"[PAEG][periodic] 建议回流失败: {e}")
+
         results["summary"] = (f"洞察+{results['insights']} 批处理:{bool(results['batch'])} "
-                              f"改进+{results['improvements']} 学科需求+{results.get('subject_requests', 0)}")
+                              f"改进+{results['improvements']} 学科需求+{results.get('subject_requests', 0)} "
+                              f"建议回流+{results.get('su_suggestions', 0)}")
         return results
 
 
