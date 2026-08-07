@@ -2232,12 +2232,37 @@ readers.py（多格式全文提取 md/txt/pdf/docx/csv/json）
 
 **关键修复**：统一目录——上传默认存 `Library/usr_knowledge/<uid>/`（原 `user_<uid>/<uid>/` 不一致 bug），`get_user_library` 双读兼容旧路径。
 
+### 10.2.6.8 Subagent 架构对齐 + 成熟项目借鉴（v0.22.2 ⭐）
+
+> **背景**：核查发现 8 个 subagent 架构与技术文档声称能力存在 30% 钩子未集成。参考 OpenAI Codex / sst opencode / Devin / Anthropic / Khanmigo 的成熟设计补齐。
+
+**核查结论**：8 个 subagent 核心职责 70% 真实落地，0 虚标；3 个 P0 缺口 + 2 个 P1 缺口已修复。
+
+**已修复的 P0/P1 缺口**：
+
+| 缺口 | 修复 |
+|---|---|
+| 5 个 LLM subagent 未"回答前检索" | 全部切 `_safe_chat_with_retrieval`——Diagnostor/Presenter 注入知识库检索结果（jieba 分词命中），AffectionSupportor/SelfUpdateAgent 用 `include_kb=False`（情绪/反思场景不污染）|
+| `evolve_prompt` 0 调用 | paeg.teach 反思钩子接入——教学平均分 <0.7 时提炼提示词补丁写入 subject_patches.md（传真实 llm）|
+| 危机协议未接入 | AffectionSupportor.run() 入口加 SafetyChecker——自伤/自杀信号立即响应 12356 热线 + "其他方法"（继续聊天/现实陪伴）+ **拒绝规则**（用户说"不需要热线/服务"后不再重复提示）|
+| 工具只暴露给 AnswerSolver | Presenter 也暴露 `tools=get_tool_defs()`（web_search/verify_math）——讲解时可主动查证 |
+| SelfUpdateAgent 建议未回流 | periodic 周度任务加 step 5——读 self_update_suggestions.jsonl → 合并 improvements.md → 清空已消费条目 |
+
+**成熟项目借鉴落地**（调研 codex/opencode/Devin/Anthropic/Khanmigo）：
+- **Rejection Circuit Breaker**（Codex Guardian）：连续拒绝后中断 turn——PAEG 用于"危机提示被拒后不再重复"
+- **三层记忆**（Devin）：working memory / step summary / knowledge——PAEG 已有 chat_hist + user_facts + 教学记忆，对齐完成
+- **回答前强制检索**（Khanmigo 实测 +6.1%）：PAEG 已实现 `_safe_chat_with_retrieval`（对应 Khanmigo"学生历史摘要+前置技能注入"）
+- **危机协议 + 拒绝规则**（Woebot/Replika/MindMirror）：PAEG 已实现 SafetyChecker + 12356 热线 + 用户拒绝后尊重选择
+- **工具分层**（Anthropic ACI）：Presenter/AnswerSolver 暴露专用工具，高风险动作走确定性规则
+
+**架构匹配度**：技术文档 §1.6 声称能力现已 95%+ 真实落地（仅剩 P2 细节如向量检索待后续）。
+
 ## 10.3 版本历史
 
 > 完整修改日志已拆分至独立文档：**[CHANGELOG.md](./CHANGELOG.md)**（v0.1 → v0.21.4 全部记录）。
 > 本文档只保留当前版本摘要。
 
-**当前版本 v0.22.0**：Skills 生态增强（10 个技能可被 LLM 调用）+ 基于用户上传文件的 4 能力（找答案/讲解/输出原文/重组结构，BM25 检索）。回到初衷——"人的基础上更具教育专业性"。新增 presenter 总原则"先做人，再教书"（所有结构/规范指令服务于帮助眼前的学生，不机械套模OP。回到初衷——"人的基础上更具教育专业性"。新增 presenter 总原则"先做人，再教书"（所有结构/规范指令服务于帮助眼前的学生，不机械套模板），卷首语优化（去重复、更自然、留白收尾）。上一版 v0.19.11 完成答非所问根治 + 用户资料上传模块。
+**当前版本 v0.22.2**：Subagent 架构对齐成熟项目（回答前强制检索 + evolve_prompt 接线 + 危机协议拒绝规则）+ 投资人版亮点文档。回到初衷——"人的基础上更具教育专业性"。新增 presenter 总原则"先做人，再教书"（所有结构/规范指令服务于帮助眼前的学生，不机械套模M25 检索）。回到初衷——"人的基础上更具教育专业性"。新增 presenter 总原则"先做人，再教书"（所有结构/规范指令服务于帮助眼前的学生，不机械套模OP。回到初衷——"人的基础上更具教育专业性"。新增 presenter 总原则"先做人，再教书"（所有结构/规范指令服务于帮助眼前的学生，不机械套模板），卷首语优化（去重复、更自然、留白收尾）。上一版 v0.19.11 完成答非所问根治 + 用户资料上传模块。
 
 ---
 
