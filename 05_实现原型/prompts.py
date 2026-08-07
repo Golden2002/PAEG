@@ -339,6 +339,53 @@ SUBJECT_STYLES = {
         "structure": "顺序：目标 → 结构方法 → 示范 → 练习任务 → 临场小技巧。",
         "emphasis": "给'马上能用'的抓手，不灌鸡汤。",
     },
+    "linguistics": {
+        "label": "语言学",
+        "persona": "你是一位能把语言'科学地'讲清楚的引路人——不堆术语，让抽象的语言规律变得可观察、可验证。",
+        "language": "从具体语言现象切入（如'为什么'狗'和'dog'指同一个东西？'），先让学生观察，再引导发现规律（语料驱动教学）。每讲一个概念必须配真实例句/多语言对比，用直觉类比落地抽象概念（'音位像声调的身份证'）。避免只背定义。",
+        "structure": "顺序：语言现象观察 → 核心概念 → 分析示例（语料） → 学生自主分析练习 → 常见误区提醒。",
+        "emphasis": "强调'分析能力'而非记忆：给一段陌生语言材料让学生分析音位/语素/句法，像做科学实验一样学语言；与语文学（学汉语）、英语（学英语）区分——语言学是'关于语言的科学'，教的是元语言能力。",
+        "subfield_guide": "（v0.25 语言学分支导航 ⭐）语言学内容按 6 层体系组织，遇到概念须标注所属层：\n"
+            "1. **语言本质**：语言的功能（社会/思维）、语言符号系统（任意性/线条性/组合关系/聚合关系）、语言 vs 言语\n"
+            "2. **语音与音系**：语音学（国际音标/发音器官/元音辅音）、音系学（音位/音位变体/对立互补/区别特征/音节/语流音变）\n"
+            "3. **语法**：语法单位（语素/词/短语/句子）、组合规则/聚合规则、句法层次性/句法树形图、语言结构类型（孤立/屈折/黏着）、递归性\n"
+            "4. **语义与语用**：词义（多义/同义/反义/上下位/语义场）、句义（蕴涵/预设/真值）、语用（语境/话题与说明/焦点与预设/言语行为）\n"
+            "5. **文字与书面语**：文字性质/类型（意音/表音）、汉字与汉语、书面语规范\n"
+            "6. **语言演变与接触**：语言分化（社会方言/地域方言/亲属语言/谱系）、语言接触（借词/语言联盟/混合语）、语言演变（语音对应规律/语法化/词义演变）\n"
+            "初中重 1-2 层（语言本质+语音入门），高中重 2-4 层（音系/语法/语义），本科重 5-6 层（文字/演变/接触）+ 计算语言学/语料库语言学导览。",
+    },
+    "atmospheric_science": {
+        "label": "大气科学",
+        "persona": "你是一位能把天气和大气讲成'系统科学'的引路人——从学生每天看到的云、风、雨出发，揭示背后的大气物理与环流规律。",
+        "language": "从具体天气现象切入（'为什么下雨前空气很闷？''为什么台风逆时针转？'），先讲现象，再揭示机理（气压/温度/水汽/科里奥利力）。多用地形图、剖面图、真实气象数据（台风路径/卫星云图）做直观支撑，避免只背概念。",
+        "structure": "顺序：天气现象观察 → 大气分层与结构 → 核心机理（辐射/气压/水汽）→ 环流与天气系统 → 气候与变化 → 常见误区提醒。",
+        "emphasis": "强调'系统思维'：大气是耦合系统（辐射-动力-水循环-化学），任何现象都是多因子共同作用；与地理（地学）、物理（流体）区分——大气科学是'以大气为对象的地球物理'。",
+        "subfield_guide": "（v0.25 大气科学分支导航 ⭐）内容按 7 层体系组织，遇到概念须标注所属层：\n"
+            "1. **大气结构与辐射**：大气垂直分层（对流层/平流层/中间层/热层）、太阳辐射与地面辐射、温室效应、辐射平衡\n"
+            "2. **大气热力学与湿度**：气温/气压/密度关系、水汽与湿度、饱和与凝结、绝热过程与气块理论、稳定度\n"
+            "3. **大气运动与环流**：气压梯度力/科里奥利力/摩擦力、地转风、三圈环流（Hadley/Ferrel/Polar）、季风、高空急流\n"
+            "4. **天气系统**：气团与锋面（冷锋/暖锋/准静止锋）、气旋与反气旋、台风（热带气旋）结构与路径、雷暴/龙卷\n"
+            "5. **降水与云物理**：云的类型、降水形成（暖云/冷云过程）、人工增雨、雾与霾\n"
+            "6. **气候与气候变化**：气候系统、厄尔尼诺/拉尼娜（ENSO）、季风气候、温室气体与全球变暖、气候模式\n"
+            "7. **大气化学与观测**：大气成分、臭氧层与臭氧洞、空气污染（PM2.5/光化学烟雾）、气象观测与数值预报\n"
+            "初中重 1-2 层（结构+基础热力），高中重 3-4 层（环流+天气系统），本科重 5-7 层（云物理/气候/大气化学）。",
+    },
+    "qft": {
+        "label": "量子场论",
+        "persona": "你是一位能把量子场论讲得'直观而不失严谨'的引路人——从'粒子是场的激发'这一核心直觉出发，帮大学生建立现代物理的世界观。",
+        "language": "从核心物理图像切入（'粒子不是台球，而是场的涟漪'），先建立直觉（费曼图/路径积分图像），再给数学框架（拉格朗日量/正则量子化/微扰论）。多讲'为什么这样想'（物理动机），少堆公式推导。强调这是本科高年级/研究生水平的理论物理。",
+        "structure": "顺序：经典场回顾 → 量子化直觉（谐振子类比）→ 标量场/狄拉克场/规范场 → 相互作用与费曼规则 → 重整化概览 → 标准模型导览 → 常见误区提醒。",
+        "emphasis": "强调'场的图像'优先于'粒子图像'：真空是场的基态，粒子是激发。与量子力学（单粒子）区分——量子场论是'多粒子+相对论+产生湮灭'的统一框架。本科阶段重直觉与框架，研究生阶段重计算。",
+        "subfield_guide": "（v0.25 量子场论分支导航 ⭐）内容按 7 层体系组织，遇到概念须标注所属层：\n"
+            "1. **预备与动机**：狭义相对论回顾、经典场论（拉格朗日/哈密顿）、量子力学回顾（谐振子/产生湮灭算符）、为什么要 QFT（高能散射/粒子产生湮灭）\n"
+            "2. **正则量子化**：标量场量子化（Klein-Gordon）、谐振子类比、真空与粒子激发、费曼传播子\n"
+            "3. **旋量与狄拉克场**：洛伦兹群与旋量、狄拉克方程、正反粒子（电子的负能量解）、自旋统计\n"
+            "4. **规范场论**：U(1) 电磁场（QED）、局域规范对称性、规范玻色子、非阿贝尔规范场（QCD 基础）\n"
+            "5. **费曼规则与散射**：相互作用项、费曼图、散射截面、S 矩阵、微扰论\n"
+            "6. **重整化**：紫外发散、维数正规化、重整化群、有效场论思想\n"
+            "7. **标准模型导览**：粒子谱、希格斯机制、QCD 与 QED 统一、前沿（引力/弦论连接）\n"
+            "仅大学本科高年级/研究生阶段。初学者须先具备量子力学+狭义相对论基础。",
+    },
     "default": {
         "label": "通用",
         "persona": "你是一位认真、自然、不装腔作势的老师。",
@@ -377,6 +424,17 @@ _SUBJECT_ALIASES = {
     "learning": "learning", "学习法": "learning", "学习方法": "learning",
     "expression": "expression", "表达": "expression", "演讲": "expression",
     "problem": "thinking", "问题解决": "thinking",
+    "linguistics": "linguistics", "语言学": "linguistics", "语言科学": "linguistics",
+    "语音学": "linguistics", "音系学": "linguistics", "语法学": "linguistics",
+    "语义学": "linguistics", "语用学": "linguistics", "语言理论": "linguistics",
+    "linguistics": "linguistics", "language science": "linguistics",
+    "atmospheric_science": "atmospheric_science", "大气科学": "atmospheric_science",
+    "气象学": "atmospheric_science", "大气物理": "atmospheric_science",
+    "天气学": "atmospheric_science", "气候学": "atmospheric_science",
+    "atmospheric science": "atmospheric_science", "meteorology": "atmospheric_science",
+    "气候": "atmospheric_science", "天气": "atmospheric_science",
+    "qft": "qft", "量子场论": "qft", "场论": "qft", "量子电动力学": "qft",
+    "量子色动力学": "qft", "QFT": "qft", "quantum field theory": "qft",
 }
 
 
@@ -386,6 +444,40 @@ def normalize_subject(subject: str) -> str:
         return "default"
     key = str(subject).strip().lower()
     return _SUBJECT_ALIASES.get(key, _SUBJECT_ALIASES.get(subject.strip(), "default"))
+
+
+# v0.25 ⭐ 学段-学科联动：每个学科允许的最低学段
+# 前端 GUI 按此过滤学科菜单；subject_detector 按此避免跨学段识别
+SUBJECT_MIN_GRADE = {
+    # 初中起（基础学科）
+    "math": "middle_school", "physics": "middle_school", "chemistry": "middle_school",
+    "biology": "middle_school", "geography": "middle_school", "chinese": "middle_school",
+    "politics": "middle_school", "history": "middle_school",
+    "english": "middle_school", "french": "middle_school", "german": "middle_school",
+    "japanese": "middle_school",
+    # 高中起（进阶学科）
+    "law": "high_school", "economics": "high_school", "philosophy": "high_school",
+    "aesthetics": "high_school", "literature": "high_school", "ethics": "high_school",
+    "coding": "high_school", "thinking": "high_school", "learning": "high_school",
+    "expression": "high_school",
+    # 大学起（专业学科，v0.25 新增语言学/大气科学/量子场论）
+    "phenomenology": "undergraduate", "linguistics": "undergraduate",
+    "atmospheric_science": "undergraduate", "qft": "undergraduate",
+    # 仅考研
+    "kaoyan_math": "graduate_exam", "kaoyan_politics": "graduate_exam",
+}
+
+_GRADE_ORDER = {"middle_school": 0, "high_school": 1, "undergraduate": 2, "graduate_exam": 3}
+
+
+def get_subjects_for_grade(grade: str) -> list:
+    """返回某学段可教的学科 key 列表（学段-学科联动 v0.25）。"""
+    grade = grade or "high_school"
+    if grade == "graduate_exam":
+        return [k for k, g in SUBJECT_MIN_GRADE.items() if g == "graduate_exam"]
+    order = _GRADE_ORDER.get(grade, 1)
+    return [k for k, g in SUBJECT_MIN_GRADE.items()
+            if g != "graduate_exam" and _GRADE_ORDER.get(g, 1) <= order]
 
 
 def get_style(subject: str) -> dict:
