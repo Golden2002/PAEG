@@ -823,27 +823,7 @@ body {
         <option value="graduate_exam">考研</option>
       </select>
       <select class="subject-select" id="subject-select">
-        <option value="math">数学</option>
-        <option value="physics">物理学</option>
-        <option value="chemistry">化学</option>
-        <option value="biology">生物学</option>
-        <option value="geography">地理学</option>
-        <option value="chinese">语文（中学）</option>
-        <option value="politics">政治</option>
-        <option value="law">法学</option>
-          <option value="history">历史学</option>
-          <option value="economics">经济学</option>
-          <option value="english">英语</option>
-        <option value="french">法语</option>
-        <option value="german">德语</option>
-        <option value="japanese">日语</option>
-        <option value="philosophy">哲学</option>
-        <option value="aesthetics">美学</option>
-        <option value="literature">文学</option>
-        <option value="ethics">道德/伦理</option>
-        <option value="phenomenology">生命现象学</option>
-        <option value="kaoyan_math">考研数学</option>
-        <option value="kaoyan_politics">考研政治</option>
+        <!-- 学科选项由 JS 按学段动态生成（v0.25 学段-学科联动） -->
       </select>
       <input class="question-input" id="question-input" type="text" placeholder="输入你想学习的内容…" autocomplete="off" />
       <!-- v0.19 P2-10：图片/文件上传 -->
@@ -909,6 +889,8 @@ const SUBJECT_LABELS = {
   philosophy: '哲学', aesthetics: '美学', literature: '文学',
   ethics: '道德', phenomenology: '生命现象学', kaoyan_math: '考研数学',
   kaoyan_politics: '考研政治', cs: '计算机', logic: '逻辑', art: '艺术',
+  qft: '量子场论', linguistics: '语言学', atmospheric_science: '大气科学',
+  coding: '编程', thinking: '批判性思维', learning: '高效学习法', expression: '公众表达',
 };
 
 const TONE_LABELS = {
@@ -920,6 +902,50 @@ const TONE_LABELS = {
 const chatWin = document.getElementById('chat-window');
 const questionInput = document.getElementById('question-input');
 const askBtn = document.getElementById('ask-btn');
+
+// ─── v0.25 学段-学科联动：按学段过滤可教学科 ⭐ ───
+const SUBJECT_MIN_GRADE = {
+  // 初中起（基础学科）
+  'math': 'middle_school', 'physics': 'middle_school', 'chemistry': 'middle_school',
+  'biology': 'middle_school', 'geography': 'middle_school', 'chinese': 'middle_school',
+  'politics': 'middle_school', 'history': 'middle_school',
+  'english': 'middle_school', 'french': 'middle_school', 'german': 'middle_school', 'japanese': 'middle_school',
+  // 高中起（进阶学科）
+  'law': 'high_school', 'economics': 'high_school', 'philosophy': 'high_school',
+  'aesthetics': 'high_school', 'literature': 'high_school', 'ethics': 'high_school',
+  'coding': 'high_school', 'thinking': 'high_school', 'learning': 'high_school', 'expression': 'high_school',
+  // 大学起（专业学科，v0.25 新增）
+  'phenomenology': 'undergraduate', 'linguistics': 'undergraduate', 'atmospheric_science': 'undergraduate', 'qft': 'undergraduate',
+  // 仅考研
+  'kaoyan_math': 'graduate_exam', 'kaoyan_politics': 'graduate_exam',
+};
+
+function refreshSubjectOptions() {
+  const grade = document.getElementById('grade-select').value;
+  const sel = document.getElementById('subject-select');
+  const current = sel.value;
+  sel.innerHTML = '';
+  Object.keys(SUBJECT_MIN_GRADE).forEach(k => {
+    if (grade === 'graduate_exam' ? SUBJECT_MIN_GRADE[k] === 'graduate_exam'
+        : SUBJECT_MIN_GRADE[k] === 'middle_school' || SUBJECT_MIN_GRADE[k] === 'high_school' || SUBJECT_MIN_GRADE[k] === 'undergraduate') {
+      // 考研学段：仅显示考研学科；其他学段：显示 <= 该学段的学科
+      if (grade !== 'graduate_exam') {
+        const order = {middle_school: 0, high_school: 1, undergraduate: 2};
+        if (order[SUBJECT_MIN_GRADE[k]] > order[grade]) return;
+      }
+      const opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = SUBJECT_LABELS[k] || k;
+      sel.appendChild(opt);
+    }
+  });
+  // 恢复或默认选择
+  if ([...sel.options].some(o => o.value === current)) sel.value = current;
+  else if (sel.options.length) sel.value = sel.options[0].value;
+  if (typeof STATE !== 'undefined') STATE.subject = sel.value;
+}
+document.getElementById('grade-select').addEventListener('change', refreshSubjectOptions);
+
 const subjectSelect = document.getElementById('subject-select');
 
 // ─── 消息渲染 ───
@@ -2067,6 +2093,7 @@ questionInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') askBtn.click();
 });
 
+refreshSubjectOptions();
 subjectSelect.addEventListener('change', () => {
   STATE.subject = subjectSelect.value;
 });
