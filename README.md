@@ -1,6 +1,6 @@
 # PAEG — Pedagogical Agent with Evolving Growth
 
-基于**西蒙娜·薇依（Simone Weil）**教育哲学、由 Agent 架构驱动的 AI 教育智能体（**v0.21.9**）。
+基于**西蒙娜·薇依（Simone Weil）**教育哲学、由 Agent 架构驱动的 AI 教育智能体（**v0.24 关键节点**）。
 
 > **定位**：PAEG = **新一代教育智能体解决方案**——为教育重新设计的 Agent 架构，让智能体指挥大模型完成教学全过程（诊断、计划、讲解、评估、调整、反思），使教育从"一次性问答"跃迁为"有教学法、有过程、有陪伴、能自我进化"的完整闭环。
 
@@ -16,11 +16,16 @@ PAEG 不是"给 LLM 套聊天框"的教育产品，而是**为教育重新设计
 ### 1. 完整教学循环（不是聊天，是教学）
 `paeg.teach()` 六阶段闭环：**诊断 → 计划 → 呈现 → 评估 → 调整 → 反思 → 自更新**。评估用确定性启发式（可复现不随机），LLM 只负责最擅长的"讲解"。
 
-### 2. 8 个子代理架构（LLM 只做擅长的事）
-Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（评估）/ Adapter（调整）/ AnswerSolver（找答案）/ AffectionSupportor（情绪陪伴）/ **SelfUpdateAgent（自我更新，v0.21.4）**。设计原则：诊断深度、评估分数、调整决策用确定性规则（可测试可复现），只有"生成讲解"用 LLM。
+### 2. 9 个子代理架构（LLM 只做擅长的事 · v0.24 全持有）
+Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（评估）/ Adapter（调整）/ AnswerSolver（找答案）/ AffectionSupportor（情绪陪伴 · 立德树人）/ SelfUpdateAgent（自我更新）/ **Individuality（个体化因材施教 · 17 维画像）**。**v0.24 修复**：PAEG 主 agent 现在持有全部 9 个 subagent 统一调度。设计原则：诊断深度、评估分数、调整决策用确定性规则（可测试可复现），只有"生成讲解"用 LLM。
 
 ### 3. 多层意图路由（Agent 自动判断该做什么）
 用户设定"考研政治"问经济学 → 自动切换学科（Steering）；问"你今天怎么样" → 意向性层走一般化回应；问"我最近好难过" → 情绪拦截走 affection；选错模式 → 后端自动纠正；问"有哪些 subagent" → 自我指涉路由（v0.21.6）；**粘贴"帮我分析这段话：<长文>" → 复合输入检测（v0.21.9），用 DeepSeek 结构化模板区分指令与资料，防注入**。
+
+### 3.5 教育理念双原则（⭐ 因材施教 × 立德树人 · v0.24 闭环）
+- **因材施教**（Individuality）：**17 维正交学生画像** + LLM 增量建模（对话中说"代数弱"→画像自动记薄弱点）+ persist 持久化（users_data/profile.json 落盘）+ 动态维度扩展（add_dimension 可加到第 18/19 维）+ inject_control 五层注入（语言/风格/深度/节奏/情绪）——对每个学生个别对待
+- **立德树人、立德为先**（AffectionSupportor）：**不教、不答、不解决，以注意力陪伴**；危机信号**先回应再关怀**（`_affection_gate_check` 危机先行钩子）；薇依世界观（真实/罪恶与善/矛盾张力/疏导+认知真实）；情绪稳定后才回归学习——**先成人，后成才**
+- **德才兼备**：通用 AI 教育产品只能做到"才"（知识传授）；PAEG 还要做到"德"（品格陪伴）——这是任何"刷题 AI"都无法复制的价值观壁垒
 
 ### 4. 系统性自我进化
 四路自进化：知识蒸馏（成功教学入库 evolved_*.json）/ 提示词补丁（SCOPE 双流）/ 工具经验 / 新学科需求闭环（用户问"量子力学"自动记录并反馈）。质量门禁（Constitutional AI 风格）过滤有害内容。SelfUpdateAgent 读取过滤后洞察 + 用户反馈生成结构化建议（/api/self-update/from-feedback）。
@@ -57,17 +62,29 @@ Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（
 元能力文档.md（智能体设计方法论）+ observability.py（结构化日志/指标/事件流）。
 顶部"气象"链接 → windy.com 气象图（免费嵌入）+ 位置共享 + Open-Meteo 实时数据。
 
-## 架构全景
+## 架构全景（v0.24 关键节点 · 真实连接）
 
 ```
 前端 GUI（6 模式：学科教学/闲聊/找答案/学习方法/知识库/倾诉）
     ↓
-server.py（多层拦截链：steering → 界面 → 知识库 → 情绪 → 意向性 → 方法 → 出题 → 教学）
+server.py（meta_router.route() 集中分发：steering → 界面 → 知识库 → 情绪 → 意向性 → 方法 → 出题 → 教学）
     ↓
-subagents.py（7 子代理）+ context_bundle（上下文打包）+ _polish_text（语言质量）
+PAEG 主 agent（持有全部 9 个 subagent：_affection_gate_check 危机先行 → Individuality 17 维画像注入）
     ↓
-tool_registry（34 工具：内置 FC + MCP）+ self_evolution（四路自进化）
+9 个 subagent（Diagnostor → Planner → Presenter → Evaluator 双维评分 → Adapter 决策执行
+       + AnswerSolver + AffectionSupportor 立德树人 + SelfUpdateAgent 自更新 + Individuality 持久化）
+    ↓
+DeepSeek（llm_adapter 全部 subagent 调用）
+    ↓
+工具链（tool_registry 7 工具 + skill_registry 10 技能 L1 注入 + 用户文件 4 能力 BM25）
+    ↓
+MCP 层（MCPClientManager 真实接线：filesystem 14 + memory 9 = 2/2 连接验证通过
+       + mcp_gateway :8765 对外暴露）
+    ↓
+本地资源（knowledge_base 知识库 + Library 薇依原著 + memory/ + users_data/ 画像 + improvements.md 自更新回流）
 ```
+
+**完整链路图**：见 `ARCHITECTURE_LINKS.md`（5 张 Mermaid 图，GitHub 原生渲染）。
 
 ## 快速开始
 
@@ -85,7 +102,7 @@ python server.py
 # 4. 打开浏览器
 #    http://localhost:5000
 
-# 5. 测试（59 个）
+# 5. 测试（132 个 · v0.24）
 python -m pytest tests -q
 python -m pytest "..\06_测试与验证\tests\test_paeg_v0_5.py" -q
 
