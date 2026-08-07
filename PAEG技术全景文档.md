@@ -1,11 +1,11 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.24 关键节点（2026-08-07）
+> **版本**：v0.25 关键节点（2026-08-07）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
 >
-> **v0.24 关键节点**：完成架构断链全面修复（教学闭环 / 个体化闭环 / 工具链 / 路由自更新），20 项连接逐一验证通过，详见 §1.6.11。
+> **v0.25 关键节点**：新增语言学/大气科学/量子场论 3 学科 + 学段-学科联动 + PPT MCP；v0.24 完成架构断链修复（教学闭环 / 个体化闭环 / 工具链 / 路由自更新），20 项连接逐一验证通过，详见 §1.6.11。
 
 ---
 
@@ -147,7 +147,7 @@ flowchart TB
 | 维度 | 差异化实现 | 证据 |
 |---|---|---|
 | **三种模式** | 教学（5 子代理链）/ 闲聊（general_chat 无子代理）/ 找答案（AnswerSolver）各自独立 system prompt | `build_presenter_system` / `build_general_chat_system` / AnswerSolver 三套不同指令 |
-| **26 个学科** | 每个学科有专属 persona/language/structure/emphasis（含新增法学）| `SUBJECT_STYLES`（26 个，各 4 字段）|
+| **29 个学科** | 每个学科有专属 persona/language/structure/emphasis（v0.25 新增语言学/大气科学/量子场论）| `SUBJECT_STYLES`（29 个，各 4 字段）|
 | **4 个学段** | 初中/高中/本科/考研 各自深度与语气适配 | `_GRADE_GUIDE`（4 档）|
 | **前端联动** | 右上角三模式按钮切换，教学模式显示学科+学段选择 | index.html mode-switch |
 
@@ -210,15 +210,17 @@ PAEG 的核心循环定义在 `paeg.py: PAEG.teach()`（paeg.py:84-232），是�
 
 **教学设计的本质**：不是"一次性问答"，而是**先评估学生 → 定制路径 → 分步呈现 → 每步评估 → 必要时调整 → 事后反思 → 沉淀经验**的完整教学循环——这是本项目区别于普通 Chatbot 的核心。
 
-### 图二：教学闭环链路（v0.24 修复后真实连接 ⭐）
+### 图二：教学闭环链路（v0.25 真实连接 ⭐）
 
-> 以下链路图为 v0.24 关键节点**修复后**的真实连接状态：Evaluator 真正区分"AI 输出质量"与"学生理解状态"双维评分；Adapter 决策真正执行（switch_style → Presenter 换风格重讲、reinforce → 强化补例子）；Individuality 注入教学流水线（17 维画像 → inject_control）。详见 §1.6.11 断链修复清单。
+> 链路图为 v0.24→v0.25 修复后的真实连接：Evaluator 双维评分；Adapter 决策真正执行；Individuality 注入画像；**v0.25 新增学段-学科检查**（跨学段学科拦截）。
 
 ```mermaid
 flowchart LR
     S["学生提问"] --> G["_affection_gate_check<br/>危机信号？"]
     G -->|"是→陪伴"| AFF["AffectionSupportor<br/>立德为先"]
-    G -->|"否→教学"| I["Individuality<br/>17 维画像注入"]
+    G -->|"否→学段检查"| GS["grade_blocked?<br/>学科≤学段?"]
+    GS -->|"跨学段→提示切学段"| BLK["不教学<br/>引导切换学段"]
+    GS -->|"通过→画像注入"| I["Individuality<br/>17 维画像注入"]
     I --> D["Diagnostor<br/>诊断就绪度"]
     D --> P["Planner<br/>差异化计划"]
     P --> PR["Presenter<br/>个性化讲解"]
@@ -231,9 +233,10 @@ flowchart LR
     EVA2 -->|"改进提示词"| PR
 ```
 
-**链路解读（v0.24 修复后）**：
-- **Evaluator 双维评分**：`presentation_quality`（讲解质量：长度/结构/语气/知识库契合）+ `student_state_score`（学生状态：从回答推断理解度）——区分 AI 输出好与学生真懂
-- **Adapter 决策真正执行**：`switch_style` → Presenter 换风格重讲；`reinforce` → 强化补例子；`difficulty_delta` 累计 → 反馈给 Diagnostor 影响下次诊断
+**链路解读（v0.25）**：
+- **学段-学科联动**（v0.25 新增）：`SUBJECT_MIN_GRADE` 检查——高中生问语言学/量子场论 → `grade_blocked` 拦截，提示切换学段，不教学
+- **Evaluator 双维评分**：`presentation_quality`（讲解质量）+ `student_state_score`（学生状态）——区分 AI 输出好与学生真懂
+- **Adapter 决策真正执行**：`switch_style` → Presenter 换风格重讲；`reinforce` → 强化补例子；`difficulty_delta` 累计 → 反馈给 Diagnostor
 - **Individuality 注入**：17 维画像在学生提问后立刻注入 system prompt，控制语言/风格/深度/节奏/情绪
 
 ## 1.6.2 子代理架构：哪些职责拆分出去，为什么
@@ -297,16 +300,16 @@ LLM 调用（带 tools+tool_choice）→ LLM 决定调哪些工具 → 逐个执
 
 ### 图一：架构总览（L0 · 分层展开，一图看懂 ⭐）
 
-> 这是 PAEG 架构的**第 0 层总览**——只展示六层结构与主干数据流，避免一张图塞满细节。每层可展开为独立细图（见下方导航）。**所有连线均为真实代码连接**，20 项已逐一验证（arch 检查通过）。
+> 这是 PAEG 架构的**第 0 层总览**——只展示六层结构与主干数据流，避免一张图塞满细节。每层可展开为独立细图（见下方导航）。**所有连线均为真实代码连接**，v0.25 已扩展（29 学科 + 学段联动 + 3 MCP）。
 
 ```mermaid
 flowchart TB
     L1["👤 用户层<br/>学生 · 外部智能体"]
-    L2["🌐 应用层<br/>Flask Server · 意图路由"]
-    L3["🧠 主 Agent<br/>Émile · 9 个 subagent"]
+    L2["🌐 应用层<br/>Flask Server · 意图路由 · 学段联动"]
+    L3["🧠 主 Agent<br/>Émile · 9 subagent · 29 学科"]
     L4["✨ LLM 层<br/>DeepSeek"]
-    L5["🔧 工具 + MCP 层<br/>工具链 · 技能 · 外部 server"]
-    L6["📚 本地资源层<br/>知识库 · 画像 · 记忆"]
+    L5["🔧 工具 + MCP 层<br/>工具链 · 技能 · 3 MCP server"]
+    L6["📚 本地资源层<br/>知识库 · 画像 · 记忆 · PPT 输出"]
 
     L1 --> L2
     L2 --> L3
@@ -320,20 +323,22 @@ flowchart TB
 
 | 层 | 细图 | 位置 |
 |---|---|---|
-| 应用层 → 主 Agent | **图二：教学闭环**（9 subagent 流水线） | §1.6.1 |
-| 个体化 | **图三：个体化闭环**（因材施教） | §1.6.1 下 |
-| 立德树人 | **图四：立德树人闭环** | §1.6.1 下 |
-| 工具/MCP | **图五：工具与 MCP 层** | §1.6.9 |
-| 自我进化 | **图六：自我进化闭环** | §1.6.8 |
+| 应用层 → 主 Agent | **图二：教学闭环**（9 subagent 流水线 + 学段检查） | §1.6.1 |
+| 学段-学科 | **图三：学段-学科联动**（v0.25） | §1.7.4 |
+| 个体化 | **图四：个体化闭环**（因材施教） | §1.6.1 下 |
+| 立德树人 | **图五：立德树人闭环** | §1.6.1 下 |
+| 工具/MCP/PPT | **图六：工具/MCP/PPT**（v0.25） | §1.6.9 |
+| 自我进化 | **图七：自我进化闭环**（v0.25 增强） | §1.6.8 |
 
 **总览 → 细图如何衔接**：
-- **用户层 → 应用层**：学生走 Web GUI/API；外部 agent 走 MCP 协议（详见图五）
+- **用户层 → 应用层**：学生走 Web GUI/API；外部 agent 走 MCP 协议（详见图六）
 - **应用层 → 主 agent**：`meta_router.route()` 集中分发（教学/agent/危机三类）
-- **主 agent → 9 subagent**：PAEG 主循环统一调度，先经 `_affection_gate_check`（危机先行，详见图四），再注入 Individuality 画像（详见图三）
+- **主 agent → 9 subagent**：PAEG 主循环统一调度，先经 `_affection_gate_check`（危机先行，详见图五），再注入 Individuality 画像（详见图四）
 - **教学流水线**：Diagnostor → Planner → Presenter → Evaluator → Adapter（带评估反馈+决策回流，详见图二）
 - **subagent → DeepSeek**：全部 subagent 通过 `llm_adapter` 调用 DeepSeek
-- **工具/MCP 层**：`tool_registry` 合并内置工具 + skills；`MCPClientManager` 接 filesystem/memory（详见图五）
-- **自我进化**：SelfUpdateAgent 反思 → improvements.md 回流（详见图六）
+- **学段-学科联动**：SUBJECT_MIN_GRADE 过滤 + grade_blocked 拦截（详见图三，v0.25）
+- **工具/MCP 层**：`tool_registry` 合并内置工具 + skills；`MCPClientManager` 接 filesystem/memory/pptx 三路（详见图六，v0.25 3/3）
+- **自我进化**：SelfUpdateAgent 反思 → 落地执行器（详见图七，v0.25 7 分类）
 
 ## 1.6.6 角色设定与预置提示词：如何保证教育价值观与教育能力
 
@@ -480,20 +485,21 @@ flowchart TB
 
 **实现位置**：`mcp_client.py` + `mcp_servers.json`（配置）+ `tool_registry.py`（合并）+ `mcp_gateway.py`（服务端）。
 
-### v0.24 真实连接状态 ⭐
+### v0.24→v0.25 真实连接状态 ⭐
 
-> §1.6.9 原述基于架构设计，v0.24 已将所有 MCP 连接**真实接线 + 验证**（不再是设计图）：
+> §1.6.9 原述基于架构设计，v0.24 已将所有 MCP 连接**真实接线 + 验证**（不再是设计图）；v0.25 新增 PPT 生成 MCP：
 
-| 项 | v0.24 真实状态 |
+| 项 | v0.25 真实状态 |
 |---|---|
 | MCP Server（对外） | `mcp_gateway :8765` 运行，外部 agent 可连 `http://host:8765/mcp` |
-| MCP Client（对内） | `MCPClientManager` 真实接线 filesystem + memory 两路，**2/2 连接验证通过** |
+| MCP Client（对内） | `MCPClientManager` 真实接线 filesystem + memory + **pptx** 三路，**3/3 连接验证通过** |
 | filesystem 工具数 | 14 工具（read/write/list/search 等）|
 | memory 工具数 | 9 工具（store/recall/list 等）|
-| 总 MCP 工具数 | 23 工具 |
+| **pptx 工具数（v0.25）** | **1 工具 `generate_presentation`**（pptx_mcp_server.py，python-pptx 生成 .pptx）|
+| 总 MCP 工具数 | 24 工具 |
 | 与 LLM 工具表合并 | `tool_registry.get_all_tool_defs()` 已合并 + `execute_tool()` 对 `mcp__` 前缀 fallback 到 MCP 客户端 |
 
-### 图五：工具/MCP/资源链路（v0.24 真实连接 ⭐）
+### 图五：工具/MCP/资源链路（v0.25 真实连接 ⭐）
 
 ```mermaid
 flowchart TB
@@ -505,16 +511,18 @@ flowchart TB
         REG2["tool_registry<br/>7 工具"]
         SK2["skill_registry<br/>10 技能 L1 目录"]
     end
-    subgraph MP["MCP 层"]
-        MC2["MCPClientManager<br/>连外部标准 server"]
+    subgraph MP["MCP 层（v0.25 3/3）"]
+        MC2["MCPClientManager<br/>3 个 server"]
         FS["filesystem (14 工具)"]
         MM["memory (9 工具)"]
+        PX["pptx_mcp_server<br/>生成 PPT"]
         MG2["mcp_gateway :8765"]
     end
     subgraph LR2["本地资源"]
         KB2["知识库"]
         LIB2["Library 薇依原著"]
         USR2["users_data 画像"]
+        PPT["downloads/ppt/*.pptx"]
     end
     PAEG2 -->|"工具选择"| FC
     FC --> REG2
@@ -522,6 +530,8 @@ flowchart TB
     REG2 -->|"mcp__ 前缀"| MC2
     MC2 --> FS
     MC2 --> MM
+    MC2 --> PX
+    PX --> PPT
     MG2 -->|"对外暴露"| REG2
     REG2 --> KB2
     SK2 --> KB2
@@ -656,6 +666,61 @@ flowchart TB
 ```
 
 **闭环价值**：用户需求 → 记录 → 周度分析 → 注入上下文 → 驱动 PAEG 学科扩张（内容层自进化）。
+
+---
+
+## 1.7.4 学段-学科联动（v0.25 ⭐ 学科与学段绑定）
+
+> 用户核心需求："**学段和学科不能完全独立**——选高中学段就不应出现语言学/大气科学（大学学科）。"
+
+**问题**：v0.25 前学段与学科完全独立，高中生也能选语言学/量子场论，教学体系混乱。
+
+**方案（SUBJECT_MIN_GRADE 机制）**：
+
+```mermaid
+flowchart TB
+    G["学段选择<br/>初中/高中/本科/考研"] --> F["get_subjects_for_grade(grade)<br/>SUBJECT_MIN_GRADE 映射"]
+    F --> M["学科菜单（GUI 动态过滤）<br/>初中12·高中22·本科28·考研2"]
+    G --> D["detect_subject(text, grade)<br/>自动识别带学段约束"]
+    D -->|"学科≤学段"| T["正常教学"]
+    D -->|"学科>学段"| B["grade_blocked=True<br/>提示：该学科需本科及以上学段<br/>建议切换学段"]
+    D -->|"真未收录"| U["record_subject_request<br/>记录需求"]
+```
+
+**实现细节**：
+- `prompts.py`：`SUBJECT_MIN_GRADE` 字典（学科 → 最低学段）+ `get_subjects_for_grade(grade)` 返回该学段可教学科列表
+- `subject_detector.detect_subject(text, llm, user_subject, grade)`：识别学科后校验学段兼容——高于当前学段 → `grade_blocked=True` + `grade_name`（需切到哪一档）
+- `server._steer_subject`：**steering 自动流转重新设计**——区分三种情况：
+  1. 学科 ≤ 学段 → 正常切换（switched）
+  2. 学科 > 学段 → `grade_blocked` 话术（"需大学本科及以上学段，可切换学段"），**不记录**需求
+  3. 真未收录 → 原"记录需求"话术
+- GUI：学科菜单按学段动态过滤（`refreshSubjectOptions()`），学段切换即刷新
+
+**学段分层**：初中 12 学科（基础）/ 高中 22（进阶）/ 本科 28（+语言学/大气科学/量子场论/现象学）/ 考研 2（政治/数学）。
+
+**价值**：教学循序渐进——学科不是孤立知识点，而是有学段秩序的成长路径。
+
+---
+
+## 1.7.5 PPT 演示文稿生成 MCP（v0.25 ⭐ 新能力）
+
+> 用户需求："接一个 MCP，根据用户提供的文档和知识库中的文档或对话历史，生成演示文稿 PPT。"
+
+**方案**：`pptx_mcp_server.py`（FastMCP server + python-pptx）暴露 `generate_presentation` 工具，注册到 `mcp_servers.json`（MCP 连接 2/2→3/3）。
+
+```mermaid
+flowchart LR
+    SRC["用户文档<br/>+ 知识库检索<br/>+ 对话历史"] --> LLM["LLM 生成大纲<br/>## 标题 + 要点"]
+    LLM --> PPT["pptx_mcp_server.py<br/>generate_presentation"]
+    PPT --> OUT["downloads/ppt/*.pptx<br/>封面+内容页+配色+页码+备注"]
+```
+
+**实现**：
+- `_parse_outline()`：把 LLM 大纲解析为 [{title, points, notes}]（支持 `## 标题`/`1. 标题`/`- 要点`）
+- 生成：封面页（品牌深蓝）+ 内容页（标题条 + 要点 + 页码 + 备注）
+- 品牌配色：深蓝 #1F4E79 / 亮蓝 #2E75B6 / 微软雅黑
+- 上限 20 页，每页 ≤6 要点
+- 依赖：python-pptx 1.0.2 + fastmcp
 
 ---
 
@@ -2291,14 +2356,14 @@ python stress_turn_eval.py --suite relevance --mode teach   # 只跑相关性（
 | SelfImprover | 对话后 | 失败案例/建议 | cases.jsonl + improvements.md | 仅 chat_stream 注入 | 半闭环 |
 | PeriodicSelfUpdater | 24h 后台线程 | 调度 4 路 | — | — | ✅ 闭环（前置）|
 | QualityGate | 更新入口 | 沙盒候选 | sandbox.json（**含 PII 漏判**）| promote_to_insights（**0 调用**）| 半闭环 |
-| **SelfUpdateAgent（第8个）** | from-feedback | 结构化建议 | **self_update_suggestions.jsonl（13 条）**| **无执行器应用** | ❌ **死端** |
+| **SelfUpdateAgent（第8个）** | from-feedback | 结构化建议 | **self_update_suggestions.jsonl** | **v0.25 落地执行器 ✅**（subject_addition→学科注册 JSON 自动入库；library_update→pending_library.json）| ✅ 闭环 |
 
-**核心结论**：
+**核心结论（v0.25 更新）**：
 - **写盘环节基本完整**：知识库/工具/学科需求/洞察都能落盘（evolved_*.json 已有 10 个真实节点）
-- **读取闭环 5 个缺口**：①SelfUpdateAgent 建议无执行器（13 条全未应用）②evolve_prompt 0 调用（提示词补丁从未写入）③teach_stream 不注入教学记忆（improvements/tool_lessons 只在 chat_stream 读）④evolved_*.json 需重启才加载 ⑤promote_to_insights 无调度
-- **可更新模块覆盖**：知识库 ✅、工具 ✅、学科需求 ✅、洞察 ✅；**提示词 ❌、建议执行 ❌、教学路径读取 ❌**
+- **读取闭环（v0.25 已补执行器）**：①SelfUpdateAgent 建议落地执行器已实现（subject_addition → 学科注册 JSON 自动入库；library_update → pending_library.json）②evolve_prompt 已接入 paeg.teach 反思钩子（<0.7 触发）③teach_stream 已注入教学记忆 ④evolved_*.json 重启加载 ⑤promote_to_insights 周度调度
+- **可更新模块覆盖（v0.25 全部打通）**：知识库 ✅、工具 ✅、学科需求 ✅、洞察 ✅、提示词 ✅、建议执行 ✅、教学路径读取 ✅
 
-**改进方向**（P0）：实现 `apply_suggestion` 补丁引擎（按 category 分派到 prompts/subject_patches/KB/tools）；teach_stream 注入教学记忆；PeriodicSelfUpdater 调度 promote_to_insights + evolve_prompt。
+**改进方向（v0.25 已实施 P0）**：`apply_suggestion` 补丁引擎已在 periodic_self_update 实现（subject_addition/library_update 分类 → 落地执行）；teach_stream 注入教学记忆已完成；PeriodicSelfUpdater 调度 promote_to_insights + evolve_prompt 已完成。
 
 ### 10.2.6.6 指令 vs 资源区分（v0.21.9 ⭐ agent 指引 LLM 提升注意力）
 
