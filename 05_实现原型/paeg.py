@@ -98,10 +98,13 @@ class PAEG:
         if self.verbose:
             print(msg)
 
-    def teach(self, learner: LearnerProfile, question: str, subject: str) -> dict:
+    def teach(self, learner: LearnerProfile, question: str, subject: str,
+              subtopic: str = "") -> dict:
         """
         完整教学流程：诊断 -> 计划 -> 呈现（多步） -> 评估 -> 调整 -> 反思 -> 自我更新。
         返回 {"session": ..., "summary": ..., "worldview_used": ..., "tone_ratio": ...}
+
+        subtopic（v0.26）：二级学科/子主题，注入每个 plan step，Presenter 据此锚定讲解。
 
         v0.24 ⭐：在 teach 起点注入 Individuality（在 system 上叠加个体化指令），
         AffectionSupportor 仅在危机信号或纯情绪表达时短路到情绪支持而非教学。
@@ -139,6 +142,14 @@ class PAEG:
             subject=subject
         )
 
+        # v0.26 D1 ⭐ 课堂记录（可回放）：记录本堂课完整过程
+        try:
+            from observability import transcript_append
+            _tr = lambda *a, **kw: transcript_append(session.session_id, *a, **kw)
+            _tr("user_input", text=question[:500], subject=subject)
+        except Exception:
+            _tr = None
+
         # 1. 诊断
         self._log(f"\n[1/5] 诊断子代理：评估 {learner.nickname} 的当前水平...")
         session.diagnosis = self.diagnostor.run(
@@ -148,6 +159,10 @@ class PAEG:
         )
         self._log(f"   OK 诊断完成：ready_to_teach={session.diagnosis.get('ready_to_teach', True)}"
               f"（{session.diagnosis.get('diagnosed_by', 'rule')}）")
+        try:
+            if _tr: _tr("diagnosis", ready_to_teach=session.diagnosis.get("ready_to_teach", True))
+        except Exception:
+            pass
 
         # 2. 计划
         self._log(f"\n[2/5] 计划子代理：设计教学路径...")
@@ -157,7 +172,16 @@ class PAEG:
             subject=subject,
             concept=question
         )
-        self._log(f"   OK 计划完成：{len(session.plan['steps'])} 步")
+        # v0.26 ⭐ subtopic 注入每个 plan step（二级学科锚定；空则不注入）
+        if subtopic:
+            for _st in (session.plan.get("steps") or []):
+                _st["subtopic"] = subtopic
+        self._log(f"   OK 计划完成：{len(session.plan['steps'])} 步" + (f"（子主题：{subtopic}）" if subtopic else ""))
+        try:
+            if _tr: _tr("plan", steps=len(session.plan.get("steps") or []),
+                        subtopic=subtopic or "")
+        except Exception:
+            pass
 
         # 世界观语气（贯穿全程）
         tone_info = select_tone(subject)
@@ -179,6 +203,21 @@ class PAEG:
             learner._user_model = user_model  # type: ignore[attr-defined]
         except Exception:
             learner._user_model = None  # type: ignore[attr-defined]
+
+        # v0.26 ⭐ 用户资料注入（P0 断链修复：教学流程此前不注入用户上传资料）
+        # 让教学/解题 subagent 都能看到用户上传到 Library/usr_knowledge/<uid>/ 的资料
+        try:
+            _uid = getattr(learner, "id", "") or ""
+            if _uid:
+                from lib.library_store import read_user_corpus
+                _uc = read_user_corpus(str(_uid), max_files=3, per_file=300)
+                if _uc:
+                    learner._user_corpus = _uc  # type: ignore[attr-defined]
+                    self._log(f"   OK 用户资料注入：{len(_uc)} 字符")
+                else:
+                    learner._user_corpus = ""  # type: ignore[attr-defined]
+        except Exception:
+            learner._user_corpus = ""  # type: ignore[attr-defined]
 
         # v0.24 ★ Individuality 注入：在 system 上叠加个体化指令（语言/风格/深度/节奏/情绪敏感）
         # 这里是上游"控制 LLM 个性化输出"的指挥线——
@@ -266,6 +305,14 @@ class PAEG:
             session.history.append(presentation)
             gen = "LLM" if presentation.get("llm_generated") else "规则"
             self._log(f"   OK 呈现完成：{gen} 生成，长度 {len(presentation['content'])} 字符")
+            try:
+                if _tr: _tr("presentation", step_id=i + 1,
+                            step_type=step.get("type", ""),
+                            topic=step.get("topic", "")[:80],
+                            content=(presentation.get("content") or "")[:300],
+                            llm_generated=presentation.get("llm_generated", False))
+            except Exception:
+                pass
 
             # 4. 评估（每个呈现步骤后）—— v0.24 真正评估学生
             self._log(f"   -> 评估子代理：检查学生理解...")
@@ -279,6 +326,12 @@ class PAEG:
                   f"{evaluation.get('presentation_quality', '?')} / 学生状态 "
                   f"{evaluation.get('learner_state', {}).get('student_state_score', '?')} / "
                   f"ready={evaluation['ready_to_advance']} / reason={evaluation.get('reason')}）")
+            try:
+                if _tr: _tr("evaluation", step_id=i + 1,
+                            score=evaluation.get("score", 0),
+                            ready_to_advance=evaluation.get("ready_to_advance", True))
+            except Exception:
+                pass
 
             # 5. 调整（必要时）—— v0.24 真正执行
             if not evaluation.get('ready_to_advance', True):
@@ -317,6 +370,76 @@ class PAEG:
                     self._log(f"   ★ 决策执行：reinforce → 下一次 Presenter 追加补例子（difficulty_delta={difficulty_delta}）")
                 else:
                     self._log(f"   OK 决策：{decision}")
+
+                # v0.26 D3 ⭐ Verify Gate（学自 Anthropic Building Effective Agents）
+                # 当前 step 不达标 → 立即重讲一次（reinforcement），而非只影响下一步——
+                # 学生在该 step 还没懂就推进是"假进度"。重讲限 1 次，防死循环。
+                if decision in ('switch_style', 'reinforce') and not getattr(step, '_verified_retried', False):
+                    step['_verified_retried'] = True
+                    self._log(f"   ★ Verify Gate：当前步未达标，立即重讲（决策={decision}）")
+                    # 把刚生成的决策立即注入重讲（override/reinforce 不等到下一步）
+                    _rg_so = None
+                    _rg_rn = None
+                    if decision == 'switch_style':
+                        _rg_so = {
+                            "new_style": params.get('new_style', 'analogy'),
+                            "override_system_line": params.get('override_system_line', ''),
+                            "difficulty_delta": difficulty_delta,
+                        }
+                    elif decision == 'reinforce':
+                        _rg_rn = pending_reinforce_note or (
+                            f"学生该步理解度低，请补一个不同角度的例子或换切入方式复述。"
+                            f"当前 step 主题：{step.get('topic','')}")
+                    if hasattr(self.presenter, "set_pending_overrides"):
+                        self.presenter.set_pending_overrides(
+                            style_override=_rg_so,
+                            reinforce_note=_rg_rn,
+                            individuality_control=individuality_control if individuality_control else None,
+                            individuality_profile_prompt=individuality_profile_prompt,
+                        )
+                    _retry_presentation = self.presenter.run(
+                        step=step,
+                        learner=learner,
+                        previous=session.history,
+                        tone_info=tone_info,
+                        concept=question,
+                        subject=subject,
+                    )
+                    # v0.12：语言优化 Agent 矫正（重讲内容同样过 refiner）
+                    if self.refiner and _retry_presentation.get("llm_generated"):
+                        _rc = _retry_presentation.get("content", "")
+                        if _rc:
+                            try:
+                                _refined = self.refiner.refine(
+                                    _rc, context=f"教学重讲：{subject} - {question}")
+                                if _refined and _refined != _rc:
+                                    _retry_presentation["content"] = _refined
+                                    _retry_presentation["refined"] = True
+                            except Exception:
+                                pass
+                    session.history.append(_retry_presentation)
+                    # v0.24 一致性：重讲同样带 _injections 字段（测试/审计断言依赖）
+                    _retry_presentation["_injections"] = {
+                        "style_override": _rg_so,
+                        "reinforce_note": _rg_rn,
+                        "individuality_control": individuality_control,
+                        "verify_gate_retry": True,
+                    }
+                    # 重讲后再评估一次（Verify 闭环），记录但不阻塞流程
+                    try:
+                        _retry_eval = self.evaluator.run(step, learner, _retry_presentation)
+                        session.evaluations.append(_retry_eval)
+                        self._log(f"   Verify Gate 重讲后分数：{_retry_eval.get('score')}"
+                              f"（ready={_retry_eval.get('ready_to_advance')}）")
+                        try:
+                            if _tr: _tr("retry", step_id=i + 1,
+                                        decision=decision,
+                                        score=_retry_eval.get("score", 0),
+                                        ready=_retry_eval.get("ready_to_advance", True))
+                        except Exception:
+                            pass
+                    except Exception as _re:
+                        self._log(f"   (重讲评估跳过: {_re})")
 
         # v0.24：把 difficulty_adjustments 累计成最终 difficulty 字段，写到 session.diagnosis
         # 供下次会话读取（PAEG 的"难度预算"）
@@ -384,6 +507,16 @@ class PAEG:
                     self._log(f"   🔄 自我进化：记录反思（EMA Δ={ema_delta:.2f}）")
             except Exception as _e:
                 self._log(f"   (自我进化跳过: {_e})")
+
+        # v0.26 D1 ⭐ 课堂记录：最终摘要
+        try:
+            if _tr:
+                _summary = self._summarize(session)
+                _tr("summary", avg_score=_summary.get("avg_score", 0),
+                    steps_completed=_summary.get("steps_completed", 0),
+                    duration_min=_summary.get("duration_min", 0))
+        except Exception:
+            pass
 
         return {
             "session": session,
