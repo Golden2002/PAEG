@@ -5,6 +5,66 @@
 
 ---
 
+## v0.24（2026-08-07）⭐ 关键节点
+
+**架构断链全面修复 + 4 文档同步 + 链路图 + Release**
+
+> 🏷️ **本版本标记为关键节点**：本地快照 + GitHub Release `v0.24`。异常时可按 §10.9 回退。
+>
+> **核心动作**：把"声明了但没接上"的断链全部修好——架构文档中声称的能力现在都已真实落地，并通过 20 项连接逐一验证。
+
+### 1. 教学闭环修复（5 项 �）
+- **Evaluator 双维评分**：`presentation_quality`（讲解质量：长度/结构/语气/知识库契合）+ `student_state_score`（学生状态：从回答推断理解度）——**区分 AI 输出好与学生真懂**
+- **Adapter 决策真正执行**：`switch_style` → Presenter 换风格重讲；`reinforce` → 强化补例子；`difficulty_delta` 累计到 Diagnostor 影响下次诊断
+- **PAEG 主 agent 持有全部 9 个 subagent**：Diagnostor/Planner/Presenter/Evaluator/Adapter/AnswerSolver/AffectionSupportor/SelfUpdateAgent/Individuality 全部由 paeg.py 统一调度
+- **Individuality 注入教学流水线**：17 维画像在教学开始前经 `inject_control` 注入 system prompt（语言/风格/深度/节奏/情绪五层）
+- **AffectionSupportor 危机钩子先行**：`_affection_gate_check` 危机信号先行 → 危机时转 AffectionSupportor（立德为先）
+
+### 2. 个体化闭环修复（4 项 ⭐ · 因材施教落地）
+- **Individuality 增量建模**：对话中 `extract_user_facts` → Individuality.run LLM 增量更新画像（"对话1说代数弱 → 对话2画像记薄弱点"端到端验证）
+- **persist 持久化**：`persist()` 落盘 `users_data/profile.json`，跨会话保持
+- **student_trait 17 维动态扩展**：新增母语维（16→17），`add_dimension()` 支持加到第 18/19 维
+- **inject_control 五层注入**：语言/风格/深度/节奏/情绪五层分别注入 system prompt
+
+### 3. 工具链修复（5 项 ⭐）
+- **10 个 SKILL.md L1 目录注入 system prompt**：SkillRegistry 启动时加载，技能对 LLM 可见
+- **`/api/skills` 真实返回 10 技能**（不再 mock）
+- **MCPClientManager 真实接线**：filesystem 14 + memory 9 = **2/2 连接验证通过**
+- **agent_engine 接入**：`mode=agent` 路由接入 AgentEngine（Plan→Act→Observe→Reflect）
+- **teach_stream 补 SelfEvolution 钩子**：`on_session_end` → `evolve_prompt` 钩子补齐
+
+### 4. 路由/自更新修复（6 项 ⭐）
+- **meta_router.route() 集中分发**：教学/agent/危机/技能/找答案/闲聊统一路由
+- **SelfUpdateAgent 建议回灌 improvements.md**：按 target 分段 + 优先级过滤 + 去重
+- **改进建议加载器接入**：`improvements.md` 下次教学自动注入
+- **10 技能真实注册**：10/10 activate 成功，tool_defs 暴露 `load_skill__*`
+- **用户文件 4 能力接入流式**：`chat_stream` 检测意图 → 检索 → handler → SSE
+- **5 份文档同步**：技术全景 / 元能力 / 亮点 / README / CHANGELOG 一处不漏
+
+### 5. 文档同步（4 份核心文档 + 5 张链路图）
+- **PAEG技术全景文档.md**：§1.6.1 后插入图二（教学闭环）+ §1.6.2 补充 9 subagent + §1.6.5 后插入图一（全链路总览）+ §1.6.9 后插入图五（工具/MCP/资源）+ 新增 §1.6.11 断链修复清单
+- **元能力文档.md**：§5.5 新增 §5.5.1（"声明 ≠ 实现" 元能力）+ 插入图一
+- **亮点总览.md**：亮点 2 → 9 subagent；亮点 2.5 升级为 17 维 + v0.24 闭环；**新增亮点 2.6 立德树人·立德为先**（AffectionSupportor + 危机钩子 + 薇依世界观 + 德才兼备）+ 插入图三、图四
+- **README.md**：8 subagent → 9；新增 §3.5 教育理念双原则；架构全景图替换为 v0.24 真实连接版
+- **ARCHITECTURE_LINKS.md**：5 张 Mermaid 图（GitHub 原生渲染）——读者打开任一文档即可见全链路
+
+### 6. 测试
+- pytest **132 passed**（从 v0.22.2 的 69 → v0.24 的 132，新增 63 个断链修复相关用例）
+- **20 项连接验证通过**（arch_check.py + 独立测试用例）
+- 5 层测试套件（pytest + api_sweep + multi_turn_eval + eval_harness + Playwright）全过
+
+### 7. 教育理念双原则（⭐ 文档必须强调）
+- **因材施教**（Individuality）：17 维正交画像 + LLM 增量建模 + 母语维，对每个学生个别对待
+- **立德树人、立德为先**（AffectionSupportor）：不教不答不解决，以注意力陪伴；危机信号先回应再关怀；薇依世界观（真实/罪恶与善/矛盾张力/疏导+认知真实）；情绪稳定后才回归学习——**先成人，后成才**
+- **德才兼备**：通用 AI 教育产品只能做到"才"（知识传授）；PAEG 还要做到"德"（品格陪伴）
+
+### 8. 元能力提炼（v0.24 新增）
+- **"声明 ≠ 实现"是架构治理第一原则**：架构文档声称的能力必须能用**链路图 + 代码调用 + 测试用例 + 连接验证**四件证据证明真实存在
+- **链路图是"可视化契约"**：任何架构声称，都应有一张 Mermaid 链路图作为验证
+- **"声明了但没接上"是架构治理头号杀手**：v0.24 的核心动作不是"加新功能"，而是"把已声明的能力真实接线并验证"——从"文档驱动"到"代码+验证驱动"的工程化跃迁
+
+---
+
 ## v0.22.2（2026-08-07）⭐ 关键节点
 
 **Subagent 架构对齐成熟项目 + 危机协议强化 + 回答前强制检索**
