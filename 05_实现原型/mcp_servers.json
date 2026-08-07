@@ -1,28 +1,59 @@
 {
   "filesystem": {
-    "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "C:/Users/团聚体"],
+    "command": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "C:/Users/团聚体"
+    ],
     "enabled": true,
     "note": "文件系统读写（opencode 同款标准 server）。路径限定在 C:/Users/团聚体（sandbox）。"
   },
   "memory": {
-    "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
+    "command": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-memory"
+    ],
     "enabled": true,
     "note": "知识图谱记忆（opencode 同款标准 server）。"
   },
   "fetch": {
-    "command": ["npx", "-y", "@modelcontextprotocol/server-fetch"],
+    "command": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-fetch"
+    ],
     "enabled": false,
     "note": "网页抓取。标准包名已变动导致 npx 404，默认关闭。"
   },
   "git": {
-    "command": ["npx", "-y", "@modelcontextprotocol/server-git"],
+    "command": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-git"
+    ],
     "enabled": false,
     "note": "Git 操作。默认关闭，按需启用。"
   },
   "brave-search": {
-    "command": ["npx", "-y", "@modelcontextprotocol/server-brave-search"],
+    "command": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-brave-search"
+    ],
     "enabled": false,
-    "environment": {"BRAVE_API_KEY": ""},
+    "environment": {
+      "BRAVE_API_KEY": ""
+    },
     "note": "Brave 搜索（需 BRAVE_API_KEY）。与内置 web_search 互补。"
+  },
+  "pptx": {
+    "command": [
+      "C:/Users/团聚体/AppData/Local/Python/pythoncore-3.14-64/python.exe",
+      "D:\\桌面\\智能体架构与开发（含大模型）\\14_教育者Agent项目\\05_实现原型\\pptx_mcp_server.py"
+    ],
+    "enabled": true,
+    "note": "PPT 演示文稿生成（python-pptx + FastMCP，v0.25 ⭐）——根据主题/大纲/来源生成 .pptx"
   }
 }
