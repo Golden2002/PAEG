@@ -127,7 +127,9 @@ def extract_user_facts(history: list, limit: int = 8) -> list:
     markers = ("我喜欢", "我爱", "我讨厌", "我最爱", "我最喜欢", "我养",
                "我叫", "我的名字", "我家的", "我最爱的", "我有个", "我有一只",
                "我住", "我的生日", "我下", "我准备", "我打算", "我的目标",
-               "顺便告诉你", "告诉你", "记得", "我最近", "我下周")
+               "顺便告诉你", "告诉你", "记得", "我最近", "我下周",
+               "I like", "I love", "I prefer", "My favorite", "I hate", "I am from",
+               "my name is", "I have a", "I study", "I want to")
     seen = set()
     for msg in history or []:
         if not isinstance(msg, dict):
