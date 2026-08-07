@@ -783,6 +783,92 @@ flowchart LR
 
 **元技能（v0.26 新增）**：教育智能体的意图理解，**把语义判断交给 LLM，把确定性判断交给规则**——规则负责"快、准、廉价"的场景，LLM 负责"懂、细、语境"的场景。两者互补，不是替代。**LLM 不是被约束的工具，而是被充分调用、被增益的智能主体**——agent 的职责是指引 LLM 更好地发挥，而不是限制它。
 
+
+## 1.7.7 连通性审计：301 条连接清单（v0.26 ⭐ 连接的真实性是 agent 设计核心）
+
+> **用户要求**："整理 agent 架构中所有的连接，记载入技术文档——连通性实现是 agent 设计很重要的部分。记录下来的所有连接都要核查。"
+
+**审计方法**：静态源码扫描（每条连接带文件:行号证据），301 条连接中 **280 条已连通（93%）**，21 条断开/未实现。
+
+### 十类连接全景
+
+| 类别 | 已连通 | 部分 | 未实现 | 小计 | 关键连接 |
+|---|---|---|---|---|---|
+| 1. 主 agent → 9 subagent | 32 | 0 | 0 | 32 | PAEG.__init__ 持有全部 9 个 |
+| 2. Subagent → LLM | 14 | 0 | 2 | 16 | _safe_chat → ModelAPI.chat |
+| 3. Subagent ↔ KB/Library | 24 | 1 | 0 | 25 | _pre_retrieve 强制检索 |
+| 4. Tool/Skill/MCP | 41 | 4 | 1 | 46 | run_agent_loop / skill L1 |
+| 5. Subagent ↔ 用户数据 | 34 | 0 | 0 | 34 | LearnerProfile 注入 |
+| 6. Subagent ↔ 记忆 | 11 | 0 | 0 | 11 | MemorySystem 三层 |
+| 7. SelfUpdate/Evolution | 49 | 4 | 1 | 54 | 四路进化闭环 |
+| 8. 前端 ↔ 后端 API | 42 | 0 | 0 | 42 | 42 端点矩阵 |
+| 9. 后端 ↔ Library | 14 | 1 | 0 | 15 | upload + 检索注入 |
+| 10. MCP ↔ 外部 | 19 | 6 | 1 | 26 | gateway 9 工具 |
+| **合计** | **280** | **16** | **5** | **301** | 连通率 93% |
+
+### 连通性原则（v0.26 ⭐ 架构要求）
+1. **每条连接必须有代码证据**（文件:行号）——不能只"画在图上"
+2. **每条连接都要核查**（不只是整理）——用 grep/运行验证真实存在
+3. **断链要修复或标注**——P0 必须修（影响核心功能），P1/P2 记录待办
+4. **用户数据/资料链路是重点**：用户个人文件夹 ↔ 公共/学科 library 联通（需用户同意）、subagent ↔ 用户建模联通
+
+### 已修复的断链（v0.26）
+| 断链 | 修复 |
+|---|---|
+| teach_stream 不写 chat_hist（记忆丢失） | v0.26 写回 chat_hist ✓ |
+| _pre_retrieve 扫空目录 Library/users/ | 改为扫 Library/usr_knowledge/<uid>/ ✓ |
+| teach 流程不注入用户资料 | paeg.teach 注入 + Presenter 消费 ✓ |
+| 教学模式靠关键词 | LLM 判断 easy/normal/deep ✓ |
+| 意图路由规则过强 | LLM 综合判断 + 规则兜底 ✓ |
+| 匿名 ID 不稳定 | GUI localStorage + server helper ✓ |
+
+
+### 学科增强连接（v0.26 新增 ⭐ 连接清单随架构更新）
+> **原则**：架构每次更新会产生新连接——连接清单必须同步更新（写入技术文档作为底层架构信息）。
+
+| # | 新连接 | 调用者 | 被调者 | 状态 |
+|---|---|---|---|---|
+| 11.1 | SUBJECT_STYLES.subfield_guide → Presenter system | build_presenter_system | style['subfield_guide'] 注入 | ✓ |
+| 11.2 | SUBJECT_STYLES.code_ability → Presenter system | build_presenter_system | style['code_ability'] 注入 | ✓ |
+| 11.3 | LLM 教学模式判断 → Presenter system | subagents._detect_teaching_mode | easy/normal/deep 指令注入 | ✓ |
+| 11.4 | LLM 综合意图判断 → meta_router.route | meta_router._llm_route_intent | 9 类意图语义路由 | ✓ |
+| 11.5 | 用户资料 → 教学流程 | paeg.teach 注入 learner._user_corpus | Presenter 消费 | ✓ |
+| 11.6 | Library 学科文件夹 → 检索 | _pre_retrieve 扫 Library/<subject>/ + common + usr_knowledge | 按学科作用域 | ✓ |
+
+**元技能（连接清单同步原则）**：**架构每更新一次，连接清单就更新一次**——新增的连接（如 subfield_guide→Presenter）必须写入技术文档，保持"声明=实现"。
+
+### 待修复断链（P1/P2 记录）
+- `/api/solve`、`/api/method` 不接 learner/chat_hist
+- 个人→公共 library opt-in API 缺失
+- Diagnostor/Planner/Evaluator/Adapter 不接 learner 画像（部分）
+- chat_hist 未注入教学 subagent（部分）
+- pptx_mcp_server 未注册 mcp_servers.json
+
+### 完整连接清单（301 条）
+> 详见 `ARCHITECTURE_LINKS.md`（v0.26 更新版）+ 技术文档 §1.6 分层链路图。核心 10 类连接的完整条目（含文件:行号）见 §1.7.7 附表。
+
+
+## 1.7.8 重点学科策略（v0.26 ⭐ 聚焦深耕 + 持续扩展）
+
+> **用户要求**："重点关注 n 个学科，将其教学能力提升到你所能的极限。在日志和文档中记载：其他学科后续可持续更新完善。"
+
+**策略**：不追求"所有学科一次性完美"，而是**聚焦深耕重点学科，其余持续迭代**。
+
+### 重点深耕学科（v0.26 优先提升）
+| 学科 | 提升内容 |
+|---|---|
+| 数学/物理 | 跨学段映射（初中→考研 4 档）+ 教学模式（easy/normal/deep）+ 用户资料注入 |
+| 计算机科学 | 增强代码能力（可运行代码/复杂度/测试用例）+ 数据结构/算法/系统 |
+| 人工智能 | Transformer/LLM/RAG/Agent 设计前沿内容 + 三层教学（直觉→数学→代码） |
+| 电子科学技术 | 电路分析（KVL/KCL/器件/CMOS）+ 工程验证思维 |
+| 语言学 | 音位/语法/语义 6 层体系 |
+
+### 其他学科（持续更新完善）
+- 现有 29+ 学科（化学/生物/政治/历史/哲学/文学/伦理 等）已接线 SUBJECT_STYLES + 知识节点
+- **后续更新方向**：逐学科优化教学法（参考重点学科模式：LLM 意图判断 + 用户资料 + 跨学段）
+- 记录于 CHANGELOG：每学科提升一个版本记录一次
+
+**元技能（v0.26）**：资源有限时，**聚焦 n 个学科做到极致**，比"所有学科都平庸"更有价值。已深耕学科的经验（教学模式/跨学段/资料注入）**可复用到其他学科**。
 ## 1.8.2 归一化路由
 
 ```
