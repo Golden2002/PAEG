@@ -1,3 +1,43 @@
+
+### v0.26 补充（学科架构审计 + 模块化 + 通识素养）
+- ⭐ 学科架构审计：对照 GB/T 13745/教育部课标/本科目录，修复 17 处不一致
+  - law 补初中+本科（persona 矛盾）；english 补考研英语；politics 补本科；aesthetics 补本科
+  - 现象学（原生命现象学）、信息科技（原计算机基础）、政治学（专业）label 规范化
+  - writing 幽灵学科补通识素养；qft 节点归入 physics；kaoyan_* 跨文件残留清理
+  - subject_detector 关键词补全 20 学科
+- ⭐ 模块化门控：require_module 装饰器覆盖 27 端点×9 模块，paeg_modules.json 一键上线/下线（403 实测）
+- ⭐ 通识素养学段（all_grades）：信息科技/批判性思维/高效学习法/公众表达/议论文写作 跨学段可选
+- 下拉栏美观度：统一 36px 高度、宽度梯度、hover/focus 交互、设计 token 对齐
+- 压力测试 120+ 提示词：94/96（98%）
+- Playwright 前端测试通过（三级级联/通识素养/头像）
+
+## v0.26 关键节点（学科/学段下拉重构 + P0 断链修复 + 头像）
+
+### 学科与学段体系
+- ⭐ 三级级联下拉：学段 → 一级学科 → 二级学科（SUBFIELD_TREE 7 学科×学段，如 物理>本科>普通物理/数学物理方法/四大力学，>考研>量子场论）
+- ⭐ 学科拆键：chinese/english/politics 只保留中学学段，新增 college_chinese（大学语文）/college_english（大学英语）/college_politics（政治学）本科专属键（共 35 键）
+- economics 显示"经济学"；补 electronics/computer_science/artificial_intelligence 中文名
+- 任意层级选择：每级可"不限"（只选学段/只选学科/全自动依赖输入检测）
+- /api/subject-tree 单一数据源，前端 API 优先 + 离线兜底
+- 修复 matchesGrade：graduate_exam 学科不再泄漏到非考研学段
+
+### P0 断链修复（自我检视发现）
+- ⭐ build_presenter_system 注入 subfield_guide/code_ability/subtopic（此前学科教学法增强是死代码）
+- ⭐ meta_router.route() 生产接线（teach/teach_stream 意向层改用 LLM 综合意图判断 9 类）
+- ⭐ teach_stream 补 Individuality 注入 + 用户资料注入（此前仅同步 teach 有）
+
+### P0 迭代（opencode/codex 借鉴）
+- D1 课堂记录可回放（transcript_append/replay JSONL）
+- D2 Token 感知压缩（token_budget 估算 + 摘要/尾部双段，修"记忆太短"）
+- D3 Verify Gate（评估不达标立即重讲+重评，限 1 次）
+
+### 用户资产
+- ⭐ 自定义头像：点击头像上传，匿名 localStorage 持久化 + 注册用户服务器持久化（/api/avatar）
+- 修复：注册用户刷新后画像显示"学习者"（profile 从 USER_STORE 加载真实画像）
+
+### 测试
+- 132 pytest 全绿保持；学科拆键/头像/注入链端到端验证通过
+
 # PAEG 修改日志（CHANGELOG）
 
 > 独立于《技术全景文档》的版本历史。
