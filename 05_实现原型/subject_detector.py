@@ -29,9 +29,10 @@ SUBJECT_CATALOG = [
     "physics", "math", "literature", "ethics", "phenomenology",
     "chemistry", "biology", "geography", "chinese", "politics",
     "law", "economics", "history", "english", "french",
-    "german", "japanese", "philosophy", "aesthetics",
-    "kaoyan_math", "kaoyan_politics", "writing", "coding",
-    "thinking", "learning", "expression", "linguistics", "atmospheric_science", "qft",
+    "german", "japanese", "philosophy", "aesthetics", "writing", "coding",
+    "thinking", "learning", "expression", "linguistics", "atmospheric_science",
+    "electronics", "computer_science", "artificial_intelligence",
+    "college_chinese", "college_english", "college_politics",
 ]
 
 # 缓存：question -> (subject_or_unknown, timestamp)
@@ -72,25 +73,32 @@ def detect_subject(text: str, llm=None, user_subject: str = "", grade: str = "")
               "grade_blocked": False}
     if llm is not None:
         result = _llm_detect(t, llm)
-    # v0.25 学段-学科联动：识别学科高于当前学段 → 降级为 unknown（该学段暂不开放）
+    # v0.25→v0.26 学段-学科联动：识别学科在当前学段不可用 → 降级为 unknown
     if result.get("subject") and grade:
         try:
-            from prompts import SUBJECT_MIN_GRADE, _GRADE_ORDER
-            min_g = SUBJECT_MIN_GRADE.get(result["subject"])
-            if min_g and min_g != "graduate_exam" and _GRADE_ORDER.get(grade, 1) < _GRADE_ORDER.get(min_g, 2):
+            from prompts import SUBJECT_GRADES, SUBJECT_MIN_GRADE, _GRADE_ORDER, subject_available_for_grade
+            # v0.26：优先用多学段集合判断；未定义回退最低学段
+            available = subject_available_for_grade(result["subject"], grade)
+            if not available:
                 _cn = result.get("subject")
+                grades = SUBJECT_GRADES.get(_cn)
+                min_g = SUBJECT_MIN_GRADE.get(_cn)
+                # 需要的最低学段（用于提示"需切换到哪一档"）
+                need_grade = grades[0] if grades and grades[0] != "graduate_exam" else (min_g or "undergraduate")
                 result["unknown"] = True
                 result["grade_blocked"] = True
                 result["unknown_name"] = {
                     "linguistics": "语言学", "atmospheric_science": "大气科学",
                     "phenomenology": "生命现象学", "aesthetics": "美学",
+                    "electronics": "电子科学与技术", "computer_science": "计算机科学",
+                    "artificial_intelligence": "人工智能",
                 }.get(_cn, _cn)
                 result["grade_name"] = {
                     "middle_school": "初中", "high_school": "高中",
                     "undergraduate": "大学本科", "graduate_exam": "考研",
-                }.get(min_g, min_g)
+                }.get(need_grade, need_grade)
                 result["subject"] = None
-                result["reason"] = f"学科 {_cn} 需 {min_g} 及以上学段"
+                result["reason"] = f"学科 {_cn} 需 {need_grade} 及以上学段"
         except Exception:
             pass
     _CACHE[_ckey] = (result, now)
@@ -160,8 +168,28 @@ _KNOWN_KEYWORDS = {
     "history": ["历史", "朝代", "战争", "革命", "古代"],
     "philosophy": ["哲学", "存在", "意识", "伦理", "形而上学"],
     "politics": ["政治", "政策", "制度", "国家", "选举", "阶级"],
-    "coding": ["编程", "代码", "算法", "python", "程序", "bug"],
+    "coding": ["编程", "代码", "算法", "python", "程序", "bug", "计算机基础"],
     "english": ["英语", "单词", "语法", "vocabulary", "grammar"],
+    # v0.26 ⭐ 补全：新学科/拆键学科关键词（审计修复）
+    "chinese": ["语文", "古诗", "文言文", "作文", "阅读", "拼音", "汉字"],
+    "literature": ["文学", "小说", "散文", "诗歌", "名著", "莎士比亚", "文学史"],
+    "ethics": ["道德", "伦理", "孝", "诚信", "价值观"],
+    "aesthetics": ["美学", "审美", "艺术鉴赏", "美"],
+    "french": ["法语", "français", "bonjour"],
+    "german": ["德语", "deutsch", "hallo"],
+    "japanese": ["日语", "五十音", "假名", "こんにちは"],
+    "thinking": ["批判性思维", "思辨", "逻辑", "推理", "思维方法"],
+    "learning": ["学习法", "学习方法", "费曼", "记忆", "专注力", "高效学习"],
+    "expression": ["演讲", "表达", "口才", "公众表达", "沟通"],
+    "writing": ["写作", "议论文", "作文技巧", "论证"],
+    "linguistics": ["语言学", "音位", "形态学", "句法", "语义", "语用", "语言"],
+    "atmospheric_science": ["大气", "气象", "台风", "气候", "天气", "臭氧"],
+    "electronics": ["电路", "电子", "MOS", "集成电路", "半导体", "KVL", "放大器"],
+    "computer_science": ["计算机", "数据结构", "操作系统", "算法复杂度", "递归", "编译", "网络协议", "数据库"],
+    "artificial_intelligence": ["人工智能", "机器学习", "深度学习", "神经网络", "Transformer", "大模型", "RAG", "强化学习", "AI"],
+    "college_chinese": ["大学语文"],
+    "college_english": ["大学英语", "学术英语", "四级", "六级"],
+    "college_politics": ["政治学", "政治学理论"],
 }
 
 
