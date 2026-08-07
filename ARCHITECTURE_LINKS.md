@@ -1,181 +1,127 @@
-# PAEG 智能体架构链路图（v0.24 关键节点 · 修复后真实连接）
+﻿# PAEG 智能体架构链路图（v0.24 关键节点 · 分层展开）
 
-> 本图基于修复后的真实代码状态绘制，20 项连接已逐一验证（arch 检查通过）。
-> 渲染：GitHub 原生支持 Mermaid，任何 Markdown 查看器均可直接显示。
+> 阅读方式：先看 **L0 总览**（一图了解全貌），再按需展开各层细图。
+> 每张图 ≤10 节点，聚焦单一主题，避免视觉负担。
+> 全部基于修复后真实代码绘制，20 项连接已逐一验证。
 
-## 一、全链路总览图（技术文档 §1.6 用）
+---
+
+## L0 · 架构总览（一图看懂）
+
+> 六层结构，每层是一个可展开的独立模块。箭头表示数据流向。
 
 ```mermaid
 flowchart TB
-    subgraph USER["用户层"]
-        S["🧑 学生 / 学习者"]
-        EXT["🤖 外部智能体<br/>Claude / Codex / OpenCode"]
-    end
+    L1["👤 用户层<br/>学生 · 外部智能体"]
+    L2["🌐 应用层<br/>Flask Server · 意图路由"]
+    L3["🧠 主 Agent<br/>Émile · 9 个 subagent"]
+    L4["✨ LLM 层<br/>DeepSeek"]
+    L5["🔧 工具 + MCP 层<br/>工具链 · 技能 · 外部 server"]
+    L6["📚 本地资源层<br/>知识库 · 画像 · 记忆"]
 
-    subgraph APP["应用层 · Flask Server (server.py)"]
-        WEB["Web GUI / API 端点<br/>chat·teach·answer·affection·skills·upload"]
-        ROUTER["meta_router.route()<br/>意图集中分发"]
-        AGENTENG["AgentEngine<br/>Plan→Act→Observe→Reflect"]
-        HEALTH["/api/health<br/>mcp_connected 2/2"]
-    end
-
-    subgraph MAIN["主 Agent · Émile Novis (paeg.py)"]
-        PAEG["PAEG 主智能体<br/>持有 9 个 subagent"]
-        GATE["_affection_gate_check<br/>危机信号先行"]
-        IND["Individuality<br/>17 维画像注入"]
-    end
-
-    subgraph SUB["Subagent 层（9 个）"]
-        DIA["Diagnostor 诊断"]
-        PLA["Planner 计划"]
-        PRE["Presenter 呈现"]
-        EVA["Evaluator 评估<br/>讲解质量+学生状态双分"]
-        ADA["Adapter 调整<br/>决策真正执行"]
-        ANS["AnswerSolver 直答"]
-        AFF["AffectionSupportor<br/>立德树人 · 危机陪伴"]
-        SUA["SelfUpdateAgent 自更新"]
-        IND2["Individuality 个体化<br/>17 维·增量建模·持久化"]
-    end
-
-    subgraph LLM["LLM 层"]
-        DS["DeepSeek (llm_adapter)<br/>全部 subagent 调用"]
-    end
-
-    subgraph TOOL["工具链层"]
-        REG["tool_registry<br/>web_search·verify_math·fetch_page<br/>daily_quote·save_doc·get_time"]
-        SK["skill_registry<br/>10 技能（L1 目录注入）"]
-        F4["用户文件 4 能力<br/>QA·讲解·原文·重组 (BM25)"]
-    end
-
-    subgraph MCP["MCP 层"]
-        MC["MCPClientManager<br/>filesystem 14 + memory 9 工具"]
-        MG["mcp_gateway :8765<br/>PAEG 能力对外暴露"]
-    end
-
-    subgraph RES["本地资源层"]
-        KB["knowledge_base 知识库"]
-        LIB["Library 薇依原著<br/>weil_corpus.json"]
-        MEM["memory/ 记忆<br/>AffectionSAPAO.md"]
-        USR["users_data/ 画像<br/>users.json"]
-        IMP["improvements.md<br/>自更新建议回流"]
-    end
-
-    S -->|"对话/自述/上传"| WEB
-    EXT -->|"MCP 协议"| MG
-    WEB -->|"路由分发"| ROUTER
-    ROUTER -->|"教学意图"| PAEG
-    ROUTER -->|"agent 模式"| AGENTENG
-    ROUTER -->|"危机/情绪"| AFF
-    AGENTENG --> DS
-    PAEG -->|"危机检查先行"| GATE
-    PAEG --> IND
-    IND --> IND2
-    GATE -->|"危机通过→教学"| DIA
-    DIA --> PLA --> PRE --> EVA --> ADA
-    EVA -.->|"学生状态反馈"| ADA
-    ADA -.->|"风格/难度决策回流"| PRE
-    PAEG --> ANS
-    PAEG --> SUA
-    PAEG --> AFF
-    DIA & PLA & PRE & EVA & ADA & ANS & AFF & SUA & IND2 --> DS
-    PAEG -->|"工具调用"| REG
-    REG --> SK
-    REG --> MC
-    PAEG --> F4
-    MC -->|"filesystem/memory 标准 server"| MEM
-    MG -->|"复用 PAEG 工具"| REG
-    DIA & PLA --> KB
-    PRE --> LIB
-    AFF --> MEM
-    IND2 --> USR
-    SUA --> IMP
-    SUA --> MEM
-    REG --> KB
-    KB --> LIB
-    IMP --> PAEG
-    USR -.->|"画像继承"| IND2
-    HEALTH --> MC
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+    L3 --> L5
+    L5 --> L6
+    L6 --> L3
 ```
 
-## 二、教学闭环链路（技术文档 §1.6.1 用）
+> **分层细图导航**：
+> - [L1 · 教学闭环](#l1--教学闭环九个-subagent-如何协同)（9 个 subagent 流水线）
+> - [L1 · 个体化（因材施教）](#l1--个体化闭环因材施教)
+> - [L1 · 立德树人](#l1--立德树人闭环)
+> - [L1 · 工具 / MCP](#l1--工具与-mcp-层)
+> - [L1 · 自我进化](#l1--自我进化闭环)
+
+---
+
+## L1 · 教学闭环（九个 subagent 如何协同）
+
+> 聚焦：一次教学对话中，9 个 subagent 的分工与协作。
 
 ```mermaid
 flowchart LR
-    S["学生提问"] --> G["_affection_gate_check<br/>危机信号？"]
-    G -->|"是→陪伴"| AFF["AffectionSupportor<br/>立德为先"]
-    G -->|"否→教学"| I["Individuality<br/>17 维画像注入"]
-    I --> D["Diagnostor<br/>诊断就绪度"]
-    D --> P["Planner<br/>差异化计划"]
-    P --> PR["Presenter<br/>个性化讲解"]
-    PR --> E["Evaluator<br/>讲解质量 + 学生状态"]
-    E --> A["Adapter<br/>switch_style / reinforce"]
-    A -->|"决策回流"| PR
-    A -->|"difficulty_delta 累计"| D
-    PR -->|"呈现给学生"| S
-    A --> EVA2["SelfEvolution<br/>evolve_prompt + on_session_end"]
-    EVA2 -->|"改进提示词"| PR
+    Q["学生提问"] --> G["危机检查<br/>_affection_gate_check"]
+    G -->|"危机 →"| AFF["AffectionSupportor<br/>立德为先"]
+    G -->|"正常 →"| DIA["① Diagnostor<br/>诊断"]
+    DIA --> PLA["② Planner<br/>计划"]
+    PLA --> PRE["③ Presenter<br/>讲解"]
+    PRE --> EVA["④ Evaluator<br/>双维评估"]
+    EVA --> ADA["⑤ Adapter<br/>调整"]
+    ADA -.->|"换风格/补例子"| PRE
+    DIA & PLA & PRE & EVA & ADA --> LLM["DeepSeek"]
+    EVA -.->|"低分 →"| SELF["⑥ 自我进化<br/>evolve_prompt"]
+    SELF -.-> PRE
 ```
 
-## 三、个体化闭环链路（亮点文档用 · 因材施教）
+**说明**：Diagnostor/Planner/Presenter/Evaluator/Adapter 是教学主链；AnswerSolver 独立处理"直接要答案"；AffectionSupportor 危机先行；SelfUpdateAgent 会话后反思；Individuality 贯穿全程注入画像。
+
+---
+
+## L1 · 个体化闭环（因材施教）
+
+> 聚焦：Individuality 如何把对话/自述变成可用的个性化画像。
 
 ```mermaid
 flowchart LR
     H["对话历史"] --> F["extract_user_facts"]
-    SD["自我陈述"] --> F
+    S["自我陈述"] --> F
     F --> IM["Individuality.run<br/>LLM 增量建模"]
-    OLD["已有画像<br/>users_data"] --> IM
-    IM --> T["student_trait 17 维<br/>正交框架"]
+    OLD["已有画像"] --> IM
+    IM --> T["student_trait<br/>17 维画像"]
     T --> P["persist 持久化"]
     P --> OLD
-    IM --> C["inject_control<br/>语言/风格/深度/节奏/情绪"]
-    C --> SYS["LLM system prompt"]
-    SYS --> OUT["母语回复/因材施教输出"]
+    IM --> C["inject_control<br/>语言/风格/深度"]
+    C --> OUT["个性化输出"]
 ```
 
-## 四、立德树人闭环链路（亮点文档用）
+---
+
+## L1 · 立德树人闭环
+
+> 聚焦：AffectionSupportor 的危机处理与陪伴流程。
 
 ```mermaid
 flowchart LR
-    E["情绪/危机表达"] --> DET["AffectionSupportor<br/>三态检测"]
-    DET --> SAFE["safety 检查<br/>自伤信号"]
-    SAFE --> WP["薇依世界观<br/>AffectionSAPAO.md"]
-    WP --> PRIN["先回应再关怀<br/>拒绝规则·不短路"]
-    PRIN --> LLM2["LLM 陪伴输出"]
-    LLM2 --> ST["情绪稳定→回归学习"]
+    E["情绪/危机表达"] --> D["三态检测"]
+    D --> S2["safety 检查"]
+    S2 --> W["薇依世界观<br/>AffectionSAPAO.md"]
+    W --> P2["先回应再关怀"]
+    P2 --> O["陪伴输出"]
+    O --> R["情绪稳定 → 回归学习"]
 ```
 
-## 五、工具/MCP/资源链路（技术文档 §1.6.9 用）
+---
+
+## L1 · 工具与 MCP 层
+
+> 聚焦：LLM 如何调用工具、技能，以及 MCP 双向连通。
 
 ```mermaid
-flowchart TB
-    subgraph AG["Agent 侧"]
-        PAEG2["主 Agent / subagent"]
-        FC["Function Calling"]
-    end
-    subgraph TL["工具链"]
-        REG2["tool_registry<br/>7 工具"]
-        SK2["skill_registry<br/>10 技能 L1 目录"]
-    end
-    subgraph MP["MCP 层"]
-        MC2["MCPClientManager<br/>连外部标准 server"]
-        FS["filesystem (14 工具)"]
-        MM["memory (9 工具)"]
-        MG2["mcp_gateway :8765"]
-    end
-    subgraph LR2["本地资源"]
-        KB2["知识库"]
-        LIB2["Library 薇依原著"]
-        USR2["users_data 画像"]
-    end
-    PAEG2 -->|"工具选择"| FC
-    FC --> REG2
-    FC --> SK2
-    REG2 -->|"mcp__ 前缀"| MC2
-    MC2 --> FS
-    MC2 --> MM
-    MG2 -->|"对外暴露"| REG2
-    REG2 --> KB2
-    SK2 --> KB2
-    LIB2 --> KB2
-    USR2 --> PAEG2
+flowchart LR
+    A["Agent / subagent"] --> FC["Function Calling"]
+    FC --> T["tool_registry<br/>7 工具"]
+    FC --> SK["skill_registry<br/>10 技能"]
+    T --> MC["MCPClientManager"]
+    MC --> FS["filesystem<br/>14 工具"]
+    MC --> MM["memory<br/>9 工具"]
+    MG["mcp_gateway :8765"] -->|"对外暴露"| T
+    T --> KB["知识库"]
+```
+
+---
+
+## L1 · 自我进化闭环
+
+> 聚焦：教学经验如何回流，让系统越用越懂怎么教。
+
+```mermaid
+flowchart LR
+    T["教学/对话"] --> R["反思<br/>SelfUpdateAgent"]
+    R --> SUG["self_update_suggestions.jsonl"]
+    SUG --> IMP["improvements.md<br/>分段归类"]
+    IMP --> EV["SelfEvolution<br/>evolve_prompt"]
+    EV --> P["提示词/知识库更新"]
+    P --> T
 ```
