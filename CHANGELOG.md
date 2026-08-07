@@ -5,7 +5,38 @@
 
 ---
 
-## v0.21.9（2026-08-07）⭐ 关键节点
+## v0.22.0（2026-08-07）
+
+**Skills 生态增强 + 基于用户上传文件的 4 能力（找答案/讲解/输出原文/重组结构）**
+
+### 1. Skills 生态增强（任务1 ⭐）
+- **下载 5 个 marketplace skills**（已集成 skill_registry）：
+  - `pdf`（anthropics/skills）：PDF 提取/表单/合并/OCR
+  - `docx`（anthropics/skills）：Word 创建/编辑/提取
+  - `xlsx`（anthropics/skills）：Excel 创建/编辑/分析
+  - `doc-coauthoring`（anthropics/skills）：文档协作工作流
+  - `teach`（mattpocock/skills，description 改写为 PAEG 教学场景）：多会话教学/间隔重复/回忆练习
+- **Skills 总数 5 → 10**：SkillRegistry 加载 10/10，tool_defs 暴露 10 个 load_skill__* 工具（LLM function calling 可调用），activate 10/10 成功
+- **验证**：tests/test_skill_registry_v022.py 6 用例（10 skills 加载/activate/tool_defs/catalog_prompt/match_skill/marketplace 激活）全过
+
+### 2. 基于用户上传文件的 4 能力（任务2 ⭐）
+- **现状修复**：
+  - 统一目录：上传默认存 `Library/usr_knowledge/<uid>/`（原 user_<uid>/<uid>/ 不一致 bug 修复）
+  - 双读兼容：`lib/library_store.py` 读 usr_knowledge + 旧路径（user_<uid>/ + user_<uid>/<uid>/）
+  - 多格式：readers.py 全文提取 md/txt/pdf(pypdf)/docx/csv/json
+- **4 能力实现**（lib/ingest/）：
+  - `intent_router.py`：意图路由 34/34 准确（file_qa/file_explain/file_quote/file_restructure + 文件名提取）
+  - `retriever.py`：BM25 + jieba（155 教育术语自定义词典）+ TF 降级，3/3 召回
+  - `chunker.py`：中文按句分块（400 字/50 重叠）
+  - `handlers/`：4 个处理器（file_quote 不依赖 LLM 逐字输出原文）
+- **server 接入**：chat_stream 检测文件操作意图 → 检索 → handler → SSE 返回
+- **端到端实测**：上传导数笔记.md → 4 种操作全部正确触发（file_qa/file_explain/file_quote/file_restructure）+ 原文输出含"幂函数 x^n 导数是 nx^(n-1)"
+
+### 3. 测试
+- pytest 63 → **69**（新增 test_skill_registry_v022.py 6 用例）
+- 端到端 4 能力实操验证通过
+
+---
 
 **指令 vs 资源区分 + 问题驱动调研方法论 + 成熟项目借鉴（DeepSeek 结构化分隔）**
 
