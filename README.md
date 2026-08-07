@@ -1,6 +1,6 @@
 # PAEG — Pedagogical Agent with Evolving Growth
 
-基于**西蒙娜·薇依（Simone Weil）**教育哲学、由 Agent 架构驱动的 AI 教育智能体（**v0.24 关键节点**）。
+基于**西蒙娜·薇依（Simone Weil）**教育哲学、由 Agent 架构驱动的 AI 教育智能体（**v0.25 关键节点 · 29 学科 + 学段联动**）。
 
 > **定位**：PAEG = **新一代教育智能体解决方案**——为教育重新设计的 Agent 架构，让智能体指挥大模型完成教学全过程（诊断、计划、讲解、评估、调整、反思），使教育从"一次性问答"跃迁为"有教学法、有过程、有陪伴、能自我进化"的完整闭环。
 
@@ -16,13 +16,13 @@ PAEG 不是"给 LLM 套聊天框"的教育产品，而是**为教育重新设计
 ### 1. 完整教学循环（不是聊天，是教学）
 `paeg.teach()` 六阶段闭环：**诊断 → 计划 → 呈现 → 评估 → 调整 → 反思 → 自更新**。评估用确定性启发式（可复现不随机），LLM 只负责最擅长的"讲解"。
 
-### 2. 9 个子代理架构（LLM 只做擅长的事 · v0.24 全持有）
+### 2. 9 个子代理架构（LLM 只做擅长的事 · v0.25 全持有）
 Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（评估）/ Adapter（调整）/ AnswerSolver（找答案）/ AffectionSupportor（情绪陪伴 · 立德树人）/ SelfUpdateAgent（自我更新）/ **Individuality（个体化因材施教 · 17 维画像）**。**v0.24 修复**：PAEG 主 agent 现在持有全部 9 个 subagent 统一调度。设计原则：诊断深度、评估分数、调整决策用确定性规则（可测试可复现），只有"生成讲解"用 LLM。
 
 ### 3. 多层意图路由（Agent 自动判断该做什么）
 用户设定"考研政治"问经济学 → 自动切换学科（Steering）；问"你今天怎么样" → 意向性层走一般化回应；问"我最近好难过" → 情绪拦截走 affection；选错模式 → 后端自动纠正；问"有哪些 subagent" → 自我指涉路由（v0.21.6）；**粘贴"帮我分析这段话：<长文>" → 复合输入检测（v0.21.9），用 DeepSeek 结构化模板区分指令与资料，防注入**。
 
-### 3.5 教育理念双原则（⭐ 因材施教 × 立德树人 · v0.24 闭环）
+### 3.5 教育理念双原则（⭐ 因材施教 × 立德树人 · v0.25 学段联动）
 - **因材施教**（Individuality）：**17 维正交学生画像** + LLM 增量建模（对话中说"代数弱"→画像自动记薄弱点）+ persist 持久化（users_data/profile.json 落盘）+ 动态维度扩展（add_dimension 可加到第 18/19 维）+ inject_control 五层注入（语言/风格/深度/节奏/情绪）——对每个学生个别对待
 - **立德树人、立德为先**（AffectionSupportor）：**不教、不答、不解决，以注意力陪伴**；危机信号**先回应再关怀**（`_affection_gate_check` 危机先行钩子）；薇依世界观（真实/罪恶与善/矛盾张力/疏导+认知真实）；情绪稳定后才回归学习——**先成人，后成才**
 - **德才兼备**：通用 AI 教育产品只能做到"才"（知识传授）；PAEG 还要做到"德"（品格陪伴）——这是任何"刷题 AI"都无法复制的价值观壁垒
@@ -31,7 +31,10 @@ Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（
 四路自进化：知识蒸馏（成功教学入库 evolved_*.json）/ 提示词补丁（SCOPE 双流）/ 工具经验 / 新学科需求闭环（用户问"量子力学"自动记录并反馈）。质量门禁（Constitutional AI 风格）过滤有害内容。SelfUpdateAgent 读取过滤后洞察 + 用户反馈生成结构化建议（/api/self-update/from-feedback）。
 
 ### 5. MCP 双向打通
-对外暴露教育工具（MCP Server），对内调用外部标准工具（MCP Client）——LLM 可用工具从 7 个扩到 34 个（filesystem/memory 等）。
+对外暴露教育工具（MCP Server），对内调用外部标准工具（MCP Client）——LLM 可用工具从 7 个扩到 34 个（filesystem/mem
+
+### 5.1 PPT 演示文稿生成（v0.25 ⭐ 新能力）
+接入 PPT 生成 MCP（pptx_mcp_server.py）——根据**用户上传文档 + 知识库检索 + 对话历史**，LLM 生成大纲 → python-pptx 自动排版 → 输出 .pptx 供下载。MCP 连接 2/2 → **3/3**（filesystem + memory + pptx）。ory 等）。
 
 ### 6. 全局中文语言质量层（v0.21.8 ⭐ 语言规范性独立能力）
 **语言规范性是教育智能体独立于模型性能的待解决问题**——通过语法分析 + 分层限制（L1 提示词约束 / L2 规则检测 / L3 LLM 修正）程序化保证。v0.21.8 新增：词法完整（禁止"倦"代"疲倦"）+ 句法完整（悬空宾语补足 + 双宾语/状语/连接词）。实测"我有点倦，想和你探讨"→"我有点疲倦了，但我还是想和你探讨这个问题"。
@@ -47,7 +50,7 @@ Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（
 每次 LLM 调用回传完整上下文（历史/画像/自我陈述/BDI/模式/学科/学段），用户选错模式后端自动纠正。
 
 ### 9. 博雅教育市场垂直
-26 学科横跨文理（数学→哲学/美学/伦理/现象学）+ 薇依人格 + 自我进化——"刷题 AI"红海中的差异化垂直智能体。
+29 学科横跨文理（数学→哲学/美学/伦理/现象学/语言学/大气科学/量子场论）+ 薇依人格 + 自我进化——"刷题 AI"红海中的差异化垂直智能体。
 
 ### 10. 知识导图功能（v0.20.5）
 说"画知识导图/列提纲/思维导图/知识结构/知识脉络/知识系统"→ 输出结构化知识地图（知识定位/知识树/关联/学习路径）。
@@ -62,16 +65,16 @@ Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（
 元能力文档.md（智能体设计方法论）+ observability.py（结构化日志/指标/事件流）。
 顶部"气象"链接 → windy.com 气象图（免费嵌入）+ 位置共享 + Open-Meteo 实时数据。
 
-## 架构全景（v0.24 关键节点 · 分层展开）
+## 架构全景（v0.25 关键节点 · 分层展开）
 
 ```mermaid
 flowchart TB
     L1["👤 用户层<br/>学生 · 外部智能体"]
-    L2["🌐 应用层<br/>Flask Server · 意图路由"]
-    L3["🧠 主 Agent<br/>Émile · 9 个 subagent"]
+    L2["🌐 应用层<br/>Flask Server · 意图路由 · 学段联动"]
+    L3["🧠 主 Agent<br/>Émile · 9 subagent · 29 学科"]
     L4["✨ LLM 层<br/>DeepSeek"]
-    L5["🔧 工具 + MCP 层<br/>工具链 · 技能 · 外部 server"]
-    L6["📚 本地资源层<br/>知识库 · 画像 · 记忆"]
+    L5["🔧 工具 + MCP 层<br/>工具链 · 技能 · 3 MCP server"]
+    L6["📚 本地资源层<br/>知识库 · 画像 · 记忆 · PPT 输出"]
 
     L1 --> L2
     L2 --> L3
@@ -99,7 +102,7 @@ python server.py
 # 4. 打开浏览器
 #    http://localhost:5000
 
-# 5. 测试（132 个 · v0.24）
+# 5. 测试（132 个 · v0.25）
 python -m pytest tests -q
 python -m pytest "..\06_测试与验证\tests\test_paeg_v0_5.py" -q
 
@@ -124,7 +127,7 @@ PAEG/
 │   ├── server.py        # Flask 后端 + 全部端点
 │   ├── paeg.py          # 教学主循环
 │   ├── subagents.py     # 7 个子代理
-│   ├── prompts.py       # 26 学科 × 4 学段提示词中心
+│   ├── prompts.py       # 29 学科 × 4 学段提示词中心（学段-学科联动）
 │   ├── meta_router.py   # 意图检测（8 类）
 │   ├── context_bundle.py# 上下文打包器
 │   ├── language_refiner.py # 语言质量修正
