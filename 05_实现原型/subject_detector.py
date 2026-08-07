@@ -31,7 +31,7 @@ SUBJECT_CATALOG = [
     "law", "economics", "history", "english", "french",
     "german", "japanese", "philosophy", "aesthetics",
     "kaoyan_math", "kaoyan_politics", "writing", "coding",
-    "thinking", "learning", "expression",
+    "thinking", "learning", "expression", "linguistics", "atmospheric_science", "qft",
 ]
 
 # 缓存：question -> (subject_or_unknown, timestamp)
@@ -43,15 +43,17 @@ def _clear_cache():
     _CACHE.clear()
 
 
-def detect_subject(text: str, llm=None, user_subject: str = "") -> dict:
+def detect_subject(text: str, llm=None, user_subject: str = "", grade: str = "") -> dict:
     """判断问题的学科归属。
 
     返回 {"subject": str|None, "unknown": bool, "unknown_name": str|None,
           "reason": str, "switched": bool}
-    - subject: 识别的学科 key（在 26 清单内）
+    - subject: 识别的学科 key（在 27 清单内）
     - unknown=True: 问题明显属某学科但不在清单（如"量子力学"）
     - unknown_name: 未收录学科的中文名
     - switched: 识别学科 ≠ 用户设定（需要 steering 切换）
+    - v0.25: grade 参数做学段-学科联动——识别到的学科若高于当前学段（如高中生问语言学），
+      视为"未收录/暂不开放"，避免跨学段教学。
     """
     t = (text or "").strip()
     if not t or len(t) > 150:
@@ -59,16 +61,39 @@ def detect_subject(text: str, llm=None, user_subject: str = "") -> dict:
         return {"subject": None, "unknown": False, "unknown_name": None,
                 "reason": "输入过长，不做识别", "switched": False}
 
-    # 缓存
+    # 缓存（v0.25: key 含 grade，避免跨学段串结果）
     now = time.time()
-    if t in _CACHE and now - _CACHE[t][1] < _CACHE_TTL:
-        cached = _CACHE[t][0]
+    _ckey = (t, grade)
+    if _ckey in _CACHE and now - _CACHE[_ckey][1] < _CACHE_TTL:
+        cached = _CACHE[_ckey][0]
         return _finalize(cached, user_subject)
 
-    result = {"subject": None, "unknown": False, "unknown_name": None, "reason": ""}
+    result = {"subject": None, "unknown": False, "unknown_name": None, "reason": "",
+              "grade_blocked": False}
     if llm is not None:
         result = _llm_detect(t, llm)
-    _CACHE[t] = (result, now)
+    # v0.25 学段-学科联动：识别学科高于当前学段 → 降级为 unknown（该学段暂不开放）
+    if result.get("subject") and grade:
+        try:
+            from prompts import SUBJECT_MIN_GRADE, _GRADE_ORDER
+            min_g = SUBJECT_MIN_GRADE.get(result["subject"])
+            if min_g and min_g != "graduate_exam" and _GRADE_ORDER.get(grade, 1) < _GRADE_ORDER.get(min_g, 2):
+                _cn = result.get("subject")
+                result["unknown"] = True
+                result["grade_blocked"] = True
+                result["unknown_name"] = {
+                    "linguistics": "语言学", "atmospheric_science": "大气科学",
+                    "phenomenology": "生命现象学", "aesthetics": "美学",
+                }.get(_cn, _cn)
+                result["grade_name"] = {
+                    "middle_school": "初中", "high_school": "高中",
+                    "undergraduate": "大学本科", "graduate_exam": "考研",
+                }.get(min_g, min_g)
+                result["subject"] = None
+                result["reason"] = f"学科 {_cn} 需 {min_g} 及以上学段"
+        except Exception:
+            pass
+    _CACHE[_ckey] = (result, now)
     return _finalize(result, user_subject)
 
 
