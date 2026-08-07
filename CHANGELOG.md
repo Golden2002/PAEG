@@ -5,6 +5,40 @@
 
 ---
 
+## v0.25 · 关键节点：3 新学科 + 学段-学科联动 + PPT MCP（2026-08-07）
+
+### 新学科（26 → 29）
+- **语言学（linguistics）**：6 层体系（语言本质/语音音系/语法/语义语用/文字/演变接触+应用），大学学段起；7 个知识节点
+- **大气科学（atmospheric_science）**：7 层体系（结构辐射/热力湿度/运动环流/天气系统/云物理/气候/大气化学），大学学段起；5 个知识节点
+- **量子场论（qft）**：7 层体系（预备动机/正则量子化/旋量狄拉克/规范场/费曼规则/重整化/标准模型），大学学段起；6 个知识节点
+- 全部接线 SUBJECT_STYLES / _SUBJECT_ALIASES / SUBJECT_CATALOG / subjects_ext
+
+### 学段-学科联动（⭐ 核心架构改进）
+- prompts.py SUBJECT_MIN_GRADE 映射 + get_subjects_for_grade() 按学段过滤学科
+- GUI 前端学科菜单动态过滤（初中 12 / 高中 22 / 本科 28 / 考研 2）；语文去掉"（中学）"标注
+- subject_detector.detect_subject 加 grade 参数：跨学段学科 → grade_blocked（高中生问语言学被拦截）
+- server _steer_subject 重新设计：区分"学段不匹配"（提示切学段）与"真未收录"（记录需求）
+- 用户需求："学段和学科不能完全独立"
+
+### SelfUpdateAgent 增强（7 分类 + 落地执行器）
+- 新增 subject_addition（新增学科建议）、library_update（资料扩充建议）
+- periodic_self_update 落地执行器：subject_addition → 学科注册 JSON 到 Library/KnowledgeBase/subjects/（自动入库）；library_update → data/pending_library.json
+- 每学科 prompt 更新通道（evolve_prompt 已接线）
+
+### PPT 生成 MCP（⭐ 新能力）
+- pptx_mcp_server.py（FastMCP + python-pptx）：generate_presentation 工具，封面+内容页+品牌配色+页码+备注
+- mcp_servers.json 注册 → MCP 连接 2/2 → 3/3
+- 输入：主题+大纲+来源（用户文档/知识库/对话历史）；输出：downloads/ppt/*.pptx
+
+### 验证
+- pytest 132 passed（无回归）
+- 端到端：学段拦截 / 新学科教学 / MCP 3/3 / PPT 生成验证
+
+### 文档同步
+- 四份文档 + CHANGELOG 更新（学科数 26→29、学段联动、PPT MCP、自我更新闭环）
+
+---
+
 ## v0.24（2026-08-07）⭐ 关键节点
 
 **架构断链全面修复 + 4 文档同步 + 链路图 + Release**
