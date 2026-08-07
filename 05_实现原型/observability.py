@@ -110,6 +110,60 @@ def emit_event(event_type: str, **payload):
         pass
 
 
+# ─── v0.26 D1 ⭐ SessionTranscript：课堂记录可回放（学自 Codex JSONL Transcript） ───
+
+_TRANSCRIPT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'transcripts')
+
+
+def _transcript_path(session_id: str) -> str:
+    os.makedirs(_TRANSCRIPT_DIR, exist_ok=True)
+    return os.path.join(_TRANSCRIPT_DIR, f"{session_id}.jsonl")
+
+
+def transcript_append(session_id: str, item_type: str, **payload):
+    """写入一条课堂记录（append-only JSONL，grep 友好、可回放）。
+
+    item_type: user_input / diagnosis / plan / presentation / evaluation /
+               adaptation / reflection / summary / done / retry(Verify Gate)
+    供：学生/教师回看整堂课；debug 按 turn 定位；审计链路真实联通。
+    """
+    try:
+        entry = {
+            "ts": time.time(),
+            "session_id": session_id,
+            "item_type": item_type,
+            **payload,
+        }
+        with open(_transcript_path(session_id), 'a', encoding='utf-8') as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def transcript_replay(session_id: str, item_type: Optional[str] = None):
+    """回放课堂记录（可过滤 item_type）。"""
+    try:
+        path = _transcript_path(session_id)
+        if not os.path.exists(path):
+            return []
+        out = []
+        with open(path, encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except Exception:
+                    continue
+                if item_type and entry.get("item_type") != item_type:
+                    continue
+                out.append(entry)
+        return out
+    except Exception:
+        return []
+
+
 if __name__ == "__main__":
     import sys, io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -117,4 +171,7 @@ if __name__ == "__main__":
     log.info("self.check", ok=True)
     record_metric("paeg.tool.duration", 123, {"tool": "web_search"})
     emit_event("thread.started", thread_id="thr_test")
-    print("可观测性模块自检 OK")
+    transcript_append("ses_test", "user_input", text="什么是熵？")
+    transcript_append("ses_test", "presentation", step_id=1, content="熵是系统混乱度的度量…")
+    items = transcript_replay("ses_test")
+    print(f"可观测性模块自检 OK（transcript {len(items)} 条）")
