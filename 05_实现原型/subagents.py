@@ -121,11 +121,86 @@ def _pre_retrieve(question: str, subject: str = None) -> str:
                 snippet = h.get("snippet") or ""
             if snippet:
                 parts.append(f"- [{cid}] {str(snippet)[:120]}")
+        # v0.26 ⭐ Library 学科作用域检索：按学科子文件夹 + 公共 + 用户文件夹
+        try:
+            _proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            _lib_root = os.path.join(_proj, 'Library')
+            _dirs = []
+            if subject:
+                _dirs.append(os.path.join(_lib_root, str(subject).strip().lower()))
+            _dirs.append(os.path.join(_lib_root, 'common'))
+            _dirs.append(os.path.join(_lib_root, 'users'))
+            # v0.26 修复：用户上传资料规范路径是 Library/usr_knowledge/<uid>/
+            # （此前只扫空的 Library/users/ 导致用户资料永远检索不到）
+            try:
+                _uk = os.path.join(_lib_root, 'usr_knowledge')
+                if os.path.isdir(_uk):
+                    for _u in os.listdir(_uk):
+                        _dirs.append(os.path.join(_uk, _u))
+            except Exception:
+                pass
+            _lib_parts = []
+            for _d in _dirs:
+                if not os.path.isdir(_d):
+                    continue
+                # 检索该目录下的 md/txt 文件（简单关键词匹配）
+                for _f in os.listdir(_d)[:10]:
+                    _fp = os.path.join(_d, _f)
+                    if not os.path.isfile(_fp):
+                        continue
+                    if not _f.endswith(('.md', '.txt')):
+                        continue
+                    try:
+                        with open(_fp, encoding='utf-8') as _fh:
+                            _ftxt = _fh.read()[:2000]
+                        if any(_tok in _ftxt for _tok in _tokens[:3]):
+                            _rel = os.path.relpath(_fp, _lib_root)
+                            _snip = _ftxt[:100].replace('\n', ' ')
+                            _lib_parts.append(f"- [{_rel}] {_snip}")
+                    except Exception:
+                        continue
+            if _lib_parts:
+                parts.append("\n## Library 学科资料（v0.26 自动注入：学科子文件夹 + common + 用户文件夹）")
+                parts.extend(_lib_parts[:5])
+        except Exception:
+            pass
         if len(parts) == 1:
             return ""
         return "\n".join(parts)
     except Exception:
         return ""
+
+
+
+
+def _detect_teaching_mode(text: str, llm=None, fallback: str = "normal") -> str:
+    """v0.26 ⭐ 教学模式识别（easy/normal/deep）——agent 引导 LLM 判断用户指令落入哪种模式。
+
+    不再依赖关键词匹配（"简单了解"等），而是让 LLM 语义判断：
+    - easy  简单理解：学生要"大概懂"即可（大白话/类比/入门/了解下/没基础）
+    - normal 标准教学：默认深入讲解
+    - deep  深度教学：学生要"讲透/深入研究/为什么/推导"
+    LLM 失败时回退 fallback。
+    """
+    try:
+        if llm is None:
+            return fallback
+        import json as _json
+        _sys = (
+            "你是教学模式识别器。判断学生这句话想用哪种教学深度：\n"
+            "1. easy：只要大概理解/简单了解/入门/大白话/简单讲讲/没基础/了解下——不要深入\n"
+            "2. normal：普通教学，默认\n"
+            "3. deep：要深入理解/讲透/为什么/严格推导/研究级\n"
+            "只输出一个词：easy 或 normal 或 deep。不要多余文字。"
+        )
+        _r = _safe_chat(llm, _sys, str(text)[:200], max_tokens=10)
+        if _r:
+            _mode = _r.strip().lower()
+            if _mode in ("easy", "normal", "deep"):
+                return _mode
+    except Exception:
+        pass
+    return fallback
 
 
 def _safe_chat_with_retrieval(model, system: str, user: str = None,
@@ -346,7 +421,41 @@ class Presenter:
                 kb_node=kb_node,
                 strategy_line=teaching_line,
                 user_model=getattr(learner, "_user_model", None),
+                subtopic=step.get("subtopic", "") or "",
             )
+            # v0.26 ⭐ 教学模式识别（agent 引导 LLM 判断 easy/normal/deep，不靠关键词）
+            try:
+                _mode = _detect_teaching_mode(concept, self.model)
+                if _mode == "easy":
+                    system = system + (
+                        "\n\n## 教学模式：简单理解（v0.26 ⭐ 用户要'大概懂'）\n"
+                        "学生想要简单理解——只讲两层：①生活类比让他'看见' ②核心机制的简化版（去推导去术语）。\n"
+                        "禁止：严格推导、术语堆砌、层层深入、结尾深问。目标是'懂个大概'。\n"
+                        "用大白话，像给完全没接触过的人讲。"
+                    )
+                elif _mode == "deep":
+                    system = system + (
+                        "\n\n## 教学模式：深度教学（v0.26 ⭐ 用户要'讲透'）\n"
+                        "学生想要深入理解——走完整四层：看见→机制→深入（联系/边界/历史）→把握（总结+追问）。\n"
+                        "公式给推导思路，文科给论证与反例。"
+                    )
+                else:
+                    system = system + (
+                        "\n\n## 教学模式：标准教学（v0.26 默认）\n"
+                        "学生未指定深度——正常深入讲解，四层走完，但开头可以稍微快一点进入正题。"
+                    )
+            except Exception:
+                pass
+            # v0.26 ⭐ 用户资料注入（P0 断链修复：教学能看到用户上传资料）
+            try:
+                _uc = getattr(learner, "_user_corpus", "") or ""
+                if _uc:
+                    system = system + (
+                        "\n\n## 用户上传的资料（v0.26 自动注入，回答时优先参考）\n"
+                        + str(_uc)[:600]
+                    )
+            except Exception:
+                pass
             # v0.24 ⭐ 把上游注入的真接到 system（让 LLM 真正按上游决策改写）
             if ind_profile:
                 system = system + "\n\n## 个体化学生画像（v0.24）\n" + ind_profile
