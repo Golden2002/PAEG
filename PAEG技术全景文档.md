@@ -50,44 +50,13 @@ PAEG 的设计目标分层：
 ## 1.2 一句话架构
 
 ```mermaid
-flowchart TB
-    subgraph CLIENT["客户端"]
-        BROWSER["浏览器（手机/电脑）"]
-    end
-
-    subgraph NET["网络层"]
-        TUNNEL["Cloudflare 隧道 trycloudflare.com<br/>公网入口，转发到本地"]
-    end
-
-    subgraph BACKEND["本地服务"]
-        FLASK["Flask server.py<br/>后端：提供网页 + API"]
-        GUI["GUI index.html<br/>前端：教学对话界面"]
-        PAEG["PAEG 智能体核心 paeg.py<br/>教学流程编排"]
-        SUB5["9 个 subagent subagents.py<br/>诊断/计划/呈现/评估/调整/直答/陪伴/自更新/个体化"]
-        PROMPTS["学科提示词 prompts.py<br/>让 LLM 讲\"人话\""]
-        KB["知识库 knowledge_base.py<br/>学科/素养/技能节点"]
-        WV["世界观 world_view.py<br/>教学语气切换"]
-        SU["自我更新 self_update.py<br/>画像持久化"]
-        LLMC["大模型客户端 llm_api.py"]
-    end
-
-    subgraph LLM2["大模型"]
-        DS["DeepSeek 大模型（云端，真正的\"大脑\"）"]
-    end
-
-    BROWSER -->|"HTTPS"| TUNNEL
-    TUNNEL -->|"HTTP 127.0.0.1:5000"| FLASK
-    FLASK --> GUI
-    FLASK --> PAEG
-    PAEG --> SUB5
-    PAEG --> PROMPTS
-    PAEG --> KB
-    PAEG --> WV
-    PAEG --> SU
-    SUB5 & PAEG --> LLMC
-    LLMC -->|"调用 DeepSeek API"| DS
-    KB -.->|"v0.24: Library 扩展 + 检索"| SUB5
-    SU -.->|"v0.24: Individuality persist"| SUB5
+flowchart LR
+    B["浏览器<br/>手机/电脑"] -->|"HTTPS"| T["Cloudflare 隧道<br/>公网入口"]
+    T -->|"HTTP :5000"| S["Flask server.py<br/>网页 + API"]
+    S --> P["PAEG 核心<br/>9 个 subagent 编排"]
+    P --> L["DeepSeek<br/>云端大脑"]
+    K["知识库 / Library"] -.-> P
+    U["用户画像 users_data"] -.-> P
 ```
 
 **关键点**：你的电脑只做**中转**——接收请求、编排教学流程、转发给 DeepSeek。真正的"思考"在云端完成。所以电脑 CPU/内存负担极小。
@@ -326,110 +295,45 @@ LLM 调用（带 tools+tool_choice）→ LLM 决定调哪些工具 → 逐个执
 - **用户模型**：`infer_user_model + infer_bdi`（agent_core.py）挂到 `learner._user_model`，Presenter 读取——**对象意识**贯穿教学。
 - **三层记忆**（memory_system.py）：短期（当前对话）→ 中期（LLM 摘要压缩）→ 长期（跨会话画像 + 对话摘要，users_data/<id>/）。
 
-### 图一：全链路总览（v0.24 修复后真实连接 ⭐）
+### 图一：架构总览（L0 · 分层展开，一图看懂 ⭐）
 
-> 这是 PAEG 架构最重要的全景图——从用户层到主 agent、再到 9 个 subagent、LLM 层、工具链层、MCP 层、本地资源层的完整链路。**所有连线均为真实代码连接**，20 项已逐一验证（arch 检查通过）。
+> 这是 PAEG 架构的**第 0 层总览**——只展示六层结构与主干数据流，避免一张图塞满细节。每层可展开为独立细图（见下方导航）。**所有连线均为真实代码连接**，20 项已逐一验证（arch 检查通过）。
 
 ```mermaid
 flowchart TB
-    subgraph USER["用户层"]
-        S["🧑 学生 / 学习者"]
-        EXT["🤖 外部智能体<br/>Claude / Codex / OpenCode"]
-    end
+    L1["👤 用户层<br/>学生 · 外部智能体"]
+    L2["🌐 应用层<br/>Flask Server · 意图路由"]
+    L3["🧠 主 Agent<br/>Émile · 9 个 subagent"]
+    L4["✨ LLM 层<br/>DeepSeek"]
+    L5["🔧 工具 + MCP 层<br/>工具链 · 技能 · 外部 server"]
+    L6["📚 本地资源层<br/>知识库 · 画像 · 记忆"]
 
-    subgraph APP["应用层 · Flask Server (server.py)"]
-        WEB["Web GUI / API 端点<br/>chat·teach·answer·affection·skills·upload"]
-        ROUTER["meta_router.route()<br/>意图集中分发"]
-        AGENTENG["AgentEngine<br/>Plan→Act→Observe→Reflect"]
-        HEALTH["/api/health<br/>mcp_connected 2/2"]
-    end
-
-    subgraph MAIN["主 Agent · Émile Novis (paeg.py)"]
-        PAEG["PAEG 主智能体<br/>持有 9 个 subagent"]
-        GATE["_affection_gate_check<br/>危机信号先行"]
-        IND["Individuality<br/>17 维画像注入"]
-    end
-
-    subgraph SUB["Subagent 层（9 个）"]
-        DIA["Diagnostor 诊断"]
-        PLA["Planner 计划"]
-        PRE["Presenter 呈现"]
-        EVA["Evaluator 评估<br/>讲解质量+学生状态双分"]
-        ADA["Adapter 调整<br/>决策真正执行"]
-        ANS["AnswerSolver 直答"]
-        AFF["AffectionSupportor<br/>立德树人 · 危机陪伴"]
-        SUA["SelfUpdateAgent 自更新"]
-        IND2["Individuality 个体化<br/>17 维·增量建模·持久化"]
-    end
-
-    subgraph LLM["LLM 层"]
-        DS["DeepSeek (llm_adapter)<br/>全部 subagent 调用"]
-    end
-
-    subgraph TOOL["工具链层"]
-        REG["tool_registry<br/>web_search·verify_math·fetch_page<br/>daily_quote·save_doc·get_time"]
-        SK["skill_registry<br/>10 技能（L1 目录注入）"]
-        F4["用户文件 4 能力<br/>QA·讲解·原文·重组 (BM25)"]
-    end
-
-    subgraph MCP["MCP 层"]
-        MC["MCPClientManager<br/>filesystem 14 + memory 9 工具"]
-        MG["mcp_gateway :8765<br/>PAEG 能力对外暴露"]
-    end
-
-    subgraph RES["本地资源层"]
-        KB["knowledge_base 知识库"]
-        LIB["Library 薇依原著<br/>weil_corpus.json"]
-        MEM["memory/ 记忆<br/>AffectionSAPAO.md"]
-        USR["users_data/ 画像<br/>users.json"]
-        IMP["improvements.md<br/>自更新建议回流"]
-    end
-
-    S -->|"对话/自述/上传"| WEB
-    EXT -->|"MCP 协议"| MG
-    WEB -->|"路由分发"| ROUTER
-    ROUTER -->|"教学意图"| PAEG
-    ROUTER -->|"agent 模式"| AGENTENG
-    ROUTER -->|"危机/情绪"| AFF
-    AGENTENG --> DS
-    PAEG -->|"危机检查先行"| GATE
-    PAEG --> IND
-    IND --> IND2
-    GATE -->|"危机通过→教学"| DIA
-    DIA --> PLA --> PRE --> EVA --> ADA
-    EVA -.->|"学生状态反馈"| ADA
-    ADA -.->|"风格/难度决策回流"| PRE
-    PAEG --> ANS
-    PAEG --> SUA
-    PAEG --> AFF
-    DIA & PLA & PRE & EVA & ADA & ANS & AFF & SUA & IND2 --> DS
-    PAEG -->|"工具调用"| REG
-    REG --> SK
-    REG --> MC
-    PAEG --> F4
-    MC -->|"filesystem/memory 标准 server"| MEM
-    MG -->|"复用 PAEG 工具"| REG
-    DIA & PLA --> KB
-    PRE --> LIB
-    AFF --> MEM
-    IND2 --> USR
-    SUA --> IMP
-    SUA --> MEM
-    REG --> KB
-    KB --> LIB
-    IMP --> PAEG
-    USR -.->|"画像继承"| IND2
-    HEALTH --> MC
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+    L3 --> L5
+    L5 --> L6
+    L6 --> L3
 ```
 
-**链路层次解读**：
-- **用户层 → 应用层**：学生走 Web GUI/API；外部 agent 走 MCP 协议
+**分层细图导航**（每层一个主题，≤10 节点，不拥挤）：
+
+| 层 | 细图 | 位置 |
+|---|---|---|
+| 应用层 → 主 Agent | **图二：教学闭环**（9 subagent 流水线） | §1.6.1 |
+| 个体化 | **图三：个体化闭环**（因材施教） | §1.6.1 下 |
+| 立德树人 | **图四：立德树人闭环** | §1.6.1 下 |
+| 工具/MCP | **图五：工具与 MCP 层** | §1.6.9 |
+| 自我进化 | **图六：自我进化闭环** | §1.6.8 |
+
+**总览 → 细图如何衔接**：
+- **用户层 → 应用层**：学生走 Web GUI/API；外部 agent 走 MCP 协议（详见图五）
 - **应用层 → 主 agent**：`meta_router.route()` 集中分发（教学/agent/危机三类）
-- **主 agent → 9 subagent**：PAEG 主循环统一调度，先经 `_affection_gate_check`（危机先行），再注入 Individuality 画像
-- **教学流水线**：Diagnostor → Planner → Presenter → Evaluator → Adapter（带评估反馈+决策回流的双虚线）
+- **主 agent → 9 subagent**：PAEG 主循环统一调度，先经 `_affection_gate_check`（危机先行，详见图四），再注入 Individuality 画像（详见图三）
+- **教学流水线**：Diagnostor → Planner → Presenter → Evaluator → Adapter（带评估反馈+决策回流，详见图二）
 - **subagent → DeepSeek**：全部 subagent 通过 `llm_adapter` 调用 DeepSeek
-- **subagent → 本地资源**：Diagnostor/Planner 读 KB；Presenter 读 Library；AffectionSupportor 读 AffectionSAPAO；Individuality 写 users_data；SelfUpdateAgent 回流 improvements.md
-- **工具/MCP 层**：`tool_registry` 合并内置工具 + skills；`MCPClientManager` 接 filesystem/memory 外部标准 server；`mcp_gateway` 把 PAEG 工具对外暴露给外部 agent
+- **工具/MCP 层**：`tool_registry` 合并内置工具 + skills；`MCPClientManager` 接 filesystem/memory（详见图五）
+- **自我进化**：SelfUpdateAgent 反思 → improvements.md 回流（详见图六）
 
 ## 1.6.6 角色设定与预置提示词：如何保证教育价值观与教育能力
 
