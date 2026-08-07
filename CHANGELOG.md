@@ -5,7 +5,40 @@
 
 ---
 
-## v0.22.0（2026-08-07）
+## v0.22.2（2026-08-07）⭐ 关键节点
+
+**Subagent 架构对齐成熟项目 + 危机协议强化 + 回答前强制检索**
+
+> 🏷️ **本版本标记为关键节点**：本地快照 + GitHub Release `v0.22.2`。异常时可按 §10.9 回退。
+
+### 1. Subagent 架构对齐（⭐ 技术文档 §10.2.6.8）
+- **核查**：8 个 subagent 架构 vs 文档声称能力——70% 真实落地、0 虚标、30% 钩子未集成
+- **P0-1**：5 个 LLM subagent 切 `_safe_chat_with_retrieval`（回答前强制检索知识库，jieba 分词注入）——Diagnostor/Presenter 注入 KB，AffectionSupportor/SelfUpdateAgent 用 include_kb=False
+- **P0-2**：`evolve_prompt` 接入 paeg.teach 反思钩子（教学平均分 <0.7 提炼提示词补丁 → subject_patches.md）
+- **P0-3**：危机协议接入 AffectionSupportor（SafetyChecker + 12356 热线）
+- **P1-1**：Presenter 暴露 tools（web_search/verify_math）——讲解时可主动查证
+- **P1-2**：SelfUpdateAgent 建议回流 improvements.md（periodic 周度 step 5）
+
+### 2. 危机协议强化（⭐ 人性化干预）
+- 危机回复补"还有其他方法"：继续和我聊天 / 去现实找真实的能陪伴你的人
+- **拒绝规则**：用户说"不需要咨询/不需要热线/不需要这些服务"→ 之后不再重复提示（尊重选择，表达陪伴）
+- 实测：首次危机含热线+其他方法；拒绝后再次危机 → opt_out、不再提热线
+
+### 3. 成熟项目借鉴（codex/opencode/Devin/Anthropic/Khanmigo）
+- Rejection Circuit Breaker（Codex）→ 危机拒绝规则
+- 三层记忆（Devin）→ chat_hist + user_facts + 教学记忆对齐
+- 回答前强制检索（Khanmigo +6.1%）→ _safe_chat_with_retrieval
+- 工具分层（Anthropic ACI）→ Presenter/AnswerSolver 专用工具
+
+### 4. 文档更新（三份）
+- 技术文档：§10.2.6.8（subagent 对齐）+ §10.3 v0.22.2
+- 元能力文档：§5.5 架构对齐方法论 + 版本声明
+- 亮点总览：投资人版强化（回答前检索 + 自我进化闭环 + 危机协议）
+
+### 5. 测试
+- pytest 69/69（无回归）；危机三场景 + 检索注入端到端验证
+
+---
 
 **Skills 生态增强 + 基于用户上传文件的 4 能力（找答案/讲解/输出原文/重组结构）**
 
