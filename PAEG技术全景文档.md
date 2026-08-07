@@ -49,89 +49,105 @@ PAEG 的设计目标分层：
 
 ## 1.2 一句话架构
 
-```
-浏览器（手机/电脑）
-    │  HTTPS
-    ▼
-Cloudflare 隧道 (trycloudflare.com)      ← 公网入口，转发到本地
-    │  HTTP 127.0.0.1:5000
-    ▼
-Flask server.py (本地 Python 服务)        ← 后端：提供网页 + API
-    │
-    ├─ GUI (index.html)                   ← 前端：教学对话界面
-    ├─ PAEG 智能体核心 (paeg.py)          ← 教学流程编排
-    │     ├─ 5 子代理 (subagents.py)      ← 诊断/计划/呈现/评估/调整
-    │     ├─ 学科提示词 (prompts.py)      ← 让 LLM 讲"人话"
-    │     ├─ 知识库 (knowledge_base.py)   ← 学科/素养/技能节点
-    │     ├─ 世界观 (world_view.py)       ← 教学语气切换
-    │     └─ 自我更新 (self_update.py)    ← 画像持久化
-    └─ 大模型客户端 (llm_api.py)
-          │  调用 DeepSeek API
-          ▼
-    DeepSeek 大模型（云端，真正的"大脑"）
+```mermaid
+flowchart TB
+    subgraph CLIENT["客户端"]
+        BROWSER["浏览器（手机/电脑）"]
+    end
+
+    subgraph NET["网络层"]
+        TUNNEL["Cloudflare 隧道 trycloudflare.com<br/>公网入口，转发到本地"]
+    end
+
+    subgraph BACKEND["本地服务"]
+        FLASK["Flask server.py<br/>后端：提供网页 + API"]
+        GUI["GUI index.html<br/>前端：教学对话界面"]
+        PAEG["PAEG 智能体核心 paeg.py<br/>教学流程编排"]
+        SUB5["9 个 subagent subagents.py<br/>诊断/计划/呈现/评估/调整/直答/陪伴/自更新/个体化"]
+        PROMPTS["学科提示词 prompts.py<br/>让 LLM 讲\"人话\""]
+        KB["知识库 knowledge_base.py<br/>学科/素养/技能节点"]
+        WV["世界观 world_view.py<br/>教学语气切换"]
+        SU["自我更新 self_update.py<br/>画像持久化"]
+        LLMC["大模型客户端 llm_api.py"]
+    end
+
+    subgraph LLM2["大模型"]
+        DS["DeepSeek 大模型（云端，真正的\"大脑\"）"]
+    end
+
+    BROWSER -->|"HTTPS"| TUNNEL
+    TUNNEL -->|"HTTP 127.0.0.1:5000"| FLASK
+    FLASK --> GUI
+    FLASK --> PAEG
+    PAEG --> SUB5
+    PAEG --> PROMPTS
+    PAEG --> KB
+    PAEG --> WV
+    PAEG --> SU
+    SUB5 & PAEG --> LLMC
+    LLMC -->|"调用 DeepSeek API"| DS
+    KB -.->|"v0.24: Library 扩展 + 检索"| SUB5
+    SU -.->|"v0.24: Individuality persist"| SUB5
 ```
 
 **关键点**：你的电脑只做**中转**——接收请求、编排教学流程、转发给 DeepSeek。真正的"思考"在云端完成。所以电脑 CPU/内存负担极小。
 
 ## 1.3 数据流（一次完整教学）
 
-```
-用户提问 "什么是熵？"
-  → GUI 发 POST /api/teach
-  → server 创建/查找学习者画像
-  → PAEG.teach() 编排：
-      ① Diagnostor 诊断（学生水平）→ ② Planner 计划（3 步）
-      ③ Presenter 呈现 ×3（每步调 DeepSeek 生成讲解）→ ④ Evaluator 评分
-      ⑤ 反思 + 自我更新（更新画像）
-  → 返回 JSON（3 段讲解 + 评分 + 画像）
-  → GUI 逐步显示气泡对话
+```mermaid
+sequenceDiagram
+    participant GUI as 前端 GUI
+    participant SVR as server.py
+    participant PAEG as PAEG.teach()
+    participant LLM as DeepSeek
+
+    GUI->>SVR: POST /api/teach "什么是熵？"
+    SVR->>SVR: 创建/查找学习者画像
+    SVR->>PAEG: 启动教学编排
+    PAEG->>PAEG: ① Diagnostor 诊断（学生水平）
+    PAEG->>PAEG: ② Planner 计划（3 步）
+    loop 每一步
+        PAEG->>LLM: ③ Presenter 调 DeepSeek 生成讲解
+        LLM-->>PAEG: 讲解内容
+        PAEG->>PAEG: ④ Evaluator 评分
+    end
+    PAEG->>PAEG: ⑤ 反思 + 自我更新（更新画像）
+    PAEG-->>SVR: 返回 JSON（3 段讲解 + 评分 + 画像）
+    SVR-->>GUI: 逐步显示气泡对话
 ```
 
 ## 1.4 Agent 指挥 LLM 的工作机制（⭐ 核心设计）
 
 PAEG 之所以比"直接使用 LLM"更强，是因为它在每次对话时，由 **Agent（编排层）综合五路信息指挥 LLM**：
 
-```
-用户输入（当前问题）
-   │
-   ▼
-┌─────────────────────────────────────────────┐
-│ Agent 编排层（server.py / paeg.py / prompts）│
-│                                             │
-│  打包五路上下文 → 注入 system/user prompt：  │
-│                                             │
-│  ① 提示词（顶层设计）                        │
-│     · 薇依人格（WEIL_CORE：先做人再教书）    │
-│     · 回复三原则（准确性/组织性/功能性）     │
-│     · 学科黄金法则 + 讲义级结构              │
-│     · 语言铁律（去 AI 味）                   │
-│                                             │
-│  ② 知识库（Library/ + KnowledgeBase/）      │
-│     · 学科事实节点                          │
-│     · 用户上传的资料（Library/user_<id>/）  │
-│                                             │
-│  ③ 工具（tool_registry：5 工具 + skills）   │
-│     · web_search / verify_math / fetch_page │
-│     · daily_quote / get_time / load_skill__ │
-│     · LLM 自主判断何时调用（function calling）│
-│                                             │
-│  ④ 用户数据                                 │
-│     · 画像（自我描述/掌握度）               │
-│     · BDI（信念/愿望/意图推断）             │
-│     · 三层记忆（短期对话/摘要/长期）        │
-│     · 教学记忆（PAEG_PEDAGOGY.md）          │
-│                                             │
-│  ⑤ 用户输入 + 页面设定（模式/学段/学科）    │
-└─────────────────────────────────────────────┘
-   │
-   ▼
-Agent 指挥 LLM 的循环（run_agent_loop）：
-   1. 先理解（结合全部上下文）
-   2. 需要时调用工具（不编造，标注来源）
-   3. 自我检查（针对问题？需验证？够深入？）
-   4. 输出高质量内容
-   ▲              │
-   └── 工具结果回传 LLM，继续完善 ──┘
+```mermaid
+flowchart TB
+    IN["用户输入（当前问题）"] --> AGENT
+
+    subgraph AGENT["Agent 编排层（server.py / paeg.py / prompts）"]
+        PACK["打包五路上下文 → 注入 system/user prompt"]
+    end
+
+    PACK --> OUT["Agent 指挥 LLM 的循环<br/>run_agent_loop"]
+
+    subgraph OUT["指挥循环"]
+        C1["1. 先理解（结合全部上下文）"]
+        C2["2. 需要时调用工具<br/>（不编造，标注来源）"]
+        C3["3. 自我检查<br/>（针对问题？需验证？够深入？）"]
+        C4["4. 输出高质量内容"]
+        C1 --> C2 --> C3 --> C4
+        C2 -.->|"工具结果回传 LLM，继续完善"| C1
+    end
+
+    subgraph CTX["五路上下文"]
+        P1["① 提示词<br/>薇依人格·回复三原则·学科黄金法则·语言铁律"]
+        P2["② 知识库<br/>Library/ + KnowledgeBase/<br/>+ 用户上传资料"]
+        P3["③ 工具<br/>tool_registry 7 工具 + skills<br/>LLM 自主判断调用"]
+        P4["④ 用户数据<br/>画像·BDI·三层记忆·教学记忆"]
+        P5["⑤ 用户输入 + 页面设定<br/>模式/学段/学科"]
+    end
+
+    P1 & P2 & P3 & P4 & P5 --> PACK
 ```
 
 ### 回复内容的三原则
@@ -457,26 +473,22 @@ flowchart TB
 
 ### 四路自进化管线
 
-```
-教学/对话完成
-   │
-   ├─① 知识库更新（distill_knowledge）
-   │    成功教学(avg≥0.7) → LLM提炼知识点(definition+intuition)
-   │      → QualityGate过滤 → Library/KnowledgeBase/subjects/evolved_*.json
-   │      → 重启后 library_loader 自动注册（知识库闭环）
-   │
-   ├─② 学科提示词更新（evolve_prompt，SCOPE双流）
-   │    教学反思 → LLM提炼改进建议
-   │      → QualityGate过滤 → memory/subject_patches.md
-   │      → teaching_memory 注入 system prompt（下次对话生效）
-   │
-   ├─③ 工具使用经验（learn_tool_lesson）
-   │    工具调用成败 → memory/tool_lessons.md
-   │      → teaching_memory 注入（优化工具选择）
-   │
-   └─④ 周度洞察（periodic_self_update）
-       每周：weekly_insight_update(ExpeL) + batch_update + analyze_failures
-         → evolve_data/insights.json + memory/improvements.md
+```mermaid
+flowchart TB
+    START["教学/对话完成"]
+
+    KB["① 知识库更新 distill_knowledge<br/>成功教学(avg≥0.7) → LLM 提炼知识点<br/>→ QualityGate 过滤 → Library/KnowledgeBase/subjects/evolved_*.json<br/>→ 重启后 library_loader 自动注册"]
+
+    PROMPT["② 学科提示词更新 evolve_prompt SCOPE双流<br/>教学反思 → LLM 提炼改进建议<br/>→ QualityGate 过滤 → memory/subject_patches.md<br/>→ teaching_memory 注入 system prompt"]
+
+    TOOL["③ 工具使用经验 learn_tool_lesson<br/>工具调用成败 → memory/tool_lessons.md<br/>→ teaching_memory 注入（优化工具选择）"]
+
+    WEEK["④ 周度洞察 periodic_self_update<br/>weekly_insight_update(ExpeL) + batch_update + analyze_failures<br/>→ evolve_data/insights.json + memory/improvements.md"]
+
+    START --> KB
+    START --> PROMPT
+    START --> TOOL
+    START --> WEEK
 ```
 
 ### 质量门禁（QualityGate）：不收集无效数据 ⭐
@@ -514,19 +526,24 @@ flowchart TB
 
 ### 双向架构
 
-```
-                        ┌────────────────────────────────┐
-                        │   PAEG 核心（tool_registry）    │
-                        │   get_all_tool_defs()           │
-                        │   execute_tool()                │
-                        └───────┬────────────┬───────────┘
-                                │            │
-                   MCP Server  │            │  MCP Client
-              （mcp_gateway.py）│            │（mcp_client.py）
-                对外暴露教育工具│            │ 连接外部标准 server
-                                ▼            ▼
-                   外部 agent（opencode 等）    @modelcontextprotocol/server-*
-                    连 :8765/mcp              filesystem / memory / fetch
+```mermaid
+flowchart TB
+    subgraph CORE["PAEG 核心（tool_registry）"]
+        DEFS["get_all_tool_defs()"]
+        EXEC["execute_tool()"]
+    end
+
+    subgraph OUT["MCP Server（mcp_gateway.py）对外暴露教育工具"]
+        EXT["外部 agent（opencode 等）<br/>连 :8765/mcp"]
+    end
+
+    subgraph IN["MCP Client（mcp_client.py）连接外部标准 server"]
+        STD["@modelcontextprotocol/server-*<br/>filesystem / memory / fetch"]
+    end
+
+    DEFS --> EXEC
+    EXEC -->|"MCP Server"| EXT
+    EXEC -->|"MCP Client"| STD
 ```
 
 **① MCP Server（已有，v0.19）**：FastMCP 网关暴露 7 个教育工具（web_search/verify_math/fetch_page/daily_quote/get_time/solve_problem/save_document），外部 agent（opencode/Claude/Cursor）连 `http://host:8765/mcp` 复用。
@@ -951,22 +968,16 @@ LLM 中文输出常出现：
 
 ## 三层架构（调研 star-word / stop-slop-zh / writing-harness / FastAPI zh-prompt）
 
-```
-┌─────────────────────────────────────────────┐
-│ L1 System Prompt Constraint（生成时 · 0 token）│
-│  所有 system prompt 统一注入"句法骨架+省略边界+  │
-│  禁用句式+few-shot"                           │
-└─────────────────────────────────────────────┘
-            ↓ LLM 输出
-┌─────────────────────────────────────────────┐
-│ L2 Rule Detection（机械检测 · 零 LLM）        │
-│  _check_ellipsis 扩展：无主语短语 + 动宾搭配    │
-└─────────────────────────────────────────────┘
-            ↓ 命中
-┌─────────────────────────────────────────────┐
-│ L3 LLM Correction（minimal-edit · 保风格）    │
-│  只改问题句，不重写风格，补主语/修动宾          │
-└─────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    L1["L1 System Prompt Constraint（生成时 · 0 token）<br/>所有 system prompt 统一注入<br/>句法骨架 + 省略边界 + 禁用句式 + few-shot"]
+    L2["L2 Rule Detection（机械检测 · 零 LLM）<br/>_check_ellipsis 扩展：<br/>无主语短语 + 动宾搭配"]
+    L3["L3 LLM Correction（minimal-edit · 保风格）<br/>只改问题句，不重写风格<br/>补主语 / 修动宾"]
+
+    L1 -->|"LLM 输出"| L2
+    L2 -->|"命中"| L3
+    L2 -.->|"零问题跳过"| DONE["正常输出"]
+    L3 --> DONE
 ```
 
 **分层过滤确认（v0.21.8 ⭐ 用户核查）**：
@@ -1723,16 +1734,15 @@ Flask 写的本地 Web 服务，**同时提供网页和 API**。默认监听 `0.
 
 ## 6.1 网络拓扑
 
-```
-你的电脑（内网 IP，如 10.163.246.118）
-    ├─ PAEG server  :5000（本地服务）
-    ├─ cloudflared  （隧道客户端，建立到 Cloudflare 的出站连接）
-    │     │  出站 HTTPS（无需开放入站端口！）
-    ▼
-Cloudflare 边缘网络 → 公网 URL https://xxx.trycloudflare.com
-    │
-    ▼
-任何设备浏览器（手机/平板/异地电脑）都能访问
+```mermaid
+flowchart TB
+    subgraph PC["你的电脑（内网 IP，如 10.163.246.118）"]
+        SVR["PAEG server :5000<br/>本地服务"]
+        CFD["cloudflared 隧道客户端<br/>建立到 Cloudflare 的出站连接"]
+        SVR -->|"出站 HTTPS（无需开放入站端口！）"| CFD
+    end
+    CFD --> EDGE["Cloudflare 边缘网络<br/>→ 公网 URL https://xxx.trycloudflare.com"]
+    EDGE --> DEV["任何设备浏览器<br/>手机 / 平板 / 异地电脑"]
 ```
 
 **为什么用隧道**：你的电脑在 NAT 后面（没有公网 IP，或公网 IP 被运营商隔离）。cloudflared 主动"拨号"到 Cloudflare，建立反向通道——**不需要路由器端口映射，不需要公网 IP**。
@@ -2066,23 +2076,19 @@ python qa_method_kb.py        # 学习方法+知识库端点
 
 **经验**：公网冒烟发现的常见问题——**浏览器缓存旧 JS**（功能"没生效"其实是缓存）、**隧道 URL 重启后变化**（bookmark 旧地址打不开）。发布流程必须包含"公网冒烟 + 记录当前有效 URL"。
 
-### 10.2.3 测试金字塔总览（v0.19.27）
+### 10.2.3 测试金字塔总览（v0.24 更新）
 
-```
-        ┌─────────────┐
-        │ Playwright  │ ← 真实浏览器：UI 渲染/交互/模式切换（最终验证）
-        │  浏览器测试  │
-        ├─────────────┤
-        │ 端到端 API  │ ← 验证后端链路：拦截/steering/情绪/知识库
-        │  qa_*.py    │
-        ├─────────────┤
-        │ eval_harness│ ← 质量评估：意图识别/公式/深度/tool-use
-        ├─────────────┤
-        │ pytest 59   │ ← 单元+集成+验收：子代理/知识库/安全/世界观
-        └─────────────┘
+```mermaid
+flowchart TB
+    T1["Playwright 浏览器测试<br/>真实浏览器：UI 渲染/交互/模式切换（最终验证）"]
+    T2["端到端 API qa_*.py<br/>验证后端链路：拦截/steering/情绪/知识库"]
+    T3["eval_harness<br/>质量评估：意图识别/公式/深度/tool-use"]
+    T4["pytest 132<br/>单元+集成+验收：子代理/知识库/安全/世界观"]
+
+    T4 --> T3 --> T2 --> T1
 ```
 
-**开发节奏**：改后端 → pytest 59 保底 → qa_*.py 验证新功能 → Playwright 真实浏览器确认渲染 → 推送。
+**开发节奏**：改后端 → pytest 132 保底 → qa_*.py 验证新功能 → Playwright 真实浏览器确认渲染 → 推送。
 
 ### 10.2.4 多轮提示词注入实验（v0.20.4 ⭐ multi_turn_eval.py）
 
@@ -2128,20 +2134,17 @@ python multi_turn_eval.py --mode all   # 5 维度多轮实验
 
 > 本节是 PAEG 开发过程中反复迭代形成的**测试元方法论**——不只记录"有哪些测试"，更说明"怎么安排测试节奏、怎么防止测试卡住、怎么才算通过"。
 
-**测试金字塔总览**（5 层，自底向上）：
+**测试金字塔总览**（5 层，自底向上，v0.24 arch_check 扩展至 20 项连接验证）：
 
-```
-        ┌─────────────┐
-        │ Playwright  │ ← 真实浏览器端到端（最终验证手段）
-        ├─────────────┤
-        │ api_sweep   │ ← 全接口多轮覆盖（HTTP/路由/拦截）
-        ├─────────────┤
-        │ multi_turn  │ ← 5 维度多轮质量（退化/决策/语言/harness/tool）
-        ├─────────────┤
-        │ pytest 单元 │ ← 子代理/知识库/安全/世界观（秒级）
-        └─────────────┘
-        │ arch_check  │ ← 架构连通性（静态可达性 16/16）
-        └─────────────┘
+```mermaid
+flowchart TB
+    A1["Playwright<br/>真实浏览器端到端（最终验证手段）"]
+    A2["api_sweep<br/>全接口多轮覆盖（HTTP/路由/拦截）"]
+    A3["multi_turn<br/>5 维度多轮质量（退化/决策/语言/harness/tool）"]
+    A4["pytest 单元<br/>子代理/知识库/安全/世界观（秒级）"]
+    A5["arch_check<br/>架构连通性（静态可达性 + 20 项连接验证）"]
+
+    A5 --> A4 --> A3 --> A2 --> A1
 ```
 
 | 层 | 何时用 | 何时不用 |
