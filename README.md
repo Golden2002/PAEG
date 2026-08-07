@@ -62,73 +62,26 @@ Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（
 元能力文档.md（智能体设计方法论）+ observability.py（结构化日志/指标/事件流）。
 顶部"气象"链接 → windy.com 气象图（免费嵌入）+ 位置共享 + Open-Meteo 实时数据。
 
-## 架构全景（v0.24 关键节点 · 真实连接）
+## 架构全景（v0.24 关键节点 · 分层展开）
 
 ```mermaid
 flowchart TB
-    subgraph USER["用户层"]
-        S["🧑 学生 / 学习者<br/>6 模式：学科教学/闲聊/找答案/学习方法/知识库/倾诉"]
-    end
+    L1["👤 用户层<br/>学生 · 外部智能体"]
+    L2["🌐 应用层<br/>Flask Server · 意图路由"]
+    L3["🧠 主 Agent<br/>Émile · 9 个 subagent"]
+    L4["✨ LLM 层<br/>DeepSeek"]
+    L5["🔧 工具 + MCP 层<br/>工具链 · 技能 · 外部 server"]
+    L6["📚 本地资源层<br/>知识库 · 画像 · 记忆"]
 
-    subgraph APP["应用层"]
-        SERVER["server.py<br/>meta_router.route() 集中分发<br/>steering→界面→知识库→情绪→意向性→方法→出题→教学"]
-    end
-
-    subgraph MAIN["主 Agent"]
-        PAEG["PAEG 主 agent<br/>持有全部 9 个 subagent<br/>危机先行 → 17 维画像注入"]
-    end
-
-    subgraph SUB["Subagent 层（9 个）"]
-        DIA["Diagnostor 诊断"]
-        PLA["Planner 计划"]
-        PRE["Presenter 呈现"]
-        EVA["Evaluator 双维评分"]
-        ADA["Adapter 决策执行"]
-        ANS["AnswerSolver 直答"]
-        AFF["AffectionSupportor 立德树人"]
-        SUA["SelfUpdateAgent 自更新"]
-        IND["Individuality 持久化"]
-    end
-
-    subgraph LLM["LLM 层"]
-        DS["DeepSeek<br/>llm_adapter 全部 subagent 调用"]
-    end
-
-    subgraph TOOL["工具链 + MCP"]
-        T1["tool_registry 7 工具"]
-        T2["skill_registry 10 技能 L1 注入"]
-        T3["用户文件 4 能力 BM25"]
-        MCP["MCPClientManager 真实接线<br/>filesystem 14 + memory 9 = 2/2"]
-        MCPG["mcp_gateway :8765 对外暴露"]
-    end
-
-    subgraph RES["本地资源"]
-        R1["knowledge_base 知识库"]
-        R2["Library 薇依原著"]
-        R3["memory/ 记忆"]
-        R4["users_data/ 画像"]
-        R5["improvements.md 自更新回流"]
-    end
-
-    S --> SERVER
-    SERVER --> PAEG
-    PAEG --> DIA & PLA & PRE & EVA & ADA & ANS & AFF & SUA & IND
-    DIA --> PLA --> PRE --> EVA --> ADA
-    ADA -.->|"决策回流"| PRE
-    DIA & PLA & PRE & EVA & ADA & ANS & AFF & SUA & IND --> DS
-    PAEG --> T1 & T2 & T3
-    T1 --> MCP
-    MCPG --> T1
-    DIA & PLA --> R1
-    PRE --> R2
-    AFF --> R3
-    IND --> R4
-    SUA --> R5
-    R5 --> PAEG
-    R1 --> R2
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+    L3 --> L5
+    L5 --> L6
+    L6 --> L3
 ```
 
-**完整链路图**：见 `ARCHITECTURE_LINKS.md`（5 张 Mermaid 图，GitHub 原生渲染）。
+**分层细图**：见 `ARCHITECTURE_LINKS.md`（L0 总览 + 5 张 L1 主题图：教学闭环 / 个体化 / 立德树人 / 工具 MCP / 自我进化，每张 ≤10 节点，GitHub 原生渲染）。
 
 ## 快速开始
 
