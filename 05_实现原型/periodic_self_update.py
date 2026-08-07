@@ -32,6 +32,67 @@ INTERVAL_HOURS = 24          # 检查周期
 WEEK_SECONDS = 7 * 86400     # 周度阈值
 
 
+# v0.24：根据 SelfUpdateAgent 建议的 target 字段，把建议分到 improvements.md 的对应改进段。
+# 段名与 PeriodicSelfUpdater 写过的现有段呼应（含 subject_requests / SelfImprover 等）。
+_TARGET_SECTION_KEYWORDS = (
+    # 段名 -> 匹配 target 子串（按顺序匹配，第一个命中者胜）
+    ("routing", (
+        "meta_router", "meta-router", "router", "route",
+        "self_update", "selfupdate", "self-update", "selfevolution",
+        "self_evolution.py", "self_update.py", "self_update_agent",
+        "from_feedback", "api/self-update", "periodic_self_update",
+        "selfupdateagent",
+    )),
+    ("system_prompt", (
+        "prompt", "system", "prompts.py", "build_",
+    )),
+    ("pedagogy", (
+        "pedagogy", "pedagogy.py", "教学法", "教学策略",
+    )),
+    ("affection", (
+        "affection", "AffectionSAPAO", "情绪", "心理", "support",
+    )),
+    ("subject_patches", (
+        "subject_patch", "subject_patches", "学科提示词",
+    )),
+    ("tool_lessons", (
+        "tool_", "tool_lesson", "tool_lessons", "工具",
+    )),
+    ("knowledge_base", (
+        "knowledge", "知识库", "kb", "library",
+    )),
+    ("safety", (
+        "safety", "guard", "安全", "护栏",
+    )),
+    ("presentation", (
+        "presenter", "presentation", "展示",
+    )),
+    ("diagnosis", (
+        "diagnos", "诊断",
+    )),
+)
+
+
+def _classify_target_section(target: str) -> str:
+    """v0.24：把 SelfUpdateAgent 建议的 target 字段映射到 improvements.md 的改进段。
+
+    例如 target="subagents.AffectionSupportor" → "affection"
+                 target="prompts.build_concept_explain_system" → "system_prompt"
+                 target="subagents.SelfUpdateAgent.run" → "routing"
+                 target="pedagogy.Pedagogy.adapt_to_learner" → "pedagogy"
+
+    默认段：general（落到总览，不进任何专精段）。
+    """
+    t = (target or "").lower()
+    if not t:
+        return "general"
+    for section, kws in _TARGET_SECTION_KEYWORDS:
+        for kw in kws:
+            if kw and kw.lower() in t:
+                return section
+    return "general"
+
+
 class PeriodicSelfUpdater:
     def __init__(self, llm=None, paeg=None, interval_hours: int = INTERVAL_HOURS,
                  verbose: bool = True):
@@ -141,36 +202,94 @@ class PeriodicSelfUpdater:
         except Exception as e:
             self._log(f"[PAEG][periodic] 新学科需求读取失败: {e}")
 
-        # 5. v0.22.2：SelfUpdateAgent 建议回流（self_update_suggestions.jsonl → improvements.md）
+        # 5. v0.22.2 → v0.24：SelfUpdateAgent 建议回流（self_update_suggestions.jsonl → improvements.md）
+        # 增强：
+        #   - 按 target 关键词把建议分到对应段（system_prompt / pedagogy / affection / general）
+        #   - 按 priority 过滤：P0/P1 写入 improvements.md（P2 仅入日志供人工 review）
+        #   - 去重（同一 (category, target, change) 只消费一次）
+        #   - 消费过则写入 processed marker 文件，避免下次重复消费
         try:
             _mem = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'memory')
             _su_path = os.path.join(_mem, 'self_update_suggestions.jsonl')
             _imp_path = os.path.join(_mem, 'improvements.md')
+            _proc_path = os.path.join(_mem, 'self_update_suggestions.processed.jsonl')
             if os.path.isfile(_su_path):
-                _new = 0
                 _lines = [l for l in open(_su_path, encoding='utf-8').read().splitlines() if l.strip()]
-                if _lines:
-                    _sug_lines = []
-                    for _l in _lines[-20:]:
-                        try:
-                            _d = json.loads(_l)
-                            for _s in (_d.get("suggestions") or [])[:3]:
-                                _chg = str(_s.get("change", ""))[:200]
-                                if _chg:
-                                    _sug_lines.append(f"- [{_s.get('category', '')}] {_chg}")
-                                    _new += 1
-                        except Exception:
+                # 加载已处理 hash（去重）
+                _processed = set()
+                if os.path.isfile(_proc_path):
+                    for _pl in open(_proc_path, encoding='utf-8').read().splitlines():
+                        if _pl.strip():
+                            try:
+                                _processed.add(json.loads(_pl).get("hash", ""))
+                            except Exception:
+                                continue
+                import hashlib as _hl
+                _consumed = 0
+                _p0p1_lines = []      # 高优先级段（写入 improvements.md）
+                _all_summary = []     # 全量摘要段（给运维参考）
+                _new_processed = []
+                # 按时间段顺序消费（最新在尾部）
+                for _l in _lines:
+                    try:
+                        _d = json.loads(_l)
+                    except Exception:
+                        continue
+                    _ts = _d.get("timestamp", "")
+                    _sugs = _d.get("suggestions") or []
+                    for _s in _sugs:
+                        if not isinstance(_s, dict):
                             continue
-                    if _sug_lines:
-                        with open(_imp_path, 'a', encoding='utf-8') as _f:
-                            _f.write(f"\n## {datetime.now().strftime('%Y-%m-%d')} · SelfUpdateAgent 建议\n")
-                            _f.write("\n".join(_sug_lines) + "\n")
-                        # 清空已回流条目（保留最后 5 条防重复消费）
-                        _keep = _lines[-5:]
-                        with open(_su_path, 'w', encoding='utf-8') as _f:
-                            _f.write("\n".join(_keep) + ("\n" if _keep else ""))
-                    results["su_suggestions"] = _new
-                    self._log(f"[PAEG][periodic] SelfUpdateAgent 建议 {_new} 条已回流 improvements.md")
+                        _cat = str(_s.get("category", "prompt_update"))
+                        _tar = str(_s.get("target", ""))
+                        _chg = str(_s.get("change", ""))
+                        _evi = str(_s.get("evidence", ""))[:160]
+                        _pri = str(_s.get("priority", "P2"))
+                        if _pri not in ("P0", "P1", "P2"):
+                            _pri = "P2"
+                        if not _chg:
+                            continue
+                        _h = _hl.md5(f"{_cat}|{_tar}|{_chg}".encode("utf-8")).hexdigest()[:16]
+                        if _h in _processed:
+                            continue
+                        _processed.add(_h)
+                        _new_processed.append({"hash": _h, "ts": _ts,
+                                                "category": _cat, "priority": _pri,
+                                                "target": _tar[:80]})
+                        # 按 target 关键词分到对应改进段
+                        _section = _classify_target_section(_tar)
+                        _line = (f"- [{_pri}] {_cat} · `{_tar[:60]}`\n"
+                                 f"  改：{_chg[:160]}\n"
+                                 f"  证：{_evi}\n"
+                                 f"  → 段：{_section}\n")
+                        _all_summary.append(_line.strip())
+                        if _pri in ("P0", "P1"):
+                            # 高优 → 写 improvements.md 对应段
+                            _p0p1_lines.append((_section, _line))
+                            _consumed += 1
+                if _p0p1_lines or _all_summary:
+                    with open(_imp_path, 'a', encoding='utf-8') as _f:
+                        _today = datetime.now().strftime('%Y-%m-%d')
+                        if _p0p1_lines:
+                            _f.write(f"\n## {_today} · SelfUpdateAgent 高优先级建议（P0/P1）\n")
+                            # 按段聚合
+                            _by_section = {}
+                            for _sec, _line in _p0p1_lines:
+                                _by_section.setdefault(_sec, []).append(_line)
+                            for _sec, _lines in _by_section.items():
+                                _f.write(f"\n### {_sec}\n")
+                                _f.write("".join(_lines))
+                        if _all_summary:
+                            _f.write(f"\n## {_today} · SelfUpdateAgent 全部建议概览（P0/P1/P2）\n")
+                            _f.write("\n".join(_all_summary) + "\n")
+                    # 写 processed marker（避免下次重复消费）
+                    with open(_proc_path, 'a', encoding='utf-8') as _f:
+                        for _p in _new_processed:
+                            _f.write(json.dumps(_p, ensure_ascii=False) + "\n")
+                    results["su_suggestions"] = _consumed
+                    results["su_total_processed"] = len(_new_processed)
+                    self._log(f"[PAEG][periodic] SelfUpdateAgent 高优 {_consumed} 条已写入"
+                              f" improvements.md（共处理 {len(_new_processed)} 条）")
         except Exception as e:
             self._log(f"[PAEG][periodic] 建议回流失败: {e}")
 
