@@ -299,6 +299,44 @@ ROUTE_TYPE_ORDER = (
 )
 
 
+
+
+def _llm_route_intent(text: str, llm) -> Optional[str]:
+    """v0.26 ⭐ LLM 综合意图判断（发挥 LLM 理解能力为原则）。
+
+    让 LLM 结合输入语义判断用户真正意图，而非只用规则正则硬拦。
+    规则（is_*_query）仍是快速路径，但 LLM 判断优先于部分规则——
+    规则可能误判"有什么思路"等语境，LLM 能理解完整语义。
+
+    返回意图 key：teach / answer / affection / knowledge / method / problem / meta / greeting / non_teaching
+    LLM 失败返回 None（调用方回退规则）。
+    """
+    try:
+        from subagents import _safe_chat
+        _sys = (
+            "你是 PAEG 的意图理解器。判断学生这句话属于哪类意图：\n"
+            "1. teach：想学一个概念/知识点（'什么是导数''讲讲勾股定理'）\n"
+            "2. answer：想要一个直接答案/结果（'2+2等于几''帮我算一下'）\n"
+            "3. affection：表达情绪/需要陪伴（'我今天很难过''感觉好累'）\n"
+            "4. knowledge：问我的知识库/能力（'你知道什么''你的知识库里有啥'）\n"
+            "5. method：问学习方法/技巧（'怎么学数学''有什么学习技巧'）\n"
+            "6. problem：给一道题求解决（'解这个方程'）\n"
+            "7. meta：问你是谁/怎么用（'你是什么''你叫什么'）\n"
+            "8. greeting：打招呼（'你好''hi'）\n"
+            "9. non_teaching：其他/闲聊\n"
+            "只输出一个词：teach/answer/affection/knowledge/method/problem/meta/greeting/non_teaching。不要多余文字。"
+        )
+        r = _safe_chat(llm, _sys, str(text)[:200], max_tokens=20)
+        if r:
+            intent = r.strip().lower()
+            valid = ("teach", "answer", "affection", "knowledge", "method", "problem", "meta", "greeting", "non_teaching")
+            if intent in valid:
+                return intent
+    except Exception:
+        pass
+    return None
+
+
 def route(text: str, learner=None, session=None, llm=None,
           fallback_to_teach: bool = False) -> dict:
     """v0.24：集中路由决策器 —— 替代 server.py 中的 if/elif 链。
@@ -406,6 +444,21 @@ def route(text: str, learner=None, session=None, llm=None,
                     "fallback_to_teach": fallback_to_teach}
     except Exception as _e:
         raw["problem_error"] = str(_e)
+
+    # 7.5) v0.26 ⭐ LLM 综合意图判断（发挥 LLM 理解能力为原则）
+    # 规则 1-7 都未命中时，让 LLM 结合语义综合判断意图（规则可能误判/漏判语境）
+    try:
+        if llm is not None:
+            _llm_intent = _llm_route_intent(t, llm)
+            if _llm_intent and _llm_intent != "teach":
+                # LLM 明确是其他意图（answer/affection/knowledge/method/problem/meta/greeting/non_teaching）
+                # 且规则未命中——信任 LLM 判断（发挥 LLM 能力），而非默认 teaching
+                return {"type": _llm_intent, "confidence": 0.8,
+                        "reason": f"LLM 综合意图判断为 {_llm_intent}（规则未命中，LLM 语义理解）",
+                        "raw": {**raw, "detector": "_llm_route_intent"},
+                        "fallback_to_teach": fallback_to_teach}
+    except Exception as _e:
+        raw["llm_route_error"] = str(_e)
 
     # 8) teaching：LLM 兜底（不再静默）
     try:
