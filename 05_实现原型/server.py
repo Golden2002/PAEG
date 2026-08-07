@@ -18,6 +18,7 @@ PAEG Flask 后端服务（v0.3 - 联通 GUI）
 from __future__ import annotations
 
 import json
+import uuid
 import os
 import sys
 import urllib.parse
@@ -35,6 +36,9 @@ from knowledge_base import KnowledgeBase
 from llm_adapter import create_llm
 from paeg import PAEG
 from self_update import SelfUpdater
+
+# v0.27 ⭐ P0-1 模块化门控：让 paeg_modules.json 真正控制路由可达性
+from module_registry import is_enabled, require_module
 
 # ─────────────────────────────────────
 # Flask 应用初始化
@@ -239,6 +243,7 @@ def modules_status():
 # ─────────────────────────────────────
 
 @app.route("/api/threads", methods=["POST"])
+@require_module("history")
 def create_thread():
     """创建教学会话 Thread（跨课次持久容器）。"""
     data = request.get_json(force=True) or {}
@@ -255,6 +260,7 @@ def create_thread():
 
 
 @app.route("/api/threads/<student_id>", methods=["GET"])
+@require_module("history")
 def list_threads(student_id):
     """列出学生的全部 Thread（不含消息体）。"""
     try:
@@ -266,6 +272,7 @@ def list_threads(student_id):
 
 
 @app.route("/api/threads/<student_id>/<tid>/events", methods=["GET"])
+@require_module("history")
 def thread_events(student_id, tid):
     """SSE 事件流（Codex App Server 的 HTTP 等价物，支持 Last-Event-ID 续传）。"""
     try:
@@ -286,6 +293,7 @@ def thread_events(student_id, tid):
 
 
 @app.route("/api/threads/<student_id>/<tid>", methods=["POST"])
+@require_module("history")
 def thread_action(student_id, tid):
     """Thread 操作：fork / archive / start_turn。"""
     data = request.get_json(force=True) or {}
@@ -598,7 +606,54 @@ def health():
     })
 
 
+@app.route("/api/subject-tree", methods=["GET"])
+def subject_tree():
+    """学科-学段-二级学科 层级树（v0.26 ⭐ 前端三级级联下拉数据源）。
+
+    单一数据源：前端下拉从本端点拉取，与后端 SUBJECT_GRADES/SUBFIELD_TREE 保持一致，
+    避免前端硬编码与后端不同步（如漏掉新学科）。
+    返回：
+      {"grades": [...], "subjects": {key: {label, min_grade, grades, subfields}}}
+    """
+    try:
+        from prompts import (SUBJECT_GRADES, SUBJECT_MIN_GRADE, SUBFIELD_TREE,
+                             SUBJECT_STYLES, normalize_subject)
+        grade_order = ["middle_school", "high_school", "undergraduate", "graduate_exam", "all_grades"]
+        grade_cn = {"middle_school": "初中", "high_school": "高中",
+                    "undergraduate": "大学本科", "graduate_exam": "考研",
+                    "all_grades": "通识素养"}
+        grade_label = {"middle_school": "初中", "high_school": "高中",
+                       "undergraduate": "本科", "graduate_exam": "考研",
+                       "all_grades": "通识素养"}
+        subjects = {}
+        for key in SUBJECT_GRADES:
+            style = SUBJECT_STYLES.get(key) or SUBJECT_STYLES.get("default", {})
+            label = style.get("label", key)
+            # 二级学科：SUBFIELD_TREE[key][grade] = [{name, tip}]
+            subfields = {}
+            tree = SUBFIELD_TREE.get(key) or {}
+            for g in grade_order:
+                items = tree.get(g) or []
+                if items:
+                    subfields[g] = [{"name": it.get("name", ""), "tip": it.get("tip", "")}
+                                    for it in items]
+            subjects[key] = {
+                "label": label,
+                "min_grade": SUBJECT_MIN_GRADE.get(key, "high_school"),
+                "grades": SUBJECT_GRADES.get(key, []),
+                "subfields": subfields,
+            }
+        return jsonify({
+            "grades": [{"value": g, "label": grade_label.get(g, g)} for g in grade_order],
+            "grade_cn": grade_cn,
+            "subjects": subjects,
+        })
+    except Exception as _e:
+        return jsonify({"error": f"subject-tree 构建失败: {_e}"}), 500
+
+
 @app.route("/api/teach", methods=["POST"])
+@require_module("teach")
 def teach():
     """同步教学接口。
 
@@ -618,7 +673,7 @@ def teach():
     from paeg import LearnerProfile
 
     # 获取或创建学习者
-    learner_id = data.get("learner_id", f"user_{len(SESSIONS)}")
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
     learner = SESSIONS.get(f"learner_{learner_id}")
     if not learner:
         learner = LearnerProfile(
@@ -640,6 +695,8 @@ def teach():
     # 教学
     concept = data["concept"]
     subject = data["subject"]
+    # v0.26 ⭐ 二级学科/子主题（前端 SUBFIELD_TREE 三级选择；可空=未选）
+    subtopic = (data.get("subtopic") or "").strip()
 
     # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（在拦截器之前）
     try:
@@ -825,9 +882,13 @@ def teach():
     # v0.19.21：意向性层 ⭐——规则都没拦住的输入，用 LLM 判断是否为教学意图。
     # 若用户其实在寒暄/闲聊/倾诉/问老师近况（如"你今天怎么样"），
     # 就一般化响应，不让教学 harness 的指令覆盖用户提问的出发点与目的。
+    # v0.26 ⭐ C3-1 P0 修复：改用 meta_router.route() 集中路由（含 _llm_route_intent 9 类
+    # LLM 综合意图判断）替代单点 is_teaching_intent——生产路径真正使用 LLM 意图路由。
     try:
-        from meta_router import is_teaching_intent
-        if not is_teaching_intent(concept, llm):
+        from meta_router import route as _paeg_route
+        _route = _paeg_route(concept, learner=learner, llm=llm, fallback_to_teach=True)
+        if _route.get("type") not in ("teach", "teaching"):
+            # LLM 综合判断为非教学意图（answer/affection/knowledge/method/problem/meta/greeting/non_teaching）
             from prompts import build_general_chat_system, build_general_chat_user
             from subagents import _safe_chat
             g_sys = build_general_chat_system(learner)
@@ -858,7 +919,7 @@ def teach():
         pass  # 意向性层失败不影响正常教学（默认按教学处理）
 
     try:
-        result = paeg.teach(learner, concept, subject)
+        result = paeg.teach(learner, concept, subject, subtopic=subtopic)
         # 序列化
         resp = jsonify({
             "session_id": result["session"].session_id,
@@ -919,6 +980,7 @@ def teach():
 
 
 @app.route("/api/teach/stream", methods=["POST"])
+@require_module("teach")
 def teach_stream():
     """流式教学接口（SSE）。
 
@@ -928,7 +990,7 @@ def teach_stream():
 
     from paeg import LearnerProfile
 
-    learner_id = data.get("learner_id", f"user_{len(SESSIONS)}")
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
     learner = SESSIONS.get(f"learner_{learner_id}")
     if not learner:
         learner =         LearnerProfile(
@@ -943,6 +1005,8 @@ def teach_stream():
 
     concept = data["concept"]
     subject = data["subject"]
+    # v0.26 ⭐ 二级学科/子主题（前端 SUBFIELD_TREE 三级选择；可空=未选）
+    subtopic = (data.get("subtopic") or "").strip()
 
     # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（流式版本）
     try:
@@ -1059,9 +1123,11 @@ def teach_stream():
         pass
 
     # v0.19.22：意向性层（流式版本）——非教学意图走一般化响应
+    # v0.26 ⭐ C3-1 P0 修复：改用 meta_router.route() 集中路由（LLM 综合意图判断）
     try:
-        from meta_router import is_teaching_intent
-        if not is_teaching_intent(concept, llm):
+        from meta_router import route as _paeg_route
+        _route = _paeg_route(concept, learner=learner, llm=llm, fallback_to_teach=True)
+        if _route.get("type") not in ("teach", "teaching"):
             from prompts import build_general_chat_system, build_general_chat_user
             from subagents import _safe_chat
             g_sys = build_general_chat_system(learner)
@@ -1166,9 +1232,43 @@ def teach_stream():
         plan = paeg.planner.run(learner, diagnosis, subject, concept, tone_info)
         yield f"event: plan\ndata: {json.dumps(plan, ensure_ascii=False)}\n\n"
 
+        # v0.26 ⭐ C3-3 P0 修复：teach_stream 补 Individuality 注入 + 用户资料注入
+        # （此前只有同步 paeg.teach 有——流式教学主路径缺个体化/用户资料，检视确认的断链）
+        try:
+            from subagents import Individuality
+            _ind_stream = Individuality()
+            _ind_hist_stream = list(SESSIONS.get(f"chat_hist_{learner_id}", []))
+            _ind_hist_stream.append({"role": "user", "content": concept})
+            _ind_res = _ind_stream.run(
+                model=llm, learner=learner,
+                history=_ind_hist_stream,
+                subject=subject)
+            _ind_control = _ind_res.get("control") or {}
+            _ind_profile = _ind_res.get("profile_prompt", "")
+            if _ind_control or _ind_profile:
+                paeg.presenter.set_pending_overrides(
+                    individuality_control=_ind_control,
+                    individuality_profile_prompt=_ind_profile,
+                )
+        except Exception as _ie:
+            print(f"[PAEG] teach_stream 个体化注入跳过: {_ie}")
+        try:
+            _uid_stream = getattr(learner, "id", "") or ""
+            if _uid_stream:
+                from lib.library_store import read_user_corpus
+                _uc_stream = read_user_corpus(str(_uid_stream), max_files=3, per_file=300)
+                if _uc_stream:
+                    learner._user_corpus = _uc_stream  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
         # 教学循环
         _assistant_parts = []  # v0.21.3：累积助手回复（用于会话保存）
         _prev_presentations = []  # v0.21.8：累积前几轮讲解（多轮上下文延续——修复 stress 发现的"问x³忘了在讲积分"）
+        # v0.26 ⭐ subtopic 注入每个 step（前端三级选择；空则不注入）
+        if subtopic:
+            for _st in (plan.get("steps") or []):
+                _st["subtopic"] = subtopic
         for i, step in enumerate(plan["steps"]):
             yield f"event: step\ndata: {json.dumps({'step_id': i + 1, 'status': 'presenting'})}\n\n"
             presentation = paeg.presenter.run(
@@ -1299,6 +1399,19 @@ def teach_stream():
         except Exception as _e:
             print(f"[PAEG] teach_stream 保存会话失败: {_e}")
 
+        # v0.26 ⭐ 修复：teach_stream 写回 chat_hist（此前教学对话不持久化，下次看不到题目）
+        # 与 chat_stream/general_chat/answer 保持一致——教学对话进入多轮上下文
+        try:
+            _hist = SESSIONS.setdefault(f"chat_hist_{learner_id}", [])
+            if isinstance(_hist, list):
+                _hist.append({"role": "user", "content": concept})
+                for _p in _assistant_parts:
+                    if _p and isinstance(_p, str) and _p.strip():
+                        _hist.append({"role": "assistant", "content": _p})
+                SESSIONS[f"chat_hist_{learner_id}"] = _hist[-20:]
+        except Exception as _eh:
+            print(f"[PAEG] teach_stream 写回 chat_hist 失败: {_eh}")
+
         # v0.19.6：关键词触发文档（教学对话中"讲义/要点/例题/笔记"）
         try:
             doc_evt = _handle_keyword_doc(concept, "", learner, data)
@@ -1307,7 +1420,23 @@ def teach_stream():
         except Exception:
             pass
 
-        yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+        # v0.26 ⭐ done 事件携带 steering 信息：前端据此自动更新学段/学科下拉（自动切换）
+        _done_extra = {}
+        try:
+            if _steer.get("switched"):
+                _done_extra["subject_steered"] = True
+                _done_extra["subject_detected"] = _steer.get("subject") or subject
+            _done_extra["grade_blocked"] = bool(_steer.get("grade_blocked"))
+            if _steer.get("grade_blocked"):
+                try:
+                    _done_extra["required_grade"] = _steer.get("response").get_json().get("required_grade", "")
+                except Exception:
+                    _done_extra["required_grade"] = ""
+        except Exception:
+            pass
+        _done_payload = {"status": "completed"}
+        _done_payload.update(_done_extra)
+        yield f"event: done\ndata: {json.dumps(_done_payload, ensure_ascii=False)}\n\n"
 
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -1328,6 +1457,60 @@ class _FakeSession:
 @app.route("/api/profile/<learner_id>", methods=["GET"])
 def profile(learner_id):
     """获取学习者画像。"""
+    # v0.26 ⭐ 修复：注册用户（u 前缀）从 USER_STORE 加载真实持久化画像
+    # （此前 SESSIONS 为空时新建"学习者"默认画像 → 刷新后登录名消失）
+    if str(learner_id).startswith('u') and USER_STORE is not None:
+        try:
+            _uinfo = USER_STORE.get_user(learner_id) or {}
+            if _uinfo:
+                learner_dict = USER_STORE.load_learner(learner_id) or {}
+                # v0.26 修复：learner.nickname 可能是早期持久化的默认"学习者"占位，
+                # 此时回退用户根 nickname（真实注册昵称），确保登录后显示用户名
+                _learner_nick = learner_dict.get("nickname") or ""
+                _root_nick = _uinfo.get("nickname") or ""
+                if _learner_nick and _learner_nick != "学习者":
+                    _nickname = _learner_nick
+                elif _root_nick:
+                    _nickname = _root_nick
+                else:
+                    _nickname = "学习者"
+                import os as _avo3
+                _av_dir3 = _avo3.path.join(_avo3.path.dirname(_avo3.path.abspath(__file__)), 'uploads', 'avatar')
+                _av_url3 = None
+                for _av_ext3 in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
+                    if _avo3.path.exists(_avo3.path.join(_av_dir3, f"avatar_{learner_id}{_av_ext3}")):
+                        _av_url3 = f"/uploads/avatar/avatar_{learner_id}{_av_ext3}"
+                        break
+                from paeg import LearnerProfile
+                learner = SESSIONS.get(f"learner_{learner_id}")
+                if not learner:
+                    learner = LearnerProfile(
+                        id=learner_dict.get("id", learner_id),
+                        nickname=_nickname,
+                        grade_level=learner_dict.get("grade_level", "high_school"),
+                        age=learner_dict.get("age", 17),
+                        cognitive_style=learner_dict.get("cognitive_style", "visual"),
+                        self_description=learner_dict.get("self_description", ""),
+                        target_exam=learner_dict.get("target_exam"),
+                        specialty_target=learner_dict.get("specialty_target"),
+                    )
+                    SESSIONS[f"learner_{learner_id}"] = learner
+                return jsonify({
+                    "id": learner.id,
+                    "nickname": learner.nickname,
+                    "avatar_url": _av_url3,
+                    "grade_level": learner.grade_level,
+                    "age": learner.age,
+                    "cognitive_style": learner.cognitive_style,
+                    "target_exam": learner.target_exam,
+                    "specialty_target": learner.specialty_target,
+                    "subjects_mastery": learner.subjects_mastery,
+                    "world_view_blend": learner.world_view_blend,
+                    "self_description": learner.self_description,
+                })
+        except Exception as _e:
+            print(f"[Server] profile 加载持久画像失败: {_e}")
+
     # v0.22.2：按需创建（匿名 web_xxx 首次访问无 SESSIONS 条目——原 404 导致前端画像消失）
     learner = SESSIONS.get(f"learner_{learner_id}")
     if not learner:
@@ -1342,9 +1525,17 @@ def profile(learner_id):
         )
         SESSIONS[f"learner_{learner_id}"] = learner
 
+    import os as _avo2
+    _av_dir2 = _avo2.path.join(_avo2.path.dirname(_avo2.path.abspath(__file__)), 'uploads', 'avatar')
+    _av_url2 = None
+    for _av_ext2 in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
+        if _avo2.path.exists(_avo2.path.join(_av_dir2, f"avatar_{learner_id}{_av_ext2}")):
+            _av_url2 = f"/uploads/avatar/avatar_{learner_id}{_av_ext2}"
+            break
     return jsonify({
         "id": learner.id,
         "nickname": learner.nickname,
+        "avatar_url": _av_url2,
         "grade_level": learner.grade_level,
         "age": learner.age,
         "cognitive_style": learner.cognitive_style,
@@ -1416,6 +1607,7 @@ def batch():
 
 
 @app.route("/api/knowledge/<concept_id>", methods=["GET"])
+@require_module("knowledge")
 def knowledge(concept_id):
     """获取知识库节点。"""
     node = kb.get_subject(concept_id) or kb.get_humanity(concept_id)
@@ -1425,6 +1617,7 @@ def knowledge(concept_id):
 
 
 @app.route("/api/knowledge/search", methods=["GET"])
+@require_module("knowledge")
 def knowledge_search():
     """搜索知识库。"""
     query = request.args.get("q", "")
@@ -1560,6 +1753,48 @@ def upload_file():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/avatar", methods=["POST"])
+def upload_avatar():
+    """v0.26 ⭐ 用户自定义头像上传。
+
+    请求：multipart/form-data, avatar(图片) + learner_id
+    响应：{"ok": True, "url": "/uploads/avatar/<learner_id>.<ext>"}
+    覆盖式保存（每用户单头像），存 uploads/avatar/<learner_id>.<ext>。
+    """
+    import os as _os
+    from datetime import datetime as _dt
+    learner_id = (request.form.get("learner_id") or "anonymous").strip()
+    if not learner_id or learner_id in (".", "..") or "/" in learner_id or "\\" in learner_id:
+        return jsonify({"error": "非法用户标识"}), 400
+    f = request.files.get("avatar")
+    if not f or not f.filename:
+        return jsonify({"error": "no avatar file"}), 400
+    ext = _os.path.splitext(f.filename)[1].lower()
+    allowed = (".png", ".jpg", ".jpeg", ".gif", ".webp")
+    if ext not in allowed:
+        return jsonify({"error": f"头像仅支持 {'/'.join(allowed)}"}), 400
+    try:
+        base = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                             'uploads', 'avatar')
+        _os.makedirs(base, exist_ok=True)
+        # 覆盖式：固定文件名 avatar_<learner_id><ext>（换头像自动覆盖旧图）
+        fname = f"avatar_{learner_id}{ext}"
+        f.save(_os.path.join(base, fname))
+        # 清理同用户旧扩展名头像（避免残留）
+        for _old_ext in allowed:
+            if _old_ext != ext:
+                _old = _os.path.join(base, f"avatar_{learner_id}{_old_ext}")
+                if _os.path.exists(_old):
+                    try:
+                        _os.remove(_old)
+                    except Exception:
+                        pass
+        from urllib.parse import quote
+        return jsonify({"ok": True, "url": f"/uploads/avatar/{quote(fname)}"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
     """提供上传文件的访问。"""
@@ -1582,6 +1817,7 @@ def get_user_library(learner_id: str) -> str:
 
 
 @app.route("/api/user-library/<learner_id>", methods=["GET"])
+@require_module("knowledge")
 def user_library_info(learner_id):
     """列出用户上传的资料（v0.21.4：含规范 + 兼容旧路径的完整文件信息）。"""
     try:
@@ -1599,6 +1835,7 @@ def user_library_info(learner_id):
 
 
 @app.route("/api/knowledge/library", methods=["GET"])
+@require_module("knowledge")
 def library_info():
     """Library 知识库扩展信息（v0.11）。"""
     if _lib is None:
@@ -1622,6 +1859,7 @@ def daily_quote():
 
 
 @app.route("/api/generate", methods=["POST"])
+@require_module("file_gen")
 def generate_file():
     """生成文件内容（v0.12：练习题/文章/讲义）。
 
@@ -1636,7 +1874,7 @@ def generate_file():
     gtype = data.get("type", "quiz")
     subject = data.get("subject", "default")
     topic = data.get("topic", "学习内容")
-    learner_id = data.get("learner_id", f"user_{len(SESSIONS)}")
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
     learner = SESSIONS.get(f"learner_{learner_id}")
 
     from paeg import LearnerProfile
@@ -1668,6 +1906,7 @@ def generate_file():
 
 
 @app.route("/api/download/<path:filename>", methods=["GET"])
+@require_module("file_gen")
 def download_file(filename):
     """下载生成的文件（v0.12）。"""
     from flask import send_from_directory
@@ -1724,6 +1963,7 @@ def login():
 
 
 @app.route("/api/chat/stream", methods=["POST"])
+@require_module("chat")
 def general_chat_stream():
     """一般对话流式版（v0.19 P1-5）：SSE 分块推送回复。
 
@@ -1740,7 +1980,7 @@ def general_chat_stream():
     from paeg import LearnerProfile
     from prompts import build_general_chat_system, build_general_chat_user
 
-    learner_id = data.get("learner_id", f"user_{len(SESSIONS)}")
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
     learner = SESSIONS.get(f"learner_{learner_id}")
     if not learner:
         learner = LearnerProfile(
@@ -2104,6 +2344,7 @@ def general_chat_stream():
 
 
 @app.route("/api/chat", methods=["POST"])
+@require_module("chat")
 def general_chat():
     """一般性对话（v0.8.2）：不限定学科，薇依式倾听与陪伴。
 
@@ -2118,7 +2359,7 @@ def general_chat():
     from paeg import LearnerProfile
     from prompts import build_general_chat_system, build_general_chat_user
 
-    learner_id = data.get("learner_id", f"user_{len(SESSIONS)}")
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
     learner = SESSIONS.get(f"learner_{learner_id}")
     if not learner:
         learner = LearnerProfile(
@@ -2399,6 +2640,7 @@ def save_document_api():
 # ─────────────────────────────────────
 
 @app.route("/api/answer", methods=["POST"])
+@require_module("answer")
 def answer_api():
     """找答案模式（v0.19.14 ⭐）：直接输出完整答案，不受教学范式约束。
 
@@ -2440,7 +2682,7 @@ def answer_api():
                 _ch = SESSIONS.setdefault(f"chat_hist_{learner_id}", [])
                 _ch.append({"role": "user", "content": question})
                 _ch.append({"role": "assistant", "content": result.get("answer") or ""})
-                SESSIONS[f"chat_hist_{learner_id}"] = _ch[-30:]
+                SESSIONS[f"chat_hist_{learner_id}"] = _ch[-20:]  # v0.26 统一窗口 20
             except Exception:
                 pass
         return jsonify(result)
@@ -2449,6 +2691,7 @@ def answer_api():
 
 
 @app.route("/api/solve", methods=["POST"])
+@require_module("answer")
 def solve_problem_api():
     """标准答案生成（v0.18）：论述/计算/证明题 → benchmark 级答案。
 
@@ -2487,12 +2730,36 @@ def solve_problem_api():
 # v0.18：对话历史持久化 API
 # ─────────────────────────────────────
 
+
+def _anon_learner_id(request_data: dict, request_obj=None) -> str:
+    """v0.26：匿名用户"一个用户一个 ID"——优先请求里已有 ID；否则会话 cookie 绑定稳定 ID。
+
+    关键：同一用户的所有请求必须映射到同一个 ID，否则记忆（chat_hist）会混乱。
+    """
+    # 1. 请求显式带 learner_id → 信任（GUI 已保证 web_/u 前缀）
+    lid = request_data.get("learner_id")
+    if lid and str(lid).strip():
+        return str(lid).strip()
+    # 2. 从 cookie 取"会话级匿名 ID"（浏览器每个用户一个 cookie，跨请求稳定）
+    try:
+        if request_obj is not None:
+            from flask import request as _req
+            cid = _req.cookies.get("paeg_anon_id")
+            if cid:
+                return cid
+    except Exception:
+        pass
+    # 3. 无 cookie 上下文 → 生成会话级 ID（本请求内稳定；有 cookie 时后续请求复用）
+    return "web_" + uuid.uuid4().hex[:10]
+
+
 def _is_registered(learner_id: str) -> bool:
     return (USER_STORE is not None and CONV_STORE is not None
             and str(learner_id).startswith('u') and learner_id[1:].isdigit())
 
 
 @app.route("/api/conversations/<learner_id>", methods=["GET"])
+@require_module("history")
 def list_conversations(learner_id):
     """列出用户全部会话（不含消息体，倒序）。"""
     if not _is_registered(learner_id):
@@ -2677,6 +2944,7 @@ def _handle_method_advice(learner, concept, subject):
 # ─────────────────────────────────────
 
 @app.route("/api/method", methods=["POST"])
+@require_module("method")
 def method_advice():
     """学科学习方法咨询（独立对话类型）。
 
@@ -2685,7 +2953,7 @@ def method_advice():
     """
     data = request.get_json(force=True)
     from paeg import LearnerProfile
-    learner_id = data.get("learner_id", f"user_{len(SESSIONS)}")
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
     learner = SESSIONS.get(f"learner_{learner_id}")
     if not learner:
         learner = LearnerProfile(
@@ -2729,6 +2997,7 @@ def method_advice():
 
 
 @app.route("/api/knowledge", methods=["POST"])
+@require_module("knowledge")
 def knowledge_query():
     """知识库查询（独立对话类型）。
 
@@ -2736,7 +3005,7 @@ def knowledge_query():
     """
     data = request.get_json(force=True)
     from paeg import LearnerProfile
-    learner_id = data.get("learner_id", f"user_{len(SESSIONS)}")
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
     learner = SESSIONS.get(f"learner_{learner_id}")
     if not learner:
         learner = LearnerProfile(
@@ -2776,6 +3045,7 @@ def knowledge_query():
 
 
 @app.route("/api/affection", methods=["POST"])
+@require_module("affection")
 def affection_support():
     """情绪与心理支持（独立对话类型 v0.19.29）。
 
@@ -2784,7 +3054,7 @@ def affection_support():
     """
     data = request.get_json(force=True)
     from paeg import LearnerProfile
-    learner_id = data.get("learner_id", f"user_{len(SESSIONS)}")
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
     learner = SESSIONS.get(f"learner_{learner_id}")
     if not learner:
         learner = LearnerProfile(
@@ -2995,6 +3265,7 @@ def _handle_keyword_doc(user_text, reply, learner, data):
 
 
 @app.route("/api/conversations/<learner_id>/<conv_id>", methods=["GET"])
+@require_module("history")
 def get_conversation(learner_id, conv_id):
     """读取某会话完整消息。"""
     if not _is_registered(learner_id):
@@ -3009,6 +3280,7 @@ def get_conversation(learner_id, conv_id):
 
 
 @app.route("/api/conversations/<learner_id>/<conv_id>", methods=["DELETE"])
+@require_module("history")
 def delete_conversation(learner_id, conv_id):
     """用户删除单个会话。"""
     if not _is_registered(learner_id):
@@ -3021,6 +3293,7 @@ def delete_conversation(learner_id, conv_id):
 
 
 @app.route("/api/conversations/<learner_id>", methods=["DELETE"])
+@require_module("history")
 def clear_conversations(learner_id):
     """用户清空全部会话。"""
     if not _is_registered(learner_id):
@@ -3033,6 +3306,7 @@ def clear_conversations(learner_id):
 
 
 @app.route("/api/conversations/cleanup", methods=["POST"])
+@require_module("history")
 def cleanup_conversations():
     """定期清理超期会话（可被定时任务调用）。"""
     if CONV_STORE is None:
@@ -3050,6 +3324,7 @@ PERIODIC_UPDATER = PeriodicSelfUpdater(llm=llm, paeg=paeg, verbose=True)
 
 
 @app.route("/api/self-update/run", methods=["POST"])
+@require_module("self_update")
 def run_self_update():
     """手动触发一次周度自我更新（洞察提取 + 批处理 + 失败分析）。"""
     try:
@@ -3060,6 +3335,7 @@ def run_self_update():
 
 
 @app.route("/api/self-update/status", methods=["GET"])
+@require_module("self_update")
 def self_update_status():
     """查看调度器状态。"""
     return jsonify({
@@ -3072,6 +3348,7 @@ def self_update_status():
 
 
 @app.route("/api/self-update/from-feedback", methods=["POST"])
+@require_module("self_update")
 def self_update_from_feedback():
     """v0.21.4：从反馈/反思生成自我更新建议（第 8 个子代理 SelfUpdateAgent）。
 
