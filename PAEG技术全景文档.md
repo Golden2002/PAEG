@@ -2309,6 +2309,47 @@ python stress_turn_eval.py --suite relevance --mode teach   # 只跑相关性（
 
 **方法论闭环**（与 chaos 相同）：`FAIL → 定位根因（输入侧 or 状态侧）→ 修复（规则/模板/记忆机制）→ 二次运行验证 → 回归确认`。attention 发现的"远端遗忘"指向**显式记忆提取**（关键信息 → 独立存储 → 优先注入）是未来改进方向。
 
+### 10.2.6.3.1 v0.25 完整压力测试（stress_eval_v25_full.py · 16 套件 21 项 ⭐）
+
+> **背景**：用户要求"拓展压力测试的强度、丰富度、覆盖度，进行测试-自检-修复循环"——覆盖全部 9 个 subagent + 全链路，重点检测**功能完整性/真实性、注意力丧失/答非所问、多轮上下文保持**。
+
+**工具**：`05_实现原型/stress_eval_v25.py`（8 套件）+ `stress_eval_v25_full.py`（16 套件 21 项，最终版）
+
+```bash
+python stress_eval_v25_full.py   # 16 套件完整跑（约 8 分钟）
+python stress_eval_v25.py        # 8 套件快速跑
+```
+
+**16 套件覆盖矩阵**（9 subagent + 全链路）：
+
+| 套件 | 覆盖 | 检测 |
+|---|---|---|
+| T1 MCP/健康 | MCP 连接 + skills + agent 引擎 | 3/3 真实性 |
+| T2 教学闭环 | Diagnostor→Planner→Presenter→Evaluator | 诊断/计划/讲解/评估全触发 |
+| T3 AnswerSolver | 直答 subagent | 完整可用答案 |
+| T4 注意力-多轮 | 金句→干扰→追问 | 答非所问检测 |
+| T5 超长多轮 | 8 轮上下文保持 | 远端信息回忆 |
+| T6 个体化 | Individuality 画像注入 | 声明→注入→持久化 |
+| T7 学段联动 | grade_blocked | 拦截 + 正常 |
+| T8 新学科 | 语言学/大气/QFT | 3 学科教学 |
+| T9 意图路由 | affection/knowledge | 模式路由正确 |
+| T10 危机协议 | AffectionSupportor | 先回应再关怀 |
+| T11 知识库 | 检索链路 | 知识库响应 |
+| T12 自我更新 | SelfUpdateAgent | 反馈→建议 200 |
+| T13 语言质量 | language_refiner | 完整规范输出 |
+| T14 PPT MCP | pptx_mcp_server | 生成 .pptx |
+| T15 AgentEngine | Plan→Act→Observe→Reflect | agent_trace |
+| T16 Evaluator/Adapter | 双维评分 + 决策 | 评估事件 + 内容 |
+
+**结果（v0.25 最终）**：**21/21 全部通过**
+
+**测试驱动修复**（v0.25 压力测试发现并解决）：
+1. **teach_stream 学段拦截缺失**（真 bug）：流式教学只查 `unknown` 未查 `grade_blocked`——高中生问语言学误报"未收录"而非"需切学段"。已新增 `grade_blocked` SSE 分支（`grade_blocked_subject`）
+2. **测试脚本 3 处**：同 uid 画像残留 / unicode 转义解析 / chat_stream `"text"` 字段支持——已修复
+
+**方法论（测试-自检-修复循环）**：
+`拓展测试 → 运行 → 定位 FAIL（区分产品 bug vs 测试脚本问题）→ 修复 → 重跑 → 21/21 全绿 → 回归 132 pytest`
+
 ### 10.2.6.4 知识库注入 + 联网搜索链路核查（v0.21.7 ⭐ 能力矩阵）
 
 > **背景**：用户要求核查"agent 是否指引大模型在思考和输出时参考知识库内容 + 联网搜索内容"——这是"更新知识库对 agent 是重要扩展"的前提。**如果注入链路缺失，更新知识库就无意义**。以下为逐端点实测结论（基于代码核查）。
