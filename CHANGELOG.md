@@ -30,6 +30,10 @@
 - mcp_servers.json 注册 → MCP 连接 2/2 → 3/3
 - 输入：主题+大纲+来源（用户文档/知识库/对话历史）；输出：downloads/ppt/*.pptx
 
+### v0.25 修复（压力测试驱动 ⭐）
+- **teach_stream 学段拦截缺失**：流式教学路径只检查 `unknown` 未检查 `grade_blocked`，高中生问语言学误报"未收录"——已新增 `grade_blocked` SSE 分支（`grade_blocked_subject`），与 teach 同步
+- **压力测试新增 stress_eval_v25.py**：8 套件多轮对话实验（教学闭环注意力/个体化多轮/学段联动/新学科/意图路由/自我更新/MCP），12/12 通过
+
 ### 验证
 - pytest 132 passed（无回归）
 - 端到端：学段拦截 / 新学科教学 / MCP 3/3 / PPT 生成验证
