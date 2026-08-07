@@ -947,6 +947,23 @@ def teach_stream():
     # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（流式版本）
     try:
         _steer = _steer_subject(concept, subject, learner, learner_id)
+        # v0.25 学段-学科联动：跨学段学科 → SSE 推"需切换学段"反馈
+        if _steer.get("grade_blocked"):
+            _gb = _steer.get("response")
+            if _gb is not None:
+                _gb_content = ""
+                try:
+                    _gb_json = _gb.get_json()
+                    _gb_content = _gb_json.get("presentations", [{}])[0].get("content", "")
+                except Exception:
+                    pass
+
+                def gen_grade_blocked():
+                    for i in range(0, len(_gb_content), 60):
+                        yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _gb_content[i:i+60], 'step_type': 'grade_blocked_subject'}, ensure_ascii=False)}\n\n"
+                    yield f"event: done\ndata: {json.dumps({'status': 'completed', 'grade_blocked': True, 'required_grade': (_steer.get('response').get_json().get('required_grade', '') if _steer.get('response') is not None else '')}, ensure_ascii=False)}\n\n"
+                return Response(gen_grade_blocked(), mimetype="text/event-stream",
+                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
         if _steer.get("unknown"):
             # 未收录学科 → SSE 推反馈
             _unk = _steer_unknown_response(concept, learner, learner_id,
