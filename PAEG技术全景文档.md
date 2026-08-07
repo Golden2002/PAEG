@@ -147,7 +147,7 @@ flowchart TB
 | 维度 | 差异化实现 | 证据 |
 |---|---|---|
 | **三种模式** | 教学（5 子代理链）/ 闲聊（general_chat 无子代理）/ 找答案（AnswerSolver）各自独立 system prompt | `build_presenter_system` / `build_general_chat_system` / AnswerSolver 三套不同指令 |
-| **32 个学科** | 每个学科有专属 persona/language/structure/emphasis（v0.25 新增语言学/大气科学/量子场论）| `SUBJECT_STYLES`（32 个，各 4 字段）|
+| **35 个学科** | 每个学科有专属 persona/language/structure/emphasis（v0.25 新增语言学/大气科学/量子场论）| `SUBJECT_STYLES`（35 个，各 4 字段）|
 | **4 个学段** | 初中/高中/本科/考研 各自深度与语气适配 | `_GRADE_GUIDE`（4 档）|
 | **前端联动** | 右上角三模式按钮切换，教学模式显示学科+学段选择 | index.html mode-switch |
 
@@ -300,13 +300,13 @@ LLM 调用（带 tools+tool_choice）→ LLM 决定调哪些工具 → 逐个执
 
 ### 图一：架构总览（L0 · 分层展开，一图看懂 ⭐）
 
-> 这是 PAEG 架构的**第 0 层总览**——只展示六层结构与主干数据流，避免一张图塞满细节。每层可展开为独立细图（见下方导航）。**所有连线均为真实代码连接**，v0.25 已扩展（32 学科 + 学段联动 + 3 MCP）。
+> 这是 PAEG 架构的**第 0 层总览**——只展示六层结构与主干数据流，避免一张图塞满细节。每层可展开为独立细图（见下方导航）。**所有连线均为真实代码连接**，v0.25 已扩展（35 学科 + 学段联动 + 3 MCP）。
 
 ```mermaid
 flowchart TB
     L1["👤 用户层<br/>学生 · 外部智能体"]
     L2["🌐 应用层<br/>Flask Server · 意图路由 · 学段联动"]
-    L3["🧠 主 Agent<br/>Émile · 9 subagent · 32 学科"]
+    L3["🧠 主 Agent<br/>Émile · 9 subagent · 35 学科"]
     L4["✨ LLM 层<br/>DeepSeek"]
     L5["🔧 工具 + MCP 层<br/>工具链 · 技能 · 3 MCP server"]
     L6["📚 本地资源层<br/>知识库 · 画像 · 记忆 · PPT 输出"]
@@ -641,7 +641,7 @@ flowchart TB
 ## 1.7.2 解决方案：学科自动识别层
 
 **`subject_detector.py`（新）**：
-- **LLM 判断**（主）：从 32 个学科清单中选择最匹配学科；判断为未收录学科时返回 `unknown:<中文名>`
+- **LLM 判断**（主）：从 35 个学科清单中选择最匹配学科；判断为未收录学科时返回 `unknown:<中文名>`
 - **规则兜底**（次）：学科关键词表（物理/数学/化学/经济/法律/历史/哲学…），LLM 不可用时用
 - **缓存**：同一问题 10 分钟内不重复调用（教学场景常见）
 - **失败安全**：识别失败 → 保持用户设定（不打断教学）
@@ -655,7 +655,7 @@ flowchart TB
 ## 1.7.3 未收录学科 → 自我更新闭环
 
 ```
-用户问量子力学（不在 32 学科）
+用户问量子力学（不在 35 学科）
   → detect_subject 返回 unknown:量子力学
   → server 调用 EVOLVER.record_subject_request("量子力学", 概念, learner_id)
   → evolve_data/subject_requests.json（去重+计数）
@@ -729,11 +729,69 @@ flowchart LR
 
 > 回答"PAEG 的学科和学段差异化设定，技术上是怎么实现的"。
 
+
+## 1.14 借鉴项目清单与效能改进建议（v0.26 ⭐）
+
+### 1.14.1 调研项目（star 取自 GitHub API，2026-08-08）
+
+- **opencode**（194,720★）— Provider 抽象、多 Agent、会话持久化、插件目录
+- **AutoGPT**（186,278★）— 工具市场、Agent 工厂、think-act-observe 循环
+- **Anthropic Skills**（166,885★）— SKILL.md 双格式、渐进披露、技能即文件夹
+- **Claude Code**（140,599★）— 原子工具集、子 Agent、hooks、极简 prompt
+- **openai/codex**（104,648★）— Agent loop、compaction、Thread/Turn/Item
+- **MetaGPT**（69,701★）— SOP 流程、角色化、Document-as-Message
+- **Mem0**（62,777★）— 记忆四原子 API、混合检索、用户/Agent 作用域
+- **AutoGen**（60,299★）— Conversable Agent、GroupChat、事件钩子
+- **CrewAI**（56,752★）— Agent/Task/Process 三件套、YAML 配置
+- **LangGraph**（39,143★）— StateGraph、Checkpointer、interrupt
+- **Letta/MemGPT**（24,148★）— Core/Archival/Recall 三级记忆、记忆工具化
+- **MCP**（8,882★）— Tools/Resources/Prompts 三类原语、JSON-RPC
+
+#
+### v0.26 学科架构审计（第三轮 ⭐ 对照 GB/T 13745/教育部课标/本科目录）
+
+审计方法：35 学科键 × 权威分类（GB/T 13745-2009、教育部本科专业目录 2024、基础教育课标 2022、Coursera 11 类）逐项对照。
+
+**已修复的不一致（17 条）**：
+1. writing 幽灵学科（有 style/别名/目录但无学段）→ 补 all_grades（通识素养）
+2. qft 残留 → MIN_GRADE 键删除、subjects_ext 6 节点 id 前缀 → physics.qft.*
+3. 缺基础教育课标学科（science/art/体育）→ 记录待新增（P1）
+4. coding label 计算机基础→信息科技（课标对齐）
+5. ethics/aesthetics 标注为哲学二级学科
+6. law 学段矛盾（persona 说初中但配置只高中）→ 补 middle_school+undergraduate
+7. phenomenology label 生命现象学→现象学（非规范译名）
+8. politics 补 undergraduate（大学思政）；college_politics label→政治学（专业）
+9. english 补 graduate_exam（考研英语）
+10-11. physics/math SUBFIELD_TREE 课程名 vs GB 二级学科 → 保留课程名（教学 UI 友好）并在 tip 映射
+12. subject_detector _KNOWN_KEYWORDS 补全 20 学科
+13. 学科边界注释（chinese/literature/college_chinese）
+14. writing 检测器同步（并入 GRADES 后不再 grade_blocked）
+15. knowledge_base 节点 id 前缀与学科键不一致（cs/language/art 等）→ 记录待统一（P1）
+16. kaoyan_* 跨文件残留（api_sweep/expert_guard/pedagogy/test）→ 迁移 math/politics
+17. computer_science 缩进修正
+
+**模块化门控（P0-1）**：module_registry.require_module 装饰器覆盖 27 端点 × 9 模块（teach/chat/answer/method/knowledge/affection/file_gen/history/self_update），paeg_modules.json 一键上线/下线，403 实测通过。
+
+**压力测试**：120+ 提示词 × 10 套件 → **94/96（98%）**。
+
+## 1.14.2 效能改进建议（P0 已落地 / P1 待做）
+
+| 建议 | 来源 | 状态 |
+|---|---|---|
+| SKILL.md 规范封装 35 学科 | Anthropic Skills | P1（当前用 SUBJECT_STYLES dict，结构相近） |
+| MCP 暴露自身工具层 | MCP | P1（已有 mcp_client/mcp_gateway 消费端，待做暴露端） |
+| StateGraph 持久化教学循环 | LangGraph | P1（当前显式阶段驱动，D1 Transcript 已近似持久化） |
+| Core/Archival/Recall 三级记忆 | Letta/Mem0 | **P0 已落地**（D2 Token 压缩 = Recall；画像 = Core） |
+| Agent/Task/Process YAML 化 | CrewAI | P1（9 subagent 当前代码实例化） |
+| 工具市场目录注册 | AutoGPT | P1（skills/ 已目录驱动，工具待目录化） |
+| hooks 注入反思/审计 | Claude Code | P1 |
+| Guardrail 输入/输出双保险 | OpenAI Agents | P1 |
+
 ## 1.8.1 数据源：prompts.py 两个核心字典
 
 | 字典 | 结构 | 作用 |
 |---|---|---|
-| `SUBJECT_STYLES`（32 学科） | `{key: {label, persona, language, structure, emphasis}}` | 每学科独立 persona/语言/节奏/侧重 |
+| `SUBJECT_STYLES`（35 学科） | `{key: {label, persona, language, structure, emphasis}}` | 每学科独立 persona/语言/节奏/侧重 |
 | `_GRADE_GUIDE`（4 学段） | `{key: {label, depth, tone_extra}}` | 每学段深度与语气 |
 
 **学科字段语义**：
@@ -837,6 +895,25 @@ flowchart LR
 
 **元技能（连接清单同步原则）**：**架构每更新一次，连接清单就更新一次**——新增的连接（如 subfield_guide→Presenter）必须写入技术文档，保持"声明=实现"。
 
+
+### v0.26 增量连接（第二轮 ⭐ SUBFIELD_TREE/拆键/头像/P0迭代）
+
+| # | 新连接 | 调用者 | 被调者 | 状态 |
+|---|---|---|---|---|
+| 12.1 | SUBFIELD_TREE → /api/subject-tree | server.subject_tree | prompts.SUBFIELD_TREE（7 学科×学段二级学科） | ✓ |
+| 12.2 | /api/subject-tree → 前端三级级联 | index.html loadSubjectTree | grade→subject→subfield 三 select | ✓ |
+| 12.3 | 前端 subtopic → teach/teach_stream → Presenter | server 读 data.subtopic → step.subtopic | build_presenter_system 当前讲授主题块 | ✓ |
+| 12.4 | 学科拆键 college_* → 学段精确过滤 | prompts.SUBJECT_GRADES | chinese/english/politics(中高) + college_*(本科) 分键 | ✓ |
+| 12.5 | done 事件 → 前端自动切换 | teach_stream done subject_steered/grade_blocked | 前端更新学段/学科下拉 | ✓ |
+| 12.6 | meta_router.route() → 生产教学兜底 | server teach/teach_stream 意向层 | _llm_route_intent 9 类 LLM 综合意图判断 | ✓ |
+| 12.7 | teach_stream → Individuality/用户资料 | generate() 注入 | Presenter.set_pending_overrides + learner._user_corpus | ✓ |
+| 12.8 | /api/avatar → uploads/avatar | server.upload_avatar | 前端 renderAvatar 自定义头像 | ✓ |
+| 12.9 | D1 课堂记录 | paeg.teach 全流程 transcript_append | observability.transcripts/<session>.jsonl 可回放 | ✓ |
+| 12.10 | D2 Token 压缩 | memory_system.compress_if_needed | token_budget 估算 + summary/tail 双段 | ✓ |
+| 12.11 | D3 Verify Gate | paeg.teach 评估不达标 | 立即重讲一次 + 重评（限 1 次） | ✓ |
+
+**D4 Question System / D5 Skill 分级**：评估为 P1（下版实现），记录于元能力文档架构成熟度清单。
+
 ### 待修复断链（P1/P2 记录）
 - `/api/solve`、`/api/method` 不接 learner/chat_hist
 - 个人→公共 library opt-in API 缺失
@@ -894,7 +971,7 @@ flowchart LR
 
 | 层 | 机制 | 效果 |
 |---|---|---|
-| 学科 persona | SUBJECT_STYLES 32 学科 × 5 字段 | 每学科独立"人格+语言+节奏" |
+| 学科 persona | SUBJECT_STYLES 35 学科 × 5 字段 | 每学科独立"人格+语言+节奏" |
 | 学段深度 | _GRADE_GUIDE 4 学段 × 3 字段 | 同学科不同学段不同讲法 |
 | 学科别名 | _SUBJECT_ALIASES 50+ 别名 | 任意说法归一 |
 | 内容 steering | subject_detector（v0.19.26） | 问题内容自动匹配学科，覆盖手动设定 |
@@ -912,7 +989,7 @@ flowchart LR
 
 | 维度 | PAEG 的博雅教育体现 |
 |---|---|
-| **知识广度** | 32 学科横跨文理（数学/物理/化学 → 哲学/美学/文学/伦理/现象学），不止应试科目 |
+| **知识广度** | 35 学科横跨文理（数学/物理/化学 → 哲学/美学/文学/伦理/现象学），不止应试科目 |
 | **人格内核** | 薇依（Simone Weil）教育哲学："爱是朝向"、注意力是最稀有的慷慨、不评判学生 |
 | **批判思维** | 专项学科：thinking（批判性思维）/ expression（公众表达）/ writing（议论文写作） |
 | **人文深度** | 专属学科：philosophy/aesthetics/literature/ethics/phenomenology + Library 薇依原著 |
@@ -924,7 +1001,7 @@ flowchart LR
 
 | 对比项 | 通用教育 AI | PAEG（博雅教育） |
 |---|---|---|
-| 覆盖 | 全科目刷题/答疑 | **精选 32 学科 + 人文深度**（质量优先于广度） |
+| 覆盖 | 全科目刷题/答疑 | **精选 35 学科 + 人文深度**（质量优先于广度） |
 | 人格 | 无/工具人 | **薇依式教师**（有价值观的教育者） |
 | 教学 | 一次性问答 | **六阶段教学循环**（诊断→计划→呈现→评估→调整→反思）|
 | 价值 | 提分 | **培养完整的人**（知识+思考+共情+学习方法）|
@@ -955,7 +1032,7 @@ flowchart LR
 **可落地的市场分层**：
 - **C 端**：焦虑的学生/家长（情绪支持 + 学习方法）+ 人文素养需求者（博雅教育）
 - **B 端**：国际学校/书院/通识教育机构——需要"有教育理念的 AI 助手"
-- **差异化壁垒**：32 学科 + 薇依哲学体系 + 自进化 + 情绪支持——竞品短期无法复制
+- **差异化壁垒**：35 学科 + 薇依哲学体系 + 自进化 + 情绪支持——竞品短期无法复制
 
 **一句话市场定位**：在"刷题 AI"的红海里，PAEG 是第一个**以完整教育人格（薇依式教师）+ 完整教学循环 + 情绪陪伴 + 自我进化**为壁垒的博雅教育垂直智能体。
 
@@ -1472,7 +1549,7 @@ PAEG 的"大脑"由 6 个子代理构成，分两类：**5 个教学子代理**�
 - **不评分、不催促、不煽情**：热情、同情、鼓励话术都不是注意力的替代品
 - **谦逊是注意力的耐心**：不假装全知
 
-### 3.3.2 学科风格：SUBJECT_STYLES（32 个基础学科 + 63 个别名）
+### 3.3.2 学科风格：SUBJECT_STYLES（35 个基础学科 + 63 个别名）
 
 ```python
 SUBJECT_STYLES = {
@@ -3109,7 +3186,7 @@ python arch_check.py          # 输出连通性报告 + arch_report.json
 | 2 | SelfImprover 改进建议闭环 | analyze_failures 已接入周期调度器 | ✅ 已完成（periodic 每周跑 analyze_failures → improvements.md → 注入） | — |
 | 3 | SelfEvolver 接入聊天模式 | on_session_end 只在 paeg.teach（教学模式）调用 | 闲聊对话后也调用 on_session_end 做失败反思 | 小 |
 | 4 | 对话级记忆未完全落地 | MemorySystem 在 chat_stream 中构造但 long_term 读写链路待确认 | 确认/完善长期记忆跨会话读取 | 中 |
-| 5 | 学科数文档与实际不一致 | 实际 19 个基础学科（已修正 §3.3.2），文档其他处如"32 学科"需核对 | 全文核对统一 | 小 |
+| 5 | 学科数文档与实际不一致 | 实际 19 个基础学科（已修正 §3.3.2），文档其他处如"35 学科"需核对 | 全文核对统一 | 小 |
 | 6 | 工具调用前端可视化增强 | 已有 tool 事件但前端展示简单 | 展示工具名+参数+耗时，失败工具高亮 | 小 |
 | 7 | 固定域名方案 | 临时隧道 URL 每次重启变化（用户暂缓，见 02_用户决策记录） | 有预算后升级（§6.3 方案 B 已写好） | 待用户确认 |
 | 8 | 评估 harness 增强 | eval_harness 7 案例 | 扩充到学科×场景矩阵，接入 CI | 中 |
