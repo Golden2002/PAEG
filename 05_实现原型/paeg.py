@@ -203,6 +203,24 @@ class PAEG:
             self.self_updater.incremental_update(session)
             self._log(f"   OK 自我更新完成")
 
+        # 7.2 v0.22.2：提示词自进化（evolve_prompt 接入——教学失败时提炼提示词改进）
+        try:
+            from self_evolution import SelfEvolution
+            if not getattr(self, "_prompt_evolver", None):
+                self._prompt_evolver = SelfEvolution(llm=self.model)
+            _avg = (session.summary or {}).get("avg_score", 0.5)
+            _improvements = ""
+            if session.reflections:
+                _improvements = str(session.reflections[-1].get("improvements", ""))
+            if float(_avg or 0.5) < 0.7 or _improvements:
+                _note = f"教学平均分 {_avg:.2f}；改进点：{_improvements[:200]}" \
+                    if _improvements else f"教学平均分 {_avg:.2f}，低于 0.7"
+                _ev = self._prompt_evolver.evolve_prompt(subject, _note, strategic=(float(_avg or 0.5) < 0.5))
+                if _ev.get("evolved", 0) > 0:
+                    self._log(f"   ⚠️ 提示词自进化：{_ev.get('evolved')} 条补丁写入 subject_patches.md")
+        except Exception as _e:
+            self._log(f"   (提示词自进化跳过: {_e})")
+
         # 7.5 v0.15：自我进化（Reflexion 微反思——EMA 下降时诊断原因）
         if self.evolver:
             try:
