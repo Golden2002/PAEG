@@ -147,7 +147,7 @@ flowchart TB
 | 维度 | 差异化实现 | 证据 |
 |---|---|---|
 | **三种模式** | 教学（5 子代理链）/ 闲聊（general_chat 无子代理）/ 找答案（AnswerSolver）各自独立 system prompt | `build_presenter_system` / `build_general_chat_system` / AnswerSolver 三套不同指令 |
-| **29 个学科** | 每个学科有专属 persona/language/structure/emphasis（v0.25 新增语言学/大气科学/量子场论）| `SUBJECT_STYLES`（29 个，各 4 字段）|
+| **32 个学科** | 每个学科有专属 persona/language/structure/emphasis（v0.25 新增语言学/大气科学/量子场论）| `SUBJECT_STYLES`（32 个，各 4 字段）|
 | **4 个学段** | 初中/高中/本科/考研 各自深度与语气适配 | `_GRADE_GUIDE`（4 档）|
 | **前端联动** | 右上角三模式按钮切换，教学模式显示学科+学段选择 | index.html mode-switch |
 
@@ -300,13 +300,13 @@ LLM 调用（带 tools+tool_choice）→ LLM 决定调哪些工具 → 逐个执
 
 ### 图一：架构总览（L0 · 分层展开，一图看懂 ⭐）
 
-> 这是 PAEG 架构的**第 0 层总览**——只展示六层结构与主干数据流，避免一张图塞满细节。每层可展开为独立细图（见下方导航）。**所有连线均为真实代码连接**，v0.25 已扩展（29 学科 + 学段联动 + 3 MCP）。
+> 这是 PAEG 架构的**第 0 层总览**——只展示六层结构与主干数据流，避免一张图塞满细节。每层可展开为独立细图（见下方导航）。**所有连线均为真实代码连接**，v0.25 已扩展（32 学科 + 学段联动 + 3 MCP）。
 
 ```mermaid
 flowchart TB
     L1["👤 用户层<br/>学生 · 外部智能体"]
     L2["🌐 应用层<br/>Flask Server · 意图路由 · 学段联动"]
-    L3["🧠 主 Agent<br/>Émile · 9 subagent · 29 学科"]
+    L3["🧠 主 Agent<br/>Émile · 9 subagent · 32 学科"]
     L4["✨ LLM 层<br/>DeepSeek"]
     L5["🔧 工具 + MCP 层<br/>工具链 · 技能 · 3 MCP server"]
     L6["📚 本地资源层<br/>知识库 · 画像 · 记忆 · PPT 输出"]
@@ -641,7 +641,7 @@ flowchart TB
 ## 1.7.2 解决方案：学科自动识别层
 
 **`subject_detector.py`（新）**：
-- **LLM 判断**（主）：从 26 个学科清单中选择最匹配学科；判断为未收录学科时返回 `unknown:<中文名>`
+- **LLM 判断**（主）：从 32 个学科清单中选择最匹配学科；判断为未收录学科时返回 `unknown:<中文名>`
 - **规则兜底**（次）：学科关键词表（物理/数学/化学/经济/法律/历史/哲学…），LLM 不可用时用
 - **缓存**：同一问题 10 分钟内不重复调用（教学场景常见）
 - **失败安全**：识别失败 → 保持用户设定（不打断教学）
@@ -655,7 +655,7 @@ flowchart TB
 ## 1.7.3 未收录学科 → 自我更新闭环
 
 ```
-用户问量子力学（不在 26 学科）
+用户问量子力学（不在 32 学科）
   → detect_subject 返回 unknown:量子力学
   → server 调用 EVOLVER.record_subject_request("量子力学", 概念, learner_id)
   → evolve_data/subject_requests.json（去重+计数）
@@ -733,7 +733,7 @@ flowchart LR
 
 | 字典 | 结构 | 作用 |
 |---|---|---|
-| `SUBJECT_STYLES`（26 学科） | `{key: {label, persona, language, structure, emphasis}}` | 每学科独立 persona/语言/节奏/侧重 |
+| `SUBJECT_STYLES`（32 学科） | `{key: {label, persona, language, structure, emphasis}}` | 每学科独立 persona/语言/节奏/侧重 |
 | `_GRADE_GUIDE`（4 学段） | `{key: {label, depth, tone_extra}}` | 每学段深度与语气 |
 
 **学科字段语义**：
@@ -894,7 +894,7 @@ flowchart LR
 
 | 层 | 机制 | 效果 |
 |---|---|---|
-| 学科 persona | SUBJECT_STYLES 26 学科 × 5 字段 | 每学科独立"人格+语言+节奏" |
+| 学科 persona | SUBJECT_STYLES 32 学科 × 5 字段 | 每学科独立"人格+语言+节奏" |
 | 学段深度 | _GRADE_GUIDE 4 学段 × 3 字段 | 同学科不同学段不同讲法 |
 | 学科别名 | _SUBJECT_ALIASES 50+ 别名 | 任意说法归一 |
 | 内容 steering | subject_detector（v0.19.26） | 问题内容自动匹配学科，覆盖手动设定 |
@@ -912,7 +912,7 @@ flowchart LR
 
 | 维度 | PAEG 的博雅教育体现 |
 |---|---|
-| **知识广度** | 26 学科横跨文理（数学/物理/化学 → 哲学/美学/文学/伦理/现象学），不止应试科目 |
+| **知识广度** | 32 学科横跨文理（数学/物理/化学 → 哲学/美学/文学/伦理/现象学），不止应试科目 |
 | **人格内核** | 薇依（Simone Weil）教育哲学："爱是朝向"、注意力是最稀有的慷慨、不评判学生 |
 | **批判思维** | 专项学科：thinking（批判性思维）/ expression（公众表达）/ writing（议论文写作） |
 | **人文深度** | 专属学科：philosophy/aesthetics/literature/ethics/phenomenology + Library 薇依原著 |
@@ -924,7 +924,7 @@ flowchart LR
 
 | 对比项 | 通用教育 AI | PAEG（博雅教育） |
 |---|---|---|
-| 覆盖 | 全科目刷题/答疑 | **精选 26 学科 + 人文深度**（质量优先于广度） |
+| 覆盖 | 全科目刷题/答疑 | **精选 32 学科 + 人文深度**（质量优先于广度） |
 | 人格 | 无/工具人 | **薇依式教师**（有价值观的教育者） |
 | 教学 | 一次性问答 | **六阶段教学循环**（诊断→计划→呈现→评估→调整→反思）|
 | 价值 | 提分 | **培养完整的人**（知识+思考+共情+学习方法）|
@@ -955,7 +955,7 @@ flowchart LR
 **可落地的市场分层**：
 - **C 端**：焦虑的学生/家长（情绪支持 + 学习方法）+ 人文素养需求者（博雅教育）
 - **B 端**：国际学校/书院/通识教育机构——需要"有教育理念的 AI 助手"
-- **差异化壁垒**：26 学科 + 薇依哲学体系 + 自进化 + 情绪支持——竞品短期无法复制
+- **差异化壁垒**：32 学科 + 薇依哲学体系 + 自进化 + 情绪支持——竞品短期无法复制
 
 **一句话市场定位**：在"刷题 AI"的红海里，PAEG 是第一个**以完整教育人格（薇依式教师）+ 完整教学循环 + 情绪陪伴 + 自我进化**为壁垒的博雅教育垂直智能体。
 
@@ -1472,7 +1472,7 @@ PAEG 的"大脑"由 6 个子代理构成，分两类：**5 个教学子代理**�
 - **不评分、不催促、不煽情**：热情、同情、鼓励话术都不是注意力的替代品
 - **谦逊是注意力的耐心**：不假装全知
 
-### 3.3.2 学科风格：SUBJECT_STYLES（19 个基础学科 + 63 个别名）
+### 3.3.2 学科风格：SUBJECT_STYLES（32 个基础学科 + 63 个别名）
 
 ```python
 SUBJECT_STYLES = {
@@ -3109,7 +3109,7 @@ python arch_check.py          # 输出连通性报告 + arch_report.json
 | 2 | SelfImprover 改进建议闭环 | analyze_failures 已接入周期调度器 | ✅ 已完成（periodic 每周跑 analyze_failures → improvements.md → 注入） | — |
 | 3 | SelfEvolver 接入聊天模式 | on_session_end 只在 paeg.teach（教学模式）调用 | 闲聊对话后也调用 on_session_end 做失败反思 | 小 |
 | 4 | 对话级记忆未完全落地 | MemorySystem 在 chat_stream 中构造但 long_term 读写链路待确认 | 确认/完善长期记忆跨会话读取 | 中 |
-| 5 | 学科数文档与实际不一致 | 实际 19 个基础学科（已修正 §3.3.2），文档其他处如"26 学科"需核对 | 全文核对统一 | 小 |
+| 5 | 学科数文档与实际不一致 | 实际 19 个基础学科（已修正 §3.3.2），文档其他处如"32 学科"需核对 | 全文核对统一 | 小 |
 | 6 | 工具调用前端可视化增强 | 已有 tool 事件但前端展示简单 | 展示工具名+参数+耗时，失败工具高亮 | 小 |
 | 7 | 固定域名方案 | 临时隧道 URL 每次重启变化（用户暂缓，见 02_用户决策记录） | 有预算后升级（§6.3 方案 B 已写好） | 待用户确认 |
 | 8 | 评估 harness 增强 | eval_harness 7 案例 | 扩充到学科×场景矩阵，接入 CI | 中 |
