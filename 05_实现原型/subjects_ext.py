@@ -441,7 +441,7 @@ EXTENDED_SUBJECTS = {
 
     # ============ 量子场论 QFT（v0.25 · 7 层体系，仅大学） ============
     "qft.prelude.motivation": {
-        "id": "qft.prelude.motivation", "subject": "qft", "topic": "prelude",
+        "id": "physics.qft.prelude.motivation", "subject": "physics", "topic": "prelude",
         "concept": "motivation", "level": "undergraduate", "difficulty": 7,
         "definition": "量子场论动机：粒子产生与湮灭、相对论性量子力学困难（负能量解）、多粒子系统、散射实验（如高能对撞）为什么必须用量子场论。",
         "intuition": "粒子不是'台球'而是'场的涟漪'：真空中充满各种场，粒子是场的局域激发——就像水面上的波浪不是'东西'，是水（场）的扰动。",
@@ -453,7 +453,7 @@ EXTENDED_SUBJECTS = {
         "worldview_fit": {"1": 0.2, "2": 0.5, "3": 0.2, "4": 0.1},
     },
     "qft.quantization.scalar_field": {
-        "id": "qft.quantization.scalar_field", "subject": "qft", "topic": "quantization",
+        "id": "physics.qft.quantization.scalar_field", "subject": "physics", "topic": "quantization",
         "concept": "scalar_field", "level": "undergraduate", "difficulty": 8,
         "definition": "标量场正则量子化：Klein-Gordon 方程、谐振子类比（每个动量模是独立谐振子）、产生/湮灭算符、真空与单粒子态、费曼传播子。",
         "intuition": "把场看成'无数个弹簧的集合'：每个动量模式是一根弹簧（谐振子），量子化就是给每根弹簧'数弹簧量子'——一个量子就是一个粒子。",
@@ -465,7 +465,7 @@ EXTENDED_SUBJECTS = {
         "worldview_fit": {"1": 0.2, "2": 0.55, "3": 0.15, "4": 0.1},
     },
     "qft.spinor.dirac_field": {
-        "id": "qft.spinor.dirac_field", "subject": "qft", "topic": "spinor",
+        "id": "physics.qft.spinor.dirac_field", "subject": "physics", "topic": "spinor",
         "concept": "dirac_field", "level": "undergraduate", "difficulty": 9,
         "definition": "旋量与狄拉克场：洛伦兹群旋量表示、狄拉克方程、负能量解的物理解释（费米海/反粒子）、自旋-统计定理、费米子场反对易。",
         "intuition": "狄拉克方程的负能量解不是'无解'而是'反粒子'：就像欠债（负能量）不是'没有'，而是'反向的财富'——电子的反粒子是正电子。",
@@ -477,7 +477,7 @@ EXTENDED_SUBJECTS = {
         "worldview_fit": {"1": 0.15, "2": 0.6, "3": 0.15, "4": 0.1},
     },
     "qft.gauge.qed": {
-        "id": "qft.gauge.qed", "subject": "qft", "topic": "gauge",
+        "id": "physics.qft.gauge.qed", "subject": "physics", "topic": "gauge",
         "concept": "qed", "level": "undergraduate", "difficulty": 9,
         "definition": "规范场论与 QED：U(1) 局域规范对称性、协变导数、光子场、QED 拉格朗日量、费曼规则（电子-光子顶点）、g-2 因子。",
         "intuition": "规范对称性 = '每个点可以自由选择相位'：要求物理在局部相位变换下不变，就必须引入光子场来'补偿'——对称性'要求'有相互作用。",
@@ -489,7 +489,7 @@ EXTENDED_SUBJECTS = {
         "worldview_fit": {"1": 0.15, "2": 0.6, "3": 0.15, "4": 0.1},
     },
     "qft.renormalization.uv_divergence": {
-        "id": "qft.renormalization.uv_divergence", "subject": "qft", "topic": "renormalization",
+        "id": "physics.qft.renormalization.uv_divergence", "subject": "physics", "topic": "renormalization",
         "concept": "uv_divergence", "level": "undergraduate", "difficulty": 9,
         "definition": "重整化：紫外发散（圈图积分发散）、维数正规化、重整化常数、可重整性、重整化群与有效场论思想。",
         "intuition": "圈图发散 = '理论在极短距离失效'：重整化是'重新标定参数'（质量/电荷吸收无穷大），就像用'实测值'校准理论，不关心裸参数。",
@@ -501,7 +501,7 @@ EXTENDED_SUBJECTS = {
         "worldview_fit": {"1": 0.15, "2": 0.6, "3": 0.15, "4": 0.1},
     },
     "qft.sm.higgs": {
-        "id": "qft.sm.higgs", "subject": "qft", "topic": "sm",
+        "id": "physics.qft.sm.higgs", "subject": "physics", "topic": "sm",
         "concept": "higgs", "level": "undergraduate", "difficulty": 9,
         "definition": "标准模型导览：粒子谱（费米子三代/规范玻色子）、希格斯机制（自发对称破缺赋予质量）、QCD 与 QED 统一、标准模型的成就与局限。",
         "intuition": "希格斯机制 = '宇宙充满的粘稠介质'：粒子穿过它'感到阻力'（获得质量）——有的阻力大（顶夸克重），有的几乎无阻力（光子无质量）。",
@@ -511,6 +511,120 @@ EXTENDED_SUBJECTS = {
         },
         "common_misconceptions": ["以为希格斯粒子'产生质量'（是希格斯场与粒子耦合）", "以为标准模型是'终极理论'（不含引力/暗物质）"],
         "worldview_fit": {"1": 0.2, "2": 0.55, "3": 0.15, "4": 0.1},
+    },
+
+    # ============ 电子科学与技术（v0.26 · 8 层体系） ============
+    "electronics.circuits.kcl_kvl": {
+        "id": "electronics.circuits.kcl_kvl", "subject": "electronics", "topic": "circuits",
+        "concept": "kcl_kvl", "level": "undergraduate", "difficulty": 3,
+        "definition": "电路抽象与基本定律：集中参数模型、基尔霍夫电流定律（KCL）与电压定律（KVL）、节点分析与网格分析、叠加定理、戴维南/诺顿等效。",
+        "intuition": "KCL 是'流进节点的电流=流出的'（电荷守恒）；KVL 是'绕一圈电压升=电压降'（能量守恒）。电路像水管：节点是接口，电流像水流，电压像水压差。",
+        "explanation_variants": {
+            "intuitive": "把电路当'水循环'：KCL 是每个管口进出水量平衡，KVL 是绕一圈水位变化总和为零",
+            "formal": "KCL: ΣI_in = ΣI_out；KVL: ΣV = 0（绕闭合回路）；戴维南等效：有源线性二端网络 → 电压源+串联电阻",
+        },
+        "common_misconceptions": ["把电压当'流过'的（电压是两点间电位差）", "忘记叠加定理只适用于线性电路"],
+        "worldview_fit": {"1": 0.1, "2": 0.65, "3": 0.15, "4": 0.1},
+    },
+    "electronics.devices.transistor": {
+        "id": "electronics.devices.transistor", "subject": "electronics", "topic": "devices",
+        "concept": "transistor", "level": "undergraduate", "difficulty": 5,
+        "definition": "半导体器件：PN 结与二极管 I-V 特性、BJT 放大原理、MOSFET 特性与开关模型、小信号模型。",
+        "intuition": "晶体管是'电控阀门'：BJT 用基极电流控制集电极大电流（电流放大），MOSFET 用栅极电压控制沟道导通（电压控制）。像'水龙头'——小旋钮控制大水流。",
+        "explanation_variants": {
+            "intuitive": "把三极管当'可控水阀'：基极是旋钮，集电极是水管，发射极是出水口",
+            "formal": "BJT: IC = β·IB（放大区）；MOSFET: ID = ½μnCox(W/L)(VGS-Vth)²（饱和区）",
+        },
+        "common_misconceptions": ["以为晶体管是'电流放大'的绝对真理（本质是受控源）", "混淆 BJT（电流控制）与 MOSFET（电压控制）"],
+        "worldview_fit": {"1": 0.1, "2": 0.65, "3": 0.15, "4": 0.1},
+    },
+    "electronics.digital.cmos": {
+        "id": "electronics.digital.cmos", "subject": "electronics", "topic": "digital",
+        "concept": "cmos", "level": "undergraduate", "difficulty": 5,
+        "definition": "数字抽象与 CMOS：数字抽象（高/低电平）、CMOS 逻辑门（NMOS+PMOS 互补）、组合逻辑（卡诺图/PLA）、时序逻辑（锁存器/寄存器/FSM）。",
+        "intuition": "数字电路把连续电压抽象成 0/1：CMOS 用 NMOS+PMOS 对实现'要么导通要么关断'——几乎不耗静态功耗。数字世界像'开关组合'：输入开关组合决定输出。",
+        "explanation_variants": {
+            "intuitive": "把逻辑门当'开关电路'：与门是串联开关，或门是并联开关，非门是反向开关",
+            "formal": "CMOS 反相器：NMOS 下拉 + PMOS 上拉，静态功耗近似为零；组合逻辑最小化用卡诺图",
+        },
+        "common_misconceptions": ["以为数字电路不耗电（动态功耗随频率上升）", "混淆组合逻辑（无记忆）与时序逻辑（有状态）"],
+        "worldview_fit": {"1": 0.1, "2": 0.6, "3": 0.2, "4": 0.1},
+    },
+
+    # ============ 计算机科学（v0.26 · 8 层体系） ============
+    "computer_science.algorithms.complexity": {
+        "id": "computer_science.algorithms.complexity", "subject": "computer_science", "topic": "algorithms",
+        "concept": "complexity", "level": "undergraduate", "difficulty": 4,
+        "definition": "算法与复杂度：大 O 记号、常见复杂度（常数/对数/线性/平方/指数）、排序与搜索算法、递归与分治。",
+        "intuition": "大 O 是'输入变大时运行时间怎么长'：O(1) 是'不管多大都一样快'，O(n²) 是'翻倍输入时间变 4 倍'。像'整理书'——线性扫一遍 vs 两两比较。",
+        "explanation_variants": {
+            "intuitive": "用'找书'理解复杂度：直接翻到（O(1)）、按页找（O(n)）、两两比对（O(n²)）、二分折半（O(log n)）",
+            "formal": "二分查找 O(log n)；快速排序平均 O(n log n)；动态规划通过子问题重用法避免指数爆炸",
+        },
+        "common_misconceptions": ["把 O(2^n) 与 O(n²) 混淆（指数远快于多项式）", "忽略空间复杂度（只记时间）"],
+        "worldview_fit": {"1": 0.1, "2": 0.6, "3": 0.2, "4": 0.1},
+    },
+    "computer_science.systems.os": {
+        "id": "computer_science.systems.os", "subject": "computer_science", "topic": "systems",
+        "concept": "os", "level": "undergraduate", "difficulty": 5,
+        "definition": "计算机系统与操作系统：CPU/存储层次/IO、进程与线程、调度、内存管理（虚拟内存/分页）、文件系统。",
+        "intuition": "操作系统是'资源管理员'：CPU 调度像'多任务分配'，虚拟内存像'假的内存更大'（磁盘当内存用），进程隔离像'每个程序有自己的房间'。",
+        "explanation_variants": {
+            "intuitive": "把 OS 当'公寓管理员'：进程是住户（各住各的），线程是同居者（共享空间），虚拟内存是'借邻居的房间'（磁盘）",
+            "formal": "时间片轮转调度；虚拟内存：页表 + 缺页中断 + LRU 替换；进程间通信：管道/消息队列/共享内存",
+        },
+        "common_misconceptions": ["混淆进程与线程（进程隔离，线程共享）", "以为虚拟内存'真的'有大内存（是映射机制）"],
+        "worldview_fit": {"1": 0.1, "2": 0.6, "3": 0.2, "4": 0.1},
+    },
+    "computer_science.programming.recursion": {
+        "id": "computer_science.programming.recursion", "subject": "computer_science", "topic": "programming",
+        "concept": "recursion", "level": "undergraduate", "difficulty": 3,
+        "definition": "编程基础：控制流、递归与分治、抽象数据类型（ADT）、函数式/OOP 范式、Python 代码实践。",
+        "intuition": "递归是'函数调用自己'：像俄罗斯套娃——处理一个 = 处理一半 + 处理剩下（分治）。关键是'基准情形'（何时停止）。",
+        "explanation_variants": {
+            "intuitive": "用'套娃'理解递归：打开一层套娃，里面还是套娃，直到最小那个（基准情形）",
+            "formal": "def fact(n): return 1 if n<=1 else n*fact(n-1)；分治：T(n)=2T(n/2)+O(n) → O(n log n)",
+        },
+        "common_misconceptions": ["忘记基准情形导致无限递归（栈溢出）", "以为递归比迭代'高级'（两者等价，递归更清晰）"],
+        "worldview_fit": {"1": 0.1, "2": 0.6, "3": 0.2, "4": 0.1},
+    },
+
+    # ============ 人工智能（v0.26 · 8 层体系） ============
+    "artificial_intelligence.ml.supervised": {
+        "id": "artificial_intelligence.ml.supervised", "subject": "artificial_intelligence", "topic": "ml",
+        "concept": "supervised", "level": "undergraduate", "difficulty": 4,
+        "definition": "机器学习基础：监督学习（线性回归/Logistic/SVM/决策树）、无监督（聚类/PCA）、模型评估（过拟合/正则化/偏差方差）。",
+        "intuition": "监督学习是'有答案的学习'：给例子+正确答案，让模型找规律。像'教小孩认猫'——看很多猫的图（特征），标注'这是猫'（标签）。",
+        "explanation_variants": {
+            "intuitive": "用'猜价格'理解回归：根据房子面积/位置（特征）预测价格（标签）——找一条线拟合数据",
+            "formal": "线性回归：最小化 MSE；逻辑回归：sigmoid 输出概率；过拟合：高方差低偏差，用正则化（L1/L2）缓解",
+        },
+        "common_misconceptions": ["混淆过拟合（记住训练集）与欠拟合（没学够）", "以为更多特征总更好（维数灾难）"],
+        "worldview_fit": {"1": 0.15, "2": 0.55, "3": 0.2, "4": 0.1},
+    },
+    "artificial_intelligence.llm.transformer": {
+        "id": "artificial_intelligence.llm.transformer", "subject": "artificial_intelligence", "topic": "llm",
+        "concept": "transformer", "level": "undergraduate", "difficulty": 6,
+        "definition": "Transformer 与大模型：自注意力机制、多头注意力、位置编码（RoPE）、MoE、KV Cache、训练与对齐（SFT/RLHF）。",
+        "intuition": "自注意力是'每个词看所有词决定自己该关注谁'：像开会时每个人听所有发言，决定谁的贡献重要。Transformer 让所有词并行处理（不像 RNN 逐个）。",
+        "explanation_variants": {
+            "intuitive": "用'开会'理解注意力：每个词（参会者）对每个其他词（发言）分配注意力权重（谁重要听谁）",
+            "formal": "Attention(Q,K,V)=softmax(QKᵀ/√d)V；多头注意力并行多个注意力头；位置编码让模型感知词序",
+        },
+        "common_misconceptions": ["以为 LLM'真理解'（是统计模式学习）", "混淆 SFT（指令微调）与 RLHF（人类反馈强化学习）"],
+        "worldview_fit": {"1": 0.2, "2": 0.5, "3": 0.2, "4": 0.1},
+    },
+    "artificial_intelligence.agents.design": {
+        "id": "artificial_intelligence.agents.design", "subject": "artificial_intelligence", "topic": "agents",
+        "concept": "design", "level": "undergraduate", "difficulty": 6,
+        "definition": "智能体设计：ReAct（推理+行动）、Tool Use、Planning、多 Agent 协作、RAG（检索增强生成）。",
+        "intuition": "智能体是'会行动的 AI'：不只说话，还能思考→决定→调用工具→观察结果→再思考（ReAct 循环）。像'有手有脚的助手'。",
+        "explanation_variants": {
+            "intuitive": "用'做饭'理解 ReAct：思考（要炒什么菜）→ 行动（开火/放油）→ 观察（油热了吗）→ 再思考（下一步）",
+            "formal": "ReAct：Thought→Action→Observation 循环；Tool Use：LLM 输出函数调用；RAG：检索相关文档增强生成",
+        },
+        "common_misconceptions": ["以为 Agent=LLM（Agent 是 LLM+工具+循环）", "忽略工具调用的错误处理（失败重试）"],
+        "worldview_fit": {"1": 0.2, "2": 0.5, "3": 0.2, "4": 0.1},
     },
 }
 
