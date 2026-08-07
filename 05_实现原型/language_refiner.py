@@ -282,6 +282,17 @@ class LanguageRefiner:
             r"^不必急", r"^不要急", r"^无需急", r"^不需要急", r"^别急",
         ]
         no_subject_compiled = [re.compile(p) for p in no_subject_phrases]
+        # v0.25：复合句缺主语检测（"因为学习了，所以进步了""虽然困难，但要坚持"——因果/转折复合句分句缺主语）
+        compound_connectors = ["因为", "所以", "虽然", "但是", "但", "由于", "因此", "然而", "既然", "如果", "尽管", "即使", "而且", "并且", "可是"]
+        compound_patterns = [
+            (r"^(因为|由于|既然|如果|虽然|尽管|即使)[^，。；]{1,15}，(所以|因此|但|但是|然而|就|便)(?!.*(我们|我|你|学生|它|他|她))[^，。；]{1,15}$",
+             "复合句分句缺主语——『因为…所以…』每个分句都应有主语（『因为学习了，所以我进步了』）"),
+            (r"^(虽然|尽管)[^，。；]{1,15}，(但|但是|可是)(?!.*(我们|我|你|学生|它|他|她))[^，。；]{1,15}$",
+             "复合句转折分句缺主语——『虽然…但…』分句应有主语（『虽然困难，但我们要坚持』）"),
+            (r"^(因为|由于|如果|既然)[^，。；]{1,12}[，。；](?!.*(我们|我|你|学生|它|他|她))",
+             "『因为/由于/如果/既然』引出的条件分句后接无主句——应补主语（『因为学习了，所以我进步了』）"),
+        ]
+        compound_compiled = [(re.compile(p), msg) for p, msg in compound_patterns]
         # v0.20：动宾搭配不当（抽象动宾组合）
         bad_collocations = [
             (r"带着(重量|分量)", "『带着重量/分量』动宾不通——『带』是随身携带，重量不能随身带。应说『这句话的分量很重』或『这句话本身已经很重』"),
@@ -364,6 +375,11 @@ class LanguageRefiner:
             for cp, msg in preposition_compiled:
                 if cp.search(clean):
                     issues.append(f"'{clean[:24]}…' 介词使用不当：{msg}")
+                    break
+            # v0.25：复合句缺主语（因果/转折分句）
+            for cp, msg in compound_compiled:
+                if cp.search(clean):
+                    issues.append(f"'{clean[:24]}…' 复合句缺主语：{msg}")
                     break
         return issues[:12]
 
