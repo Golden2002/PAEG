@@ -1845,6 +1845,9 @@ def profile_update(learner_id):
         "target_exam": "target_exam",
         "specialty_target": "specialty_target",
         "self_description": "self_description",
+        # v0.36 ⭐ 补：subjects_mastery 允许 PUT 持久化（此前只在 SESSIONS 内存，
+        # 教学管线自动维护但前端主动改时无法落盘）——与 UserStore.save_learner 对齐
+        "subjects_mastery": "subjects_mastery",
     }
     for key, attr in editable.items():
         if key in data and data[key] is not None:
