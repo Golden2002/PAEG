@@ -62,7 +62,7 @@ API_TESTS = {
     "/api/method": [
         ("怎么学数学", "math", {}),
         ("那物理呢", "physics", {}),                  # 续问
-        ("考研数学怎么复习", "kaoyan_math", {}),
+        ("考研数学怎么复习", "math", {}),
     ],
     "/api/knowledge": [
         ("知识库", "general", {}),
