@@ -344,6 +344,34 @@ body {
 }
 .msg.user .msg-bubble .step-tag { background: rgba(255,255,255,.2); color: #fff; }
 
+/* v0.28：检索状态徽章——对话输出前的"已完成检索"小标志。
+   复用 .step-tag 的 token 体系（accent-soft/border/text-dim），保证视觉一致。 */
+.retrieval-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; line-height: 1; padding: 4px 8px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  font-weight: 500;
+  animation: retrieval-badge-in .25s ease-out;
+}
+.retrieval-badge .check {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 12px;
+}
+.retrieval-badge .label-name {
+  color: var(--accent);
+  font-weight: 600;
+  margin-left: 2px;
+}
+@keyframes retrieval-badge-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* v0.14：Markdown 内容样式 */
 .msg-bubble .md-content { line-height: 1.75; }
 .msg-bubble .md-content p { margin: 6px 0; }
@@ -1595,6 +1623,23 @@ function escapeHtml(s) {
   })[c]);
 }
 
+// v0.28：在气泡顶部插入"已完成检索"徽章。
+//   - 去重：同一气泡内仅首次插入有效（用 _retrievalBadgeShown 标志挂在气泡 DOM 上）
+//   - XSS：done 值经 escapeHtml 转义
+//   - 不依赖具体文案：data.done 取值（"知识库检索"/未来"网络检索" 等）原样渲染
+function insertRetrievalBadge(bubble, done) {
+  if (!bubble) return;
+  if (bubble._retrievalBadgeShown) return;  // 一次对话多次 retrieval → 只显示一次
+  bubble._retrievalBadgeShown = true;
+  const bubbleBody = bubble.querySelector('.msg-bubble');
+  if (!bubbleBody) return;
+  const badge = document.createElement('div');
+  badge.className = 'retrieval-badge';
+  badge.innerHTML = `<span class="check">✓</span>已完成<span class="label-name">${escapeHtml(done || '检索')}</span>`;
+  // 插到 .msg-bubble 内顶部（在 .md-content 等任何后续元素之前）
+  bubbleBody.insertBefore(badge, bubbleBody.firstChild);
+}
+
 async function checkHealth() {
   try {
     const h = await api('/api/health');
@@ -1604,6 +1649,9 @@ async function checkHealth() {
     restoreLoginState();
     // 同步学习者画像
     loadProfile();
+    // v0.27 ⭐ 元认知日志（画像）持久化：必须在 learnerId 恢复后加载，
+    // 否则刷新后 stat-reflect/学习记录丢失（此前 loadMetaLog 在 checkHealth 外先跑）
+    loadMetaLog();
     return h;
   } catch (e) {
     document.getElementById('conn-status').textContent = '服务离线';
@@ -1783,11 +1831,18 @@ function renderLogs(logs) {
     list.innerHTML = `<div class="log-item"><div class="txt" style="color:var(--text-dim)">等待教学记录…</div></div>`;
     return;
   }
-  list.innerHTML = logs.slice(0, 8).map(l => `
+  list.innerHTML = logs.slice(0, 8).map(l => {
+    // v0.27 ⭐ 修复：reflection 可能是对象（反思 dict），需安全提取字符串
+    const r = (typeof l.reflection === 'string') ? l.reflection
+             : (l.reflection && typeof l.reflection === 'object') ? (l.reflection.concept || l.reflection.summary || '')
+             : '';
+    const txt = r || l.concept || l.note || '';
+    return `
     <div class="log-item">
       <div class="time">${(l.timestamp || '').slice(5, 16)}</div>
-      <div class="txt">${(l.reflection || l.concept || l.note || '').slice(0, 60)}</div>
-    </div>`).join('');
+      <div class="txt">${String(txt).slice(0, 60)}</div>
+    </div>`;
+  }).join('');
 }
 
 function updateStats() {
@@ -1854,6 +1909,17 @@ async function teach(question, subject, subtopic) {
               <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button></div></div>`;
             chatWin.appendChild(mainBubble);
           }
+        } else if (event === 'retrieval') {
+          // v0.28：检索状态徽章——后端在输出 presentation 前报告已完成何种检索
+          // retrieval 可能先于 presentation 到达 → 需 lazy 创建气泡，保证徽章显示在顶部
+          if (!mainBubble) {
+            mainBubble = document.createElement('div');
+            mainBubble.className = 'msg paeg';
+            mainBubble.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><div class="md-content"></div>
+              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button></div></div>`;
+            chatWin.appendChild(mainBubble);
+          }
+          insertRetrievalBadge(mainBubble, obj.done);
           // 流式显示累积内容
           const contentDiv = mainBubble.querySelector('.md-content');
           const step = 12;
@@ -2039,6 +2105,10 @@ async function generalChat(text) {
           if (!bubble.isConnected) chatWin.appendChild(bubble);
           bubbleBody.appendChild(card);
           chatWin.scrollTop = chatWin.scrollHeight;
+        } else if (event === 'retrieval') {
+          // v0.28：检索状态徽章——chat 气泡已在函数开头创建，直接插入徽章到顶部
+          if (!bubble.isConnected) chatWin.appendChild(bubble);
+          insertRetrievalBadge(bubble, obj.done);
         } else if (event === 'seg') {
           // 流式文本累积
           if (!bubble.isConnected) chatWin.appendChild(bubble);
@@ -2808,7 +2878,6 @@ document.getElementById('resource-btn').addEventListener('click', fetchResources
 
 // ─── 启动 ───
 checkHealth();
-loadMetaLog();
 loadDailyQuote();        // v0.17：每日一句
 setInterval(checkHealth, 30000);  // 30s 健康检查
 </script>
