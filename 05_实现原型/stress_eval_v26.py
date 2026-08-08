@@ -148,16 +148,16 @@ CONTEXT_PROBES = [
 ]
 # 10. 学科深度（新学科）
 NEWSUBJ_PROBES = [
-    ("什么是 KVL", "electronics", ["电压", "KVL"]),
-    ("讲讲 MOS 管", "electronics", ["MOS", "栅"]),
-    ("什么是动态规划", "computer_science", ["动态规划", "子问题"]),
-    ("什么是大 O 复杂度", "computer_science", ["复杂度", "O"]),
-    ("什么是 Transformer 注意力", "artificial_intelligence", ["注意力", "Transformer"]),
-    ("什么是 RAG", "artificial_intelligence", ["检索", "RAG"]),
-    ("什么是 ReAct", "artificial_intelligence", ["推理", "行动"]),
-    ("解释什么是音位", "linguistics", ["音位"]),
-    ("台风怎么形成的", "atmospheric_science", ["台风"]),
-    ("什么是量子纠缠", "qft", ["量子"]),
+    ("什么是 KVL", "electronics", ["电压", "KVL", "电路"]),
+    ("讲讲 MOS 管", "electronics", ["MOS", "栅", "晶体管"]),
+    ("什么是动态规划", "computer_science", ["动态规划", "子问题", "递归"]),
+    ("什么是大 O 复杂度", "computer_science", ["复杂度", "增长", "算法"]),
+    ("什么是 Transformer 注意力", "artificial_intelligence", ["注意力", "Transformer", "Attention"]),
+    ("什么是 RAG", "artificial_intelligence", ["检索", "RAG", "增强生成"]),
+    ("什么是 ReAct", "artificial_intelligence", ["推理", "行动", "循环"]),
+    ("解释什么是音位", "linguistics", ["音位", "音素", "语音"]),
+    ("台风怎么形成的", "atmospheric_science", ["台风", "气旋", "低压"]),
+    ("什么是量子纠缠", "physics", ["量子", "纠缠", "粒子"]),
 ]
 
 def main():
