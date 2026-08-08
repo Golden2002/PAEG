@@ -11,6 +11,7 @@ PAEG 元问题路由（v0.17.1）
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 # 元问题模式：关于 PAEG 自身身份/能力/机制的问题
 META_PATTERNS = [
@@ -244,6 +245,15 @@ def is_teaching_intent(text: str, llm=None, fallback_to_teach: bool = True) -> b
                     "返回严格 JSON：{\"teaching\": true/false, \"reason\": \"简短原因\"}\n"
                     "teaching=true：涉及学科知识/概念/题目/解题/学习方法/复习备考等。\n"
                     "teaching=false：寒暄/情感倾诉/生活闲聊/非学科话题/问老师近况/感谢/告别等。\n"
+                    "【端点语义优先级（v0.34 ⭐）】\n"
+                    "- 此判断在 /api/teach/stream 端点被调用，已通过前端模式开关选定教学模式。\n"
+                    "- 普通概念提问（'什么是熵'、'解释牛顿第二定律'）即使形式像聊天，"
+                    "也必须返回 teaching=true（这是教学模式的核心契约）。\n"
+                    "- 仅当用户表达明确属于下列子意图时才返回 teaching=false：\n"
+                    "  * 情绪宣泄（'我很焦虑'）\n"
+                    "  * 方法论咨询（'怎么学好物理'）\n"
+                    "  * 知识库查询（'查一下课本第 X 章'）\n"
+                    "  * 界面操作/元问题（'换皮肤'、'你是谁'）\n"
                     "只输出 JSON。"
                 )
                 user = f"学生说：{t}"
@@ -329,9 +339,23 @@ def _llm_route_intent(text: str, llm) -> Optional[str]:
             "判断规则：\n"
             "- **无关话题/闲聊/寒暄性提问必须归 non_teaching**，绝不能因含名词（如'天气'）就当 teach——那是答非所问\n"
             "- 只有学生明确表达'想学/讲讲/什么是'某学科概念时才算 teach\n"
+            "【端点语义优先级（v0.34 ⭐）】\n"
+            "- 若调用方传入 endpoint_hint=\"teach_stream\"，表示已通过前端模式开关选定教学模式。\n"
+            "- 此模式下，仅当用户表达明确属于下列子意图时才返回非 teach：\n"
+            "  * affection：情绪宣泄（'我很焦虑'）\n"
+            "  * method：方法论咨询（'怎么学好物理'）\n"
+            "  * knowledge：知识库查询（'查一下课本第 X 章'）\n"
+            "  * greeting/meta：界面/元问题（'换皮肤''你是谁'）\n"
+            "- 普通概念提问（'什么是熵'、'解释牛顿第二定律'）即使形式像聊天，也必须返回 teach。\n"
             "只输出一个词：teach/answer/affection/knowledge/method/problem/meta/greeting/non_teaching。不要多余文字。"
         )
-        r = _safe_chat(llm, _sys, str(text)[:200], max_tokens=20)
+        _user = str(text)[:200]
+        # v0.34 ⭐ 端点语义锚点注入（支持 context 时透传 endpoint_hint）
+        try:
+            r = _safe_chat(llm, _sys, _user, max_tokens=20, context={"endpoint_hint": "teach_stream"})
+        except TypeError:
+            # _safe_chat 不支持 context 参数时回退原签名
+            r = _safe_chat(llm, _sys, _user, max_tokens=20)
         if r:
             intent = r.strip().lower()
             valid = ("teach", "answer", "affection", "knowledge", "method", "problem", "meta", "greeting", "non_teaching")
@@ -343,7 +367,7 @@ def _llm_route_intent(text: str, llm) -> Optional[str]:
 
 
 def route(text: str, learner=None, session=None, llm=None,
-          fallback_to_teach: bool = False) -> dict:
+          fallback_to_teach: bool = False, endpoint_hint: Optional[str] = None) -> dict:
     """v0.24：集中路由决策器 —— 替代 server.py 中的 if/elif 链。
 
     依次按优先级评估现有 detector：
@@ -364,6 +388,8 @@ def route(text: str, learner=None, session=None, llm=None,
         llm: LLM 实例，传给 is_teaching_intent。
         fallback_to_teach: 当 LLM 不可用或异常时，is_teaching_intent 是否返回 True。
             route() 默认 False —— 不再静默按教学处理，记录 warn 日志。
+        endpoint_hint: v0.34 ⭐ 端点语义提示（如 "teach_stream"），用于上下文锚定。
+            当前主要在 prompt 中体现；调用方应自行兜底（避免被 LLM 误判绕过）。
 
     Returns:
         dict 形如
@@ -373,6 +399,7 @@ def route(text: str, learner=None, session=None, llm=None,
               "reason": str,
               "raw": dict,         # 命中的 detector 反馈 + 后备
               "fallback_to_teach": bool,  # 透传给 is_teaching_intent
+              "endpoint_hint": Optional[str],  # v0.34 端点语义提示
             }
     """
     t = (text or "").strip()
@@ -383,6 +410,7 @@ def route(text: str, learner=None, session=None, llm=None,
             "reason": "空输入",
             "raw": {"empty": True},
             "fallback_to_teach": fallback_to_teach,
+            "endpoint_hint": endpoint_hint,
         }
 
     raw = {}
@@ -392,7 +420,8 @@ def route(text: str, learner=None, session=None, llm=None,
         if is_affection_expression(t):
             return {"type": "affection", "confidence": 0.95,
                     "reason": "情绪/心理/人生困惑模式命中", "raw": {**raw, "detector": "is_affection_expression"},
-                    "fallback_to_teach": fallback_to_teach}
+                    "fallback_to_teach": fallback_to_teach,
+                    "endpoint_hint": endpoint_hint}
     except Exception as _e:
         raw["affection_error"] = str(_e)
 
@@ -401,7 +430,8 @@ def route(text: str, learner=None, session=None, llm=None,
         if is_intent_with_material(t):
             return {"type": "composite", "confidence": 0.9,
                     "reason": "复合输入（指令+资料）命中", "raw": {**raw, "detector": "is_intent_with_material"},
-                    "fallback_to_teach": fallback_to_teach}
+                    "fallback_to_teach": fallback_to_teach,
+                    "endpoint_hint": endpoint_hint}
     except Exception as _e:
         raw["composite_error"] = str(_e)
 
@@ -410,7 +440,8 @@ def route(text: str, learner=None, session=None, llm=None,
         if is_meta_question(t):
             return {"type": "meta", "confidence": 0.9,
                     "reason": "元问题模式命中", "raw": {**raw, "detector": "is_meta_question"},
-                    "fallback_to_teach": fallback_to_teach}
+                    "fallback_to_teach": fallback_to_teach,
+                    "endpoint_hint": endpoint_hint}
     except Exception as _e:
         raw["meta_error"] = str(_e)
 
@@ -419,7 +450,8 @@ def route(text: str, learner=None, session=None, llm=None,
         if is_greeting(t):
             return {"type": "greeting", "confidence": 0.95,
                     "reason": "寒暄模式命中", "raw": {**raw, "detector": "is_greeting"},
-                    "fallback_to_teach": fallback_to_teach}
+                    "fallback_to_teach": fallback_to_teach,
+                    "endpoint_hint": endpoint_hint}
     except Exception as _e:
         raw["greeting_error"] = str(_e)
 
@@ -428,7 +460,8 @@ def route(text: str, learner=None, session=None, llm=None,
         if is_knowledge_query(t):
             return {"type": "knowledge", "confidence": 0.9,
                     "reason": "知识库查询模式命中", "raw": {**raw, "detector": "is_knowledge_query"},
-                    "fallback_to_teach": fallback_to_teach}
+                    "fallback_to_teach": fallback_to_teach,
+                    "endpoint_hint": endpoint_hint}
     except Exception as _e:
         raw["knowledge_error"] = str(_e)
 
@@ -437,7 +470,8 @@ def route(text: str, learner=None, session=None, llm=None,
         if is_method_advice(t):
             return {"type": "method", "confidence": 0.85,
                     "reason": "学习方法咨询模式命中", "raw": {**raw, "detector": "is_method_advice"},
-                    "fallback_to_teach": fallback_to_teach}
+                    "fallback_to_teach": fallback_to_teach,
+                    "endpoint_hint": endpoint_hint}
     except Exception as _e:
         raw["method_error"] = str(_e)
 
@@ -446,7 +480,8 @@ def route(text: str, learner=None, session=None, llm=None,
         if is_problem_request(t):
             return {"type": "problem", "confidence": 0.85,
                     "reason": "出题意图模式命中", "raw": {**raw, "detector": "is_problem_request"},
-                    "fallback_to_teach": fallback_to_teach}
+                    "fallback_to_teach": fallback_to_teach,
+                    "endpoint_hint": endpoint_hint}
     except Exception as _e:
         raw["problem_error"] = str(_e)
 
@@ -461,7 +496,8 @@ def route(text: str, learner=None, session=None, llm=None,
                 return {"type": _llm_intent, "confidence": 0.8,
                         "reason": f"LLM 综合意图判断为 {_llm_intent}（规则未命中，LLM 语义理解）",
                         "raw": {**raw, "detector": "_llm_route_intent"},
-                        "fallback_to_teach": fallback_to_teach}
+                        "fallback_to_teach": fallback_to_teach,
+                    "endpoint_hint": endpoint_hint}
     except Exception as _e:
         raw["llm_route_error"] = str(_e)
 
@@ -470,12 +506,14 @@ def route(text: str, learner=None, session=None, llm=None,
         if is_teaching_intent(t, llm=llm, fallback_to_teach=fallback_to_teach):
             return {"type": "teaching", "confidence": 0.6,
                     "reason": "LLM 意图判断为教学意图", "raw": {**raw, "detector": "is_teaching_intent"},
-                    "fallback_to_teach": fallback_to_teach}
+                    "fallback_to_teach": fallback_to_teach,
+                    "endpoint_hint": endpoint_hint}
         else:
             # LLM 明确非教学意图 → 直接 non_teaching（不再 fallback 教学）
             return {"type": "non_teaching", "confidence": 0.7,
                     "reason": "LLM 意图判断为非教学意图", "raw": {**raw, "detector": "is_teaching_intent"},
-                    "fallback_to_teach": fallback_to_teach}
+                    "fallback_to_teach": fallback_to_teach,
+                    "endpoint_hint": endpoint_hint}
     except Exception as _e:
         raw["teaching_error"] = str(_e)
         # route() 自己兜底：若调用方愿意降级为教学，返回 teaching；
@@ -484,11 +522,13 @@ def route(text: str, learner=None, session=None, llm=None,
             return {"type": "teaching", "confidence": 0.3,
                     "reason": f"LLM 异常且 fallback_to_teach=True: {_e}",
                     "raw": {**raw, "detector": "fallback"},
-                    "fallback_to_teach": True}
+                    "fallback_to_teach": True,
+                    "endpoint_hint": endpoint_hint}
         return {"type": "non_teaching", "confidence": 0.3,
                 "reason": f"LLM 异常且 fallback_to_teach=False: {_e}",
                 "raw": {**raw, "detector": "fallback"},
-                "fallback_to_teach": False}
+                "fallback_to_teach": False,
+                "endpoint_hint": endpoint_hint}
 
 
 # v0.21.9：复合输入检测——"指令 + 资源"（用户给指令让处理一段资料）
