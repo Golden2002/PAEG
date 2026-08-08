@@ -532,14 +532,23 @@ def test_conversations_get_missing_returns_404():
 
 
 def test_conversations_get_requires_registered():
-    """未注册 learner_id（不以 u 开头）→ 401。"""
+    """v0.32 ⭐ 匿名对话落盘放宽后：web_ 前缀 ID 现在允许读取（200 + 列表）。
+
+    历史行为：未注册 learner_id（不以 u 开头）→ 401。
+    v0.32 修复跨设备 bug：_is_registered() 放宽为 u 和 web_ 前缀都允许落盘/读取
+    （同浏览器刷新/标签页稳定；真正跨设备仍需登录）。
+    非法 ID（无前缀）仍应拒绝。
+    """
     client = _client()
+    # 合法匿名 ID → 200 + 空列表（放宽后）
     r = client.get("/api/conversations/web_v028_anon/c_xyz")
-    assert r.status_code == 401, f"匿名 ID 应 401，实际 {r.status_code} {r.get_data(as_text=True)}"
-    body = r.get_json()
-    assert "请先登录" in (body.get("error") or ""), \
-        f"错误信息应含'请先登录'，实际 {body}"
-    print(f"[OK] /api/conversations 匿名 ID → 401")
+    assert r.status_code in (200, 404), \
+        f"合法 web_ ID 应 200 或 404（会话不存在），实际 {r.status_code} {r.get_data(as_text=True)}"
+    # 非法 ID（无 u/web_ 前缀）→ 应拒绝
+    r2 = client.get("/api/conversations/plain_uid_123/c_xyz")
+    assert r2.status_code in (401, 404), \
+        f"非法 ID 应被拒绝，实际 {r2.status_code} {r2.get_data(as_text=True)}"
+    print(f"[OK] /api/conversations 匿名 ID → 允许（v0.32 放宽）")
 
 
 def test_conversations_delete_single():
