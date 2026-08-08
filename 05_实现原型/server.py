@@ -2093,6 +2093,36 @@ def upload_avatar():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/voice/tts", methods=["POST"])
+@require_module("voice")
+def voice_tts():
+    """v0.36 ⭐ 文本转语音（edge-tts，免 key）。请求 {text, learner_id} → {url}"""
+    data = request.get_json(force=True) or {}
+    text = (data.get("text") or "").strip()[:2000]
+    learner_id = data.get("learner_id") or "anon"
+    if not text:
+        return jsonify({"ok": False, "error": "空文本"}), 400
+    from voice_service import tts_synthesize, voice_available
+    if not voice_available():
+        return jsonify({"ok": False, "error": "语音暂不可用（edge-tts 未安装）"}), 503
+    url = tts_synthesize(text, learner_id=learner_id)
+    if url:
+        return jsonify({"ok": True, "url": url})
+    return jsonify({"ok": False, "error": "语音合成失败"}), 500
+
+
+@app.route("/api/voice/stt", methods=["POST"])
+@require_module("voice")
+def voice_stt():
+    """v0.36 ⭐ 语音转文本契约（v1 由浏览器 Web Speech API 完成）。
+    保留端点供未来 v2 provider 替换（讯飞/Azure）。"""
+    from voice_service import stt_transcribe
+    f = request.files.get("audio")
+    if f:
+        return jsonify(stt_transcribe(f.read()))
+    return jsonify({"ok": False, "hint": "v1 语音识别由浏览器 Web Speech API 完成（前端）", "text": ""}), 200
+
+
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
     """提供上传文件的访问。"""
