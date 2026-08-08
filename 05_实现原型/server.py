@@ -1908,6 +1908,19 @@ def knowledge_search():
     return jsonify({"results": results[:20]})
 
 
+# ---------------------------------------------------------------------------
+# v0.36 ⭐ P0-04：查资料聚合端点（解锁前端 resource-btn UI）
+# 聚合 ResourceLibrarian：知识库(KB) + Library 个人资料库(lib) + 互联网检索(web)
+# 返回 {"sources":[{title,url,snippet,type}], scope, keywords, ppt_outline}
+# - type 取值: kb | md | pdf | docx | web（前端 rc-badge 按 type 着色）
+# - 网络检索失败 → 内部 try/except 降级（不抛 500）
+# - 前端 resource-btn + renderResourceCards 期望的契约
+# ---------------------------------------------------------------------------
+# v0.36 清理：此处的 /api/resources 简化版（resources()）被下方 resource_lookup()
+# （L2338，v0.26 完整版，含 for_ppt PPT 联动）同路径覆盖——Flask 后者生效，
+# 前者 70 行为死代码，已删除。保留 resource_lookup() 为唯一实现。
+
+
 @app.route("/api/skills", methods=["GET"])
 def skills_list():
     """v0.24 修复 2：列出全部技能节点（统一以 SkillRegistry 为准，向下兼容 kb.skills）。
@@ -2037,7 +2050,7 @@ def upload_file():
 
 @app.route("/api/avatar", methods=["POST"])
 def upload_avatar():
-    """v0.26 ⭐ 用户自定义头像上传。
+    """v0.26 ⭐ 用户自定义头像上传 + v0.36 P0-03 错误响应加 ok:False（前端 `!j.ok` 双重校验更稳）。
 
     请求：multipart/form-data, avatar(图片) + learner_id
     响应：{"ok": True, "url": "/uploads/avatar/<learner_id>.<ext>"}
@@ -2047,14 +2060,14 @@ def upload_avatar():
     from datetime import datetime as _dt
     learner_id = (request.form.get("learner_id") or "anonymous").strip()
     if not learner_id or learner_id in (".", "..") or "/" in learner_id or "\\" in learner_id:
-        return jsonify({"error": "非法用户标识"}), 400
+        return jsonify({"ok": False, "error": "非法用户标识"}), 400
     f = request.files.get("avatar")
     if not f or not f.filename:
-        return jsonify({"error": "no avatar file"}), 400
+        return jsonify({"ok": False, "error": "no avatar file"}), 400
     ext = _os.path.splitext(f.filename)[1].lower()
     allowed = (".png", ".jpg", ".jpeg", ".gif", ".webp")
     if ext not in allowed:
-        return jsonify({"error": f"头像仅支持 {'/'.join(allowed)}"}), 400
+        return jsonify({"ok": False, "error": f"头像仅支持 {'/'.join(allowed)}"}), 400
     try:
         base = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
                              'uploads', 'avatar')
@@ -2074,7 +2087,7 @@ def upload_avatar():
         from urllib.parse import quote
         return jsonify({"ok": True, "url": f"/uploads/avatar/{quote(fname)}"})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/uploads/<path:filename>")
@@ -3541,6 +3554,11 @@ def _handle_method_advice(learner, concept, subject):
         subject_cn = subject
     desc = getattr(learner, "self_description", "") or ""
     desc_line = f"学生的自述：{desc.strip()}\n" if desc.strip() else ""
+    # v0.36 ⭐ P0-08 ContextBundle 接线：补 BDI/user_model/完整画像段注入
+    # （之前 method 端点只有 self_description，缺对象意识与掌握度——LLM 给学习方法时不知学生水平）
+    # 复用现有 helper _build_learner_ctx_str（与 _handle_knowledge_query L3564 同源）
+    # 异常时 helper 返回 ""，不破坏原逻辑
+    _learner_ctx = _build_learner_ctx_str(learner)
 
     system = (
         "你是 Émile Novis，一位既懂学科又懂学习的老师。学生问的是'如何学习{subject}'这类方法问题。\n"
@@ -3553,6 +3571,8 @@ def _handle_method_advice(learner, concept, subject):
         "5. 语气像一位耐心的老师，不列'步骤1/2/3'，用自然的讲义式叙述\n"
         "不需要出题，不需要讲具体知识点，就谈'怎么学'。"
     ).format(subject=subject_cn, grade=grade_cn)
+    if _learner_ctx:
+        system = f"【学生画像与对象意识】\n{_learner_ctx}\n\n" + system
 
     user = f"学生问：{concept}\n{desc_line}请给出{subject_cn}的学习方法建议。"
     answer = _safe_chat(llm, system, user, max_tokens=1400)
@@ -3778,6 +3798,10 @@ def _handle_problem_request(learner, concept, subject):
     # 画像（薄弱点/目标）
     desc = getattr(learner, "self_description", "") or ""
     desc_line = f"学生自述：{desc.strip()}\n" if desc.strip() else ""
+    # v0.36 ⭐ P0-08 ContextBundle 接线：补 BDI/user_model/完整画像段注入
+    # （之前 problem 端点只有 self_description，缺对象意识与掌握度——LLM 出题时不知学生薄弱点）
+    # 复用现有 helper _build_learner_ctx_str（与 _handle_knowledge_query L3564 同源）
+    _learner_ctx = _build_learner_ctx_str(learner)
 
     system = (
         "你是一位有多年命题经验、深知考试评分标准的{grade}{subject}老师（Émile Novis）。\n"
@@ -3789,6 +3813,8 @@ def _handle_problem_request(learner, concept, subject):
         "5. 如果学生自述了薄弱点，优先出一道针对薄弱点的题\n"
         "语言朴素准确，不列'步骤1/2/3'，用自然段落。公式用 $...$ 或 $$...$$。"
     ).format(grade=grade_cn, subject=subject_cn)
+    if _learner_ctx:
+        system = f"【学生画像与对象意识】\n{_learner_ctx}\n\n" + system
 
     user = (
         f"请给我一道{grade_cn}{subject_cn}经典题目。\n"
