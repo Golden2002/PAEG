@@ -3134,6 +3134,56 @@ readers.py（多格式全文提取 md/txt/pdf/docx/csv/json）
 - **整体**：5 轮 64 项，63 通过（98.4%），唯一失败为测试脚本问题而非产品缺陷
 - **同时**：pytest **195 passed**（140 + 55 P0 新增）、arch_check 100%、adv 越权修复验证通过
 
+### 10.2.13 ⭐ v0.32 测试盲区反思 + 优化测试架构（学段×学科矩阵 bug 复盘）
+
+> **触发**：用户报告"跨学段教学对话"bug（选本科仍按高中输出，语言学反复"需切换学段"）。
+> 反思：为何 195 测试 + 5 轮综合测试都没测出？——**不是漏测，是测试架构主动绕开了 bug**。
+
+#### 一、5 大测试盲区（含证据）
+
+| # | 盲区 | 证据（文件:行） |
+|---|---|---|
+| 1 | **HTTP 层未覆盖**：tests/ 22 个文件 0 个调 `/api/teach/stream` | test_v028_endpoints.py 664 行 grep `teach_stream` 0 匹配 |
+| 2 | **`_uid()` 主动回避状态残留**：学段联动测试用不同 uid 测高中/本科 | stress_eval_v25.py:155 注释"用不同 uid 避免画像残留"——作者明知状态残留，却回避而非覆盖 |
+| 3 | **弱断言骗过检测**：`len(r) > 150` 让 280 字 grade_blocked 提示通过 | stress_eval_v26.py:253 `(hit or len(r) > 150) and len(r) > 20` |
+| 4 | **关键词子串误判**："学段"/"本科"在正常回答和拦截提示中都出现 | stress_eval_v25.py:160 `"学段" in r or "本科" in r` |
+| 5 | **缺矩阵化**：无 [3 学段] × [学科子节点] × [多轮切换] 笛卡尔积 | subjects_ext.py:295-378 linguistics 6 节点跨 3 学段，无测试验证 |
+
+**根因总结**：测试设计了"单请求 × 新 uid × 长度断言"的组合，恰好**避开**了"同 uid 多轮 + 状态缓存 + 字段级断言"这一 bug 触发路径。
+
+#### 二、优化后的测试架构原则（v0.32 强制执行）
+
+1. **HTTP 层覆盖**：核心教学端点必须走 Flask test_client 真实调用（不再只测内部函数）
+2. **同 uid 多轮**：学段/学科切换测试必须复用同一 learner_id，暴露 SESSIONS 缓存问题
+3. **字段级断言**：解析 SSE done 事件的 `grade_blocked`/`required_grade` 字段，禁止 `len()>N` 弱断言
+4. **矩阵笛卡尔积**：学段 × 学科子节点 × 多轮切换的完整组合
+5. **正反双向**：既断言"切到本科应正常"，也断言"拦截逻辑本身有效"
+
+#### 三、新测试：tests/test_v032_grade_subject_matrix.py（5 个测试）
+
+| 测试 | 覆盖 | 验证点 |
+|---|---|---|
+| test_same_uid_grade_switch_reaches_undergraduate | 同 uid 高中→本科切换 | **缓存同步**（历史 bug 本体） |
+| test_grade_switch_actually_changes_backend_state | 后端 SESSIONS 状态 | 请求后 profile.grade_level 已更新 |
+| test_matrix_all_grades_linguistics_no_grade_blocked | 3学段×3节点 | 方案A学科级放行 |
+| test_atmospheric_science_cross_grade | 大气科学同款修复 | 跨学段节点不拦截 |
+| test_alternating_grade_switches_stay_consistent | 高中↔本科交替 | 状态不漂移 |
+
+**RED→GREEN 证据**：修复前 4 failed / 修复后 5 passed。测试总 195 → 200。
+
+#### 四、v0.32 同时修复的 2 个 bug
+
+**Bug 1 学段缓存不一致**（Oracle 方案 A）：
+- server.py 新增 `_hydrate_learner()`：每次请求同步 grade_level 到 SESSIONS 缓存（9 端点）
+- prompts.py SUBJECT_GRADES：linguistics/atmospheric_science 从本科-only 改为跨学段（与知识库分层一致——知识库本有中学/高中节点，配置滞后误拦）
+- 前端：移除 `gradeSel.value = required_grade` 强制覆盖（改为提示+手动）；grade-select change 时 PUT /api/profile 同步
+
+**Bug 2 跨设备数据丢失**：
+- `_is_registered()` 放宽：`web_` 前缀匿名对话也可落盘/读取（同浏览器刷新/标签页稳定）
+- 9 处内联 `startswith('u')` 守卫统一为 `_is_registered()`（对话落盘）；画像持久化保持 u-only
+- 路径安全：仅允许 `[u|web_][A-Za-z0-9_-]`，防目录穿越
+- **注意**：真正跨设备恢复仍需**登录**（u 前缀绑定 users_data）；匿名放宽只解决同浏览器场景
+
 ## 10.3 版本历史
 
 > 完整修改日志已拆分至独立文档：**[CHANGELOG.md](./CHANGELOG.md)**（v0.1 → v0.21.4 全部记录）。
