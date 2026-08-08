@@ -1017,6 +1017,7 @@ body {
         <img class="upload-btn-icon" src="assets/icons/book-open.svg" alt="资料" />
       </label>
       <button class="ask-btn" id="ask-btn">发送</button>
+      <button class="stop-gen-btn" id="stop-gen-btn" title="停止生成" style="display:none;border:none;background:#e5484d;color:#fff;border-radius:8px;padding:9px 14px;font-size:13px;cursor:pointer;flex-shrink:0;transition:opacity .2s" onclick="window._genAbort && window._genAbort.abort()">■ 停止</button>
     </div>
 
     <div class="subject-chips">
@@ -1858,6 +1859,19 @@ function updateStats() {
 async function teach(question, subject, subtopic) {
   const thinking = addThinking('teach');
   askBtn.disabled = true;
+  // v0.27 ⭐ 需求：生成中可打断——AbortController + 打断按钮
+  if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
+  const controller = new AbortController();
+  window._genAbort = controller;
+  window._showStopBtn = () => {
+    const stopBtn = document.getElementById('stop-gen-btn');
+    if (stopBtn) stopBtn.style.display = '';
+  };
+  window._hideStopBtn = () => {
+    const stopBtn = document.getElementById('stop-gen-btn');
+    if (stopBtn) stopBtn.style.display = 'none';
+  };
+  window._showStopBtn();
   try {
     const resp = await fetch(API_BASE + '/api/teach/stream', {
       method: 'POST',
@@ -1870,6 +1884,7 @@ async function teach(question, subject, subtopic) {
         subtopic: subtopic || '',
         concept: question,
       }),
+      signal: controller.signal,
     });
     if (!resp.ok) throw new Error(`API ${resp.status}`);
     const reader = resp.body.getReader();
@@ -1992,9 +2007,20 @@ async function teach(question, subject, subtopic) {
     loadMetaLog();
   } catch (e) {
     removeThinking(thinking);
-    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    // v0.27 ⭐ 打断（AbortError）→ 友好提示，不显示"出错了"
+    if (e && (e.name === 'AbortError' || (e.message || '').includes('abort'))) {
+      addMsg('paeg', '<small>已停止生成。你可以继续提问，我会接着聊。</small>');
+      if (mainBubble && allText) {
+        const contentDiv = mainBubble.querySelector('.md-content');
+        if (contentDiv && !contentDiv.textContent.trim()) contentDiv.remove();
+      }
+    } else {
+      addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    }
   } finally {
     askBtn.disabled = false;
+    try { window._hideStopBtn && window._hideStopBtn(); } catch(e2){}
+    window._genAbort = null;
     loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
   }
 }
@@ -2044,6 +2070,11 @@ function renderStepBubble(bubble, text, idx) {
 async function generalChat(text) {
   const thinking = addThinking('chat');
   askBtn.disabled = true;
+  // v0.27 ⭐ 需求：生成中可打断
+  if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
+  const controller = new AbortController();
+  window._genAbort = controller;
+  try { document.getElementById('stop-gen-btn').style.display = ''; } catch(e){}
   // 流式消息气泡（累积显示）
   const bubble = document.createElement('div');
   bubble.className = 'msg paeg';
@@ -2062,6 +2093,7 @@ async function generalChat(text) {
         grade_level: document.getElementById('grade-select').value,
         text: text,
       }),
+      signal: controller.signal,
     });
     if (!resp.ok) throw new Error(`API ${resp.status}`);
     const reader = resp.body.getReader();
@@ -2160,9 +2192,16 @@ async function generalChat(text) {
   } catch (e) {
     clearInterval(timeoutTimer);
     removeThinking(thinking);
-    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    // v0.27 ⭐ 打断（AbortError）→ 友好提示
+    if (e && (e.name === 'AbortError' || (e.message || '').includes('abort'))) {
+      addMsg('paeg', '<small>已停止生成。你可以继续输入，我会接着聊。</small>');
+    } else {
+      addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    }
   } finally {
     askBtn.disabled = false;
+    try { document.getElementById('stop-gen-btn').style.display = 'none'; } catch(e2){}
+    window._genAbort = null;
     loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
   }
 }
@@ -2891,6 +2930,13 @@ function renderResourceCards(payload, question) {
 
   // 标题行：检索完成 + 来源说明
   const scopeText = { kb: '知识库', library: '个人资料库', web: '互联网', all: '知识库 + 资料库 + 互联网' }[scope] || scope;
+  // v0.27 ⭐ 需求：联网检索徽章——sources 含 web 来源时显示"已完成网络检索"
+  const hasWeb = Array.isArray(sources) && sources.some(s => s.type === 'web');
+  const hasKb = Array.isArray(sources) && sources.some(s => s.type === 'kb' || s.type === 'md' || s.type === 'pdf' || s.type === 'docx');
+  const badgesHtml = [
+    (hasKb ? `<span class="retrieval-badge" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);background:var(--accent-soft);border-radius:6px;padding:2px 8px;margin-right:6px;margin-bottom:4px"><span style="color:var(--accent)">✓</span>已完成知识库检索</span>` : ''),
+    (hasWeb ? `<span class="retrieval-badge" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);background:var(--accent-soft);border-radius:6px;padding:2px 8px;margin-right:6px;margin-bottom:4px"><span style="color:var(--accent)">✓</span>已完成网络检索</span>` : ''),
+  ].join('');
   const kwLine = keywords.length
     ? `<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px">关键词：${escapeHtml(keywords.join('、'))}</div>`
     : '';
@@ -2941,6 +2987,7 @@ function renderResourceCards(payload, question) {
       <span style="font-weight:600;color:var(--text)">检索完成</span>
       <span style="font-size:12px;color:var(--text-dim)">来源：${escapeHtml(scopeText)} · 共 ${sources.length} 条</span>
     </div>
+    <div style="margin-bottom:6px">${badgesHtml}</div>
     ${kwLine}
     <div class="resource-list">${cardsHtml}</div>
     ${pptBtnHtml}`;
