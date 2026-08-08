@@ -2069,6 +2069,34 @@ Flask 写的本地 Web 服务，**同时提供网页和 API**。默认监听 `0.
 | P2-4 ✅ | **表单 label**：输入框/textarea 用 `aria-label` 补语义 | A10 | 901–904/926 | ⏳ |
 | P2-5 ✅ | **Toast 去重**：防止同消息堆叠（若存在） | A11 | JS | ⏳ |
 
+### 5.7 ⭐ 全局断点审计 + 停止按钮修复（v0.31）
+
+#### 一、全项目断点清单（explore 全量扫描）
+
+| # | 断点 | 类型 | 关键规则 |
+|---|---|---|---|
+| M1 | prefers-color-scheme: dark | 系统 | `:root:not([data-theme=light])` 深色 token |
+| M2/M8 | prefers-reduced-motion | 系统 | 动画降级（spinner/skeleton） |
+| M3 | ≤1280px | 宽度 | .main padding 16px；.mode-switch wrap 320px |
+| M4 | ≤1024px | 宽度 | .msg 94%；**.input-bar 换行（P2-7 新增）** |
+| M5 | ≤960px | 宽度 | **双栏→单栏**；sidebar wrap |
+| M6 | ≤768px | 宽度 | topbar 紧凑；input-bar 换行；ask-btn 全宽 |
+| M7 | ≤480px | 宽度 | mode-switch grid 2列；msg 100% |
+
+**覆盖缺口（已修复）**：769–1024px 区间原无 input-bar/ask-btn 规则 → 单行 flex 溢出。P2-7 将换行阈值上提到 1024px，实测 769px 无溢出。
+
+**固定宽度风险点**：.main 300px+1fr（960px 切单栏）、3 select min-width 336px、ask-btn flex-shrink:0（已加 min-width:88px）。
+
+#### 二、停止按钮修复（P2-6，用户报告）
+
+| 问题 | 根因 | 修复 |
+|---|---|---|
+| 透明度 60% | teach() 设 disabled + `.ask-btn:disabled{opacity:.6}` | `.ask-btn[data-generating="1"]{opacity:1}` |
+| 宽度超出布局 | "■ 停止"比"发送"宽 + flex-shrink:0 + 769–960 无断点 | min-width:88px + 生成态紧凑 padding + 1024px 断点换行 |
+| 硬编码色 | JS `style.background='#e5484d'` | 删除 JS 内联色 → CSS `var(--danger)` gradient，深浅色自动适配 |
+
+**验证**：900px/769px 实测——停止按钮 opacity 1、宽 88px、无横向溢出；教学回答正常、停止按钮恢复"发送"。
+
 ---
 
 # 6. 网络与公网部署
