@@ -18,3 +18,8 @@ Library/**/*.doc
 # 系统
 .DS_Store
 Thumbs.db
+
+# 敏感数据不上传
+05_实现原型/users.json
+05_实现原型/users_data/
+05_实现原型/uploads/
