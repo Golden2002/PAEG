@@ -1017,7 +1017,6 @@ body {
         <img class="upload-btn-icon" src="assets/icons/book-open.svg" alt="资料" />
       </label>
       <button class="ask-btn" id="ask-btn">发送</button>
-      <button class="stop-gen-btn" id="stop-gen-btn" title="停止生成" style="display:none;border:none;background:#e5484d;color:#fff;border-radius:8px;padding:9px 14px;font-size:13px;cursor:pointer;flex-shrink:0;transition:opacity .2s" onclick="window._genAbort && window._genAbort.abort()">■ 停止</button>
     </div>
 
     <div class="subject-chips">
@@ -1859,17 +1858,27 @@ function updateStats() {
 async function teach(question, subject, subtopic) {
   const thinking = addThinking('teach');
   askBtn.disabled = true;
-  // v0.27 ⭐ 需求：生成中可打断——AbortController + 打断按钮
+  // v0.27 ⭐ 需求：生成中可打断——发送按钮变为"■ 停止"，点击停止
   if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
   const controller = new AbortController();
   window._genAbort = controller;
   window._showStopBtn = () => {
-    const stopBtn = document.getElementById('stop-gen-btn');
-    if (stopBtn) stopBtn.style.display = '';
+    try {
+      const ab = document.getElementById('ask-btn');
+      ab.textContent = '■ 停止';
+      ab.style.background = '#e5484d';
+      ab.style.color = '#fff';
+      ab.dataset.generating = '1';
+    } catch(e){}
   };
   window._hideStopBtn = () => {
-    const stopBtn = document.getElementById('stop-gen-btn');
-    if (stopBtn) stopBtn.style.display = 'none';
+    try {
+      const ab = document.getElementById('ask-btn');
+      ab.textContent = '发送';
+      ab.style.background = '';
+      ab.style.color = '';
+      delete ab.dataset.generating;
+    } catch(e){}
   };
   window._showStopBtn();
   try {
@@ -2070,11 +2079,17 @@ function renderStepBubble(bubble, text, idx) {
 async function generalChat(text) {
   const thinking = addThinking('chat');
   askBtn.disabled = true;
-  // v0.27 ⭐ 需求：生成中可打断
+  // v0.27 ⭐ 需求：生成中可打断——发送按钮变为"■ 停止"
   if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
   const controller = new AbortController();
   window._genAbort = controller;
-  try { document.getElementById('stop-gen-btn').style.display = ''; } catch(e){}
+  try {
+    const ab = document.getElementById('ask-btn');
+    ab.textContent = '■ 停止';
+    ab.style.background = '#e5484d';
+    ab.style.color = '#fff';
+    ab.dataset.generating = '1';
+  } catch(e){}
   // 流式消息气泡（累积显示）
   const bubble = document.createElement('div');
   bubble.className = 'msg paeg';
@@ -2200,7 +2215,13 @@ async function generalChat(text) {
     }
   } finally {
     askBtn.disabled = false;
-    try { document.getElementById('stop-gen-btn').style.display = 'none'; } catch(e2){}
+    try {
+      const ab = document.getElementById('ask-btn');
+      ab.textContent = '发送';
+      ab.style.background = '';
+      ab.style.color = '';
+      delete ab.dataset.generating;
+    } catch(e2){}
     window._genAbort = null;
     loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
   }
