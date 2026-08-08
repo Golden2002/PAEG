@@ -366,6 +366,10 @@ def run_agent_loop(model, system: str, user_input: str,
     tool_defs = get_all_tool_defs() if include_skills else get_tool_defs()
     calls_log: List[Dict[str, Any]] = []
 
+    # v0.32 ⭐ 辅助：检测本轮是否调用了 web_search——供前端 badge 区分"知识库检索/网络检索"
+    def _web_searched_flag() -> bool:
+        return any(c.get("name") == "web_search" for c in calls_log)
+
     for _ in range(max_iterations):
         try:
             resp = model.chat(
@@ -377,18 +381,21 @@ def run_agent_loop(model, system: str, user_input: str,
                 tool_choice="auto",
             )
         except Exception as e:
-            return {"answer": f"（模型调用失败: {e}）", "tool_calls": calls_log}
+            return {"answer": f"（模型调用失败: {e}）", "tool_calls": calls_log,
+                    "web_searched": _web_searched_flag()}
 
         # 若返回的是工具调用 JSON
         if resp.strip().startswith('{"tool_calls"'):
             try:
                 data = json.loads(resp)
             except json.JSONDecodeError:
-                return {"answer": resp, "tool_calls": calls_log}
+                return {"answer": resp, "tool_calls": calls_log,
+                        "web_searched": _web_searched_flag()}
 
             tool_calls = data.get("tool_calls", [])
             if not tool_calls:
-                return {"answer": resp, "tool_calls": calls_log}
+                return {"answer": resp, "tool_calls": calls_log,
+                        "web_searched": _web_searched_flag()}
 
             # 执行所有工具调用并回传
             assistant_msg = {"role": "assistant", "content": None,
@@ -415,10 +422,11 @@ def run_agent_loop(model, system: str, user_input: str,
             continue  # 下一轮让模型基于工具结果回答
 
         # 正常文本回答
-        return {"answer": resp, "tool_calls": calls_log}
+        return {"answer": resp, "tool_calls": calls_log,
+                "web_searched": _web_searched_flag()}
 
     return {"answer": "（工具调用轮数超限，停止）", "tool_calls": calls_log,
-            "metrics": _tool_metrics()}
+            "metrics": _tool_metrics(), "web_searched": _web_searched_flag()}
 
 
 def _tool_metrics() -> dict:
