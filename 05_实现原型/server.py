@@ -1172,10 +1172,27 @@ def teach_stream():
 
     # v0.19.22：意向性层（流式版本）——非教学意图走一般化响应
     # v0.26 ⭐ C3-1 P0 修复：改用 meta_router.route() 集中路由（LLM 综合意图判断）
+    # v0.34 ⭐ 教学端点语义锚定：/api/teach/stream 是教学专用端点，meta_router 不应把概念提问降级为 chat
     try:
         from meta_router import route as _paeg_route
-        _route = _paeg_route(concept, learner=learner, llm=llm, fallback_to_teach=True)
-        if _route.get("type") not in ("teach", "teaching"):
+        # v0.34 ⭐：endpoint_hint 透传给 meta_router（目前 route() 未读取该 kwarg，留作未来扩展；
+        # 治本在 prompt 端点语义锚点 + 兜底在本 if 分支——三层防御确保教学请求必走完整管线）
+        _route = _paeg_route(concept, learner=learner, llm=llm, fallback_to_teach=True,
+                             endpoint_hint="teach_stream")
+        _route_type = _route.get("type")
+        # v0.34 ⭐ 兜底：仅当 LLM 明确判断为"非教学子意图"时才早退
+        # （情绪/方法论/知识库/界面/元问题/寒暄/倾诉——这些都是用户明确表达的非学科请求）
+        # 注意：chat/answer/problem 不在此列——LLM 把概念提问兜底为 chat 时应落入
+        # 下方 else 分支，由"端点语义 + 有效学科"强制教学（Oracle 方案 C 三层防御）
+        _NON_TEACH_INTENTS = {
+            "emotion", "method", "knowledge", "ui", "interface",
+            "affection", "meta", "greeting", "non_teaching",
+        }
+        if _route_type in ("teach", "teaching"):
+            # LLM 判断为教学 → 继续走完整管线（不做早退）
+            pass
+        elif _route_type in _NON_TEACH_INTENTS:
+            # LLM 明确非教学子意图 → 早退（情绪/方法论/知识库/界面/元问题/闲聊）
             from prompts import build_general_chat_system, build_general_chat_user
             from subagents import _safe_chat
             g_sys = build_general_chat_system(learner)
@@ -1188,6 +1205,35 @@ def teach_stream():
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_intent(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        else:
+            # v0.34 ⭐ 兜底二次防御：LLM 误判（返回 chat/其他不明类型）但用户显式选了具体学科
+            # → 强制教学（教学端点语义契约：进入 /api/teach/stream 即视为教学意图）
+            try:
+                from prompts import SUBJECT_GRADES as _SUBJECT_GRADES
+                _subject_valid = isinstance(subject, str) and subject in _SUBJECT_GRADES
+            except Exception:
+                _subject_valid = False
+            if _subject_valid:
+                # 覆盖路由 → 教学（endpoint_override：端点语义优先于 LLM 误判）
+                _route = {"type": "teach", "source": "endpoint_override",
+                          "reason": f"subject={subject} 在 SUBJECT_GRADES，强制教学"}
+                print(f"[PAEG][v0.34] teach_stream 端点语义兜底：LLM 误判为 {_route_type!r}，"
+                      f"但 subject={subject!r} ∈ SUBJECT_GRADES → 强制教学管线")
+                # 不早退，继续走完整管线
+            else:
+                # subject 为空/other/general/不在 SUBJECT_GRADES → 尊重 LLM 判断，走早退
+                from prompts import build_general_chat_system, build_general_chat_user
+                from subagents import _safe_chat
+                g_sys = build_general_chat_system(learner)
+                g_usr = build_general_chat_user(concept)
+                g_reply = _safe_chat(llm, g_sys, g_usr, max_tokens=700) or \
+                    f"嗯，我听着。你想聊{subject}之外的什么，我都在。"
+
+                def gen_intent():
+                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': g_reply, 'step_type': 'chat'}, ensure_ascii=False)}\n\n"
+                    yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+                return Response(gen_intent(), mimetype="text/event-stream",
+                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
         pass
 
@@ -1293,6 +1339,9 @@ def teach_stream():
 
         # v0.26 ⭐ C3-3 P0 修复：teach_stream 补 Individuality 注入 + 用户资料注入
         # （此前只有同步 paeg.teach 有——流式教学主路径缺个体化/用户资料，检视确认的断链）
+        _modeling_reflections = []  # v0.32 ⭐ meta-log 接入 LLM 建模：构造 user_modeling reflection（下方 incremental_update 写入 history）
+        _ind_res = {}  # 兜底：try 块异常时 _ind_res 不存在导致 NameError
+        from datetime import datetime as _dt  # 局部导入避免函数体内未导入
         try:
             from subagents import Individuality
             _ind_stream = Individuality()
@@ -1309,6 +1358,36 @@ def teach_stream():
                     individuality_control=_ind_control,
                     individuality_profile_prompt=_ind_profile,
                 )
+            # v0.32 ⭐ meta-log 接入 LLM 建模：把 Individuality 的 trait（学习风格/擅长/薄弱等）写入元认知日志
+            # —— meta-log 之前只记录"教学打分/自检"（agent 视角），缺 LLM 对用户建模后的判断（用户视角）
+            # —— 注：即使 trait 为空也记录一条（llm_modeled=False 标记未建模），保证 meta-log 有建模轨迹
+            try:
+                _trait_stream = _ind_res.get("trait") or {}
+                _facts_stream = _ind_res.get("facts") or []
+                _llm_modeled_stream = bool(_ind_res.get("llm_modeled"))
+                _modeling_reflections.append({
+                        "type": "user_modeling",
+                        "timestamp": _dt.now().isoformat(),
+                        "learner_id": learner.id,
+                        "concept": concept,
+                        "subject": subject,
+                        "llm_modeled": _llm_modeled_stream,
+                        "learning_style": _trait_stream.get("learning_style"),
+                        "knowledge_strengths": _trait_stream.get("knowledge_strengths", []) or [],
+                        "knowledge_gaps": _trait_stream.get("knowledge_gaps", []) or [],
+                        "emotional_tendency": _trait_stream.get("emotional_tendency"),
+                        "motivation": _trait_stream.get("motivation"),
+                        "interests": _trait_stream.get("interests", []) or [],
+                        "facts": _facts_stream,
+                        "reflection": (
+                            f"建模：风格 {_trait_stream.get('learning_style') or '未知'}, "
+                            f"擅长 {_trait_stream.get('knowledge_strengths') or '[]'}, "
+                            f"薄弱 {_trait_stream.get('knowledge_gaps') or '[]'}, "
+                            f"情绪 {_trait_stream.get('emotional_tendency') or '未知'}"
+                        ),
+                    })
+            except Exception as _me:
+                print(f"[PAEG] teach_stream meta-log 建模记录跳过: {_me}")
         except Exception as _ie:
             print(f"[PAEG] teach_stream 个体化注入跳过: {_ie}")
         try:
@@ -1340,6 +1419,10 @@ def teach_stream():
         if subtopic:
             for _st in (plan.get("steps") or []):
                 _st["subtopic"] = subtopic
+        import sys as _sys_dbg6
+        print(f"[PAEG][v0.34-DEBUG] step loop about to start: plan_keys={list(plan.keys())[:5]} "
+              f"steps_count={len(plan.get('steps') or [])}",
+              file=_sys_dbg6.stderr, flush=True)
         for i, step in enumerate(plan["steps"]):
             yield f"event: step\ndata: {json.dumps({'step_id': i + 1, 'status': 'presenting'})}\n\n"
             presentation = paeg.presenter.run(
@@ -1408,7 +1491,12 @@ def teach_stream():
 
         # 自我更新
         if paeg.self_updater:
-            paeg.self_updater.incremental_update(_FakeSession(learner, concept, subject, plan, []))
+            # v0.32 ⭐ meta-log 接入 LLM 建模：把 teach_stream 顶部构造的 _modeling_reflections
+            # 追加到 fake session.reflections，让 incremental_update 把它写入 history
+            _fs_for_meta = _FakeSession(learner, concept, subject, plan, [])
+            if _modeling_reflections:
+                _fs_for_meta.reflections.extend(_modeling_reflections)
+            paeg.self_updater.incremental_update(_fs_for_meta)
             yield f"event: self_update\ndata: {json.dumps({'history_size': len(paeg.self_updater.history)}, ensure_ascii=False)}\n\n"
 
         # 总结
@@ -2573,10 +2661,7 @@ def general_chat_stream():
                 "最终输出像一份**优秀讲义的片段**：观点明确、层次清晰、内容详实、公式用 LaTeX（$...$）、"
                 "像一位真正的好老师当面讲解，而不是搜索结果的堆砌。")
             # v0.27 ⭐ 需求：对话输出前检索状态标志（前端小徽章"已完成知识库/网络检索"）
-            try:
-                yield f"event: retrieval\ndata: {json.dumps({'done': '知识库检索'}, ensure_ascii=False)}\n\n"
-            except Exception:
-                pass
+            # v0.32：移到 run_agent_loop 之后，根据 LLM 是否真调 web_search 发"网络检索"或"知识库检索"
             # v0.19.4：把打包后的 user（含当前设定/历史/身份）传给 agent loop，
             # 修复"偏离提问"——之前传的是原始 text，LLM 收不到上下文
             # v0.20.2：同时传真 messages 历史（多轮连贯性——LLM 能记住上文）
@@ -2586,6 +2671,15 @@ def general_chat_stream():
             _ar = run_agent_loop(llm, _agent_sys, user, max_iterations=3, history=_hist_msgs)
             reply = _ar.get("answer")
             tool_log = _ar.get("tool_calls", [])
+            # v0.32 ⭐ 网络检索 badge 区分：LLM 实际调用 web_search 时前端显示"网络检索"；
+            # 未发生 web_search 则显示"知识库检索"兜底。两条互斥，只发一条
+            # （前端 insertRetrievalBadge 有 _retrievalBadgeShown 去重，但本路径本就只发一次）
+            # 此处放 run_agent_loop 之后：需要先知道是否真调了 web_search
+            try:
+                _badge_text = "网络检索" if _ar.get("web_searched") else "知识库检索"
+                yield f"event: retrieval\ndata: {json.dumps({'done': _badge_text}, ensure_ascii=False)}\n\n"
+            except Exception:
+                pass
         except Exception:
             reply = None
         if not reply or reply.startswith("（模型调用失败"):
