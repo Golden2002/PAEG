@@ -1,3 +1,9 @@
+### v0.36 语音模块（TTS/STT）
+- 🎙 新增语音交互：edge-tts 朗读回答（免key中文女声）+ 浏览器 Web Speech API 语音提问
+- 🏗 模块化：voice 模块门控（paeg_modules.json 可开关）、voice_service.py provider 抽象、纯 I/O adapter 不进 subagent 调度
+- 📚 参考项目：讯飞/Azure/edge-tts/Web Speech API（54来源）→ 技术文档 §10.2.18
+- ✅ 端到端：TTS 生成 MP3 + 缓存命中 + 路由 200 + 前端 mic/🔊 按钮
+
 ### v0.35.1 元认知日志建模评估修复（画像作为 LLM 输入）
 - 🐛 修复：元认知日志显示对话历史 → 根因是 LLM 建模缺画像输入（只有概念），trait 字段全空
 - ⭐ Individuality.run 加入画像上下文（掌握度→擅长/薄弱、认知风格→风格）；LLM 空字段画像兜底（非空不覆盖）
