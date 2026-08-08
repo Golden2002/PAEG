@@ -1,3 +1,12 @@
+### v0.35 LLM 优先意图路由 + 语言规范总纲（用户原则回归）
+- ⭐ 架构原则反转：规则优先 → LLM 优先（route_intent 14 选项 LLM 分类 + 规则降级兜底）；教学请求必走完整管线
+- ⭐ 意图选项与兜底规则函数同名（teach/knowledge/knowledge_map/recommend/method/emotion/problem/meta/greeting/material/interface/ppt/answer/chat）
+- 🐛 修复"推荐类问题答非所问"：法语学习的软件有什么推荐 → recommend 分支（联网检索+真实推荐+badge+meta-log）
+- ⭐ 语言规范总纲（L1 提示词）：句子完整/词形完整/介词/修饰/状语 7 项自查口诀；规则层补 3 条检测兜底
+- 🐛 修复模型输出不规范句（每天固定时间用/别贪多/作为主力）
+- ✅ 新增 test_v035_recommend_branch / test_v035_llm_first_routing；回归 146+ passed
+- ✅ 技术文档 §10.2.15 + 元能力文档 §6.7
+
 ### v0.34 标准化综合测试 v2.0 + 教学意图确定性修复
 - ⭐ 反思 6 大测试盲区（早退绕过管线/意图路由不稳定/契约未验证/弱断言/_uid回避/SSE未消费）→ 技术文档 §10.2.14 + 元能力文档 §6.6
 - ⭐ 测试 v2.0：契约层（6 契约字段级断言）+ 管线完整性层（7 测试，须含 diagnosis）+ SSE 捕获工具（sse_helpers.py）
