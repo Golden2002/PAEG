@@ -1093,10 +1093,34 @@ def teach_stream():
     except Exception:
         pass
 
-    # v0.19.27：界面自指涉拦截（流式版本）
+    # v0.35 ⭐ LLM 优先意图路由（用户原则：LLM 是被充分调用的主体，规则只兜底）
+    # 大模型先判断用户意图（在 14 项里选一个）；置信度 ≥0.6 时作为分支选择的第一依据
+    # ——置信度不足或 LLM 不可用时保留所有现有规则链（向后兼容）。
+    # 设计：_llm_intent is None = 完全走规则链；_llm_intent == "teach"/"answer" = 教学请求必走完整管线（核心修复）
+    _llm_intent = None
+    _llm_conf = 0.0
+    try:
+        from meta_router import route_intent as _route_intent_v035
+        _intent_res = _route_intent_v035(concept, llm=llm)
+        _llm_conf = float(_intent_res.get("confidence", 0.0) or 0.0)
+        if _llm_conf >= 0.6 and _intent_res.get("intent") in {
+            "teach", "knowledge", "knowledge_map", "recommend", "method",
+            "emotion", "problem", "meta", "greeting", "material",
+            "interface", "ppt", "answer", "chat",
+        }:
+            _llm_intent = _intent_res.get("intent")
+    except Exception as _re:
+        _llm_intent = None
+        _llm_conf = 0.0
+    # v0.35 调试：可观察一次 LLM 路由结果（不影响行为）
+    if _llm_intent is not None:
+        print(f"[PAEG][v0.35-LLM-ROUTE] intent={_llm_intent!r} conf={_llm_conf:.2f} text={concept[:40]!r}",
+              file=__import__("sys").stderr, flush=True)
+
+    # v0.19.27：界面自指涉拦截（流式版本）——v0.35 ⭐ LLM 优先（LLM 判 interface → 跳过规则）
     try:
         from self_referential import is_interface_query, handle_interface_query
-        if is_interface_query(concept):
+        if _llm_intent == "interface" or (_llm_intent is None and is_interface_query(concept)):
             _ui_reply = handle_interface_query(concept, learner)
 
             def gen_ui():
@@ -1108,10 +1132,34 @@ def teach_stream():
     except Exception:
         pass
 
+    # v0.35 ⭐ 推荐类问题优先处理（在知识库拦截之前）——"有什么推荐/推荐几本/哪个软件好"
+    # 应联网检索真实推荐，而不是清点 Library 答非所问（之前被 is_knowledge_query 误判→答"清点藏书"）。
+    # v0.35 ⭐ LLM 优先：LLM 判 recommend → 推荐分支；LLM 不可用时规则兜底
+    try:
+        from meta_router import is_recommend_request
+        if _llm_intent == "recommend" or (_llm_intent is None and is_recommend_request(concept)):
+            _rec = _handle_recommend_query(learner, concept, subject, llm)
+            _rec_content = _rec.get("presentations", [{}])[0].get("content", "")
+            _rec_web = _rec.get("web_searched", False)
+
+            def gen_rec():
+                # v0.35 ⭐ 先发 retrieval 事件（前端显示"已联网检索"badge）：
+                # 与 _handle_recommend_query 中是否真做了 web_search 对应。
+                _badge = "网络检索" if _rec_web else "检索"
+                yield f"event: retrieval\ndata: {json.dumps({'done': _badge}, ensure_ascii=False)}\n\n"
+                for i in range(0, len(_rec_content), 60):
+                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _rec_content[i:i+60], 'step_type': 'recommend'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            return Response(gen_rec(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception:
+        pass
+
     # v0.19.22：知识库查询拦截必须先于 meta（流式版本）——"知识库/你学过什么"应清点 Library
+    # v0.35 ⭐ LLM 优先：LLM 判 knowledge → 知识库分支；LLM 不可用时规则兜底
     try:
         from meta_router import is_knowledge_query
-        if is_knowledge_query(concept):
+        if _llm_intent == "knowledge" or (_llm_intent is None and is_knowledge_query(concept)):
             _kb = _handle_knowledge_query(learner, subject)
             _kb_content = _kb.get("presentations", [{}])[0].get("content", "")
 
@@ -1125,9 +1173,10 @@ def teach_stream():
         pass
 
     # v0.20.5：知识导图拦截（流式版本）——"画知识导图/列提纲/知识结构"
+    # v0.35 ⭐ LLM 优先：LLM 判 knowledge_map → 思维导图分支；LLM 不可用时规则兜底
     try:
         from knowledge_map import is_knowledge_map_request, handle_knowledge_map
-        if is_knowledge_map_request(concept):
+        if _llm_intent == "knowledge_map" or (_llm_intent is None and is_knowledge_map_request(concept)):
             _map_result = handle_knowledge_map(concept, subject, learner, llm, history=SESSIONS.get(f"chat_hist_{learner_id}", []))
             _map_content = _map_result.get("content", "")
 
@@ -1142,9 +1191,10 @@ def teach_stream():
 
     # v0.21.9：复合输入拦截（流式版）——"指令+资料"走资源分析，不走教学 harness
     # DeepSeek file_template 结构化分隔 + 信任边界声明（让 LLM 注意力区分，非正则硬切）
+    # v0.35 ⭐ LLM 优先：LLM 判 material → 资料分支；LLM 不可用时规则兜底
     try:
         from meta_router import is_intent_with_material, split_intent_and_material
-        if is_intent_with_material(concept):
+        if _llm_intent == "material" or (_llm_intent is None and is_intent_with_material(concept)):
             from prompts import build_general_chat_system, build_general_chat_user
             from subagents import _safe_chat
             _instr, _material = split_intent_and_material(concept)
@@ -1170,9 +1220,37 @@ def teach_stream():
     except Exception:
         pass
 
+    # v0.35 ⭐ PPT / 演示文稿生成（流式版本兜底分支）——
+    # LLM/规则判定用户要生成 PPT / 课件 / 演示文稿时，统一引导至课程备课流程，
+    # 暂走通用 chat 响应 + 引导文案（避免误入教学管线把概念当学科讲）。
+    # v0.35 ⭐ LLM 优先：LLM 判 ppt → 该分支；LLM 不可用时规则兜底
+    try:
+        from meta_router import is_ppt_request
+        if _llm_intent == "ppt" or (_llm_intent is None and is_ppt_request(concept)):
+            from prompts import build_general_chat_system, build_general_chat_user
+            from subagents import _safe_chat
+            _ppt_sys = build_general_chat_system(learner)
+            _ppt_usr = build_general_chat_user(
+                f"用户希望生成 PPT/演示文稿：{concept}。"
+                f"请先用 1-2 句自然语言回复用户：这个意图在当前流式教学端点不在主路径，"
+                f"我们建议使用课程备课或独立的演示文稿工具；如需继续教学可换个话题。"
+            )
+            _ppt_reply = _safe_chat(llm, _ppt_sys, _ppt_usr, max_tokens=400) or \
+                "做演示文稿我建议用课程备课流程——把你的素材和大纲给我，我帮你组织成 PPT。"
+
+            def gen_ppt():
+                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _ppt_reply, 'step_type': 'ppt'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'ppt'}, ensure_ascii=False)}\n\n"
+            return Response(gen_ppt(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception:
+        pass
+
     # v0.19.22：意向性层（流式版本）——非教学意图走一般化响应
     # v0.26 ⭐ C3-1 P0 修复：改用 meta_router.route() 集中路由（LLM 综合意图判断）
     # v0.34 ⭐ 教学端点语义锚定：/api/teach/stream 是教学专用端点，meta_router 不应把概念提问降级为 chat
+    # v0.35 ⭐ LLM 优先生效：本块作为"上游规则链漏过"时的兜底；当 route_intent 已明确
+    # 给出 teach/answer 时，强制走完整管线（不被 meta_router.route() 的非教学分支吞掉）
     try:
         from meta_router import route as _paeg_route
         # v0.34 ⭐：endpoint_hint 透传给 meta_router（目前 route() 未读取该 kwarg，留作未来扩展；
@@ -1180,6 +1258,15 @@ def teach_stream():
         _route = _paeg_route(concept, learner=learner, llm=llm, fallback_to_teach=True,
                              endpoint_hint="teach_stream")
         _route_type = _route.get("type")
+        # v0.35 ⭐ LLM 优先：当 LLM 在更细粒度 route_intent 已判 teach/answer 时，
+        # 强制对齐到教学类型（绕过下方 non-teach 早退）——这是"教学必走完整管线"的核心修复。
+        if _llm_intent in ("teach", "answer") and _route_type != "teaching":
+            _route = {"type": "teaching", "source": "v0.35_llm_route",
+                      "reason": f"route_intent={_llm_intent} conf={_llm_conf:.2f}，强制教学"}
+            _route_type = "teaching"
+            print(f"[PAEG][v0.35-LLM-ROUTE] 强制教学：route_intent={_llm_intent} "
+                  f"覆盖 meta_router.route()={_route.get('type')!r} -> teaching",
+                  file=__import__("sys").stderr, flush=True)
         # v0.34 ⭐ 兜底：仅当 LLM 明确判断为"非教学子意图"时才早退
         # （情绪/方法论/知识库/界面/元问题/寒暄/倾诉——这些都是用户明确表达的非学科请求）
         # 注意：chat/answer/problem 不在此列——LLM 把概念提问兜底为 chat 时应落入
@@ -1237,10 +1324,10 @@ def teach_stream():
     except Exception:
         pass
 
-    # v0.19.7：学习方法咨询拦截（流式版本）
+    # v0.19.7：学习方法咨询拦截（流式版本）——v0.35 ⭐ LLM 优先
     try:
         from meta_router import is_method_advice
-        if is_method_advice(concept):
+        if _llm_intent == "method" or (_llm_intent is None and is_method_advice(concept)):
             _ma = _handle_method_advice(learner, concept, subject)
             _ma_content = _ma.get_json().get("presentations", [{}])[0].get("content", "")
 
@@ -1252,10 +1339,10 @@ def teach_stream():
     except Exception:
         pass
 
-    # v0.19：出题意图拦截（流式版本）
+    # v0.19：出题意图拦截（流式版本）——v0.35 ⭐ LLM 优先
     try:
         from meta_router import is_problem_request
-        if is_problem_request(concept):
+        if _llm_intent == "problem" or (_llm_intent is None and is_problem_request(concept)):
             _pr = _handle_problem_request(learner, concept, subject)
             _pr_content = _pr.get_json().get("presentations", [{}])[0].get("content", "")
 
@@ -1267,10 +1354,10 @@ def teach_stream():
     except Exception:
         pass
 
-    # v0.19.27：情绪与心理支持拦截（流式版本）
+    # v0.19.27：情绪与心理支持拦截（流式版本）——v0.35 ⭐ LLM 优先（emotion LLM 路由含危机检测）
     try:
         from meta_router import is_affection_expression
-        if is_affection_expression(concept):
+        if _llm_intent == "emotion" or (_llm_intent is None and is_affection_expression(concept)):
             from subagents import AffectionSupportor
             _emo = AffectionSupportor()
             _hist = SESSIONS.get(f"chat_hist_{learner_id}", [])
@@ -1286,10 +1373,11 @@ def teach_stream():
     except Exception:
         pass
 
-    # v0.17.1：元问题/寒暄走闲聊（流式版本直接返回单段回答）
+    # v0.17.1：元问题/寒暄走闲聊（流式版本直接返回单段回答）——v0.35 ⭐ LLM 优先
     try:
         from meta_router import is_meta_question, is_greeting
-        if is_meta_question(concept) or is_greeting(concept):
+        if _llm_intent in ("meta", "greeting") or \
+                (_llm_intent is None and (is_meta_question(concept) or is_greeting(concept))):
             from prompts import build_general_chat_system, build_general_chat_user
             from subagents import _safe_chat
             m_sys = build_general_chat_system(learner)
@@ -2611,6 +2699,26 @@ def general_chat_stream():
         except Exception:
             pass
 
+        # v0.35 ⭐ 推荐类问题优先于知识库拦截——闲聊端点里用户也可能问"有什么推荐"。
+        # 与 teach_stream 同理由：推荐问题应联网检索，不能答"清点藏书"。
+        try:
+            from meta_router import is_recommend_request
+            if is_recommend_request(text):
+                _rec = _handle_recommend_query(learner, text, data.get("subject", "general"), llm)
+                _rec_content = _rec.get("presentations", [{}])[0].get("content", "")
+                _rec_web = _rec.get("web_searched", False)
+                # v0.35 ⭐ 先发 retrieval 事件（前端 badge "已联网检索" / "检索"）。
+                _badge = "网络检索" if _rec_web else "检索"
+                yield f"event: retrieval\ndata: {json.dumps({'done': _badge}, ensure_ascii=False)}\n\n"
+                _chunks = [_rec_content[i:i+60] for i in range(0, len(_rec_content), 60)] or [_rec_content]
+                for _c in _chunks:
+                    yield f"event: seg\ndata: {json.dumps({'text': _c, 'step_type': 'recommend'}, ensure_ascii=False)}\n\n"
+                    _time.sleep(0.02)
+                yield f"event: done\ndata: {json.dumps({'ok': True}, ensure_ascii=False)}\n\n"
+                return
+        except Exception:
+            pass
+
         # v0.19.16：知识库查询——闲聊模式下问"你学过什么/知识库"也走知识库总结
         try:
             from meta_router import is_knowledge_query
@@ -3241,6 +3349,71 @@ def list_conversations(learner_id):
         return jsonify({"conversations": convs})
     except Exception as e:
         return jsonify({"conversations": [], "error": str(e)}), 500
+
+
+def _handle_recommend_query(learner, question, subject, llm_arg):
+    """v0.35 ⭐ 推荐类问题：联网检索真实推荐 + 组织回答。
+
+    用户问"有什么推荐/推荐几本/哪个软件好"——必须基于外部真实信息（web_search
+    检索结果），不能凭 LLM 训练知识编造。返回**纯 dict**（不 jsonify），
+    调用方自行决定序列化方式——生成器（SSE 流）里没有 Flask app context，
+    不能调 jsonify（与 _handle_knowledge_query 同约定）。
+    """
+    # 1) 联网检索：拿真实推荐信息
+    results_text = ""
+    web_ok = False
+    try:
+        from web_search_tool import web_search
+        search_q = f"{question} 推荐 排名 对比"
+        raw = web_search(search_q, max_results=5)
+        web_ok = bool(raw) and ("搜索未返回" not in raw)
+        results_text = raw or ""
+    except Exception:
+        results_text, web_ok = "", False
+
+    # 2) LLM 基于检索结果组织回答
+    answer = ""
+    try:
+        from subagents import _safe_chat
+        sys_prompt = (
+            "你是一位熟悉多语言学习产品的老师。学生问推荐类问题，请结合检索到的真实信息回答。\n"
+            "要求：\n"
+            "1. 先给出 2-4 个具体推荐（名称+一句话理由），优先用检索到的真实产品\n"
+            "2. 每个推荐说明适合什么水平/目标（如零基础/进阶/备考）\n"
+            "3. 若无检索结果，诚实说明'我查到的信息有限'，给通用建议但标注不确定性\n"
+            "4. 用中文回答，语气亲切实用\n\n"
+            f"检索到的资料：\n{results_text[:3000] if results_text else '（无检索结果）'}"
+        )
+        user_msg = f"学生问：{question}"
+        answer = _safe_chat(llm_arg, sys_prompt, user_msg, max_tokens=900) or ""
+    except Exception:
+        answer = ""
+    if not answer:
+        answer = (
+            "关于推荐，我帮你查了一些资料，但信息有限。"
+            "你可以告诉我你的具体水平和目标，我帮你更精准地推荐。"
+        )
+
+    return {
+        "session_id": f"rec_{learner.id}",
+        "summary": {"avg_score": 0},
+        "worldview_used": "weil",
+        "tone_ratio": 0,
+        "presentations": [
+            {"step_id": 1, "content": answer, "step_type": "recommend"}
+        ],
+        "evaluations": [],
+        "diagnosis": {},
+        "plan": {"steps": [{"type": "recommend"}]},
+        "reflections": [],
+        "learner": {
+            "id": learner.id,
+            "nickname": learner.nickname,
+            "grade_level": learner.grade_level,
+            "subjects_mastery": learner.subjects_mastery,
+        },
+        "web_searched": web_ok,  # v0.35 ⭐ 告知调用方：是否真做了网络检索（前端 badge 用）
+    }
 
 
 def _handle_knowledge_query(learner, subject):
