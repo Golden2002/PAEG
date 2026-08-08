@@ -2067,11 +2067,27 @@ function renderLogs(logs) {
     return;
   }
   list.innerHTML = logs.slice(0, 8).map(l => {
-    // v0.27 ⭐ 修复：reflection 可能是对象（反思 dict），需安全提取字符串
-    const r = (typeof l.reflection === 'string') ? l.reflection
-             : (l.reflection && typeof l.reflection === 'object') ? (l.reflection.concept || l.reflection.summary || '')
-             : '';
-    const txt = r || l.concept || l.note || '';
+    // v0.32 ⭐ meta-log 接入 LLM 建模：识别 type=="user_modeling" 的记录，从顶层字段拼装展示
+    // —— v0.27 修复：reflection 可能是对象（反思 dict），需安全提取字符串
+    let txt = '';
+    if (l.reflection && typeof l.reflection === 'object' && l.reflection.type === 'user_modeling') {
+      const m = l.reflection;
+      const ks = (m.knowledge_strengths || []).slice(0, 2).join('、');
+      const kg = (m.knowledge_gaps || []).slice(0, 2).join('、');
+      const ls = m.learning_style || '';
+      const emo = m.emotional_tendency || '';
+      const parts = [];
+      if (ks) parts.push(`擅 ${ks}`);
+      if (kg) parts.push(`薄 ${kg}`);
+      if (ls) parts.push(`风 ${ls}`);
+      if (emo && emo !== '未知') parts.push(`情 ${emo}`);
+      txt = parts.length ? `🎯 建模 · ${parts.join(' · ')}` : (m.reflection || '建模');
+    } else {
+      const r = (typeof l.reflection === 'string') ? l.reflection
+               : (l.reflection && typeof l.reflection === 'object') ? (l.reflection.concept || l.reflection.summary || '')
+               : '';
+      txt = r || l.concept || l.note || '';
+    }
     return `
     <div class="log-item">
       <div class="time">${(l.timestamp || '').slice(5, 16)}</div>
