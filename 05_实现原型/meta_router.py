@@ -258,6 +258,20 @@ _INTENT_CACHE_TTL = 600
 # v0.35 ⭐ 命名统一原则（用户原话："选项应该和兜底规则的变量名相同"）
 # VALID_INTENTS 的每个 key 必须能在本模块（或被 try/except 引入的模块）里
 # 找到对应的 is_xxx() 规则函数；LLM 选出来后 rule_fallback_intent() 用同名函数兜底。
+#
+# v0.36 ⭐ P0-E 修正（命名规范统一）：
+# 本文件存在两套意图命名（历史遗留）：
+#   1. **v0.35 LLM 主路由**用动词原形（teach / knowledge / recommend / method / emotion /
+#      problem / meta / greeting / material / interface / ppt / answer / chat）——见下方 VALID_INTENTS。
+#   2. **v0.35 之前 is_teaching_intent 旧二分类**返回 {"type": "teaching" / "non_teaching"}——保留
+#      仅作回滚保险与向后兼容（行 ~432 起的 deprecated 函数）。
+# v0.36 起规范：
+#   - **新代码、对外 API、规则函数调用**：统一使用 v0.35 LLM 主路由的动词原形（teach/...）。
+#   - **旧代码（is_teaching_intent 路径）**：保留 type 字段为 "teaching"/"non_teaching"，
+#     但下游消费方应做归一化映射——见 route_intent() 行 ~614 的 priority 注释。
+#   - 不允许再新增第三套命名（teach_xxx / is_teach_xxx 等）。
+#   - 此约定 v0.36 起冻结，未来版本（v0.37+）可移除 is_teaching_intent 全部路径，
+#     届时 VALID_INTENTS 仅留单数动词原形。
 VALID_INTENTS = {
     "teach",          # is_teaching_intent       (LLM-only，规则已弃用)
     "knowledge",      # is_knowledge_query       (库清点)
