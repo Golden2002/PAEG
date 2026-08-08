@@ -119,6 +119,11 @@ def is_knowledge_query(text: str) -> bool:
     # 排除：方法/技巧/思路类（应走学习方法或教学，不是知识库清点）
     if re.search(r"(思路|方法|技巧|妙招|套路|怎么(做|解|学|复习)|如何(解|学|复习)|解题)", t):
         return False
+    # v0.35 ⭐ 排除：推荐类问题（"有什么推荐/推荐什么/推荐几本/哪个APP好"）——
+    # 用户问"法语学习的软件有什么推荐"会被 `学习.*什么` 正则误判为知识库查询。
+    # 推荐是主动咨询行为，不是"查我的知识库"，应走教学/回答管线。
+    if re.search(r"(推荐|推荐什么|有什么推荐|哪个.{0,6}(好|好用|推荐)|推荐几|求推荐|安利)", t):
+        return False
     return any(p.search(t) for p in KNOWLEDGE_COMPILED)
 
 
@@ -128,6 +133,53 @@ def is_greeting(text: str) -> bool:
     if not t:
         return False
     return any(p.match(t) for p in GREETING_COMPILED)
+
+
+# v0.35 ⭐ 推荐类问题：用户问"有什么推荐/推荐什么/哪个软件好"——
+# 应联网检索真实推荐，不是查知识库，也不是普通教学。
+# 这是"主动咨询"型输入（求资源/APP/书/课程），与"查我的知识库"不同，
+# 也与一般教学（讲概念）不同——必须先有外部事实才能给有用答案。
+RECOMMEND_PATTERNS = [
+    r"推荐|有什么(好|不错|值得|适合).{0,6}(软件|书|资源|网站|课程|视频|应用|工具|资料|教材|APP)",
+    r"(软件|书|资源|网站|课程|视频|应用|工具|教材|APP).{0,8}(推荐|推荐吗|哪个好)",
+    r"(求|想要|找).{0,4}(推荐|资源|资料|教材)",
+]
+RECOMMEND_COMPILED = [re.compile(p, re.IGNORECASE) for p in RECOMMEND_PATTERNS]
+
+
+def is_recommend_request(text: str) -> bool:
+    """判断用户是否在问推荐类问题（软件/书/资源/课程等推荐）。
+
+    v0.35 新增：解决"法语学习的软件有什么推荐"被 is_knowledge_query
+    误判为查知识库、走到答非所问"清点藏书"的问题。
+    长度限制与 is_knowledge_query 一致：>60 字通常不是咨询式推荐问题。
+    """
+    t = (text or "").strip()
+    if not t or len(t) > 60:
+        return False
+    return any(p.search(t) for p in RECOMMEND_COMPILED)
+
+
+# v0.35 ⭐ PPT 生成意图：用户要"做PPT/演示文稿/课件"
+# 单独的规则函数（与 is_recommend_request / is_problem_request 都不同语义），
+# 并补齐 VALID_INTENTS 里 "ppt" 选项的兜底路径。
+PPT_PATTERNS = [
+    r"(做|生成|制作|整理|创建).{0,6}(PPT|ppt|演示文稿|课件|幻灯片)",
+    r"(PPT|ppt|演示文稿|课件|幻灯片).{0,6}(做|生成|制作|整理)",
+    r"把.{0,10}(整理|做成|生成).{0,6}(PPT|ppt|演示文稿)",
+]
+PPT_COMPILED = [re.compile(p, re.IGNORECASE) for p in PPT_PATTERNS]
+
+
+def is_ppt_request(text: str) -> bool:
+    """v0.35 ⭐ 判断用户是否要求生成 PPT / 演示文稿 / 课件。
+
+    与 is_recommend_request 区别：推荐是"给个选项让我选"，PPT 是"直接产出文件"。
+    """
+    t = (text or "").strip()
+    if not t or len(t) > 60:
+        return False
+    return any(p.search(t) for p in PPT_COMPILED)
 
 
 def is_meta_question(text: str) -> bool:
@@ -188,16 +240,197 @@ def is_affection_expression(text: str) -> bool:
 # 解法：在进入教学 harness 前，用 LLM 判断用户输入是否为"教学意图"。
 #   教学意图   → 正常走教学（学科知识/概念/题目/方法）
 #   非教学意图 → 一般化响应（寒暄/情感/生活话题/非学科闲聊），不套教学模板
-# 原则：规则拦截（is_knowledge_query/meta/greeting/method/problem）永远优先且廉价；
-#       LLM 意向性判断是"兜底"，只对规则没拦住的输入启用。
+# 原则（v0.35 ⭐ 用户原话："LLM 是被充分调用的主体，规则只兜底"）：
+#   LLM 主路由（route_intent）优先——大模型先判断意图、在多选项中选一个；
+#   规则（rule_fallback_intent）降级兜底——只在 LLM 失败/低置信度时介入。
+#   下方的 is_teaching_intent 是更早版本的二分类判断（教/非教），v0.35 起
+#   被 route_intent 的 11 类多分类取代；保留作回滚保险与向后兼容。
 
 # 缓存：同一句输入 10 分钟内不重复调用 LLM（教学场景重复问同一概念很常见）
 _INTENT_CACHE = {}
 _INTENT_CACHE_TTL = 600
 
 
+# ═════════════════════════════════════════════════════════════
+# v0.35 ⭐ LLM 优先意图路由（用户原则：LLM 是被充分调用的主体，规则只兜底）
+# 大模型先判断用户意图，在多个选项中选一个；规则仅作 LLM 失败/低置信度时的兜底。
+# ═════════════════════════════════════════════════════════════
+# v0.35 ⭐ 命名统一原则（用户原话："选项应该和兜底规则的变量名相同"）
+# VALID_INTENTS 的每个 key 必须能在本模块（或被 try/except 引入的模块）里
+# 找到对应的 is_xxx() 规则函数；LLM 选出来后 rule_fallback_intent() 用同名函数兜底。
+VALID_INTENTS = {
+    "teach",          # is_teaching_intent       (LLM-only，规则已弃用)
+    "knowledge",      # is_knowledge_query       (库清点)
+    "knowledge_map",  # is_knowledge_map_request (思维导图/知识地图) — knowledge_map.py
+    "recommend",      # is_recommend_request     (软件/书/资源推荐)
+    "method",         # is_method_advice         (学习方法咨询)
+    "emotion",        # is_affection_expression  (情绪/心理/危机)
+    "problem",        # is_problem_request       (出题/练习)
+    "meta",           # is_meta_question         (关于系统本身)
+    "greeting",       # is_greeting              (寒暄/打招呼)
+    "material",       # is_intent_with_material  (用户上传文件/复合指令+资料)
+    "interface",      # is_interface_query       (界面操作) — server.py
+    "ppt",            # is_ppt_request           (PPT/演示文稿生成) — 本文件新增
+    "answer",         # 知识问答/直接回答（无规则函数，纯 LLM 判断）
+    "chat",           # 闲聊（无规则函数，纯 LLM 判断）
+}
+
+INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。根据用户输入选择最匹配的一个意图。
+
+意图选项（互斥，必须选一个；选项名与本模块 is_xxx() 规则函数一一对应）：
+- teach: 开始/继续教学（如"教我法语""继续""下一题""讲解这个语法"）
+- knowledge: 清点/查询知识库已有内容（如"我学过什么""知识库有什么""总结我学过的"）
+- knowledge_map: 生成/查看知识地图/思维导图（如"画个思维导图""知识框架""结构图"）
+- recommend: 工具/软件/书/资源推荐（如"推荐app""学法语用什么软件""有什么好书"）
+- method: 学习方法论/认知策略（如"怎么记单词""如何高效学习""怎么复习"）
+- emotion: 情绪表达/倾诉（如"学不下去了""太难了想放弃""我很焦虑"）
+- problem: 出题/测验/练习（如"出10道题""考考我""来道练习"）
+- meta: 关于系统本身（如"你是谁""你能做什么""怎么用"）
+- greeting: 寒暄/打招呼（如"你好""在吗"）
+- material: 基于用户上传的文件操作（如"看我上传的文件""用我的资料回答""讲义在哪"）
+- interface: 关于界面操作（如"换主题""深色模式""按钮在哪""怎么切换语言"）
+- ppt: 生成演示文稿/PPT（如"做PPT""整理成演示文稿""生成课件""把这些资料做成PPT"）
+- chat: 闲聊/与教学无关（如"今天天气""随便聊聊"）
+- answer: 知识问答/直接回答（如"什么是X""为什么Y""法语难吗"）
+
+【关键区分示例】
+- "学法语用什么软件" → recommend（推荐工具），不是 knowledge
+- "教我法语" → teach（要开始教学），不是 recommend
+- "法语难吗" → answer（知识问答），不是 method
+- "怎么学法语" → method（学习方法），不是 teach
+- "我学过什么" → knowledge（清点知识库），不是 teach
+- "画个知识框架图" → knowledge_map（思维导图），不是 teach
+- "把这些资料做成PPT" → ppt（生成演示文稿），不是 teach
+- "看下我上传的笔记" → material（用户文件），不是 knowledge
+- "换深色模式" → interface（界面操作），不是 teach
+- "推荐几本学英语的书" → recommend（推荐），不是 knowledge
+
+【用户输入】
+{text}
+
+只输出严格 JSON（不要 markdown 代码块、不要其他文字）：{"intent": "...", "confidence": 0.0-1.0, "reason": "简短中文原因"}
+"""
+
+_INTENT_CACHE_V2 = {}
+_INTENT_CACHE_TTL_V2 = 600
+
+
+def route_intent(text: str, llm=None, use_cache: bool = True) -> dict:
+    """v0.35 ⭐ LLM 主路由：判断用户意图（在选项中选一个）。
+    返回 {"intent": str, "confidence": float, "reason": str}
+    LLM 不可用/失败/超时 → 返回 {"intent": "chat", "confidence": 0.0, "reason": "llm_error"}
+    """
+    import time as _t
+    t = (text or "").strip()
+    if not t:
+        return {"intent": "chat", "confidence": 0.0, "reason": "empty"}
+    now = _t.time()
+    if use_cache and t in _INTENT_CACHE_V2 and now - _INTENT_CACHE_V2[t][1] < _INTENT_CACHE_TTL_V2:
+        return _INTENT_CACHE_V2[t][0]
+    if llm is None:
+        return {"intent": "chat", "confidence": 0.0, "reason": "no_llm"}
+    try:
+        from subagents import _safe_chat
+        # 用 replace 而非 format：模板里含 JSON 示例（{...}），不能被 format 当占位符
+        prompt = INTENT_PROMPT.replace("{text}", t[:120])
+        raw = _safe_chat(llm, prompt, t[:120], max_tokens=120)
+        if not raw:
+            return {"intent": "chat", "confidence": 0.0, "reason": "llm_empty"}
+        # 提取 JSON（可能被 ```json 包裹）
+        import re as _re, json as _json
+        m = _re.search(r'\{.*\}', raw, _re.S)
+        if not m:
+            return {"intent": "chat", "confidence": 0.0, "reason": "no_json"}
+        data = _json.loads(m.group(0))
+        intent = str(data.get("intent", "chat")).strip()
+        if intent not in VALID_INTENTS:
+            intent = "chat"
+        conf = float(data.get("confidence", 0.5))
+        result = {"intent": intent, "confidence": max(0.0, min(1.0, conf)),
+                  "reason": str(data.get("reason", ""))[:100]}
+        if use_cache:
+            _INTENT_CACHE_V2[t] = (result, now)
+        return result
+    except Exception as e:
+        return {"intent": "chat", "confidence": 0.0, "reason": f"llm_error:{type(e).__name__}"}
+
+
+def rule_fallback_intent(text: str) -> dict:
+    """v0.35 ⭐ 规则降级兜底：LLM 失败/低置信度时用。
+    危机/自伤必须 fast-path（安全 > 延迟）；其余按现有规则函数判定。
+    命名与 VALID_INTENTS 一一对应（用户原则：选项=兜底规则变量名）。
+    """
+    t = (text or "").strip()
+    # 危机/自伤：无条件 fast-path（不依赖 LLM）
+    try:
+        from safety import guard_input
+        res = guard_input(t)
+        if res and res.get("blocked") and "self_harm" in (res.get("reason") or []):
+            return {"intent": "emotion", "confidence": 0.95, "reason": "rule:emergency"}
+    except Exception:
+        pass
+    if is_greeting(t):
+        return {"intent": "greeting", "confidence": 0.85, "reason": "rule:greeting"}
+    if is_meta_question(t):
+        return {"intent": "meta", "confidence": 0.8, "reason": "rule:meta"}
+    try:
+        if is_recommend_request(t):
+            return {"intent": "recommend", "confidence": 0.7, "reason": "rule:recommend"}
+    except Exception:
+        pass
+    # v0.35 ⭐ 知识地图 / 思维导图（独立模块 knowledge_map.py）
+    try:
+        from knowledge_map import is_knowledge_map_request
+        if is_knowledge_map_request(t):
+            return {"intent": "knowledge_map", "confidence": 0.8, "reason": "rule:knowledge_map"}
+    except Exception:
+        pass
+    # v0.35 ⭐ 用户上传文件 / 指令+资料复合
+    try:
+        if is_intent_with_material(t):
+            return {"intent": "material", "confidence": 0.7, "reason": "rule:material"}
+    except Exception:
+        pass
+    # v0.35 ⭐ material 兜底补强：is_intent_with_material 只认"指令+资料"复合形态
+    # （长度 > 60 + 分隔符 或 复合指令关键词），对"看我上传的笔记"等短句上传类
+    # 输入会漏判。这里加一个轻量关键词兜底（不修改原 is_intent_with_material）。
+    if re.search(
+        r"(我(的)?|刚)(上传|传|发|提交)(的|了)?.{0,6}(文件|资料|笔记|讲义|文档|作业|附件|图片|资料)",
+        t,
+    ):
+        return {"intent": "material", "confidence": 0.7, "reason": "rule:material_upload"}
+    # v0.35 ⭐ 界面操作（独立模块 server.py）
+    try:
+        from server import is_interface_query
+        if is_interface_query(t):
+            return {"intent": "interface", "confidence": 0.7, "reason": "rule:interface"}
+    except Exception:
+        pass
+    # v0.35 ⭐ PPT / 演示文稿生成（本文件新增 is_ppt_request）
+    try:
+        if is_ppt_request(t):
+            return {"intent": "ppt", "confidence": 0.8, "reason": "rule:ppt"}
+    except Exception:
+        pass
+    if is_knowledge_query(t):
+        return {"intent": "knowledge", "confidence": 0.5, "reason": "rule:knowledge_low"}
+    if is_method_advice(t):
+        return {"intent": "method", "confidence": 0.7, "reason": "rule:method"}
+    try:
+        if is_problem_request(t):
+            return {"intent": "problem", "confidence": 0.7, "reason": "rule:problem"}
+    except Exception:
+        pass
+    try:
+        if is_affection_expression(t):
+            return {"intent": "emotion", "confidence": 0.7, "reason": "rule:emotion"}
+    except Exception:
+        pass
+    return {"intent": "chat", "confidence": 0.3, "reason": "rule:default"}
+
+
 def is_teaching_intent(text: str, llm=None, fallback_to_teach: bool = True) -> bool:
-    """LLM 判断用户输入是否为教学意图（默认 True——教学模式假设可教）。
+    """（v0.35 起弃用——用 route_intent 替代）LLM 判断用户输入是否为教学意图（默认 True——教学模式假设可教）。
 
     返回 True（教学） / False（一般性对话，走闲聊响应）。
     规则已拦截的输入不应到这里（调用方保证）；此函数只兜底。
