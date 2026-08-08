@@ -3061,7 +3061,7 @@ readers.py（多格式全文提取 md/txt/pdf/docx/csv/json）
 **校验工具**（项目根目录 `sync_check.py`）：
 ```powershell
 $env:GH_TOKEN='<token>'
-python sync_check.py        # 只读校验：对比本地 106+ 文件与 GitHub sha
+python sync_check.py        # 只读校验：对比本地 109+ 文件与 GitHub sha
 python sync_check.py --fix  # 自动推送差异（本地为权威源）
 ```
 
@@ -3072,7 +3072,7 @@ python sync_check.py --fix  # 自动推送差异（本地为权威源）
 4. **敏感数据排除**：users.json / users_data/ / uploads/ / data/ 等运行时数据不参与备份（非代码资产）
 5. **token 不入库**：脚本从 `GH_TOKEN` 环境变量读取，禁止硬编码（GitHub secret 扫描会拦截）
 
-**验证基线（2026-08-08）**：106 个代码/文档文件全部一致（0 缺失 0 差异），Release v0.34 为最新。
+**验证基线（2026-08-08）**：109 个代码/文档文件全部一致（0 缺失 0 差异），Release v0.34 为最新。
 
 ### 10.2.9 v0.27 ⭐ 综合测试反思与架构优化（字段完整性 + 内容更换）
 
