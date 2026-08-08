@@ -2074,7 +2074,10 @@ function renderMastery(masteries) {
   const list = document.getElementById('mastery-list');
   const entries = Object.entries(masteries).slice(0, 8);
   if (!entries.length) {
-    list.innerHTML = `<div style="font-size:12.5px;color:var(--text-dim)">暂无学习记录，开始第一次对话吧</div>`;
+    // v0.36 ⭐ 未登录提示：换设备/浏览器后匿名数据不跨设备，登录账号可同步
+    const isAnon = !(window.STATE && STATE.learnerId && String(STATE.learnerId).startsWith('u'));
+    list.innerHTML = `<div style="font-size:12.5px;color:var(--text-dim)">
+      暂无学习记录${isAnon ? '，登录账号后可跨设备同步' : ''}。开始第一次对话吧</div>`;
     return;
   }
   list.innerHTML = entries.map(([subj, v]) => {
@@ -2092,10 +2095,12 @@ function renderMastery(masteries) {
 function renderLogs(logs) {
   const list = document.getElementById('log-list');
   if (!logs.length) {
+    // v0.36 ⭐ 未登录提示：匿名用户数据不跨设备，登录账号可同步
+    const isAnon = !(window.STATE && STATE.learnerId && String(STATE.learnerId).startsWith('u'));
     list.innerHTML = `<div class="empty-state" role="status">
         <img class="empty-icon" src="assets/icons/brain.svg" alt="" aria-hidden="true" />
         <div class="empty-title">还没有反思记录</div>
-        <div class="empty-desc">开始几次对话后，老师会在这里整理你的学习轨迹与建议。</div>
+        <div class="empty-desc">${isAnon ? '登录账号后，老师会在这里整理你的学习轨迹（跨设备同步）。' : '开始几次对话后，老师会在这里整理你的学习轨迹与建议。'}</div>
       </div>`;
     return;
   }
@@ -2993,12 +2998,20 @@ askBtn.addEventListener('click', () => {
   recog.lang = 'zh-CN';
   recog.continuous = false;
   recog.interimResults = false;
-  recog.onstart = () => { recognizing = true; voiceBtn.classList.add('recording'); };
+  recog.onstart = () => { recognizing = true; voiceBtn.classList.add('recording'); addMsg('paeg', '<small>🎙 正在聆听…请说话（说完自动识别）。</small>'); };
   recog.onend = () => { recognizing = false; voiceBtn.classList.remove('recording'); };
   recog.onerror = (e) => {
     recognizing = false; voiceBtn.classList.remove('recording');
-    if (e.error === 'not-allowed') {
-      addMsg('paeg', '<small>麦克风权限被拒绝，可在浏览器地址栏重新允许。</small>');
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      addMsg('paeg', '<small>🎙 麦克风权限被拒绝。请在浏览器地址栏左侧的🔒图标 → 网站设置中允许麦克风，然后重试。</small>');
+    } else if (e.error === 'network') {
+      addMsg('paeg', '<small>🎙 语音识别网络错误（Chrome 语音服务需要联网）。</small>');
+    } else if (e.error === 'no-speech') {
+      addMsg('paeg', '<small>🎙 没有听到声音，请靠近麦克风再说一次。</small>');
+    } else if (e.error === 'audio-capture') {
+      addMsg('paeg', '<small>🎙 未检测到麦克风设备，请检查系统录音设置。</small>');
+    } else {
+      addMsg('paeg', '<small>🎙 语音识别未成功（' + (e.error || '未知错误') + '），可直接打字输入。</small>');
     }
   };
   recog.onresult = (e) => {
@@ -3008,7 +3021,15 @@ askBtn.addEventListener('click', () => {
   };
   voiceBtn.addEventListener('click', () => {
     if (recognizing) { recog.stop(); }
-    else { try { recog.start(); } catch (err) {} }
+    else {
+      // 先检查权限状态，给出即时反馈
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        addMsg('paeg', '<small>🎙 当前环境不支持麦克风（需 HTTPS 或 localhost）。</small>');
+        return;
+      }
+      try { recog.start(); }
+      catch (err) { addMsg('paeg', '<small>🎙 无法启动语音识别：' + (err && err.message ? err.message : err) + '</small>'); }
+    }
   });
 })();
 
