@@ -27,7 +27,7 @@ _SUBJECT_BLOOM_BASE = {
     "coding": "create", "writing": "create", "thinking": "analyze",
     "learning": "apply", "expression": "apply",
     # 考研：应用/分析
-    "kaoyan_math": "apply", "kaoyan_politics": "analyze",
+    "math": "apply", "politics": "analyze",
     "default": "understand",
 }
 
