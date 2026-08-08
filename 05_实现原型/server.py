@@ -1245,6 +1245,11 @@ def teach_stream():
             pass
         # 诊断
         yield f"event: diagnosis\ndata: {json.dumps({'status': 'diagnosing'})}\n\n"
+        # v0.27 ⭐ 需求：对话输出前检索状态标志（前端小徽章"已完成知识库检索"）
+        try:
+            yield f"event: retrieval\ndata: {json.dumps({'done': '知识库检索', 'subject': subject}, ensure_ascii=False)}\n\n"
+        except Exception:
+            pass
         # v0.27 ⭐ 需求A：教学模式一次识别（入口用原句，存 learner 供 Presenter 全程消费）
         try:
             from subagents import _detect_teaching_mode
@@ -2318,6 +2323,11 @@ def general_chat_stream():
                 "### 四、输出高质量内容\n"
                 "最终输出像一份**优秀讲义的片段**：观点明确、层次清晰、内容详实、公式用 LaTeX（$...$）、"
                 "像一位真正的好老师当面讲解，而不是搜索结果的堆砌。")
+            # v0.27 ⭐ 需求：对话输出前检索状态标志（前端小徽章"已完成知识库/网络检索"）
+            try:
+                yield f"event: retrieval\ndata: {json.dumps({'done': '知识库检索'}, ensure_ascii=False)}\n\n"
+            except Exception:
+                pass
             # v0.19.4：把打包后的 user（含当前设定/历史/身份）传给 agent loop，
             # 修复"偏离提问"——之前传的是原始 text，LLM 收不到上下文
             # v0.20.2：同时传真 messages 历史（多轮连贯性——LLM 能记住上文）
