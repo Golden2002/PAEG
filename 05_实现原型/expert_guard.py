@@ -39,7 +39,7 @@ _FLUFF_PATTERNS = [
 ]
 
 # 数学题缺少公式的信号（subject 为数学/物理/化学时）
-_MATH_SUBJECTS = {"math", "physics", "chemistry", "kaoyan_math"}
+_MATH_SUBJECTS = {"math", "physics", "chemistry", "math"}
 
 # 论述题缺少论证结构的信号
 _ESSAY_STRUCTURE_MARKERS = ["因为", "所以", "因此", "一方面", "另一方面",
