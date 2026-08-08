@@ -2707,6 +2707,140 @@ function resourceTypeLabel(t) {
   return RESOURCE_TYPE_LABEL[(t || '').toLowerCase()] || '来源';
 }
 
+// 从本地资源 url（如 /api/user-library?file=xxx.pdf）里抽出 file 参数
+// 安全转义后拼到 /api/library-file 上
+function extractFileParamFromLocalUrl(url) {
+  try {
+    const u = new URL(url, location.origin);
+    const f = u.searchParams.get('file');
+    return f ? f : null;
+  } catch (e) { return null; }
+}
+
+// 本地资料"下载"：GET /api/library-file → 文本弹窗（type=text/markdown/json）
+// 或触发浏览器下载（pdf/docx/图片等二进制）
+async function downloadLocalResource(source) {
+  if (!source || !source.url) return;
+  const filename = extractFileParamFromLocalUrl(source.url);
+  if (!filename) {
+    addMsg('paeg', `本地资料地址缺少 <code>file</code> 参数，无法下载。<br><small>${escapeHtml(source.url || '')}</small>`);
+    return;
+  }
+  const apiUrl = `/api/library-file?learner_id=${encodeURIComponent(STATE.learnerId || '')}&file=${encodeURIComponent(filename)}`;
+  addMsg('paeg', `正在获取本地资料 <b>${escapeHtml(filename)}</b> …`);
+  try {
+    const resp = await fetch(API_BASE + apiUrl);
+    if (!resp.ok) {
+      const errText = await resp.text();
+      let friendly = errText;
+      try { const j = JSON.parse(errText); friendly = j.error || j.message || errText; } catch (e) {}
+      throw new Error(friendly || `HTTP ${resp.status}`);
+    }
+    const ct = (resp.headers.get('content-type') || '').toLowerCase();
+    // 文本类（text/* / json / 缺失类型） → 弹窗显示
+    if (ct.startsWith('text/') || ct.includes('json') || ct === '' || ct.includes('xml')) {
+      const text = await resp.text();
+      showLocalTextInModal(filename, text, ct);
+      return;
+    }
+    // 二进制（pdf/docx/图片…） → blob 下载
+    const blob = await resp.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(objUrl), 4000);
+    addMsg('paeg', `已下载 <b>${escapeHtml(filename)}</b>（${escapeHtml(ct || blob.type || 'application/octet-stream')} · ${blob.size} 字节）。`);
+  } catch (e) {
+    addMsg('paeg', `获取本地资料失败：${escapeHtml(e.message || String(e))}`);
+  }
+}
+
+// 简单弹窗显示文本内容（不引入依赖，复用现有样式变量）
+function showLocalTextInModal(filename, text, contentType) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  const box = document.createElement('div');
+  box.style.cssText = 'max-width:780px;width:100%;max-height:80vh;display:flex;flex-direction:column;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.4);overflow:hidden';
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px';
+  head.innerHTML = `<b>${escapeHtml(filename)}</b><span style="color:var(--text-dim);font-size:11.5px">${escapeHtml(contentType || 'text')}</span>`;
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.textContent = '×';
+  closeBtn.style.cssText = 'background:transparent;border:0;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:0 6px';
+  closeBtn.setAttribute('aria-label', '关闭');
+  closeBtn.onclick = () => overlay.remove();
+  head.appendChild(closeBtn);
+  const pre = document.createElement('pre');
+  pre.style.cssText = 'margin:0;padding:16px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.55;flex:1';
+  pre.textContent = text;
+  box.appendChild(head);
+  box.appendChild(pre);
+  overlay.appendChild(box);
+  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+// PPT 一键生成：复用本次 /api/resources 的 sources（for_ppt=true 已被 fetchResources 设置过）
+// 后端响应若含 ppt:{ok,url}，按钮变"下载 PPT"
+async function generatePptFromResources(btnEl, sources, question) {
+  if (!sources || !sources.length) {
+    addMsg('paeg', '当前没有可用资料用于生成 PPT。');
+    return;
+  }
+  const q = (question || '').trim() || questionInput.value.trim() || '这份资料';
+  const originalHtml = btnEl.innerHTML;
+  btnEl.disabled = true;
+  btnEl.innerHTML = '<span class="rp-spinner" style="margin-right:6px;vertical-align:middle"></span>生成中…';
+  try {
+    const subjectEl = document.getElementById('subject-select');
+    const gradeEl = document.getElementById('grade-select');
+    const subfieldEl = document.getElementById('subfield-select');
+    const resp = await api('/api/resources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        learner_id: STATE.learnerId,
+        question: q,
+        subject: subjectEl ? subjectEl.value : 'physics',
+        grade_level: gradeEl ? gradeEl.value : 'high_school',
+        subfield: subfieldEl ? subfieldEl.value : '',
+        include_web: true,
+        for_ppt: true,
+      }),
+    });
+    const ppt = resp && resp.ppt;
+    if (ppt && ppt.ok && ppt.url) {
+      // 成功 — 把按钮变成下载链接
+      btnEl.disabled = false;
+      btnEl.innerHTML = '';
+      const a = document.createElement('a');
+      a.href = safeResourceUrl(ppt.url) || '#';
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.download = (ppt.path || '').split(/[\\/]/).pop() || 'presentation.pptx';
+      a.className = 'rc-link';
+      a.innerHTML = '<img class="link-icon" src="assets/icons/graduation-cap.svg" alt=""/>下载 PPT';
+      if (!a.href || a.href === '#') a.removeAttribute('href');
+      btnEl.replaceWith(a);
+      addMsg('paeg', `PPT 已生成（${escapeHtml(String(ppt.slides != null ? ppt.slides + ' 页' : ''))}）：<a href="${escapeHtml(safeResourceUrl(ppt.url) || '#')}" target="_blank" rel="noopener noreferrer">${escapeHtml(a.download)}</a>`);
+    } else {
+      const errMsg = (ppt && ppt.error) || (resp && resp.error) || '后端未返回 ppt.url';
+      btnEl.disabled = false;
+      btnEl.innerHTML = originalHtml;
+      addMsg('paeg', `PPT 生成失败：${escapeHtml(errMsg)}`);
+    }
+  } catch (e) {
+    btnEl.disabled = false;
+    btnEl.innerHTML = originalHtml;
+    addMsg('paeg', `PPT 生成失败：${escapeHtml(e.message || String(e))}`);
+  }
+}
+
 // 阶段式进度气泡（与 addThinking 视觉一致）
 function addResourceProgress(question) {
   const div = document.createElement('div');
@@ -2769,11 +2903,19 @@ function renderResourceCards(payload, question) {
         const rawUrl = safeResourceUrl(s.url);
         const typeBadge = resourceTypeBadgeClass(s.type);
         const typeLabel = resourceTypeLabel(s.type);
+        const isLocal = rawUrl && rawUrl.startsWith('/api/');
         const linkHtml = rawUrl
-          ? `<a class="rc-link" href="${escapeHtml(rawUrl)}" target="_blank" rel="noopener noreferrer" data-idx="${idx}">
-               <img class="link-icon" src="assets/icons/magnifying-glass.svg" alt=""/>
-               ${rawUrl.startsWith('/api/') ? '查看资料' : '打开链接'}
-             </a>`
+          ? (isLocal
+              // 本地资料（/api/user-library…）：渲染"下载"按钮 → 走 /api/library-file 真正下载/查看内容
+              ? `<button class="rc-link rc-link-btn" type="button" data-act="download-local" data-idx="${idx}">
+                   <img class="link-icon" src="assets/icons/download.svg" alt=""/>
+                   下载
+                 </button>`
+              // 外部链接：保持原行为（新窗口打开）
+              : `<a class="rc-link" href="${escapeHtml(rawUrl)}" target="_blank" rel="noopener noreferrer" data-idx="${idx}">
+                   <img class="link-icon" src="assets/icons/magnifying-glass.svg" alt=""/>
+                   打开链接
+                 </a>`)
           : '<span class="rc-link" style="opacity:.5;cursor:default">无链接</span>';
         return `
         <div class="resource-card" data-idx="${idx}">
@@ -2805,25 +2947,20 @@ function renderResourceCards(payload, question) {
   div.appendChild(inner);
   chatWin.appendChild(div);
 
-  // PPT 引导按钮（事件代理，点击不刷新页面）
+  // 本地资料"下载"按钮（事件代理）
+  inner.addEventListener('click', (ev) => {
+    const t = ev.target.closest('[data-act="download-local"]');
+    if (!t) return;
+    ev.preventDefault();
+    const idx = parseInt(t.getAttribute('data-idx'), 10);
+    const src = sources[idx];
+    if (src) downloadLocalResource(src);
+  });
+
+  // PPT 一键生成按钮（事件代理）— 直接调 /api/resources(for_ppt=true)
   const pptBtn = inner.querySelector('[data-act="ppt"]');
   if (pptBtn) {
-    pptBtn.addEventListener('click', () => {
-      const q = (question || '').trim() || questionInput.value.trim() || '这份资料';
-      const prompt = `根据资料制作 PPT：${q}`;
-      questionInput.value = prompt;
-      questionInput.focus();
-      // 闪一下输入框，提示用户确认发送
-      questionInput.style.transition = 'background-color .25s';
-      const prev = questionInput.style.backgroundColor;
-      questionInput.style.backgroundColor = 'var(--accent-soft)';
-      setTimeout(() => {
-        questionInput.style.backgroundColor = prev || '';
-        setTimeout(() => { questionInput.style.transition = ''; }, 260);
-      }, 260);
-      // 提示气泡
-      addMsg('paeg', `已填入引导语：<b>${escapeHtml(prompt)}</b><br><span style="font-size:12px;color:var(--text-dim)">点 <kbd style="padding:1px 6px;border:1px solid var(--border);border-radius:4px;background:var(--surface-2)">发送</kbd> 后，后端会调用 pptx MCP 制作演示文稿。</span>`);
-    });
+    pptBtn.addEventListener('click', () => generatePptFromResources(pptBtn, sources, question));
   }
 
   chatWin.scrollTop = chatWin.scrollHeight;
