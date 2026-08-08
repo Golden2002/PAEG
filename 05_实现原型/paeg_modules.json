@@ -10,5 +10,6 @@
   "mcp": true,
   "self_update": true,
   "file_gen": true,
-  "history": true
+  "history": true,
+  "voice": true
 }
