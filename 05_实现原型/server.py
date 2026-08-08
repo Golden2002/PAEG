@@ -24,7 +24,7 @@ import sys
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 # 让 server.py 能找到同目录的模块
 sys.path.insert(0, str(Path(__file__).parent))
@@ -1915,6 +1915,123 @@ def library_info():
     })
 
 
+# ─────────────────────────────────────
+# v0.26 ⭐ 资源生产/下载闭环：本地资料下载入口
+# ─────────────────────────────────────
+
+# 图片类扩展（直接返回原文件）
+_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}
+# 文本类扩展（提取文本后 JSON 返回）
+_TEXT_EXTS = {".md", ".txt", ".csv", ".json"}
+
+
+def _safe_resolve_user_library_file(learner_id: str, filename: str) -> Optional[Path]:
+    """解析用户资料文件路径并做安全校验。
+
+    安全策略：
+      1. learner_id / filename 必须为非空字符串，且不含路径分隔符或 ".."
+      2. 解析后必须在 LIBRARY_DIR/usr_knowledge/<uid>/ 或 LIBRARY_DIR/user_<uid>/ 实际路径下
+      3. 必须为真实文件（非目录、非符号链接逃逸）
+      4. 拒绝非当前用户目录（防止 id 字段水平越权）
+    """
+    if not learner_id or not filename:
+        return None
+    # 防止 uid 本身含路径分隔符 / 相对路径元素
+    if "/" in learner_id or "\\" in learner_id or ".." in learner_id:
+        return None
+    # 防止 file 字段含路径分隔符 / 相对路径元素
+    if "/" in filename or "\\" in filename or ".." in filename:
+        return None
+
+    try:
+        from lib import library_store
+        # 候选根：规范路径 + 兼容旧路径
+        roots = [library_store.resolve_library_root(learner_id)] + library_store.legacy_paths(learner_id)
+        for root in roots:
+            try:
+                candidate = (root / filename).resolve()
+                real_root = root.resolve()
+                # 必须真实落在某个 user 目录前缀内
+                if not (str(candidate).startswith(str(real_root) + os.sep) or candidate == real_root):
+                    continue
+            except Exception:
+                continue
+            if candidate.is_file():
+                return candidate
+        return None
+    except Exception:
+        return None
+
+
+@app.route("/api/library-file", methods=["GET"])
+@require_module("knowledge")
+def library_file_download():
+    """v0.26 ⭐ 下载/查看用户资料库中的某个文件。
+
+    URL: GET /api/library-file?learner_id=<uid>&file=<​filename>
+
+    行为：
+      - 文本类（md/txt/csv/json）→ JSON 返回 {"ok": true, "filename", "content", "type"}
+      - 图片类（png/jpg/...）→ send_file 原文件下载
+      - pdf/docx → 提取文本后 JSON 返回
+      - 路径穿越 / 目录不存在 / 文件不存在 → JSON 错误
+
+    安全：realpath 校验 + 拒绝路径分隔符 + 拒绝非当前用户目录。
+    """
+    learner_id = (request.args.get("learner_id") or "").strip()
+    filename = (request.args.get("file") or "").strip()
+    if not learner_id or not filename:
+        return jsonify({"ok": False, "error": "learner_id 与 file 均为必填"}), 400
+
+    # 防止 uid 自身含路径元素（拒绝请求而非 500）
+    if "/" in learner_id or "\\" in learner_id or ".." in learner_id:
+        return jsonify({"ok": False, "error": "learner_id 非法"}), 400
+    if "/" in filename or "\\" in filename or ".." in filename:
+        return jsonify({"ok": False, "error": "file 非法（含路径分隔符）"}), 400
+
+    fp = _safe_resolve_user_library_file(learner_id, filename)
+    if fp is None:
+        return jsonify({
+            "ok": False,
+            "error": f"文件不存在或无权限访问: {filename}",
+        }), 404
+
+    ext = fp.suffix.lower()
+    # 图片类 → 直接返回原文件
+    if ext in _IMAGE_EXTS:
+        try:
+            return send_from_directory(str(fp.parent), fp.name, as_attachment=False)
+        except Exception as e:
+            return jsonify({"ok": False, "error": f"图片读取失败: {e}"}), 500
+
+    # 文本类 / 文档类 → 提取文本后 JSON 返回
+    try:
+        from lib import library_store
+        content = library_store.read_user_file_text(fp, limit_chars=20000)
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"内容提取失败: {e}"}), 500
+
+    type_label = ext.lstrip(".") or "text"
+    if ext in (".md", ".txt"):
+        type_label = "md" if ext == ".md" else "txt"
+    elif ext == ".pdf":
+        type_label = "pdf"
+    elif ext == ".docx":
+        type_label = "docx"
+    elif ext == ".csv":
+        type_label = "csv"
+    elif ext == ".json":
+        type_label = "json"
+
+    return jsonify({
+        "ok": True,
+        "filename": fp.name,
+        "type": type_label,
+        "size": fp.stat().st_size,
+        "content": content,
+    })
+
+
 @app.route("/api/quote", methods=["GET"])
 def daily_quote():
     """每日一句（v0.17）：薇依/约纳斯/胡塞尔/维特根斯坦/斯宾诺莎/怀特海。"""
@@ -1932,7 +2049,10 @@ def resource_lookup():
     """v0.26 ⭐ 需求C：资料检索（ResourceLibrarian）。
 
     请求：{learner_id, question, subject, grade_level, scope?, include_web?, for_ppt?}
-    响应：{"sources": [{title, url, snippet, type}], "scope", "keywords", "ppt_outline"}
+    响应：
+      - for_ppt=False（默认）：{"sources": [...], "scope", "keywords", "ppt_outline", "learner_id"}
+      - for_ppt=True：上方 + "ppt": {"ok", "path", "url", "slides"}
+        url 指向 /api/download/&lt;filename&gt;（DOWNLOAD_DIR/ppt/ 子目录）
     前端可点击链接获取资料，或联动 PPT 制作。
     """
     data = request.get_json(force=True)
@@ -1953,6 +2073,7 @@ def resource_lookup():
     if not question:
         return jsonify({"error": "question is required"}), 400
     subject = data.get("subject") or getattr(learner, "_current_subject", "") or "default"
+    for_ppt = bool(data.get("for_ppt", False))
     try:
         from subagents import ResourceLibrarian
         _rl = ResourceLibrarian(model=llm)
@@ -1960,11 +2081,89 @@ def resource_lookup():
             question, learner=learner, llm=llm, subject=subject,
             scope=data.get("scope", "all"),
             include_web=bool(data.get("include_web", True)),
-            for_ppt=bool(data.get("for_ppt", False)),
+            for_ppt=for_ppt,
         )
-        return jsonify({**_result, "learner_id": learner_id})
+        response = {**_result, "learner_id": learner_id}
+
+        # v0.26 ⭐ 需求C：for_ppt=True 时联动 pptx_mcp_server.generate_ppt 真正生成 PPT
+        if for_ppt:
+            ppt_meta = _generate_ppt_from_outline(
+                question=question,
+                outline=_result.get("ppt_outline") or "",
+                sources=_result.get("sources") or [],
+                learner_id=learner_id,
+            )
+            response["ppt"] = ppt_meta
+
+        return jsonify(response)
     except Exception as e:
         return jsonify({"error": f"资料检索失败: {e}", "sources": []}), 500
+
+
+def _generate_ppt_from_outline(
+    question: str,
+    outline: str,
+    sources: list,
+    learner_id: str,
+) -> dict:
+    """v0.26 ⭐ 需求C：把 ResourceLibrarian 的 ppt_outline 喂给 pptx_mcp_server 生成真实 PPT。
+
+    返回 {"ok": bool, "path": str, "url": str, "slides": int, "error": str}
+    """
+    try:
+        import pptx_mcp_server
+        # 整理 sources 摘要
+        src_titles = [
+            (s.get("title") or "").strip()
+            for s in (sources or [])
+            if (s.get("title") or "").strip()
+        ][:8]
+        sources_blob = "、".join(src_titles) if src_titles else ""
+
+        # 主题：question 截前 30 字符，去掉路径分隔符
+        import re as _re
+        topic = _re.sub(r'[\\/:*?"<>|\r\n]+', " ", question).strip()[:60] or "学习资料"
+
+        ppt_res = pptx_mcp_server.generate_ppt(
+            topic=topic,
+            outline=outline or "",
+            sources=sources_blob,
+            uid=str(learner_id or ""),
+        )
+        if not ppt_res.get("ok"):
+            return {
+                "ok": False,
+                "path": "",
+                "url": "",
+                "slides": 0,
+                "error": ppt_res.get("error") or "生成失败",
+            }
+
+        # path 在 OUT_DIR = .../downloads/ppt/&lt;fname&gt;
+        # 把 ppt 文件路径映射到 /api/download/&lt;rel&gt; —— /api/download/<path:filename>
+        # Flask 下载端点指向 DOWNLOAD_DIR；pptx_mcp 用的是其自身的 OUT_DIR。
+        # 兼容策略：把 pptx 文件复制到全局 DOWNLOAD_DIR（如果不同），并用统一 /api/download 下载。
+        full_path = ppt_res.get("path") or ""
+        slides = int(ppt_res.get("slides") or 0)
+        if not full_path or not os.path.isfile(full_path):
+            return {"ok": False, "path": full_path, "url": "", "slides": slides, "error": "PPT 文件未生成"}
+
+        # 计算相对于 DOWNLOAD_DIR/ppt 的文件名（pptx 自身写到 downloads/ppt/）
+        try:
+            from pathlib import Path as _P
+            url_path = f"/api/download/ppt/{urllib.parse.quote(_P(full_path).name)}"
+        except Exception:
+            url_path = f"/api/download/ppt/{urllib.parse.quote(os.path.basename(full_path))}"
+
+        return {
+            "ok": True,
+            "path": full_path,
+            "url": url_path,
+            "slides": slides,
+            "error": "",
+        }
+    except Exception as e:
+        return {"ok": False, "path": "", "url": "", "slides": 0, "error": f"PPT 生成异常: {e}"}
 
 
 @app.route("/api/generate", methods=["POST"])
