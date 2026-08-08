@@ -1812,6 +1812,30 @@ function removeThinking(div) {
   if (div) div.remove();
 }
 
+// v0.36 ⭐ 教学阶段指示器：SSE 事件驱动更新思考框文字
+// addThinking 创建的 th-text 结构：firstChild(纯文字) + <span.th-dots/>
+// 无 <b>，用 firstChild 直接替换文字最兼容；3 秒后自动恢复"正在思考"
+let _stageRestoreTimer = null;
+function updateTeachingStage(text) {
+  const box = document.querySelector('.thinking-box .th-text');
+  if (!box) return;
+  // 直接替换首文本节点（th-text 结构为：[text, <span.th-dots>]）
+  if (box.firstChild && box.firstChild.nodeType === 3) {
+    box.firstChild.nodeValue = text;
+  } else {
+    // 兜底：插入文字节点并补上 dots
+    box.innerHTML = `${text}<span class="th-dots"></span>`;
+  }
+  // 阶段文字 3 秒后恢复默认（避免残留）；期间后续事件会覆盖
+  if (_stageRestoreTimer) clearTimeout(_stageRestoreTimer);
+  _stageRestoreTimer = setTimeout(() => {
+    const b2 = document.querySelector('.thinking-box .th-text');
+    if (b2 && b2.firstChild && b2.firstChild.nodeType === 3 && b2.firstChild.nodeValue === text) {
+      b2.firstChild.nodeValue = '正在思考';
+    }
+  }, 3000);
+}
+
 // 加载每日一句（v0.17）
 async function loadDailyQuote() {
   try {
@@ -2167,7 +2191,16 @@ async function teach(question, subject, subtopic) {
         let obj;
         try { obj = JSON.parse(data); } catch (e) { continue; }
 
-        if (event === 'presentation') {
+        // v0.36 ⭐ 教学阶段事件：驱动思考框文字显示 6 步推理进度
+        // 教学流中 SSE 顺序：diagnosis → plan → step → presentation → evaluation → adjustment → reflection
+        if (event === 'diagnosis') {
+          updateTeachingStage('诊断学情');
+        } else if (event === 'plan') {
+          updateTeachingStage('规划教学路径');
+        } else if (event === 'step') {
+          const sid = obj.step_id || 1;
+          updateTeachingStage(`第 ${sid} 步讲解`);
+        } else if (event === 'presentation') {
           // 追加到同一气泡（步骤间加空行分隔，不拆气泡）
           const content = obj.content || obj.text || '';
           if (allText && !allText.endsWith('\n\n')) allText += '\n\n';
@@ -2202,6 +2235,12 @@ async function teach(question, subject, subtopic) {
             await new Promise(r => setTimeout(r, 10));
           }
           mainBubble._rawText = allText;
+        } else if (event === 'evaluation') {
+          updateTeachingStage('评估掌握度');
+        } else if (event === 'adjustment') {
+          updateTeachingStage('调整教学策略');
+        } else if (event === 'reflection') {
+          updateTeachingStage('教学反思');
         } else if (event === 'summary') {
           lastSummary = obj.avg_score || 0;
         } else if (event === 'doc') {
