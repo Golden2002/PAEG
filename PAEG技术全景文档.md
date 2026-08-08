@@ -3327,6 +3327,26 @@ answer / chat（纯 LLM 判断，无规则函数）
 
 **回归**：146+ passed（1 个预先存在的测试顺序问题与本次无关），新增 test_v035_recommend_branch.py / test_v035_llm_first_routing.py 全过。
 
+### 10.2.16 ⭐ v0.35 元认知日志建模评估修复（用户画像作为 LLM 输入）
+
+> **触发**：用户反馈"元认知日志显示的是对话历史，不是 LLM 对用户建模的评估"。
+
+#### 根因链（已确认）
+1. 前端渲染正确（renderLogs 识别 type=user_modeling）
+2. 后端写入正确（reflections.json 142 条 user_modeling）
+3. **但 trait 字段几乎全空**（learning_style 1%、strengths 0%、gaps 0%）
+4. 原因：Individuality.run 的 LLM prompt 只含对话历史（teach_stream 只传当前概念）+ 自我陈述，**缺用户画像（掌握度/认知风格/学段/年龄）** → LLM 信息不足，只能输出 interests，其他字段空
+5. 验证：丰富 history → LLM 完整输出 6 类；单条概念 → 只输出 interests
+
+#### 修复（Oracle 方案 D：B 治本 + C 补空兜底）
+- **B 治本**：Individuality.run 的 LLM prompt 加入用户画像上下文（subjects_mastery 高/低掌握学科 → 擅长/薄弱、cognitive_style → 学习风格、grade/age）；输出约束改为"必须输出全部 6 类字段，无法判断输出 null 不省略"
+- **C 兜底**：LLM 空字段用画像填充（高掌握学科 → strengths、低掌握 → gaps、认知风格 → learning_style）；**非空不覆盖**
+- 效果：元认知日志显示"风格=visual · 擅=[physics] · 薄=[english]"而非"风格未知"
+
+#### 验证
+- 真实 LLM + 画像：learning_style=visual / strengths=['physics'] / gaps=['english']
+- 端到端：教学后 meta-log 显示"风格=visual 薄=[音位概念...] 趣=[语言学]"
+
 ## 10.3 版本历史
 
 > 完整修改日志已拆分至独立文档：**[CHANGELOG.md](./CHANGELOG.md)**（v0.1 → v0.21.4 全部记录）。
