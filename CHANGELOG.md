@@ -1,3 +1,9 @@
+### v0.32 测试架构反思 + 学段/跨设备双 bug 修复（TDD：RED→GREEN）
+- ⭐ 反思：5 大测试盲区（HTTP未覆盖/_uid回避状态残留/弱断言/子串误判/缺矩阵化）→ 技术文档 §10.2.13 + 元能力文档 §6.5 盲区模式库
+- 🐛 Bug1 学段缓存：teach_stream 仅首次读 grade_level → 新增 _hydrate_learner 9端点同步；前端移除强制覆盖 grade-select + change 同步后端；SUBJECT_GRADES linguistics/atmospheric_science 对齐知识库分层
+- 🐛 Bug2 跨设备：_is_registered 放宽 web_ 匿名落盘（9处守卫统一）+ 路径安全校验；画像持久化保持 u-only
+- ✅ TDD：test_v032_grade_subject_matrix.py（5测试 RED→GREEN）；pytest 195→200 零回归
+
 ### v0.31 GUI 修复：停止按钮 + 断点审计
 - ⭐ 全局断点审计（8 个 @media + 固定宽度清单）→ 技术文档 §5.7
 - 🔧 停止按钮修复：透明度（disabled opacity .6 → 生成态 opacity 1）、宽度（min-width:88px + 紧凑 padding）、硬编码色 → var(--danger) token
