@@ -1,3 +1,9 @@
+### v0.31 GUI 修复：停止按钮 + 断点审计
+- ⭐ 全局断点审计（8 个 @media + 固定宽度清单）→ 技术文档 §5.7
+- 🔧 停止按钮修复：透明度（disabled opacity .6 → 生成态 opacity 1）、宽度（min-width:88px + 紧凑 padding）、硬编码色 → var(--danger) token
+- 🔧 769–1024px 输入栏溢出修复：换行阈值上提到 1024px（P2-7）
+- ✅ 浏览器实测：900px/769px 无溢出、停止按钮不透明、教学零回归
+
 ### v0.29 GUI 设计优化（调研 73 条原则 + P0/P1/P2 全部落地）
 - ⭐ 调研：网页 GUI 设计原则 73 条（WCAG 2.2/NN/G/Material 3/Apple HIG/Mayer/Sweller）→ 技术文档 §5.5 + 元能力文档 §6.4
 - ⭐ P0：aria 补全 19 处、模式切换 role=tablist、登录弹窗 role=dialog+Esc 关闭、对比度修复（--text-dim #5C534A，实测 6.0–7.2:1 全达标）、6 档响应式断点（1280/1024/960/768/480）、触控目标 ≥40px
