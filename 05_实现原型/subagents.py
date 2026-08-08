@@ -29,6 +29,39 @@ def _is_real_llm(model) -> bool:
     return hasattr(model, "chat") and getattr(model, "name", "mock") != "mock"
 
 
+def _inject_skill_catalog(system: str) -> str:
+    """v0.36 P0 修复（teach 路径断链）：把 SkillRegistry 的 L1 技能目录追加到 system prompt。
+
+    - server.py L135 _inject_skill_catalog 的 subagents 等价实现（教学走 paeg.teach / paeg.presenter.run）
+    - 教学路径（/api/teach 和 /api/teach/stream）原本未注入 10 个 SKILL.md 目录，LLM 教学时看不见技能
+    - 现在 Presenter.run 在送出 system 给 LLM 前一次性追加（与 chat_stream 行为一致）
+    - 容错：SKILL_REGISTRY 未初始化或扫描结果为空 → 原样返回
+    - 幂等性：已含 `## 可用技能` 标记时跳过重复注入
+    """
+    if not system:
+        return system
+    try:
+        from skill_registry import SkillRegistry
+        # 与 server.py 共享 SkillRegistry 实例（保证两边状态一致）
+        global _SHARED_SKILL_REGISTRY
+        try:
+            reg = _SHARED_SKILL_REGISTRY
+        except NameError:
+            reg = None
+        if reg is None:
+            reg = SkillRegistry()
+            _SHARED_SKILL_REGISTRY = reg
+        catalog = reg.catalog_prompt()
+    except Exception:
+        return system
+    if not catalog:
+        return system
+    # 幂等性：避免 Presenter.run 被同流程多次调用时重复注入
+    if "## 可用技能" in system:
+        return system
+    return system + "\n\n" + catalog
+
+
 def _safe_chat(model, system: str, user: str = None, messages: list = None,
                max_tokens: int = 512, tools: list = None,
                tool_choice: Optional[str] = None) -> Optional[str]:
@@ -608,6 +641,11 @@ class Presenter:
                 _tools = get_tool_defs()
             except Exception:
                 _tools = None
+            # v0.36 P0 修复（teach 路径断链）：skill catalog 注入教学 system
+            # — chat_stream 走 server._inject_skill_catalog 已修；teach/teach_stream 走 paeg.presenter.run 此前漏注
+            # — Presenter.run 是 sync (/api/teach) 与 stream (/api/teach/stream) 共同终点，单点修复两边覆盖
+            # — 在所有教学指令（LANGUAGE_STYLE/学科导航/母语迁移/个体化/适配决策）追加完毕后注入，避免覆盖既有策略
+            system = _inject_skill_catalog(system)
             content = _safe_chat_with_retrieval(
                 self.model, system, user, subject=subject, max_tokens=512, tools=_tools,
                 learner=learner, llm=self.model,  # v0.26 需求B：LLM 选库+关键词引导
