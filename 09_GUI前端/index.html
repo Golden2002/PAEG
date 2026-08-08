@@ -678,9 +678,18 @@ body {
   color: #fff; font-size: 14px; font-weight: 600;
   padding: 10px 22px; border-radius: 10px; cursor: pointer;
   transition: all .2s; flex-shrink: 0;
+  min-width: 88px;   /* v0.31 P2-6：固定宽度，切换"发送"↔"■ 停止"时不跳动 */
 }
 .ask-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(79,124,255,.35); }
 .ask-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+/* v0.31 P2-6：生成中停止按钮保持不透明（覆盖 disabled 的 opacity .6）+ 危险色 token 化 */
+.ask-btn[data-generating="1"] {
+  opacity: 1;
+  padding: 10px 14px; font-size: 13px; letter-spacing: .5px; white-space: nowrap;
+  background: linear-gradient(135deg, var(--danger), color-mix(in srgb, var(--danger) 75%, #000));
+}
+.ask-btn[data-generating="1"]:hover { transform: none; box-shadow: none; }
+.ask-btn[data-generating="1"]:disabled { opacity: 1; cursor: pointer; }
 
 /* ─── 学科快速入口 ─── */
 .subject-chips { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
@@ -953,6 +962,11 @@ body {
 @media (max-width: 1024px) {
   .msg { max-width: 94%; }
   .mode-btn { font-size: 12px; padding: 5px 9px; }
+  /* v0.31 P2-7：769–1024px 输入栏换行，修复横向溢出 */
+  .input-bar { flex-wrap: wrap; }
+  .input-bar .subject-select { flex: 1 1 30%; min-width: 90px; }
+  .question-input { flex: 1 1 100%; order: 5; }
+  .ask-btn { flex: 1 1 100%; order: 6; }
 }
 @media (max-width: 960px) {
   .main { grid-template-columns: 1fr; }
@@ -2076,8 +2090,6 @@ async function teach(question, subject, subtopic) {
     try {
       const ab = document.getElementById('ask-btn');
       ab.textContent = '■ 停止';
-      ab.style.background = '#e5484d';
-      ab.style.color = '#fff';
       ab.dataset.generating = '1';
     } catch(e){}
   };
@@ -2085,8 +2097,6 @@ async function teach(question, subject, subtopic) {
     try {
       const ab = document.getElementById('ask-btn');
       ab.textContent = '发送';
-      ab.style.background = '';
-      ab.style.color = '';
       delete ab.dataset.generating;
     } catch(e){}
   };
@@ -2296,8 +2306,6 @@ async function generalChat(text) {
   try {
     const ab = document.getElementById('ask-btn');
     ab.textContent = '■ 停止';
-    ab.style.background = '#e5484d';
-    ab.style.color = '#fff';
     ab.dataset.generating = '1';
   } catch(e){}
   // 流式消息气泡（累积显示）
@@ -2428,8 +2436,6 @@ async function generalChat(text) {
     try {
       const ab = document.getElementById('ask-btn');
       ab.textContent = '发送';
-      ab.style.background = '';
-      ab.style.color = '';
       delete ab.dataset.generating;
     } catch(e2){}
     window._genAbort = null;
