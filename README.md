@@ -207,3 +207,22 @@ python D:\桌面\智能体架构与开发（含大模型）_教育者Agent项�
 
 ### 完成状态
 - 2026-08-08：106 个代码/文档文件全部一致（0 缺失 0 差异），Release v0.34 为最新
+
+## 技术栈
+
+| 层 | 技术 |
+|---|---|
+| 后端 | Python + Flask（47+ API 路由）+ module_registry 模块门控 |
+| LLM | DeepSeek（云端推理，agent 指挥 LLM） |
+| 前端 | 原生 HTML/CSS/JS（无框架）+ KaTeX 数学渲染 + marked Markdown |
+| 语音 | v0.36 ⭐：edge-tts（TTS 免key）+ 浏览器 Web Speech API（STT） |
+| 工具 | 7 内置工具 + 10 Skills + 3 MCP（filesystem/memory/pptx） |
+| 存储 | JSON 文件落盘（users_data/ + data/ + Library/） |
+| 部署 | 本地 :5000 + cloudflared 隧道公网 |
+
+## 语音模块（v0.36 ⭐）
+
+- **TTS（朗读回答）**：edge-tts（免费，中文女声 zh-CN-XiaoxiaoNeural），后端 /api/voice/tts 生成 MP3
+- **STT（语音提问）**：浏览器 Web Speech API（Chrome/Edge/Safari），转文本后复用现有发送管线
+- 模块门控：paeg_modules.json 可开关；纯 I/O adapter，不进 subagent 调度
+- v2 规划：讯飞/微软/Azure 替换 provider（接口已抽象在 voice_service.py）
