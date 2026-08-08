@@ -1298,7 +1298,19 @@ def teach_stream():
 
         # 教学循环
         _assistant_parts = []  # v0.21.3：累积助手回复（用于会话保存）
-        _prev_presentations = []  # v0.21.8：累积前几轮讲解（多轮上下文延续——修复 stress 发现的"问x³忘了在讲积分"）
+        # v0.27 ⭐ 跨会话上下文：_prev_presentations 预载 chat_hist 的历史对话——
+        # 修复"第二问'那极限呢'引用不到上轮'微积分'"（此前只含当前会话步骤）
+        _prev_presentations = []
+        try:
+            _hist_ctx = SESSIONS.get(f"chat_hist_{learner_id}", [])
+            for _h in _hist_ctx[-6:]:
+                _prev_presentations.append({
+                    "content": _h.get("content", ""),
+                    "role": _h.get("role", "user"),
+                    "step_type": "history",
+                })
+        except Exception:
+            pass
         # v0.26 ⭐ subtopic 注入每个 step（前端三级选择；空则不注入）
         if subtopic:
             for _st in (plan.get("steps") or []):
