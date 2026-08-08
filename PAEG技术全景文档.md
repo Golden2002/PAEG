@@ -3184,6 +3184,69 @@ readers.py（多格式全文提取 md/txt/pdf/docx/csv/json）
 - 路径安全：仅允许 `[u|web_][A-Za-z0-9_-]`，防目录穿越
 - **注意**：真正跨设备恢复仍需**登录**（u 前缀绑定 users_data）；匿名放宽只解决同浏览器场景
 
+### 10.2.14 ⭐ v0.34 综合测试盲区反思 + 标准化测试 v2.0（检测项目完整性）
+
+> **触发**：用户连续报告"元认知日志只记对话历史""没有联网检索标签"——暴露测试体系只验证"接口有响应"，不验证"是否走了设计承诺的完整管线"。本反思回答"综合测试还可能有哪些盲区，如何提升检测项目完整性的能力"。
+
+#### 一、综合测试的 6 大盲区（反思总结）
+
+| # | 盲区 | 具体表现 | 后果 |
+|---|---|---|---|
+| 1 | **早退分支绕过核心管线** | teach_stream 有 10+ 早退分支（情绪/grade_blocked/unknown/界面/知识库/思维导图/用户文件/意图路由/方法论/出题/元问题），每个只发 presentation→done | 多数请求从不建模、不写 meta-log——测试只看到"有响应" |
+| 2 | **意图路由不稳定** | meta_router 用 LLM 判意图，同一教学问题偶发被误判为 chat → 走早退 | 相同输入有时完整教学(38s)有时早退(14s)，不可复现 |
+| 3 | **测试不验证设计契约** | 技术文档记载 18+ 功能契约，测试从不对照文档 | meta-log 建模/badge 区分/字段完整性等断链无人发现 |
+| 4 | **弱断言** | len()>N 让拦截提示文本骗过检测 | grade_blocked 提示 280 字 → 测试误判通过 |
+| 5 | **_uid() 状态回避** | 学段联动测试用不同 uid，注释"避免画像残留" | 恰好绕开 SESSIONS 缓存 bug |
+| 6 | **SSE 流未消费** | test_client.post() 不消费 generator 流 → teach_stream 不执行 | meta-log 从不写入（v0.34 实测根因） |
+
+**核心教训**：测试验证"接口有响应" ≠ "项目完整性"——必须验证**设计契约**（文档承诺）与**管线完整性**（走了完整流程）。
+
+#### 二、标准化测试 v2.0（检测完整性能力）
+
+**新增 3 个测试维度**（相对 v0.32 的 6 层）：
+
+| 维度 | 文件 | 作用 |
+|---|---|---|
+| **契约层** | tests/test_contracts.py（6 契约） | 从技术文档提取契约，字段级断言（profile 字段/health 字段/subject-tree/grade_blocked/mode_auto_correct/meta-log） |
+| **管线完整性层** | tests/test_pipeline_integrity.py（7 测试） | 完整管线（须含 diagnosis）vs 早退分支（无 diagnosis）判定；meta-log 写入验证 |
+| **SSE 捕获工具** | tests/sse_helpers.py | parse_sse / assert_complete_pipeline / assert_early_return |
+
+**测试设计原则（v2.0 强制）**：
+1. **契约 = 文档承诺**：每条契约带技术文档行号，字段级断言（禁止 len()>N）
+2. **管线判定 = 必须有 diagnosis**：教学请求若缺 diagnosis 即失败（防早退绕过）
+3. **SSE 流必须消费**：`resp.get_data(as_text=True)` 让 generator 完整执行
+4. **确定性兜底**：教学端点语义锚定——用户选了具体学科 + 进入 /api/teach/stream → LLM 误判为 chat 时强制教学（Oracle 方案 C）
+5. **重试防 flaky**：LLM 建模偶发超时 → 测试重试 3 次
+
+#### 三、v0.34 修复的 2 个根本 bug
+
+**Bug 1 meta_router 教学意图误判**（用户报告"meta-log 只记对话历史"的根源）：
+- server.py L1175-1234：教学端点语义锚定（_NON_TEACH_INTENTS 排除 chat/answer）+ 确定性兜底（有效学科强制教学）
+- meta_router.py prompt：端点语义锚点（endpoint_hint="teach_stream"）
+- 结果：教学请求稳定走完整管线 → Individuality 建模 → user_modeling 写入 meta-log
+
+**Bug 2 test_v033 未消费 SSE**（测试自身缺陷）：
+- Flask test_client.post() 返回 Response 不执行 generator → teach_stream 不运行
+- 修复：测试补 `resp.get_data(as_text=True)` 消费流
+
+#### 四、v2.0 测试结果（217 passed 0 failed）
+
+| 组 | 数量 | 内容 |
+|---|---|---|
+| 快测试 | 138 | 单元/连通/路由/安全/自更新 |
+| v028+teaching+individuality | 57 | 端点/教学循环/画像 |
+| v033 综合 | 4 | meta-log 建模/badge/学段 |
+| 契约测试 | 6 | 文档契约字段级断言 |
+| 管线完整性 | 7 | 完整管线 vs 早退 |
+| v032 矩阵 | 5 | 学段×学科×多轮 |
+| **总计** | **217** | **0 failed** |
+
+#### 五、持续改进（元技能）
+
+1. **新契约提取**：每次功能开发后，把技术文档新增承诺同步为契约测试（元能力文档 §6.6）
+2. **管线完整性**：任何新端点/新早退分支，必须明确"完整管线 or 有意早退"并测之
+3. **标准化 runner**：未来将 6 层整合为 `run_v2.py` 一键执行 + 报告（契约通过率/管线完整率/断链清单）
+
 ## 10.3 版本历史
 
 > 完整修改日志已拆分至独立文档：**[CHANGELOG.md](./CHANGELOG.md)**（v0.1 → v0.21.4 全部记录）。
