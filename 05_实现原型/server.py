@@ -1636,6 +1636,15 @@ def profile_update(learner_id):
         if key in data and data[key] is not None:
             setattr(learner, attr, data[key])
 
+    # v0.27 ⭐ 修复：画像编辑（自我描述/年级等）必须持久化到 UserStore——
+    # 此前只更新 SESSIONS 内存，注册用户刷新/重启后丢失（除非先 teach 触发 save_learner）。
+    try:
+        if USER_STORE is not None and str(learner_id).startswith('u') \
+                and learner_id[1:].isdigit():
+            USER_STORE.save_learner(learner_id, learner)
+    except Exception as _pe:
+        print(f"[Server] profile_update 持久化失败: {_pe}")
+
     return jsonify({
         "ok": True,
         "learner": {
