@@ -2964,6 +2964,42 @@ readers.py（多格式全文提取 md/txt/pdf/docx/csv/json）
 3. **目的**：测"新情况下的反应稳定性"——避免重复测同一场景导致"熟悉的成功"掩盖真实缺陷
 4. **记录**：每轮测试记录使用的具体内容（stress_reports/ 存档），下一轮从不同内容库取样
 
+
+### 10.2.11 v0.28 ⭐ 增强版测试架构（基于前沿调研 + 覆盖缺口）
+
+> **调研**（42 方法/10 建议/102 来源）：GAIA2、τ-bench、AgentBench、SWE-bench、garak、DeepEval、Promptfoo、RULER、Drift No More、ScaffoldLM、Khan Academy KGI。
+
+#### 一、强度增强维度（新增）
+
+| 维度 | 方法 | 来源 | 状态 |
+|---|---|---|---|
+| **pass^k 一致性** | 同一问题跑 k=5 次，要求全部成功（非 pass@1） | τ-bench | ✅ v28 |
+| **drift 多轮** | 金句→干扰→追问 10 轮，测记忆保持与主题失焦 | Drift No More | ✅ v28 |
+| **长上下文** | 4K-128K 多档，retrieval/aggregation/multi-hop | RULER | P1 |
+| **属性测试** | Hypothesis 不变量（格式化幂等/批改自反） | Anthropic PBT | P1 |
+| **进化对抗** | 攻击 LLM 基于失败生成新攻击 prompt | Anthropic Red Team | P2 |
+| **跨模型切换** | prefix/suffix 模型切换漂移 ΔA→B | arXiv 2603.03111 | P2 |
+| **教学 KGI** | next-item correctness / 认知参与度 | Khan Academy | P2 |
+
+#### 二、覆盖缺口补齐（P0 已补）
+
+| 缺口 | 测试文件 |
+|---|---|
+| Planner subagent | test_v028_planner_memory_tools.py |
+| MemorySystem 三层记忆 | 同上 |
+| tool_registry 7 工具 | 同上 |
+| 26 端点补覆盖 | test_v028_endpoints.py |
+
+#### 三、前端脚本化（计划）
+
+- Playwright 脚本（固定场景 + 边界输入库）：学习者画像/日志/下拉/打断/徽章/PPT
+- 每轮更换场景（内容更换声明 §10.2.10）
+
+#### 四、运行规则（5 轮综合测试）
+
+- 每轮：pytest（含新测试）→ arch → 压力（全新内容）→ Playwright → 自检 → 文档/GitHub/Release
+- 每轮内容全更换（新学科/新场景/新边界）
+
 ## 10.3 版本历史
 
 > 完整修改日志已拆分至独立文档：**[CHANGELOG.md](./CHANGELOG.md)**（v0.1 → v0.21.4 全部记录）。
