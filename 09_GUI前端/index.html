@@ -1511,6 +1511,17 @@ async function loadSubjectTree() {
 
 document.getElementById('grade-select').addEventListener('change', () => {
   refreshSubjectOptions();   // 切学段→清空一级学科+二级学科
+  // v0.32 ⭐ 学段切换同步到后端画像（防止 SESSIONS 缓存陈旧——此前后端只在首次请求读学段）
+  if (typeof STATE !== 'undefined' && STATE.learnerId) {
+    const _grade = document.getElementById('grade-select').value;
+    fetch(API_BASE + '/api/profile/' + STATE.learnerId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ grade_level: _grade }),
+    }).catch(function (e) {
+      console.warn('[PAEG] 学段同步到后端失败（下次请求仍会带上，不影响使用）:', e);
+    });
+  }
 });
 
 const subjectSelect = document.getElementById('subject-select');
@@ -2200,15 +2211,11 @@ async function teach(question, subject, subtopic) {
                 console.log('[PAEG] subject detected:', obj.subject_detected);
               }
             }
-            // grade_blocked=true 时按 required_grade 切换学段
+            // v0.32 ⭐ grade_blocked 提示但不强制覆盖用户选择（Oracle 方案 A：LLM 是主体，规则只兜底）
+            // 此前强制 gradeSel.value = required_grade 会静默替用户切换学段，且后端缓存未同步导致死循环
             if (obj.grade_blocked && obj.required_grade) {
-              const gradeSel = document.getElementById('grade-select');
-              if (gradeSel.value !== obj.required_grade) {
-                const gradeLabel = { middle_school: '初中', high_school: '高中', undergraduate: '大学本科', graduate_exam: '考研' }[obj.required_grade] || obj.required_grade;
-                gradeSel.value = obj.required_grade;
-                refreshSubjectOptions();  // 切学段会清空一级+二级（按 v0.27 的级联规则）
-                addMsg('paeg', `<small>提示：当前问题更适合<b>${gradeLabel}</b>学段，已为您切换${gradeLabel}继续讲解。</small>`);
-              }
+              const gradeLabel = { middle_school: '初中', high_school: '高中', undergraduate: '大学本科', graduate_exam: '考研' }[obj.required_grade] || obj.required_grade;
+              addMsg('paeg', `<small>提示：「${obj.subject_requested || '该学科'}」更适合<b>${gradeLabel}</b>学段。若想正式学习，可在左上角切换学段；当前对话仍会尽量按你的选择继续。</small>`);
             }
           } catch (e) {
             console.warn('[PAEG] done 事件处理异常:', e);
