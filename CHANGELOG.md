@@ -1,3 +1,10 @@
+### v0.34 标准化综合测试 v2.0 + 教学意图确定性修复
+- ⭐ 反思 6 大测试盲区（早退绕过管线/意图路由不稳定/契约未验证/弱断言/_uid回避/SSE未消费）→ 技术文档 §10.2.14 + 元能力文档 §6.6
+- ⭐ 测试 v2.0：契约层（6 契约字段级断言）+ 管线完整性层（7 测试，须含 diagnosis）+ SSE 捕获工具（sse_helpers.py）
+- 🐛 修复 meta_router 教学意图误判：端点语义锚定（_NON_TEACH_INTENTS 排除 chat）+ 确定性兜底（有效学科强制教学）→ 教学请求稳定走完整管线
+- 🐛 修复 test_v033 未消费 SSE（generator 不执行）→ meta-log 建模测试通过
+- ✅ pytest 204 → 217 passed 0 failed；教学→建模→meta-log 全链路验证通过
+
 ### v0.32 测试架构反思 + 学段/跨设备双 bug 修复（TDD：RED→GREEN）
 - ⭐ 反思：5 大测试盲区（HTTP未覆盖/_uid回避状态残留/弱断言/子串误判/缺矩阵化）→ 技术文档 §10.2.13 + 元能力文档 §6.5 盲区模式库
 - 🐛 Bug1 学段缓存：teach_stream 仅首次读 grade_level → 新增 _hydrate_learner 9端点同步；前端移除强制覆盖 grade-select + change 同步后端；SUBJECT_GRADES linguistics/atmospheric_science 对齐知识库分层
