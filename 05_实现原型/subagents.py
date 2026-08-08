@@ -831,8 +831,9 @@ class ResourceLibrarian:
         # Library 资料（用户/公共/学科）
         if not _scopes or any(s in ("user", "public", "subject") for s in _scopes):
             _sources += self._search_library(learner, _kw, scope=_scope)
-        # 互联网
-        if include_web and (not _scopes or "web" in _scopes):
+        # 互联网（v0.27 ⭐：独立于 LLM scope——include_web=True 时始终尝试 web 检索，
+        # 避免 LLM 误判"不需要 web"而完全跳过联网（前端需要"已完成网络检索"徽章））
+        if include_web:
             _sources += self._search_web(question, _kw)
 
         # 去重（按 url）
