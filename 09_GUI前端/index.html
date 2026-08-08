@@ -2219,7 +2219,7 @@ async function teach(question, subject, subtopic) {
             mainBubble = document.createElement('div');
             mainBubble.className = 'msg paeg';
             mainBubble.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><div class="md-content"></div>
-              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button></div></div>`;
+              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div></div>`;
             chatWin.appendChild(mainBubble);
           }
         } else if (event === 'retrieval') {
@@ -2229,7 +2229,7 @@ async function teach(question, subject, subtopic) {
             mainBubble = document.createElement('div');
             mainBubble.className = 'msg paeg';
             mainBubble.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><div class="md-content"></div>
-              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button></div></div>`;
+              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div></div>`;
             chatWin.appendChild(mainBubble);
           }
           insertRetrievalBadge(mainBubble, obj.done);
@@ -2330,7 +2330,7 @@ function makeStepBubble(idx) {
   const div = document.createElement('div');
   div.className = 'msg paeg';
   div.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><span class="step-tag">讲解</span><div class="md-content"></div>
-    <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button></div>
+    <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div>
   </div>`;
   chatWin.appendChild(div);
   chatWin.scrollTop = chatWin.scrollHeight;
@@ -2476,7 +2476,7 @@ async function generalChat(text) {
         const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(textParts)));
         bubbleBody.innerHTML = toolCards.map(c => c.outerHTML).join('') +
           '<div class="md-content">' + (typeof marked !== 'undefined' ? marked.parse(fixedText) : escapeHtml(textParts)) + '</div>' +
-          '<div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button></div>';
+          '<div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div>';
         // 保存原始文本（复制/文档用）
         bubble._rawText = textParts;
         renderMath(bubbleBody);
@@ -2484,7 +2484,7 @@ async function generalChat(text) {
       } catch (e) {
         // v0.19.18：渲染失败不阻塞——至少显示纯文本
         bubbleBody.innerHTML = '<div class="md-content">' + escapeHtml(textParts) + '</div>' +
-          '<div class="msg-actions"><input type="checkbox" class="msg-select" /><button class="msg-copy" aria-label="复制此回复" onclick="copyMsg(this)">复制</button></div>';
+          '<div class="msg-actions"><input type="checkbox" class="msg-select" /><button class="msg-copy" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div>';
         bubble._rawText = textParts;
       }
     } else {
