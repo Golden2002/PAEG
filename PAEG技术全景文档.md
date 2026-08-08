@@ -805,6 +805,29 @@ flowchart LR
 | Guardrail 输入/输出双保险 | OpenAI Agents | P1 |
 
 
+
+### 资料库三级分级（⭐ 技术指标：学科 / 公共 / 用户隔离）
+
+**架构**：`Library/` 目录按三级作用域组织，检索时由 agent 引导 LLM 选择范围（`_llm_choose_retrieval_scope`）：
+
+| 级别 | 目录 | 作用域 | 检索触发 |
+|---|---|---|---|
+| **学科级** | `Library/<subject>/` | 当前学科专属资料（Math/Physics/Linguistics 等 30+ 学科子文件夹） | LLM 判定学科概念时 |
+| **公共级** | `Library/common/` | 跨学科通用资料 | LLM 判定基础概念时 |
+| **用户级（隔离）** | `Library/usr_knowledge/<uid>/` | **仅该用户上传的资料**（强隔离，他人不可见） | LLM 判定"我的资料/我上传"时 |
+
+**实现**：
+- `_pre_retrieve`（subagents.py:202-216）：按 `_scopes` 过滤目录（subject→学科目录、public→common、user→usr_knowledge/<uid>）
+- `ResourceLibrarian._search_library`：scope in ("all","subject"/"public"/"user") 三级过滤
+- **用户隔离**：用户目录以 `learner.id` 定位，检索只扫当前用户目录——不泄露他人资料
+- 知识库节点（knowledge_base.py + subjects_ext.py）作为**第四数据源**与三级 Library 并存
+
+**技术指标**：
+- 作用域粒度：3 级（学科/公共/用户）+ 知识库（4 源）
+- 用户隔离：100%（usr_knowledge/<uid> 目录级隔离）
+- LLM 引导：检索前 agent 先让 LLM 选库+关键词（LLM 优先，规则兜底）
+- 覆盖：30+ 学科子文件夹 + common + usr_knowledge 多用户
+
 ## 1.15 v0.27 增强（LLM 意图/检索引导/资料检索/PPT）
 
 ### 1.15.1 需求A：教学模式一次识别（LLM 优先 + 关键词兜底）
