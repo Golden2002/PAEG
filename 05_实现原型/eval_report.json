@@ -1,0 +1,67 @@
+{
+ "report": {
+  "total": 7,
+  "passed": 7,
+  "failed": 0,
+  "pass_rate": 1.0,
+  "avg_score": 1.0
+ },
+ "results": [
+  {
+   "label": "寒暄",
+   "question": "你好",
+   "answer": "",
+   "score": 1.0,
+   "pass": true,
+   "issues": []
+  },
+  {
+   "label": "身份",
+   "question": "你是谁",
+   "answer": "",
+   "score": 1.0,
+   "pass": true,
+   "issues": []
+  },
+  {
+   "label": "能力",
+   "question": "你能调用知识库吗",
+   "answer": "",
+   "score": 1.0,
+   "pass": true,
+   "issues": []
+  },
+  {
+   "label": "考研出题",
+   "question": "给我一道经典题目",
+   "answer": "",
+   "score": 1.0,
+   "pass": true,
+   "issues": []
+  },
+  {
+   "label": "概念教学",
+   "question": "什么是熵",
+   "answer": "",
+   "score": 1.0,
+   "pass": true,
+   "issues": []
+  },
+  {
+   "label": "导数公式",
+   "question": "求函数 f(x)=x^3-3x+1 的极值",
+   "answer": "",
+   "score": 1.0,
+   "pass": true,
+   "issues": []
+  },
+  {
+   "label": "解方程",
+   "question": "解方程 x^2-5x+6=0",
+   "answer": "",
+   "score": 1.0,
+   "pass": true,
+   "issues": []
+  }
+ ]
+}
