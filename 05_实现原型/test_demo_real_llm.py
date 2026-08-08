@@ -98,7 +98,7 @@ def main():
         grade_level="graduate_exam",
         age=22,
         cognitive_style="reading",
-        target_exam="kaoyan_math_i",
+        target_exam="math_i",
         specialty_target="计算机科学",
     )
 
@@ -106,7 +106,7 @@ def main():
     demos = [
         (high_school_student, "physics", "什么是熵？"),
         (high_school_student, "ethics", "电车难题该拉开关吗？"),
-        (kaoyan_student, "kaoyan_math", "极限的 ε-δ 定义是什么？"),
+        (kaoyan_student, "math", "极限的 ε-δ 定义是什么？"),
     ]
 
     total_tokens = 0
