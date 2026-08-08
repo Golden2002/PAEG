@@ -115,7 +115,7 @@ if (typeof marked === 'undefined') {
   --surface: #FFFFFF;        /* 卡片表面 */
   --surface-2: #F5F2EC;      /* 次级表面（暖灰） */
   --text: #1F1B16;           /* 深褐黑文字 */
-  --text-dim: #6B6259;       /* 次级文字 */
+  --text-dim: #5C534A;       /* 次级文字（v0.31 P0-4：原 #6B6259 在 #F5F2EC 上 4.4:1，未达 AA 4.5:1，加深） */
   --accent: #4F6BFF;         /* 教育蓝（信任+专注） */
   --accent-hover: #3D55E8;
   --accent-soft: rgba(79, 107, 255, 0.12);
@@ -138,6 +138,21 @@ if (typeof marked === 'undefined') {
   --font-display: 'Lora', 'Noto Serif SC', Georgia, serif;
   /* 动效 */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* v0.29 P1-1：硬编码色收敛（教育蓝/紫渐变/气泡/标签/徽章统一 token） */
+  --accent-2: #7c5cff;        /* 紫渐变副色 */
+  --grad-from: #4f7cff;       /* 蓝渐变起点 */
+  --user-bubble-bg: #eef2f7;  /* 用户头像底色 */
+  --tone-tag-bg: #f3f4f6;     /* 语气标签背景 */
+  --danger-2: #c0392b;        /* 删除红 hover */
+  --kb-badge: #4f6bff;        /* 知识库徽章主色 */
+  --lib-badge: #059669;       /* 本地库徽章主色 */
+  --web-badge: #b45309;       /* 网页徽章主色 */
+  /* v0.29 P1-2：字号节奏（11 / 12 / 14 / 16 / 20） */
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-base: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
 }
 
 /* v0.19.3：深色模式（系统偏好 + 手动切换） */
@@ -146,7 +161,7 @@ if (typeof marked === 'undefined') {
   --surface: #1C1E26;
   --surface-2: #23252F;
   --text: #EDEAE3;
-  --text-dim: #B5AFA4;
+  --text-dim: #A8A296;        /* v0.31 P0-4：原 #B5AFA4 在 #23252F 上对比度不足（<4.5:1），微调加深 */
   --accent: #7B91FF;
   --accent-hover: #95A8FF;
   --accent-soft: rgba(123, 145, 255, 0.18);
@@ -161,6 +176,48 @@ if (typeof marked === 'undefined') {
   --shadow-lg: 0 8px 24px rgba(0,0,0,.4);
   --elevated: rgba(28, 30, 38, 0.75);
   --sidebar-bg: #181A21;
+  /* v0.29 P1-1：硬编码色收敛（深色模式对应色） */
+  --accent-2: #a78bfa;
+  --grad-from: #7b91ff;
+  --user-bubble-bg: #2a2e3a;
+  --tone-tag-bg: #2f323d;
+  --danger-2: #f87171;
+  --kb-badge: #7b91ff;
+  --lib-badge: #34d399;
+  --web-badge: #fbbf24;
+}
+
+/* v0.29 P2-1：系统暗色自动跟随（用户从未手动选过时生效；手动选 light 后由 data-theme="light" 屏蔽） */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14151B;
+    --surface: #1C1E26;
+    --surface-2: #23252F;
+    --text: #EDEAE3;
+    --text-dim: #A8A296;
+    --accent: #7B91FF;
+    --accent-hover: #95A8FF;
+    --accent-soft: rgba(123, 145, 255, 0.18);
+    --coral: #FFAB91;
+    --coral-soft: rgba(255, 171, 145, 0.18);
+    --success: #34D399;
+    --warning: #FBBF24;
+    --danger: #F87171;
+    --border: rgba(237, 234, 227, 0.14);
+    --border-subtle: rgba(237, 234, 227, 0.08);
+    --shadow: 0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,.4);
+    --elevated: rgba(28, 30, 38, 0.75);
+    --sidebar-bg: #181A21;
+    --accent-2: #a78bfa;
+    --grad-from: #7b91ff;
+    --user-bubble-bg: #2a2e3a;
+    --tone-tag-bg: #2f323d;
+    --danger-2: #f87171;
+    --kb-badge: #7b91ff;
+    --lib-badge: #34d399;
+    --web-badge: #fbbf24;
+  }
 }
 
 /* 全局过渡（主题切换平滑） */
@@ -171,7 +228,7 @@ body, .sidebar, .card, .msg-bubble, .topbar, .input-bar, .chat-window {
 /* v0.19.25：独立对话类型标签（学习方法/知识库） */
 .mode-tag {
   display: inline-block;
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -210,7 +267,7 @@ body {
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand-logo {
   width: 34px; height: 34px; border-radius: 9px;
-  background: linear-gradient(135deg, var(--accent), #7c5cff);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-weight: 700; font-size: 15px;
   box-shadow: 0 2px 8px var(--accent-soft);
@@ -224,7 +281,7 @@ body {
 .topbar-right { display: flex; align-items: center; gap: 12px; }
 .theme-btn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+  width: 36px; height: 36px; border-radius: 8px; cursor: pointer;
   background: var(--surface-2); border: 1px solid var(--border-subtle);
   transition: background .15s var(--ease-out);
 }
@@ -276,7 +333,7 @@ body {
 .profile-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .avatar {
   width: 46px; height: 46px; border-radius: 50%;
-  background: linear-gradient(135deg, #4f7cff, #7c5cff);
+  background: linear-gradient(135deg, var(--grad-from), var(--accent-2));
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-size: 18px; font-weight: 600;
   cursor: pointer; overflow: hidden;
@@ -297,16 +354,16 @@ body {
 .profile-meta { font-size: 12px; color: var(--text-dim); }
 .mastery-list { display: flex; flex-direction: column; gap: 10px; }
 .mastery-item { display: flex; flex-direction: column; gap: 4px; }
-.mastery-row { display: flex; justify-content: space-between; font-size: 12.5px; }
+.mastery-row { display: flex; justify-content: space-between; font-size: var(--fs-sm); }
 .mastery-row .subj { color: var(--text-dim); }
 .mastery-row .val { font-weight: 600; }
 .mastery-bar { height: 6px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
-.mastery-bar > i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #4f7cff, #7c5cff); transition: width .4s ease; }
+.mastery-bar > i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--grad-from), var(--accent-2)); transition: width .4s ease; }
 
 .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .stat-cell { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
-.stat-cell .num { font-size: 20px; font-weight: 700; color: var(--accent); }
-.stat-cell .lbl { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
+.stat-cell .num { font-size: var(--fs-xl); font-weight: 700; color: var(--accent); }
+.stat-cell .lbl { font-size: var(--fs-xs); color: var(--text-dim); margin-top: 2px; }
 
 /* ─── 右栏：对话主区 ─── */
 .chat-area { display: flex; flex-direction: column; min-height: calc(100vh - 120px); }
@@ -327,12 +384,21 @@ body {
   display: flex; align-items: center; justify-content: center; font-size: 14px;
 }
 .msg.paeg .msg-avatar { background: var(--accent-soft); color: var(--accent); }
-.msg.user .msg-avatar { background: #eef2f7; color: var(--text-dim); }
+.msg.user .msg-avatar { background: var(--user-bubble-bg); color: var(--text-dim); }
 .msg-bubble {
   background: var(--surface-2); border-radius: 12px; padding: 11px 15px;
   font-size: 14px; line-height: 1.7; word-break: break-word;
 }
-.msg.user .msg-bubble { background: var(--accent); color: #fff; border-radius: 12px 12px 3px 12px; }
+.msg.user .msg-bubble {
+  background: var(--accent); color: #fff;
+  font-weight: 500;                       /* v0.29 P1-4：14px 普通体 → 500，蓝底白字可读性提升 */
+  border-radius: 12px 12px 3px 12px;
+}
+/* v0.29 P1-4：深色模式 #7B91FF + #fff 仅约 3.4:1，加深气泡底保 ≥4.5:1 对比 */
+[data-theme="dark"] .msg.user .msg-bubble {
+  background: color-mix(in srgb, var(--accent) 55%, var(--surface));
+  color: #fff;
+}
 .msg.paeg .msg-bubble { border-radius: 12px 12px 12px 3px; }
 .msg-bubble .step-tag {
   display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 6px;
@@ -340,7 +406,7 @@ body {
 }
 .msg-bubble .tone-tag {
   display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 6px;
-  background: #f3f4f6; color: var(--text-dim); margin-left: 6px;
+  background: var(--tone-tag-bg); color: var(--text-dim); margin-left: 6px;
 }
 .msg.user .msg-bubble .step-tag { background: rgba(255,255,255,.2); color: #fff; }
 
@@ -348,7 +414,7 @@ body {
    复用 .step-tag 的 token 体系（accent-soft/border/text-dim），保证视觉一致。 */
 .retrieval-badge {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 11.5px; line-height: 1; padding: 4px 8px;
+  font-size: var(--fs-xs); line-height: 1; padding: 4px 8px;
   margin-bottom: 8px;
   border-radius: 6px;
   background: var(--accent-soft);
@@ -412,7 +478,7 @@ body {
 /* v0.17：阶段化思考提示（等待时不空转，展示思考过程） */
 .thinking-box {
   display: flex; align-items: center; gap: 10px;
-  padding: 4px 2px; font-size: 13.5px; color: var(--text-dim);
+  padding: 4px 2px; font-size: var(--fs-base); color: var(--text-dim);
 }
 .thinking-box .th-spinner {
   width: 16px; height: 16px; border-radius: 50%;
@@ -479,12 +545,13 @@ body {
   text-overflow: ellipsis; white-space: nowrap;
 }
 .conv-item .conv-del {
-  font-size: 12px; color: var(--text-dim); padding: 2px 6px;
+  font-size: 12px; color: var(--text-dim); padding: 4px 10px;   /* v0.31 P0-6：加大命中区 */
   border-radius: 4px; flex-shrink: 0; opacity: 0;
   transition: opacity .15s;
+  min-height: 28px; display: inline-flex; align-items: center;
 }
 .conv-item:hover .conv-del { opacity: 1; }
-.conv-item .conv-del:hover { color: #c0392b; background: rgba(192,57,43,.1); }
+.conv-item .conv-del:hover { color: var(--danger-2); background: color-mix(in srgb, var(--danger-2) 10%, transparent); }
 
 /* v0.19.5：数学公式 */
 .math-block { margin: 12px 0; overflow-x: auto; }
@@ -497,9 +564,10 @@ body {
 }
 .msg.paeg:hover .msg-actions { opacity: 1; }
 .msg-copy {
-  font-size: 11px; padding: 2px 10px; border-radius: 6px;
+  font-size: 11px; padding: 4px 10px; border-radius: 6px;   /* v0.31 P0-6：垂直内边距 2→4 增命中区 */
   background: var(--surface-2); border: 1px solid var(--border-subtle);
   color: var(--text-dim); cursor: pointer; transition: all .15s;
+  min-height: 28px; display: inline-flex; align-items: center;
 }
 .msg-copy:hover { background: var(--accent-soft); color: var(--accent); }
 .msg-select {
@@ -564,7 +632,7 @@ body {
   appearance: none; -webkit-appearance: none; -moz-appearance: none;
   height: 36px; line-height: 1;
   padding: 0 32px 0 12px;
-  font-size: 13.5px; font-weight: 500; color: var(--text);
+  font-size: var(--fs-base); font-weight: 500; color: var(--text);
   background-color: var(--surface-2);
   border: 1px solid transparent;
   border-radius: 9px;
@@ -587,7 +655,7 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%234F6BFF'/%3E%3C/svg%3E");
 }
 .subject-select:focus-visible {
-  outline: none;
+  outline: none;                          /* v0.29 P1-5：用 box-shadow 自带环，避免与全局 :focus-visible 双环叠加 */
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
   background-color: var(--surface);
@@ -601,12 +669,12 @@ body {
   color: var(--text-dim);
 }
 .question-input {
-  flex: 1; border: none; outline: none; font-size: 14.5px; color: var(--text);
+  flex: 1; border: none; outline: none; font-size: var(--fs-base); color: var(--text);
   background: transparent; padding: 8px 4px;
 }
-.question-input::placeholder { color: #9ca3af; }
+.question-input::placeholder { color: var(--text-dim); opacity: .85; }   /* v0.31 P0-4：原 #9ca3af 过浅无法辨识，绑定 token */
 .ask-btn {
-  border: none; background: linear-gradient(135deg, #4f7cff, #7c5cff);
+  border: none; background: linear-gradient(135deg, var(--grad-from), var(--accent-2));
   color: #fff; font-size: 14px; font-weight: 600;
   padding: 10px 22px; border-radius: 10px; cursor: pointer;
   transition: all .2s; flex-shrink: 0;
@@ -619,7 +687,7 @@ body {
 .chips-icon { width: 14px; height: 14px; opacity: .6; align-self: center; }
 .chip {
   border: 1px solid var(--border); background: var(--surface);
-  padding: 6px 14px; border-radius: 20px; font-size: 12.5px; color: var(--text-dim);
+  padding: 6px 14px; border-radius: 20px; font-size: var(--fs-sm); color: var(--text-dim);
   cursor: pointer; transition: all .2s;
 }
 .chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
@@ -629,7 +697,7 @@ body {
 .action-bar { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .action-btn {
   border: 1px solid var(--border); background: var(--surface);
-  padding: 6px 14px; border-radius: 20px; font-size: 12.5px; color: var(--text-dim);
+  padding: 6px 14px; border-radius: 20px; font-size: var(--fs-sm); color: var(--text-dim);
   cursor: pointer; transition: all .2s;
 }
 .action-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
@@ -644,7 +712,7 @@ body {
 /* ─── 自我描述编辑（v0.10） ─── */
 .desc-toggle {
   border: 1px solid var(--border); background: var(--surface);
-  padding: 5px 12px; border-radius: 14px; font-size: 11.5px; color: var(--text-dim);
+  padding: 5px 12px; border-radius: 14px; font-size: var(--fs-xs); color: var(--text-dim);
   cursor: pointer; transition: all .2s;
 }
 .desc-toggle:hover { border-color: var(--accent); color: var(--accent); }
@@ -652,12 +720,12 @@ body {
 .desc-editor.open { display: block; }
 .desc-textarea {
   width: 100%; min-height: 110px; border: 1px solid var(--border);
-  border-radius: 8px; padding: 8px 10px; font-size: 12.5px; color: var(--text);
+  border-radius: 8px; padding: 8px 10px; font-size: var(--fs-sm); color: var(--text);
   background: var(--surface-2); resize: vertical; font-family: inherit; line-height: 1.6;
 }
 .desc-textarea:focus { outline: none; border-color: var(--accent); }
 .desc-save {
-  margin-top: 8px; border: none; background: linear-gradient(135deg, #4f7cff, #7c5cff);
+  margin-top: 8px; border: none; background: linear-gradient(135deg, var(--grad-from), var(--accent-2));
   color: #fff; font-size: 12px; font-weight: 600; padding: 6px 16px; border-radius: 8px;
   cursor: pointer; transition: all .2s;
 }
@@ -668,7 +736,7 @@ body {
 .generate-bar { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
 .generate-btn {
   border: 1px dashed var(--accent); background: var(--accent-soft);
-  padding: 6px 14px; border-radius: 20px; font-size: 12.5px; color: var(--accent);
+  padding: 6px 14px; border-radius: 20px; font-size: var(--fs-sm); color: var(--accent);
   cursor: pointer; transition: all .2s;
 }
 .generate-btn:hover { background: var(--accent); color: #fff; }
@@ -681,13 +749,13 @@ body {
 /* ─── 用户注册/登录（v0.14） ─── */
 .user-btn {
   border: 1px solid var(--border); background: var(--surface);
-  padding: 6px 14px; border-radius: 20px; font-size: 12.5px; color: var(--text);
+  padding: 6px 14px; border-radius: 20px; font-size: var(--fs-sm); color: var(--text);
   cursor: pointer; transition: all .2s;
 }
 /* ─── 气象链接（v0.20.5） ─── */
 .weather-link {
   border: 1px solid var(--border); background: var(--surface);
-  padding: 6px 14px; border-radius: 20px; font-size: 12.5px;
+  padding: 6px 14px; border-radius: 20px; font-size: var(--fs-sm);
   color: var(--accent); text-decoration: none; cursor: pointer;
   transition: all .2s;
 }
@@ -716,12 +784,12 @@ body {
 }
 .auth-input:focus { outline: none; border-color: var(--accent); }
 .auth-submit {
-  width: 100%; border: none; background: linear-gradient(135deg, #4f7cff, #7c5cff);
+  width: 100%; border: none; background: linear-gradient(135deg, var(--grad-from), var(--accent-2));
   color: #fff; font-size: 14px; font-weight: 600; padding: 11px; border-radius: 10px;
   cursor: pointer; margin-top: 4px; transition: all .2s;
 }
 .auth-submit:hover { opacity: .9; }
-.auth-msg { font-size: 12.5px; margin-top: 10px; min-height: 18px; }
+.auth-msg { font-size: var(--fs-sm); margin-top: 10px; min-height: 18px; }
 .auth-msg.ok { color: var(--success); }
 .auth-msg.err { color: var(--danger); }
 .auth-close {
@@ -729,11 +797,11 @@ body {
   cursor: pointer; color: var(--text-dim); line-height: 1;
 }
 .user-badge {
-  font-size: 12.5px; color: var(--accent); font-weight: 600;
+  font-size: var(--fs-sm); color: var(--accent); font-weight: 600;
   padding: 4px 10px; background: var(--accent-soft); border-radius: 14px;
 }
 .download-link {
-  display: inline-block; margin-top: 4px; font-size: 12.5px; color: var(--accent);
+  display: inline-block; margin-top: 4px; font-size: var(--fs-sm); color: var(--accent);
   text-decoration: none; font-weight: 600;
 }
 .download-link:hover { text-decoration: underline; }
@@ -760,7 +828,7 @@ body {
   color: var(--text); font-weight: 600; flex: 1;
 }
 .resource-progress .rp-stage {
-  font-size: 11.5px; color: var(--text-dim); font-weight: 400;
+  font-size: var(--fs-xs); color: var(--text-dim); font-weight: 400;
   padding: 2px 8px; border-radius: 8px; background: var(--accent-soft); color: var(--accent);
 }
 .resource-progress .rp-bar {
@@ -769,7 +837,7 @@ body {
 }
 .resource-progress .rp-bar > i {
   display: block; height: 100%; width: 0%;
-  background: linear-gradient(90deg, #4f7cff, #7c5cff);
+  background: linear-gradient(90deg, var(--grad-from), var(--accent-2));
   border-radius: 2px;
   animation: resource-indeterminate 1.4s ease-in-out infinite;
 }
@@ -789,7 +857,7 @@ body {
   font-size: 12px; color: var(--text-dim);
   padding: 0 2px;
 }
-.resource-list .rl-header b { color: var(--text); font-size: 13.5px; font-weight: 600; }
+.resource-list .rl-header b { color: var(--text); font-size: var(--fs-base); font-weight: 600; }
 
 /* 单张资料卡片 */
 .resource-card {
@@ -812,17 +880,18 @@ body {
   font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
   flex-shrink: 0; white-space: nowrap;
 }
-.resource-card .rc-badge.kb   { background: rgba(79,107,255,.12); color: #4f6bff; }
-.resource-card .rc-badge.lib  { background: rgba(16,185,129,.14); color: #059669; }
-.resource-card .rc-badge.web  { background: rgba(245,158,11,.16); color: #b45309; }
+/* v0.29 P1-1：徽章统一用 color-mix 跟随 token，深浅色下均自动适配 */
+.resource-card .rc-badge.kb   { background: color-mix(in srgb, var(--kb-badge) 12%, transparent); color: var(--kb-badge); }
+.resource-card .rc-badge.lib  { background: color-mix(in srgb, var(--lib-badge) 14%, transparent); color: var(--lib-badge); }
+.resource-card .rc-badge.web  { background: color-mix(in srgb, var(--web-badge) 16%, transparent); color: var(--web-badge); }
 .resource-card .rc-badge.unknown { background: var(--surface-2); color: var(--text-dim); }
 .resource-card .rc-snippet {
-  font-size: 12.5px; color: var(--text-dim); line-height: 1.6;
+  font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.6;
   word-break: break-word;
 }
 .resource-card .rc-link {
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: 12.5px; color: var(--accent); text-decoration: none;
+  font-size: var(--fs-sm); color: var(--accent); text-decoration: none;
   font-weight: 600; align-self: flex-start; margin-top: 2px;
 }
 .resource-card .rc-link:hover { text-decoration: underline; }
@@ -845,21 +914,141 @@ body {
 .log-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .log-item {
   background: var(--surface-2); border-radius: 8px; padding: 8px 12px;
-  font-size: 12.5px; border-left: 3px solid var(--accent);
+  font-size: var(--fs-sm); border-left: 3px solid var(--accent);
 }
 .log-item .time { color: var(--text-dim); font-size: 11px; }
 .log-item .txt { margin-top: 3px; color: var(--text); }
 
+/* v0.29 P1-3：空状态四要素（图标 + 标题 + 说明 + 文字引导） */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 18px 10px; text-align: center;
+  color: var(--text-dim);
+  background: transparent;
+}
+.empty-state .empty-icon {
+  width: 32px; height: 32px; opacity: .55;
+  margin-bottom: 2px;
+}
+.empty-state .empty-title {
+  font-size: var(--fs-sm); font-weight: 600; color: var(--text);
+}
+.empty-state .empty-desc {
+  font-size: var(--fs-xs); line-height: 1.6; color: var(--text-dim);
+  max-width: 220px;
+}
+
 /* ─── 响应式 ─── */
+/* v0.31 P0-5 / P0-6：多档断点 + 触控目标扩大
+   1280 以下：主区缩内边距、模式条压缩
+   1024 以下：消息接近满宽
+   960  及以下：原布局（单栏 + 侧栏 wrap）
+   768  及以下：顶栏/输入区紧凑、按钮全宽
+   480  及以下：模式条 2 列网格，键盘不缩防 iOS 缩放 */
+@media (max-width: 1280px) {
+  .main { padding: 0 16px; }
+  .mode-switch { flex-wrap: wrap; max-width: 320px; justify-content: flex-end; }
+  .mode-btn { padding: 5px 10px; font-size: var(--fs-sm); }
+}
+@media (max-width: 1024px) {
+  .msg { max-width: 94%; }
+  .mode-btn { font-size: 12px; padding: 5px 9px; }
+}
 @media (max-width: 960px) {
   .main { grid-template-columns: 1fr; }
   .sidebar { flex-direction: row; flex-wrap: wrap; }
   .sidebar .card { flex: 1; min-width: 260px; }
   .msg { max-width: 92%; }
 }
+@media (max-width: 768px) {
+  .topbar { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
+  .brand-sub { display: none; }
+  .chat-window { padding: 16px; }
+  .input-bar { flex-wrap: wrap; padding: 8px; }
+  .input-bar .subject-select { flex: 1 1 30%; min-width: 90px; }
+  .question-input { flex: 1 1 100%; order: 5; }
+  .ask-btn { flex: 1 1 100%; order: 6; }
+  .input-bar .upload-btn { order: 3; }
+  .msg { max-width: 96%; }
+  /* v0.31 P0-6：触控目标 ≥ 40px */
+  .theme-btn { width: 40px; height: 40px; }
+  .upload-btn { width: 40px; height: 40px; }
+  .msg-copy { min-height: 32px; padding: 6px 12px; }
+}
+@media (max-width: 480px) {
+  .topbar { padding: 8px 12px; }
+  .topbar-right { gap: 8px; flex-wrap: wrap; }
+  .mode-switch {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    width: 100%;
+    max-width: none;
+    padding: 4px;
+    gap: 4px;
+  }
+  .mode-btn { padding: 8px 6px; font-size: 12px; }
+  .subject-chips .chip,
+  .action-bar .action-btn,
+  .generate-bar .generate-btn { font-size: 12px; padding: 6px 10px; }
+  /* iOS 输入框 16px 以下会自动缩放——v0.29 P1-2 归入 --fs-base（14px），正文不缩；若需恢复 14.5 在此处覆盖即可 */
+  .question-input { font-size: var(--fs-base); }
+  .msg { max-width: 100%; }
+  .chat-window { padding: 12px; }
+}
+
+/* v0.29 P1-5：全局焦点环（WCAG 2.4.7 / 2.4.13）
+   解决 outline:none 处（.question-input / .desc-textarea / .auth-input）失去可见焦点的问题；
+   .subject-select 已有专属 box-shadow 环，本块在其内部 outline:none 抑制叠加。 */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* v0.29 P2-2：键盘跳过导航（WCAG 2.4.1）—— 视觉隐藏，键盘聚焦时显形 */
+.skip-link {
+  position: absolute; left: -9999px; top: 0;
+  background: var(--accent); color: #fff;
+  padding: 8px 16px; border-radius: 0 0 8px 0;
+  font-size: 13px; font-weight: 600; z-index: 999;
+  text-decoration: none;
+}
+.skip-link:focus-visible { left: 0; outline-offset: 0; }
+
+/* v0.29 P2-4：思考提示的骨架占位（与消息气泡同节奏，模拟 2-3 行待渲染文本） */
+.skeleton-bubble {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px; margin-top: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  max-width: 70%;
+}
+.skeleton-line {
+  height: 10px; border-radius: 4px;
+  background: linear-gradient(90deg,
+    var(--border-subtle) 0%,
+    var(--border) 40%,
+    var(--border-subtle) 80%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-line.w-100 { width: 100%; }
+.skeleton-line.w-90  { width: 90%; animation-delay: .15s; }
+.skeleton-line.w-70  { width: 70%; animation-delay: .3s; }
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line { animation: none; background: var(--border); }
+}
 </style>
 </head>
 <body>
+
+<!-- v0.29 P2-2：键盘跳过导航（WCAG 2.4.1） -->
+<a class="skip-link" href="#chat-window">跳到对话区</a>
 
 <!-- 顶栏 -->
 <header class="topbar">
@@ -871,26 +1060,26 @@ body {
     </div>
   </div>
   <div class="topbar-right">
-    <button class="theme-btn" id="theme-btn" title="切换深色/浅色模式">
+    <button class="theme-btn" id="theme-btn" title="切换深色/浅色模式" aria-label="切换深色/浅色模式">
       <img src="assets/icons/lightbulb.svg" alt="主题" id="theme-icon" />
     </button>
     <span class="conn-dot" id="conn-status">服务在线</span>
     <span class="user-badge" id="user-badge" style="display:none"></span>
     <button class="user-btn" id="user-btn">登录/注册</button>
     <a class="weather-link" href="/weather.html" title="查看气象图（Windy + 位置共享）">气象</a>
-    <div class="mode-switch">
-      <button class="mode-btn active" data-mode="teach">学科教学</button>
-      <button class="mode-btn" data-mode="chat">闲聊~</button>
-      <button class="mode-btn" data-mode="answer" title="直接给完整答案（论述/计算/证明题）">找答案</button>
-      <button class="mode-btn" data-mode="method" title="问某门课该怎么学、怎么复习、怎么规划">学习方法</button>
-      <button class="mode-btn" data-mode="knowledge" title="查看我的知识库：我收着哪些资料">知识库</button>
-      <button class="mode-btn" data-mode="affection" title="难过、焦虑、迷茫……想找人说说话">倾诉</button>
+    <div class="mode-switch" role="tablist" aria-label="对话模式">
+      <button class="mode-btn active" data-mode="teach" role="tab" aria-selected="true">学科教学</button>
+      <button class="mode-btn" data-mode="chat" role="tab" aria-selected="false">闲聊~</button>
+      <button class="mode-btn" data-mode="answer" title="直接给完整答案（论述/计算/证明题）" role="tab" aria-selected="false">找答案</button>
+      <button class="mode-btn" data-mode="method" title="问某门课该怎么学、怎么复习、怎么规划" role="tab" aria-selected="false">学习方法</button>
+      <button class="mode-btn" data-mode="knowledge" title="查看我的知识库：我收着哪些资料" role="tab" aria-selected="false">知识库</button>
+      <button class="mode-btn" data-mode="affection" title="难过、焦虑、迷茫……想找人说说话" role="tab" aria-selected="false">倾诉</button>
     </div>
   </div>
 </header>
 
 <!-- v0.14：注册/登录弹窗 -->
-<div class="auth-modal" id="auth-modal">
+<div class="auth-modal" id="auth-modal" role="dialog" aria-modal="true" aria-label="登录或注册">
   <div class="auth-card">
     <button class="auth-close" id="auth-close">×</button>
     <h2>PAEG 学习账户</h2>
@@ -898,9 +1087,9 @@ body {
       <button class="auth-tab active" id="tab-login">登录</button>
       <button class="auth-tab" id="tab-register">注册</button>
     </div>
-    <input class="auth-input" id="auth-identifier" type="text" placeholder="邮箱或手机号" />
-    <input class="auth-input" id="auth-password" type="password" placeholder="密码（至少 6 位）" />
-    <input class="auth-input" id="auth-nickname" type="text" placeholder="昵称（注册时填写，可选）" style="display:none" />
+    <input class="auth-input" id="auth-identifier" type="text" placeholder="邮箱或手机号" aria-label="邮箱或手机号" />
+    <input class="auth-input" id="auth-password" type="password" placeholder="密码（至少 6 位）" aria-label="密码" />
+    <input class="auth-input" id="auth-nickname" type="text" placeholder="昵称（注册时填写，可选）" aria-label="昵称（可选）" style="display:none" />
     <button class="auth-submit" id="auth-submit">登录</button>
     <div class="auth-msg" id="auth-msg"></div>
   </div>
@@ -923,7 +1112,8 @@ body {
       <input type="file" id="avatar-input" accept="image/*" style="display:none"/>
       <div class="desc-editor" id="desc-editor">
         <textarea class="desc-textarea" id="desc-textarea"
-          placeholder="例如：我是小林，高三理科生。目标是通过高考考上复旦大学，未来想学医。我擅长物理数学，不擅长死记硬背，喜欢理解原理。最近有点焦虑…"></textarea>
+          placeholder="例如：我是小林，高三理科生。目标是通过高考考上复旦大学，未来想学医。我擅长物理数学，不擅长死记硬背，喜欢理解原理。最近有点焦虑…"
+          aria-label="描述你的学习情况和目标"></textarea>
         <button class="desc-save" id="desc-save">保存（每次对话都会记住）</button>
         <div class="desc-hint">写下你是怎样的人、学习目标、擅长与不擅长——之后每一次对话，PAEG 都会带着这段描述来教你。</div>
       </div>
@@ -943,7 +1133,11 @@ body {
     <div class="card">
       <h3>元认知日志</h3>
       <div class="log-list" id="log-list">
-        <div class="log-item"><div class="txt" style="color:var(--text-dim)">等待教学记录…</div></div>
+<div class="empty-state" role="status">
+          <img class="empty-icon" src="assets/icons/brain.svg" alt="" aria-hidden="true" />
+          <div class="empty-title">还没有反思记录</div>
+          <div class="empty-desc">开始几次对话后，老师会在这里整理你的学习轨迹与建议。</div>
+        </div>
       </div>
     </div>
 
@@ -951,7 +1145,11 @@ body {
     <div class="card" id="conv-card">
       <h3>历史会话 <button class="desc-toggle" id="conv-clear" title="清空全部会话" style="display:none">清空</button></h3>
       <div class="conv-list" id="conv-list">
-        <div class="log-item"><div class="txt" style="color:var(--text-dim)">登录后自动保存对话，可在这里恢复</div></div>
+<div class="empty-state" role="status">
+          <img class="empty-icon" src="assets/icons/message-circle.svg" alt="" aria-hidden="true" />
+          <div class="empty-title">登录后可恢复历史会话</div>
+          <div class="empty-desc">右上角"登录/注册"开启后，对话会自动归档到这里。</div>
+        </div>
       </div>
     </div>
 
@@ -991,7 +1189,7 @@ body {
     </div>
 
     <div class="input-bar">
-      <select class="subject-select" id="grade-select">
+      <select class="subject-select" id="grade-select" aria-label="学段">
         <option value="">不限</option>
         <option value="middle_school">初中</option>
         <option value="high_school" selected>高中</option>
@@ -999,20 +1197,20 @@ body {
         <option value="graduate_exam">考研</option>
         <option value="all_grades">通识素养</option>
       </select>
-      <select class="subject-select" id="subject-select">
+      <select class="subject-select" id="subject-select" aria-label="学科">
         <!-- 学科选项由 JS 按学段动态生成（v0.25 学段-学科联动） -->
       </select>
-      <select class="subject-select" id="subfield-select" disabled title="三级学科：按学段与一级学科过滤">
+      <select class="subject-select" id="subfield-select" disabled title="三级学科：按学段与一级学科过滤" aria-label="二级学科">
         <option value="">不限</option>
       </select>
-      <input class="question-input" id="question-input" type="text" placeholder="输入你想学习的内容…" autocomplete="off" />
+      <input class="question-input" id="question-input" type="text" placeholder="输入你想学习的内容…" autocomplete="off" aria-label="输入你想学习的内容" />
       <!-- v0.19 P2-10：图片/文件上传 -->
-      <label class="upload-btn" id="upload-btn" title="上传图片/文件">
+      <label class="upload-btn" id="upload-btn" title="上传图片/文件" aria-label="上传图片或文件">
         <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.md,.txt" style="display:none" />
         <img class="upload-btn-icon" src="assets/icons/upload.svg" alt="上传" />
       </label>
       <!-- v0.19.11：资料上传（存入个人资料库，Agent 回答时参考） -->
-      <label class="upload-btn" id="lib-upload-btn" title="上传资料到个人资料库（回答时自动参考）">
+      <label class="upload-btn" id="lib-upload-btn" title="上传资料到个人资料库（回答时自动参考）" aria-label="上传资料到个人资料库">
         <input type="file" id="lib-input" accept=".pdf,.md,.txt,.docx,.csv,.json,.png,.jpg" style="display:none" />
         <img class="upload-btn-icon" src="assets/icons/book-open.svg" alt="资料" />
       </label>
@@ -1447,7 +1645,7 @@ function addMsg(role, html, tone, intent, preHtml) {
   const pre = preHtml || '';
   // v0.19.3：功能性——复制按钮 + 选择复选框（生成文档）
   const copyBtn = role === 'paeg'
-    ? `<button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button>` : '';
+    ? `<button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button>` : '';
   const checkBox = role === 'paeg'
     ? `<input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" />` : '';
   div.innerHTML = `
@@ -1563,6 +1761,14 @@ function addThinking(mode) {
   box.className = 'thinking-box';
   box.innerHTML = `<span class="th-spinner"></span><span class="th-text">${stages[0]}<span class="th-dots"></span></span>`;
   inner.appendChild(box);
+  /* v0.29 P2-4：骨架占位（与思考文字同级，显示待渲染内容的视觉提示） */
+  const skeleton = document.createElement('div');
+  skeleton.className = 'skeleton-bubble';
+  skeleton.setAttribute('role', 'status');
+  skeleton.setAttribute('aria-live', 'polite');
+  skeleton.setAttribute('aria-label', '正在生成回答');
+  skeleton.innerHTML = '<div class="skeleton-line w-100"></div><div class="skeleton-line w-90"></div><div class="skeleton-line w-70"></div>';
+  inner.appendChild(skeleton);
   div.appendChild(inner);
   chatWin.appendChild(div);
   chatWin.scrollTop = chatWin.scrollHeight;
@@ -1575,7 +1781,7 @@ function addThinking(mode) {
   return div;
 }
 
-// 移除思考提示（清理定时器）
+// 移除思考提示（清理定时器；P2-4：骨架随消息容器一起被 div.remove() 回收，无需单独清）
 function removeThinking(div) {
   if (div && div._stageTimer) { clearInterval(div._stageTimer); div._stageTimer = null; }
   if (div) div.remove();
@@ -1828,7 +2034,11 @@ function renderMastery(masteries) {
 function renderLogs(logs) {
   const list = document.getElementById('log-list');
   if (!logs.length) {
-    list.innerHTML = `<div class="log-item"><div class="txt" style="color:var(--text-dim)">等待教学记录…</div></div>`;
+    list.innerHTML = `<div class="empty-state" role="status">
+        <img class="empty-icon" src="assets/icons/brain.svg" alt="" aria-hidden="true" />
+        <div class="empty-title">还没有反思记录</div>
+        <div class="empty-desc">开始几次对话后，老师会在这里整理你的学习轨迹与建议。</div>
+      </div>`;
     return;
   }
   list.innerHTML = logs.slice(0, 8).map(l => {
@@ -1930,7 +2140,7 @@ async function teach(question, subject, subtopic) {
             mainBubble = document.createElement('div');
             mainBubble.className = 'msg paeg';
             mainBubble.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><div class="md-content"></div>
-              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button></div></div>`;
+              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button></div></div>`;
             chatWin.appendChild(mainBubble);
           }
         } else if (event === 'retrieval') {
@@ -1940,7 +2150,7 @@ async function teach(question, subject, subtopic) {
             mainBubble = document.createElement('div');
             mainBubble.className = 'msg paeg';
             mainBubble.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><div class="md-content"></div>
-              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button></div></div>`;
+              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button></div></div>`;
             chatWin.appendChild(mainBubble);
           }
           insertRetrievalBadge(mainBubble, obj.done);
@@ -2039,7 +2249,7 @@ function makeStepBubble(idx) {
   const div = document.createElement('div');
   div.className = 'msg paeg';
   div.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><span class="step-tag">讲解</span><div class="md-content"></div>
-    <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button></div>
+    <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button></div>
   </div>`;
   chatWin.appendChild(div);
   chatWin.scrollTop = chatWin.scrollHeight;
@@ -2187,7 +2397,7 @@ async function generalChat(text) {
         const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(textParts)));
         bubbleBody.innerHTML = toolCards.map(c => c.outerHTML).join('') +
           '<div class="md-content">' + (typeof marked !== 'undefined' ? marked.parse(fixedText) : escapeHtml(textParts)) + '</div>' +
-          '<div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" onclick="copyMsg(this)">复制</button></div>';
+          '<div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button></div>';
         // 保存原始文本（复制/文档用）
         bubble._rawText = textParts;
         renderMath(bubbleBody);
@@ -2195,7 +2405,7 @@ async function generalChat(text) {
       } catch (e) {
         // v0.19.18：渲染失败不阻塞——至少显示纯文本
         bubbleBody.innerHTML = '<div class="md-content">' + escapeHtml(textParts) + '</div>' +
-          '<div class="msg-actions"><input type="checkbox" class="msg-select" /><button class="msg-copy" onclick="copyMsg(this)">复制</button></div>';
+          '<div class="msg-actions"><input type="checkbox" class="msg-select" /><button class="msg-copy" aria-label="复制此回复" onclick="copyMsg(this)">复制</button></div>';
         bubble._rawText = textParts;
       }
     } else {
@@ -2456,7 +2666,11 @@ function applyLogin(result) {
 async function loadConversations() {
   const list = document.getElementById('conv-list');
   if (!STATE.learnerId.startsWith('u')) {
-    list.innerHTML = `<div class="log-item"><div class="txt" style="color:var(--text-dim)">登录后自动保存对话，可在这里恢复</div></div>`;
+    list.innerHTML = `<div class="empty-state" role="status">
+        <img class="empty-icon" src="assets/icons/message-circle.svg" alt="" aria-hidden="true" />
+        <div class="empty-title">登录后可恢复历史会话</div>
+        <div class="empty-desc">右上角"登录/注册"开启后，对话会自动归档到这里。</div>
+      </div>`;
     document.getElementById('conv-clear').style.display = 'none';
     return;
   }
@@ -2552,6 +2766,15 @@ document.getElementById('auth-close').addEventListener('click', () => {
 document.getElementById('auth-modal').addEventListener('click', (e) => {
   if (e.target === document.getElementById('auth-modal')) {
     document.getElementById('auth-modal').classList.remove('open');
+  }
+});
+// v0.31 (P0-3)：Esc 关闭登录弹窗（可访问性）
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.keyCode === 27) {
+    const modal = document.getElementById('auth-modal');
+    if (modal && modal.classList.contains('open')) {
+      modal.classList.remove('open');
+    }
   }
 });
 
@@ -2691,8 +2914,9 @@ document.querySelectorAll('.chip').forEach(chip => {
 
 document.querySelectorAll('.mode-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.mode-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
     btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
     currentMode = btn.dataset.mode;
     // v0.19.7：教学模式/找答案模式显示学科+学段选择；闲聊模式全部隐藏
     // v0.19.14：新增 answer（找答案）模式
@@ -2724,10 +2948,18 @@ function applyTheme(theme) {
   document.getElementById('theme-icon').src = theme === 'dark'
     ? 'assets/icons/lightbulb.svg' : 'assets/icons/sparkles.svg';
 }
+/* v0.29 P2-1：用户从未手动选过时跟随系统（不写 data-theme，让 prefers-color-scheme 媒体查询生效）；
+   手动选过则照旧显式写 data-theme，固化偏好、不再跟随系统变化。 */
 (function initTheme() {
   const saved = localStorage.getItem('paeg-theme');
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  applyTheme(saved || (prefersDark ? 'dark' : 'light'));
+  if (saved === 'dark' || saved === 'light') {
+    applyTheme(saved);
+  } else {
+    // 仅根据当前系统偏好同步图标（lightbulb=暗色待切换；sparkles=浅色待切换）
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.getElementById('theme-icon').src = prefersDark
+      ? 'assets/icons/lightbulb.svg' : 'assets/icons/sparkles.svg';
+  }
 })();
 document.getElementById('theme-btn').addEventListener('click', () => {
   const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
