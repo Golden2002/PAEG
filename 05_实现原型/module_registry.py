@@ -10,10 +10,13 @@ PAEG 功能模块注册机制（v0.21 ⭐ 模块化元技能）
 配置：paeg_modules.json（JSONC 风格，支持 {env:VAR}）
 
 用法：
-    from module_registry import MODULES, is_enabled, register_module
+    from module_registry import is_enabled, require_module, enabled_modules
     if is_enabled("weather"):
         from weather_routes import weather_bp
         app.register_blueprint(weather_bp)
+    # v0.36：路由可用 @require_module("模块名") 装饰器门禁
+    @require_module("knowledge")
+    def knowledge_search(): ...
 """
 from __future__ import annotations
 
