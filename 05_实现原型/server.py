@@ -1552,6 +1552,7 @@ def profile(learner_id):
                         self_description=learner_dict.get("self_description", ""),
                         target_exam=learner_dict.get("target_exam"),
                         specialty_target=learner_dict.get("specialty_target"),
+                        subjects_mastery=learner_dict.get("subjects_mastery") or {},
                     )
                     SESSIONS[f"learner_{learner_id}"] = learner
                 return jsonify({
