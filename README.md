@@ -185,3 +185,25 @@ PAEG 有 **10 个技能**（skill_registry.py 注册，经 tool_registry 暴露�
 ## License
 
 MIT
+
+## ⭐ 三处一致原则（本地目录 ↔ GitHub ↔ Release）
+
+**项目维护铁律**：本地项目目录、GitHub 仓库（Golden2002/PAEG main 分支）、Release 三者内容必须完全一致、互为备份。
+
+### 校验脚本
+
+```powershell
+$env:GH_TOKEN='<你的token>'
+python D:\桌面\智能体架构与开发（含大模型）_教育者Agent项目\sync_check.py        # 只读校验
+python D:\桌面\智能体架构与开发（含大模型）_教育者Agent项目\sync_check.py --fix  # 自动推送差异（本地为权威）
+```
+
+### 原则
+1. **本地为权威源**：任何修改先在本地完成并验证
+2. **每次变更后同步**：改完代码/文档 → 跑 sync_check.py --fix 推送 GitHub
+3. **Release 保持最新**：重大版本更新时更新 Release 名称与正文（tag 可复用 v0.26）
+4. **敏感数据不上传**：users.json / users_data/ / uploads/ / data/ 等运行时数据不参与备份
+5. **token 不入库**：脚本从环境变量 GH_TOKEN 读取，禁止硬编码密钥
+
+### 完成状态
+- 2026-08-08：106 个代码/文档文件全部一致（0 缺失 0 差异），Release v0.34 为最新
