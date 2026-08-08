@@ -21,6 +21,7 @@ import json
 import uuid
 import os
 import sys
+import re
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
@@ -419,6 +420,24 @@ def _polish_text(text: str, context: str = "") -> str:
         pass
     return text
 
+def _hydrate_learner(learner, data):
+    """v0.32 ⭐ 每次请求把请求体的学段/画像字段同步到 SESSIONS 缓存。
+
+    历史 bug：teach_stream 等端点只在首次创建 LearnerProfile 时读 grade_level，
+    之后永远用缓存旧值，导致用户切换学段后后端仍按旧学段教学（linguistics 反复 grade_blocked）。
+    这里只更新运行时字段，不负责持久化（持久化由 profile_update 的 save_learner 负责）。
+    """
+    if learner is None or not isinstance(data, dict):
+        return learner
+    grade = data.get("grade_level")
+    if grade and getattr(learner, "grade_level", None) != grade:
+        try:
+            learner.grade_level = grade
+        except Exception as _e:
+            print(f"[Server] _hydrate_learner grade_level 同步失败: {_e}")
+    return learner
+
+
 def _steer_subject(concept: str, subject: str, learner, learner_id: str) -> dict:
     """根据问题内容自动判断学科，覆盖用户手动设定。
 
@@ -691,6 +710,7 @@ def teach():
         # 已有学习者：允许在请求中更新自我描述（v0.10）
         if data.get("self_description") is not None:
             learner.self_description = data["self_description"]
+    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
     # 教学
     concept = data["concept"]
@@ -957,20 +977,24 @@ def teach():
                     "summary_avg": (result.get("summary") or {}).get("avg_score"),
                     "timestamp": datetime.now().isoformat(),
                 })
-                # v0.18：保存完整对话到 conversations（前端可恢复）
-                if CONV_STORE is not None:
-                    cid = SESSIONS.get(f"conv_{learner_id}")
-                    cid = CONV_STORE.add_message(
-                        learner_id, "teach", f"{concept}", "user", concept, conv_id=cid)
-                    for p in result["session"].history:
-                        content = p.get("content") or p.get("text") or ""
-                        if content:
-                            cid = CONV_STORE.add_message(
-                                learner_id, "teach", f"{concept}", "assistant",
-                                content, conv_id=cid)
-                    SESSIONS[f"conv_{learner_id}"] = cid
             except Exception as _e:
                 print(f"[Server] 画像持久化失败: {_e}")
+        # v0.18：保存完整对话到 conversations（前端可恢复）
+        # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀），画像仍仅注册用户
+        if _is_registered(learner_id):
+            try:
+                cid = SESSIONS.get(f"conv_{learner_id}")
+                cid = CONV_STORE.add_message(
+                    learner_id, "teach", f"{concept}", "user", concept, conv_id=cid)
+                for p in result["session"].history:
+                    content = p.get("content") or p.get("text") or ""
+                    if content:
+                        cid = CONV_STORE.add_message(
+                            learner_id, "teach", f"{concept}", "assistant",
+                            content, conv_id=cid)
+                SESSIONS[f"conv_{learner_id}"] = cid
+            except Exception as _e:
+                print(f"[Server] 对话保存失败: {_e}")
         # v0.19.22：自进化——成功教学后提炼知识点（经质量门禁）
         if EVOLVER is not None:
             try:
@@ -1005,6 +1029,7 @@ def teach_stream():
             self_description=data.get("self_description", ""),
         )
         SESSIONS[f"learner_{learner_id}"] = learner
+    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
     concept = data["concept"]
     subject = data["subject"]
@@ -1454,9 +1479,9 @@ def teach_stream():
             yield f"event: self_evolution\ndata: {json.dumps({'events': _ev_stream_events}, ensure_ascii=False)}\n\n"
 
         # v0.21.3：流式教学也保存会话到 CONV_STORE（修复前端历史会话列表为空）
+        # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
         try:
-            if USER_STORE is not None and str(learner_id).startswith('u') \
-                    and learner_id[1:].isdigit() and CONV_STORE is not None:
+            if _is_registered(learner_id):
                 cid = SESSIONS.get(f"conv_{learner_id}")
                 # 用户消息
                 cid = CONV_STORE.add_message(
@@ -2082,6 +2107,7 @@ def resource_lookup():
             self_description=data.get("self_description", ""),
         )
         SESSIONS[f"learner_{learner_id}"] = learner
+    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
     question = (data.get("question") or "").strip()
     if not question:
         return jsonify({"error": "question is required"}), 400
@@ -2208,6 +2234,7 @@ def generate_file():
             self_description=data.get("self_description", ""),
         )
         SESSIONS[f"learner_{learner_id}"] = learner
+    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
     try:
         if gtype == "article":
@@ -2315,6 +2342,7 @@ def general_chat_stream():
         SESSIONS[f"learner_{learner_id}"] = learner
     elif data.get("self_description") is not None:
         learner.self_description = data["self_description"]
+    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
     system = build_general_chat_system(learner)
 
@@ -2651,8 +2679,7 @@ def general_chat_stream():
                         )
             except Exception as _e:
                 print(f"[Server] 工具经验学习失败: {_e}")
-        if CONV_STORE is not None and USER_STORE is not None \
-                and str(learner_id).startswith('u') and learner_id[1:].isdigit():
+        if _is_registered(learner_id):
             try:
                 cid = SESSIONS.get(f"conv_chat_{learner_id}")
                 cid = CONV_STORE.add_message(learner_id, "chat", text[:30],
@@ -2699,6 +2726,7 @@ def general_chat():
         SESSIONS[f"learner_{learner_id}"] = learner
     elif data.get("self_description") is not None:
         learner.self_description = data["self_description"]
+    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
     system = build_general_chat_system(learner)
 
@@ -2891,8 +2919,8 @@ def general_chat():
             pass
 
     # v0.18：保存完整对话到 conversations（前端可恢复）
-    if CONV_STORE is not None and USER_STORE is not None \
-            and str(learner_id).startswith('u') and learner_id[1:].isdigit():
+    # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
+    if _is_registered(learner_id):
         try:
             cid = SESSIONS.get(f"conv_chat_{learner_id}")
             cid = CONV_STORE.add_message(learner_id, "chat", text[:30],
@@ -2991,6 +3019,7 @@ def answer_api():
     learner_id = data.get("learner_id", "")
     if learner_id:
         learner = SESSIONS.get(f"learner_{learner_id}")
+        _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
     try:
         from subagents import AnswerSolver
         solver = AnswerSolver()
@@ -2999,8 +3028,8 @@ def answer_api():
         result = solver.run(llm, question, subject=subject,
                             grade_level=grade_level, learner=learner, history=_hist)
         # 保存到对话历史
-        if CONV_STORE is not None and USER_STORE is not None \
-                and str(learner_id).startswith('u') and learner_id[1:].isdigit():
+        # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
+        if _is_registered(learner_id):
             try:
                 cid = SESSIONS.get(f"conv_answer_{learner_id}")
                 cid = CONV_STORE.add_message(learner_id, "answer", f"找答案：{question[:30]}",
@@ -3044,8 +3073,8 @@ def solve_problem_api():
         result = solve_problem(llm, problem, subject=subject, grade_level=grade_level)
         # 保存到对话历史（若已登录）
         learner_id = data.get("learner_id", "")
-        if CONV_STORE is not None and USER_STORE is not None \
-                and str(learner_id).startswith('u') and learner_id[1:].isdigit():
+        # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
+        if _is_registered(learner_id):
             try:
                 cid = SESSIONS.get(f"conv_solve_{learner_id}")
                 cid = CONV_STORE.add_message(learner_id, "solve", f"做题：{problem[:30]}",
@@ -3088,8 +3117,21 @@ def _anon_learner_id(request_data: dict, request_obj=None) -> str:
 
 
 def _is_registered(learner_id: str) -> bool:
-    return (USER_STORE is not None and CONV_STORE is not None
-            and str(learner_id).startswith('u') and learner_id[1:].isdigit())
+    """v0.32 ⭐ 放宽：注册用户（u 前缀）与匿名用户（web_ 前缀）都允许对话落盘。
+
+    历史问题：此函数只认 u 前缀 → 匿名用户（web_xxx）的对话不落盘也不读取，
+    导致换设备/清缓存后（localStorage 的匿名 ID 丢失，生成新 web_xxx）历史全丢。
+    修复：web_ 前缀同样允许持久化（同浏览器刷新/标签页稳定）；真正跨设备仍需登录。
+    路径安全：仅允许 alnum/下划线/连字符，防止目录穿越。
+    """
+    if USER_STORE is None or CONV_STORE is None:
+        return False
+    sid = str(learner_id)
+    if not re.match(r'^(u|web_)[A-Za-z0-9_\-]+$', sid):
+        return False
+    if sid.startswith('u'):
+        return sid[1:].isdigit()
+    return True
 
 
 @app.route("/api/conversations/<learner_id>", methods=["GET"])
@@ -3299,6 +3341,7 @@ def method_advice():
             self_description=data.get("self_description", ""),
         )
         SESSIONS[f"learner_{learner_id}"] = learner
+    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
     concept = data.get("concept") or data.get("text") or ""
     subject = data.get("subject", "general")
     if not concept:
@@ -3312,9 +3355,9 @@ def method_advice():
         pass
     result = _handle_method_advice(learner, concept, subject)
     # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
+    # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
     try:
-        if CONV_STORE is not None and USER_STORE is not None \
-                and str(learner_id).startswith('u') and learner_id[1:].isdigit():
+        if _is_registered(learner_id):
             cid = SESSIONS.get(f"conv_method_{learner_id}")
             _content = ""
             if isinstance(result, dict):
@@ -3351,6 +3394,7 @@ def knowledge_query():
             self_description=data.get("self_description", ""),
         )
         SESSIONS[f"learner_{learner_id}"] = learner
+    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
     subject = data.get("subject", "general")
     # v0.20.3：知识库模式若用户实际在倾诉/问方法，自动纠正
     try:
@@ -3363,9 +3407,9 @@ def knowledge_query():
         pass
     result = _handle_knowledge_query(learner, subject)
     # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
+    # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
     try:
-        if CONV_STORE is not None and USER_STORE is not None \
-                and str(learner_id).startswith('u') and learner_id[1:].isdigit():
+        if _is_registered(learner_id):
             _q = data.get("text") or data.get("concept") or "知识库"
             cid = SESSIONS.get(f"conv_knowledge_{learner_id}")
             _content = (result.get("presentations") or [{}])[0].get("content", "") \
@@ -3400,6 +3444,7 @@ def affection_support():
             self_description=data.get("self_description", ""),
         )
         SESSIONS[f"learner_{learner_id}"] = learner
+    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
     text = data.get("text") or data.get("concept") or ""
     if not text:
         return jsonify({"error": "text is required"}), 400
@@ -3416,9 +3461,9 @@ def affection_support():
     _emo_result = _emo.run(llm, text, learner, history=_chat_hist)
     _emo_content = _polish_text(_emo_result.get("content", ""), context=f"affection:{text[:30]}")
     # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
+    # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
     try:
-        if CONV_STORE is not None and USER_STORE is not None \
-                and str(learner_id).startswith('u') and learner_id[1:].isdigit():
+        if _is_registered(learner_id):
             cid = SESSIONS.get(f"conv_affection_{learner_id}")
             cid = CONV_STORE.add_message(learner_id, "affection", text[:30], "user", text, conv_id=cid)
             cid = CONV_STORE.add_message(learner_id, "affection", text[:30], "assistant", _emo_content, conv_id=cid)
