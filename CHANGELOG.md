@@ -1,3 +1,10 @@
+### v0.29 GUI 设计优化（调研 73 条原则 + P0/P1/P2 全部落地）
+- ⭐ 调研：网页 GUI 设计原则 73 条（WCAG 2.2/NN/G/Material 3/Apple HIG/Mayer/Sweller）→ 技术文档 §5.5 + 元能力文档 §6.4
+- ⭐ P0：aria 补全 19 处、模式切换 role=tablist、登录弹窗 role=dialog+Esc 关闭、对比度修复（--text-dim #5C534A，实测 6.0–7.2:1 全达标）、6 档响应式断点（1280/1024/960/768/480）、触控目标 ≥40px
+- ⭐ P1：硬编码色 13 处收敛为 token、字号节奏化 25 处（5 级 token）、空状态四要素（元认知/历史会话）、用户气泡对比度（深色 55% 混合）、全局焦点环 :focus-visible
+- ⭐ P2：prefers-color-scheme 自动暗色（手动优先）、键盘跳过导航 skip-link、aria-label 表单语义 8 处、思考骨架屏 skeleton-bubble（shimmer）
+- ✅ 浏览器实测全部通过：渲染无 JS 错误、对比度全达标、5 档响应式、真实 Tab 焦点环、Esc 关闭、骨架屏出现与移除
+
 
 ### v0.28 增强测试架构 + 5轮综合测试
 - ⭐ 增强测试架构（调研42方法/10建议）：pass^k一致性、drift多轮、长上下文、属性测试、进化对抗、跨模型切换
