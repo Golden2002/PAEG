@@ -747,23 +747,58 @@ class ResourceLibrarian:
         return out
 
     def _search_web(self, question: str, keywords: list, max_results: int = 3) -> list:
-        """互联网检索（web_search tool；无工具时返回空）。"""
+        """互联网检索（web_search tool；无工具时返回空）。
+
+        v0.27 ⭐ 修复：web_search 返回格式化 str（LLM 工具入口），需解析为结构化 list。
+        解析失败时回退内部 _bing_search（返回 list）。
+        """
         out = []
         try:
             if self.web_search is None:
                 from web_search_tool import web_search
                 self.web_search = web_search
             _kw = keywords[0] if keywords else question[:30]
-            _results = self.web_search(_kw, max_results=max_results)
-            for _r in (_results or [])[:max_results]:
-                out.append({
-                    "title": _r.get("title") or _r.get("url") or "",
-                    "url": _r.get("url") or "",
-                    "snippet": (_r.get("snippet") or _r.get("description") or "")[:150],
-                    "type": "web",
-                })
+            # v0.27 ⭐ 兜底关键词清理：去掉中文停用词/功能词（无 LLM 规划时）
+            if not keywords:
+                import re as _re
+                _kw = _re.sub(r"(什么是|是什么|啥是|怎么|如何|为什么|制作|ppt|PPT|演示文稿|帮我|请|一下|介绍|讲讲|说说|最近|今天|最新|新闻)", "", _kw).strip()
+                if len(_kw) < 2:
+                    _kw = question[:30]
+            _res = self.web_search(_kw, max_results=max_results)
+            if isinstance(_res, list):
+                for _r in _res[:max_results]:
+                    out.append({
+                        "title": _r.get("title") or _r.get("url") or "",
+                        "url": _r.get("url") or "",
+                        "snippet": (_r.get("snippet") or _r.get("content") or "")[:150],
+                        "type": "web",
+                    })
+            elif isinstance(_res, str) and _res and "未返回" not in _res and "未找到" not in _res:
+                # 解析 "[来源 N] 标题\nURL: url\n内容" 格式
+                import re as _re
+                for _blk in _res.split("\n\n"):
+                    _m = _re.search(r"URL:\s*(\S+)", _blk)
+                    _t = _re.match(r"\[来源 \d+\]\s*(.+)", _blk.strip())
+                    if _m:
+                        out.append({
+                            "title": (_t.group(1) if _t else "")[:150],
+                            "url": _m.group(1)[:300],
+                            "snippet": _blk.split("URL:", 1)[-1].split("\n", 1)[-1][:150],
+                            "type": "web",
+                        })
         except Exception:
-            pass
+            # 兜底：直接调内部 Bing（返回 list）
+            try:
+                from web_search_tool import _bing_search
+                for _r in (_bing_search(_kw, max_results=max_results) or [])[:max_results]:
+                    out.append({
+                        "title": _r.get("title", ""),
+                        "url": _r.get("url", ""),
+                        "snippet": (_r.get("content") or "")[:150],
+                        "type": "web",
+                    })
+            except Exception:
+                pass
         return out
 
     def run(self, question: str, learner=None, llm=None, scope: str = "all",
