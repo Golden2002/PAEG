@@ -1,3 +1,8 @@
+### v0.35.1 元认知日志建模评估修复（画像作为 LLM 输入）
+- 🐛 修复：元认知日志显示对话历史 → 根因是 LLM 建模缺画像输入（只有概念），trait 字段全空
+- ⭐ Individuality.run 加入画像上下文（掌握度→擅长/薄弱、认知风格→风格）；LLM 空字段画像兜底（非空不覆盖）
+- ✅ 端到端：meta-log 显示"风格=visual · 擅=[physics] · 薄=[english]"；技术文档 §10.2.16 + 元能力 §6.8
+
 ### v0.35 LLM 优先意图路由 + 语言规范总纲（用户原则回归）
 - ⭐ 架构原则反转：规则优先 → LLM 优先（route_intent 14 选项 LLM 分类 + 规则降级兜底）；教学请求必走完整管线
 - ⭐ 意图选项与兜底规则函数同名（teach/knowledge/knowledge_map/recommend/method/emotion/problem/meta/greeting/material/interface/ppt/answer/chat）
