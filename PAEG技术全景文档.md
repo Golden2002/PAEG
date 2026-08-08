@@ -3347,6 +3347,25 @@ answer / chat（纯 LLM 判断，无规则函数）
 - 真实 LLM + 画像：learning_style=visual / strengths=['physics'] / gaps=['english']
 - 端到端：教学后 meta-log 显示"风格=visual 薄=[音位概念...] 趣=[语言学]"
 
+### 10.2.17 ⭐ v0.36 提示词层修复 + 母语迁移教学（第二轮审计）
+
+> **触发**：第二轮全面审计发现提示词层 4 个 P0（母语迁移缺失/指令矛盾/命名混用/规范桥接缺失）。
+> **教训**：有一次修复被 agent 误改到废弃副本（paeg_work），主项目零改动——已通过"项目文件夹整理"根治（见维护手册 §八）。
+
+#### 修复内容
+
+| P0 | 问题 | 修复 |
+|---|---|---|
+| P0-C | 母语迁移缺失（语言学科不考虑中文母语者） | build_presenter_system 对 english/french/german/japanese/college_english 注入母语迁移段（正迁移/负迁移/易错点/跨文化） |
+| P0-D | 指令矛盾（"看/写"禁用 vs 推荐） | 禁用清单改为抽象单字（用/搞/弄/做/整），与"三条语言铁律"对齐 |
+| P0-E | 命名混用（teach/teaching/non_teaching） | meta_router docstring 命名规范统一说明 |
+| P0-A/B | 规范桥接缺失 | build_presenter_system 加"语言总纲锚定"；闲聊加"轻量≠不规范" |
+
+#### 验证
+- 主项目 prompts.py：v0.36=8 处、母语迁移=4 处
+- build_presenter_system('french') 含母语迁移；('math') 不含（白名单守门）
+- 回归：test_presenter 2 passed + 核心功能 40+7 全过
+
 ## 10.3 版本历史
 
 > 完整修改日志已拆分至独立文档：**[CHANGELOG.md](./CHANGELOG.md)**（v0.1 → v0.21.4 全部记录）。
