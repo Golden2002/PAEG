@@ -3054,6 +3054,25 @@ readers.py（多格式全文提取 md/txt/pdf/docx/csv/json）
 
 每次迭代：代码+文档+测试 → GitHub 推送 → Release 更新（版本号+说明+快照资产）
 
+#### 八、⭐ 三处一致原则（v0.34 用户要求 · 本地目录 ↔ GitHub ↔ Release 互为备份）
+
+**原则**：本地项目目录、GitHub 仓库（Golden2002/PAEG main 分支）、Release 三者内容**必须完全一致、互为备份**。任何一处独立改动都视为破坏原则。
+
+**校验工具**（项目根目录 `sync_check.py`）：
+```powershell
+$env:GH_TOKEN='<token>'
+python sync_check.py        # 只读校验：对比本地 106+ 文件与 GitHub sha
+python sync_check.py --fix  # 自动推送差异（本地为权威源）
+```
+
+**执行规则**：
+1. **本地为权威源**：任何修改先在本地完成并验证（pytest 217 全绿）
+2. **每次变更后同步**：改完代码/文档/测试 → `sync_check.py --fix` 推送 GitHub
+3. **Release 保持最新**：重大版本更新时更新 Release 名称与正文（tag 可复用）
+4. **敏感数据排除**：users.json / users_data/ / uploads/ / data/ 等运行时数据不参与备份（非代码资产）
+5. **token 不入库**：脚本从 `GH_TOKEN` 环境变量读取，禁止硬编码（GitHub secret 扫描会拦截）
+
+**验证基线（2026-08-08）**：106 个代码/文档文件全部一致（0 缺失 0 差异），Release v0.34 为最新。
 
 ### 10.2.9 v0.27 ⭐ 综合测试反思与架构优化（字段完整性 + 内容更换）
 
@@ -3246,6 +3265,67 @@ readers.py（多格式全文提取 md/txt/pdf/docx/csv/json）
 1. **新契约提取**：每次功能开发后，把技术文档新增承诺同步为契约测试（元能力文档 §6.6）
 2. **管线完整性**：任何新端点/新早退分支，必须明确"完整管线 or 有意早退"并测之
 3. **标准化 runner**：未来将 6 层整合为 `run_v2.py` 一键执行 + 报告（契约通过率/管线完整率/断链清单）
+
+### 10.2.15 ⭐ v0.35 LLM 优先意图路由 + 语言规范总纲（用户原则回归）
+
+> **触发**：用户报告"法语学习的软件有什么推荐"被硬编码正则误判为知识库查询 → 答非所问 + 无检索 badge + 无 meta-log。
+> **用户指示（核心原则）**："不要用规则匹配，规则兜底，大模型先判断，指挥大模型在几个选项中选择——先选择是否是知识库、思维导图……"
+> **语言规范指示**："要清楚地告诉大模型什么叫做规范——句子结构完整、用词用完整词、介词要使用上、修饰成分要足够、要有状语。"
+
+#### 一、架构原则反转（规则优先 → LLM 优先）
+
+| 维度 | 旧（v0.34 前） | 新（v0.35 ⭐） |
+|---|---|---|
+| 意图判断 | 规则拦截链优先（is_knowledge_query 等 10+ 个 if） | **LLM 先判断**（route_intent 在 14 个选项中选） |
+| 规则角色 | 主判断 | **降级兜底**（LLM 失败/低置信度时） |
+| 教学请求 | 可能被早退拦截 | **intent=teach/answer 必走完整管线** |
+| 语言规范 | 事后规则过滤（language_refiner） | **L1 提示词源头约束**（生成时即规范） |
+
+#### 二、LLM 优先意图路由（route_intent）
+
+**14 个意图选项**（与兜底规则函数同名，用户要求）：
+```
+teach↔is_teaching_intent / knowledge↔is_knowledge_query / knowledge_map↔is_knowledge_map_request
+recommend↔is_recommend_request / method↔is_method_advice / emotion↔is_affection_expression
+problem↔is_problem_request / meta↔is_meta_question / greeting↔is_greeting
+material↔is_intent_with_material / interface↔is_interface_query / ppt↔is_ppt_request
+answer / chat（纯 LLM 判断，无规则函数）
+```
+
+**流程**（server.py teach_stream）：
+1. `route_intent(concept, llm)` → {intent, confidence, reason}（10min 缓存，温度低）
+2. confidence ≥ 0.6 → 用 LLM 分类；否则走规则兜底
+3. intent=teach/answer → **强制走完整教学管线**（核心修复）
+4. 其他 intent → 对应分支（recommend→联网检索，knowledge→清点，ppt→生成...）
+5. LLM 不可用 → 完全走规则链（向后兼容）
+
+**危机/自伤**：唯一保留规则 fast-path（安全 > 延迟）。
+
+#### 三、语言规范总纲（L1 提示词源头治理）
+
+在 prompts.py LANGUAGE_STYLE 新增"规范定义"章节，**明确告诉 LLM 什么是规范**：
+
+| 规范 | 反例 → 正例 |
+|---|---|
+| 句子结构完整 | "别贪多" → "你不要贪多" |
+| 用词完整 | "别急" → "不要着急"；"用" → "使用" |
+| 介词必须使用 | "每天固定时间用" → "在每天固定的时间使用" |
+| 修饰成分足够 | "选一个作为主力" → "选择一个作为主力工具" |
+| 句子要有状语 | "使用这个软件" → "你可以在每天固定的时间使用这个软件" |
+
+**自查口诀**：有主语吗？有谓语吗？有宾语吗？介词用了吗？词形完整吗？修饰够吗？状语有吗？——七项全过才输出。
+规则层（language_refiner.py）保留作兜底（已补 3 条检测：缺介词/别贪多/作为主力）。
+
+#### 四、用户 bug 修复验证
+
+| 用户报告 | 修复后实测 |
+|---|---|
+| 推荐问题答非所问（清点藏书） | ✅ intent=recommend → 联网检索 + 真实推荐（Duolingo/Babbel） |
+| 无"已检索/已联网检索"badge | ✅ retrieval 事件发出（前端 badge 亮） |
+| 无学习记录/反思记录 | ✅ 教学请求走完整管线 → meta-log 写入 |
+| 模型输出不规范句子 | ✅ L1 规范定义 + L2 规则兜底双保险 |
+
+**回归**：146+ passed（1 个预先存在的测试顺序问题与本次无关），新增 test_v035_recommend_branch.py / test_v035_llm_first_routing.py 全过。
 
 ## 10.3 版本历史
 
