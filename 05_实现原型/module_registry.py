@@ -39,6 +39,7 @@ MODULE_CATALOG: Dict[str, Dict[str, Any]] = {
     "self_update": {"desc": "周期自我更新", "default": True},
     "file_gen": {"desc": "文件生成（讲义/练习题）", "default": True},
     "history":  {"desc": "历史会话", "default": True},
+    "voice":    {"desc": "语音输入/朗读（STT + TTS，v0.36）", "default": False},
 }
 
 
