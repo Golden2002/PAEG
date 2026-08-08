@@ -1952,23 +1952,51 @@ class Individuality:
                         if _parts:
                             _existing_str = "\n（学生已有画像：{0} ——请勿重复，只输出本轮新增或变化的信息；无新增则输出空 JSON {{}}）".format(
                                 "; ".join(_parts))
+                    # v0.35 ⭐ 画像上下文：把掌握度/认知风格/学段/年龄作为 LLM 建模输入（Oracle 方案 B 治本）
+                    # —— 之前 LLM 只看到 history + self_description，信息不足时只输出 interests，
+                    #    其它 5 类全空；现在把 learner 的系统记录也喂给 LLM，让它能基于事实推断擅长/薄弱/风格。
+                    _profile_ctx = ""
+                    try:
+                        if learner is not None:
+                            _sm = getattr(learner, "subjects_mastery", {}) or {}
+                            _strong = [s for s, v in _sm.items()
+                                       if isinstance(v, dict) and v.get("mastery", 0) >= 0.7]
+                            _weak = [s for s, v in _sm.items()
+                                     if isinstance(v, dict) and v.get("mastery", 0) < 0.5]
+                            _style = getattr(learner, "cognitive_style", "")
+                            _g = getattr(learner, "grade_level", "")
+                            _ag = getattr(learner, "age", "")
+                            _profile_ctx = (
+                                f"\n【学生画像】（系统记录，非本轮对话）：\n"
+                                f"- 学段：{_g}；年龄：{_ag}\n"
+                                f"- 认知风格：{_style or '未知'}\n"
+                                f"- 掌握较好的学科：{('、'.join(_strong[:5])) if _strong else '暂无'}\n"
+                                f"- 相对薄弱的学科：{('、'.join(_weak[:5])) if _weak else '暂无'}\n"
+                            )
+                    except Exception:
+                        _profile_ctx = ""
                     _sys = (
-                        "你是个体化建模助手。从学生的对话历史与自我陈述中，提取 6 类结构化信息："
+                        "你是个体化建模助手。从学生的对话历史、自我陈述与【学生画像】中，"
+                        "提取 6 类结构化信息："
                         "1) learning_style（学习方式偏好） 2) knowledge_strengths（已掌握） "
                         "3) knowledge_gaps（薄弱点） 4) emotional_tendency（情绪倾向） "
                         "5) motivation（学习动机） 6) interests（兴趣）\n"
+                        "结合【学生画像】中系统记录的掌握度/风格信息推断擅长与薄弱，"
+                        "不要只依赖对话历史。\n"
                         + (
                             "结合学生已有画像，只输出本轮新增或变化的信息——"
                             "没有变化就输出空 JSON {}，不要重复已有内容。\n"
                             if _incremental_mode else
-                            "请根据本轮对话/自我陈述输出完整提取（首次建模）。\n"
+                            "请根据本轮对话/自我陈述/学生画像输出完整提取（首次建模）。\n"
                         )
-                        + '输出 JSON 格式：{"learning_style":"...","knowledge_strengths":[...],'
-                        '"knowledge_gaps":[...],"emotional_tendency":"...",'
-                        '"motivation":"...","interests":[...]}'
+                        + '输出 JSON 格式（必须包含全部 6 类字段，无法判断的字段输出 null 或 []，不要省略）：'
+                        + '{"learning_style":"...","knowledge_strengths":[...],'
+                        + '"knowledge_gaps":[...],"emotional_tendency":"...",'
+                        + '"motivation":"...","interests":[...]}'
                     )
                     _usr = (
                         f"对话历史：\n{_hist_src}\n自我陈述：{_desc}"
+                        f"{_profile_ctx}"
                         f"{_existing_str}"
                     )
                     _llm_out = _safe_chat(model, _sys, _usr, max_tokens=400)
@@ -2086,6 +2114,48 @@ class Individuality:
                     _add.append(f"- 兴趣（LLM 建模）：{', '.join(_md['interests'][:3])}")
                 if _add:
                     profile_prompt = profile_prompt + "\n" + "\n".join(_add)
+        except Exception:
+            pass
+
+        # v0.35 ⭐ 兜底：LLM 信息不足时用画像填充空字段（Oracle 方案 C——不覆盖 LLM 有效判断）
+        # —— StudentTrait.to_dict() 输出的是 16 维（cognitive_style / mastery / ...），
+        #   但下游 meta-log（server.py:1463-1468）读 trait["learning_style"] /
+        #   trait["knowledge_strengths"] / trait["knowledge_gaps"] / trait["interests"] /
+        #   trait["emotional_tendency"] / trait["motivation"]；这些键默认不存在。
+        # —— 策略：先从 LLM 建模结果（self._llm_modeled）注入；缺则从 learner 画像兜底。
+        # —— 不覆盖 LLM 已输出的非空值。
+        try:
+            _fb_modeled = getattr(self, "_llm_modeled", {}) or {}
+            if not isinstance(_fb_modeled, dict):
+                _fb_modeled = {}
+            if not isinstance(trait, dict):
+                trait = {}
+            for _k in ("learning_style", "emotional_tendency", "motivation"):
+                if not trait.get(_k) and _fb_modeled.get(_k):
+                    _v = _fb_modeled[_k]
+                    if isinstance(_v, str) and _v.strip():
+                        trait[_k] = _v.strip()
+            for _k in ("knowledge_strengths", "knowledge_gaps", "interests"):
+                _fb_v = _fb_modeled.get(_k)
+                if (not trait.get(_k)) and isinstance(_fb_v, list) and _fb_v:
+                    _clean = [str(x).strip() for x in _fb_v if isinstance(x, str) and x.strip()]
+                    if _clean:
+                        trait[_k] = _clean
+            # 画像兜底（仅当上述注入仍为空时；不覆盖 LLM 有效判断）
+            if learner is not None:
+                _sm = getattr(learner, "subjects_mastery", {}) or {}
+                _strong_ss = [s for s, v in _sm.items()
+                              if isinstance(v, dict) and v.get("mastery", 0) >= 0.7]
+                _weak_ss = [s for s, v in _sm.items()
+                            if isinstance(v, dict) and v.get("mastery", 0) < 0.5]
+                if not trait.get("knowledge_strengths") and _strong_ss:
+                    trait["knowledge_strengths"] = [f"{s}掌握较好" for s in _strong_ss[:3]]
+                if not trait.get("knowledge_gaps") and _weak_ss:
+                    trait["knowledge_gaps"] = [f"{s}需要加强" for s in _weak_ss[:3]]
+                if not trait.get("learning_style"):
+                    _cs = getattr(learner, "cognitive_style", "")
+                    if _cs and _cs != "unknown":
+                        trait["learning_style"] = _cs
         except Exception:
             pass
 
