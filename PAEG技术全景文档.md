@@ -3366,6 +3366,60 @@ answer / chat（纯 LLM 判断，无规则函数）
 - build_presenter_system('french') 含母语迁移；('math') 不含（白名单守门）
 - 回归：test_presenter 2 passed + 核心功能 40+7 全过
 
+### 10.2.18 ⭐ v0.36 语音模块（TTS/STT）+ 技术栈 + 参考信息
+
+> **功能**：PAEG 首次支持语音交互（朗读回答 + 语音提问）。参考项目见 §6.10 元能力（记录参考项目意识）。
+
+#### 技术栈（全项目）
+
+| 层 | 技术 | 说明 |
+|---|---|---|
+| 后端 | Python + Flask | 47+ API 路由，module_registry 12+1 模块门控 |
+| LLM | DeepSeek | agent 指挥 LLM，9 subagent 调度 |
+| 前端 | 原生 HTML/CSS/JS | 无框架，KaTeX + marked |
+| 语音 TTS | **edge-tts**（v0.36 新增） | 免费，中文女声 zh-CN-XiaoxiaoNeural |
+| 语音 STT | **浏览器 Web Speech API**（v0.36 新增） | Chrome/Edge/Safari 原生 |
+| 工具 | 7 内置 + 10 Skills + 3 MCP | filesystem/memory/pptx |
+| 存储 | JSON 文件 | users_data/ + data/ + Library/ |
+| 部署 | localhost:5000 + cloudflared | 公网隧道 |
+
+#### 语音模块设计（v0.36 ⭐）
+
+**架构**：语音 = 纯 I/O adapter（Oracle 评审），**不进 9 subagent 调度**——LLM 看到的永远是文本，对话核心零改动。
+
+```
+前端 mic 按钮 → Web Speech API 录音 → 转文本 → 复用 askBtn.click() 现有管线
+                                        ↓
+                    PAEG 9 subagent 教学循环（不变）
+                                        ↓
+前端 🔊 按钮 → /api/voice/tts → edge-tts 生成 MP3 → 播放
+```
+
+**后端**：
+- `voice_service.py`：provider 抽象（tts_synthesize / stt_transcribe / voice_available），edge-tts 懒加载 + SHA1 缓存
+- `/api/voice/tts`：JSON {text, learner_id} → MP3 → `/uploads/voice/<id>/<hash>.mp3`（`@require_module("voice")`）
+- `/api/voice/stt`：v1 契约占位（浏览器完成），v2 替换 provider
+- `module_registry`：`voice` 模块（可开关）
+
+**前端**：
+- `assets/icons/mic.svg` + `#voice-btn`（复用 .upload-btn 样式，录音态红色）
+- `initVoice()`：Web Speech API 中文识别 → 文本回填 → askBtn.click()
+- `playMsgTTS()`：🔊 按钮 → /api/voice/tts → Audio 播放
+- TTS 按钮挂在每条 PAEG 回复的 msg-actions
+
+**验证**：TTS 生成 MP3（10-34KB 中文语音）✅ / 缓存命中 ✅ / 路由 200 ✅ / 前端元素就位 ✅
+
+#### 参考信息（语音模块调研，54 来源节选）
+
+| 参考 | 决策 | 来源 |
+|---|---|---|
+| 讯飞开放平台 | v2 候选（中文教育 domain=edu，50万次免费） | xfyun.cn 语音听写/合成 API |
+| Azure Speech | 跟读评分 v2（唯一发音评估，中文 GA） | learn.microsoft.com pronunciation-assessment |
+| edge-tts | ✅ v1 采用（免 key 中文女声） | pypi.org/project/edge-tts |
+| Web Speech API | ✅ v1 STT（浏览器原生，Chrome/Edge 推荐） | MDN Using the Web Speech API |
+| OpenAI Realtime | ❌ 否决（绕过 DeepSeek，违背哲学） | developers.openai.com realtime |
+| AssemblyAI+DeepSeek+ElevenLabs | 架构参考（STT+LLM+TTS 三段式） | assemblyai.com voice-agent 配方 |
+
 ## 10.3 版本历史
 
 > 完整修改日志已拆分至独立文档：**[CHANGELOG.md](./CHANGELOG.md)**（v0.1 → v0.21.4 全部记录）。
