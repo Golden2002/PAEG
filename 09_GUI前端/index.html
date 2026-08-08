@@ -617,6 +617,8 @@ body {
   font-size: 18px; line-height: 1; flex-shrink: 0; transition: all .15s;
 }
 .upload-btn:hover { background: var(--border); color: var(--accent); }
+/* v0.36 ⭐ 语音按钮：录音态红色提示 */
+#voice-btn.recording { color: #ef4444; background: rgba(239,68,68,.1); }
 .upload-msg { font-size: 12px; color: var(--text-dim); margin-left: 8px; }
 .upload-preview img { max-height: 120px; border-radius: 8px; border: 1px solid var(--border); }
 
@@ -1228,6 +1230,10 @@ body {
         <input type="file" id="lib-input" accept=".pdf,.md,.txt,.docx,.csv,.json,.png,.jpg" style="display:none" />
         <img class="upload-btn-icon" src="assets/icons/book-open.svg" alt="资料" />
       </label>
+      <!-- v0.36 ⭐ 语音输入按钮（Web Speech API，Chrome/Edge 推荐） -->
+      <button class="upload-btn" id="voice-btn" title="语音输入（Chrome/Edge 推荐）" aria-label="语音输入">
+        <img class="upload-btn-icon" src="assets/icons/mic.svg" alt="语音" />
+      </button>
       <button class="ask-btn" id="ask-btn">发送</button>
     </div>
 
@@ -1671,12 +1677,15 @@ function addMsg(role, html, tone, intent, preHtml) {
   // v0.19.3：功能性——复制按钮 + 选择复选框（生成文档）
   const copyBtn = role === 'paeg'
     ? `<button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button>` : '';
+  // v0.36 ⭐ 语音播放按钮（调后端 /api/voice/tts 朗读回复）
+  const speakBtn = role === 'paeg'
+    ? `<button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button>` : '';
   const checkBox = role === 'paeg'
     ? `<input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" />` : '';
   div.innerHTML = `
     <div class="msg-avatar">${avatar}</div>
     <div class="msg-bubble">${pre}${contentHtml}${intentTag}${toneTag}
-      <div class="msg-actions">${checkBox}${copyBtn}</div>
+      <div class="msg-actions">${checkBox}${copyBtn}${speakBtn}</div>
     </div>`;
   // 保存原始文本（复制用）
   div._rawText = fixed || html;
@@ -2965,6 +2974,65 @@ askBtn.addEventListener('click', () => {
     teach(q, subjectSelect.value, subfieldSelect.value);
   }
 });
+
+// ─── v0.36 ⭐ 语音模块：Web Speech API 录音转文本 → 复用现有发送管线 ───
+(function initVoice() {
+  const voiceBtn = document.getElementById('voice-btn');
+  if (!voiceBtn) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    voiceBtn.title = '语音输入需 Chrome/Edge/Safari';
+    voiceBtn.style.opacity = '.4';
+    voiceBtn.addEventListener('click', () => {
+      addMsg('paeg', '<small>当前浏览器不支持语音输入，推荐使用 Chrome 或 Edge。</small>');
+    });
+    return;
+  }
+  let recognizing = false;
+  const recog = new SR();
+  recog.lang = 'zh-CN';
+  recog.continuous = false;
+  recog.interimResults = false;
+  recog.onstart = () => { recognizing = true; voiceBtn.classList.add('recording'); };
+  recog.onend = () => { recognizing = false; voiceBtn.classList.remove('recording'); };
+  recog.onerror = (e) => {
+    recognizing = false; voiceBtn.classList.remove('recording');
+    if (e.error === 'not-allowed') {
+      addMsg('paeg', '<small>麦克风权限被拒绝，可在浏览器地址栏重新允许。</small>');
+    }
+  };
+  recog.onresult = (e) => {
+    const text = e.results[0][0].transcript;
+    const input = document.getElementById('question-input');
+    if (input && text) { input.value = text; document.getElementById('ask-btn').click(); }
+  };
+  voiceBtn.addEventListener('click', () => {
+    if (recognizing) { recog.stop(); }
+    else { try { recog.start(); } catch (err) {} }
+  });
+})();
+
+// v0.36 ⭐ TTS 播放：调后端 /api/voice/tts 生成音频并播放
+async function playMsgTTS(btn) {
+  const bubble = btn.closest('.msg-bubble');
+  const text = (bubble ? bubble.textContent : '').replace(/[🔊复制\n]+/g, '').trim().slice(0, 2000);
+  if (!text) return;
+  try {
+    const r = await fetch(API_BASE + '/api/voice/tts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, learner_id: STATE.learnerId })
+    });
+    const j = await r.json();
+    if (j.ok && j.url) {
+      const audio = new Audio(j.url);
+      audio.play();
+    } else {
+      addMsg('paeg', '<small>语音暂不可用（edge-tts 未安装或合成失败）。</small>');
+    }
+  } catch (err) {
+    addMsg('paeg', '<small>语音服务暂时不可用。</small>');
+  }
+}
 
 questionInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') askBtn.click();
