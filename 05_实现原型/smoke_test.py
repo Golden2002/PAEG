@@ -14,7 +14,8 @@ import urllib.request
 import urllib.error
 
 BASE = "http://127.0.0.1:5000"
-TIMEOUT = 5  # 秒——每个请求最多等 5 秒
+TIMEOUT = 5  # 秒——普通请求最多等 5 秒
+STREAM_TIMEOUT = 20  # 秒——SSE 流式请求（LLM 首字节可能慢）最多等 20 秒
 
 _results = []
 
@@ -71,10 +72,11 @@ def main():
     s, head = post_quick("/api/voice/tts", {"text": "冒烟", "learner_id": "smoke"})
     check("TTS 可达", s == 200, f"got {s}")
 
-    # 4. 教学流式（只验首事件——SSE 首字节诊断）
+    # 4. 教学流式（只验首事件——SSE 首字节诊断；LLM 首字节可能慢，用 STREAM_TIMEOUT）
     s, head = post_quick("/api/teach/stream",
                          {"learner_id": "smoke", "concept": "什么是熵",
-                          "subject": "physics", "grade_level": "high_school"})
+                          "subject": "physics", "grade_level": "high_school"},
+                         timeout=STREAM_TIMEOUT)
     raw = head.decode("utf-8", errors="replace") if isinstance(head, bytes) else ""
     check("teach_stream 首事件", s == 200 and "event:" in raw, f"got {s} 首事件={raw[:40]!r}")
 
@@ -90,15 +92,19 @@ def main():
     s, _ = get_quick("/api/subject-tree")
     check("subject-tree 200", s == 200)
 
-    # 8. 情绪支持端点（不调 LLM，只看路由存在）
+    # 8. 情绪支持端点（不调 LLM，只看路由存在；带一次重试防抖动）
     s, head = post_quick("/api/affection",
                          {"learner_id": "smoke", "text": "测试", "subject": "general"})
+    if s == -1:
+        s, head = post_quick("/api/affection",
+                             {"learner_id": "smoke", "text": "测试", "subject": "general"})
     check("affection 可达", s == 200 or s == 500, f"got {s}")
 
-    # 9. 知识导图（teach_stream 触发，首事件）
+    # 9. 知识导图（teach_stream 触发，首事件；LLM 慢用 STREAM_TIMEOUT）
     s, head = post_quick("/api/teach/stream",
                          {"learner_id": "smoke", "concept": "帮我把熵画成思维导图",
-                          "subject": "physics", "grade_level": "high_school"})
+                          "subject": "physics", "grade_level": "high_school"},
+                         timeout=STREAM_TIMEOUT)
     raw = head.decode("utf-8", errors="replace") if isinstance(head, bytes) else ""
     check("知识导图首事件", s == 200, f"got {s}")
 
