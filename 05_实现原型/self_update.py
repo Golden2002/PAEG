@@ -27,7 +27,8 @@ MIN_EVIDENCE_FOR_STRATEGY = 3
 MIN_CONFIDENCE_FOR_KNOWLEDGE = 0.8
 PROFILE_EMA_ALPHA = 0.3
 ROLLBACK_WINDOW_DAYS = 7
-VERSION_KEEP = 10
+# v0.37.2 ⭐ Oracle 扩展性：10→3 版快照（每份 5.3MB，10 份=53MB 写放大；3 份足够回滚）
+VERSION_KEEP = 3
 
 # v0.37.2 ⭐ Oracle P0-A 修复：进程内文件写锁（跨实例共享）。
 # Windows 下 _save() 的 tmp.replace() 无锁时并发抛 WinError 32（多测试/多 SSE 流实测复现）。
@@ -39,9 +40,15 @@ class SelfUpdater:
     def __init__(self, knowledge_base, data_dir: Optional[str] = None):
         self.kb = knowledge_base
         self.data_dir = Path(data_dir) if data_dir else (Path(__file__).parent / "data")
-        self.history = []            # 反思历史
+        self.history = []            # 反思历史（内存缓存，读点兼容）
         self.strategies_discovered = []  # 发现的新策略
         self.version = 0
+        # v0.38 ⭐ Oracle 扩展性：SQLite 反思存储（append-only，消除 5.3MB 写放大）
+        try:
+            from reflection_store import ReflectionStore
+            self._ref_store = ReflectionStore()
+        except Exception:
+            self._ref_store = None
         self._load()
 
     # ------------------------------------------------------------------
@@ -53,12 +60,26 @@ class SelfUpdater:
     def _load(self):
         """启动时加载持久化状态（不存在则从空开始）。"""
         self._ensure_dirs()
-        try:
-            refs = (self.data_dir / "reflections.json")
-            if refs.is_file():
-                self.history = json.loads(refs.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            self.history = []
+        # v0.38 ⭐ SQLite 优先：迁移旧 JSON → 读全部历史（保序）
+        if self._ref_store is not None:
+            try:
+                _migrated = self._ref_store.migrate_from_json(
+                    self.data_dir / "reflections.json")
+                if _migrated:
+                    print(f"[PAEG] reflections 已迁移 {_migrated} 条到 SQLite")
+            except Exception as _me:
+                print(f"[PAEG] reflections SQLite 迁移失败（用 JSON 兜底）: {_me}")
+            try:
+                self.history = self._ref_store.query("*", limit=10**6)
+            except Exception:
+                self.history = []
+        if not self.history:
+            try:
+                refs = (self.data_dir / "reflections.json")
+                if refs.is_file():
+                    self.history = json.loads(refs.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                self.history = []
         try:
             strs = (self.data_dir / "strategies.json")
             if strs.is_file():
@@ -86,23 +107,32 @@ class SelfUpdater:
                 try:
                     self._ensure_dirs()
                     self.version += 1
-                    # 原子写当前状态
-                    for name, payload in (
-                        ("reflections.json", self.history),
-                        ("strategies.json", self.strategies_discovered),
-                    ):
-                        tmp = self.data_dir / (name + ".tmp")
-                        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                    # v0.38 ⭐ SQLite 优先：reflections 已由 append_reflection/append_many 增量写入，
+                    # 此处不再全量重写 reflections.json（消除 5.3MB 写放大）。
+                    # 仅当 SQLite 不可用时降级为 JSON 全量写（兼容）。
+                    if self._ref_store is None:
+                        for name, payload in (
+                            ("reflections.json", self.history),
+                            ("strategies.json", self.strategies_discovered),
+                        ):
+                            tmp = self.data_dir / (name + ".tmp")
+                            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                                           encoding="utf-8")
+                            tmp.replace(self.data_dir / name)
+                    else:
+                        # strategies 仍 JSON（小文件）；reflections 走 SQLite
+                        tmp = self.data_dir / ("strategies.json.tmp")
+                        tmp.write_text(json.dumps(self.strategies_discovered, ensure_ascii=False, indent=2),
                                        encoding="utf-8")
-                        tmp.replace(self.data_dir / name)
+                        tmp.replace(self.data_dir / "strategies.json")
                     (self.data_dir / "version.txt").write_text(str(self.version), encoding="utf-8")
-                    # 版本快照（保留最近 VERSION_KEEP 版）
+                    # 版本快照（轻量：只存 strategies + 计数，不再复制 5MB reflections）
                     snap_dir = self.data_dir / "versions"
                     snap = snap_dir / f"v{self.version:04d}.json"
                     snap.write_text(json.dumps({
                         "version": self.version,
                         "timestamp": datetime.now().isoformat(),
-                        "history": self.history,
+                        "reflections_count": len(self.history),
                         "strategies": self.strategies_discovered,
                     }, ensure_ascii=False, indent=2), encoding="utf-8")
                     for old in sorted(snap_dir.glob("v*.json"))[:-VERSION_KEEP]:
@@ -129,6 +159,15 @@ class SelfUpdater:
                 "subject": getattr(session, "subject", ""),
                 "reflection": reflection
             })
+        # v0.38 ⭐ SQLite 增量写（append-only，单条 <1KB IO，替代全量重写）
+        if self._ref_store is not None and session.reflections:
+            try:
+                self._ref_store.append_many(
+                    session.learner.id, session.reflections,
+                    concept=session.concept, subject=getattr(session, "subject", ""),
+                )
+            except Exception as _re:
+                print(f"[PAEG] reflections SQLite 写入失败: {_re}")
 
         # 2. 如果教学成功，提炼模式
         if any(r.get('success', False) for r in session.reflections):
@@ -165,6 +204,7 @@ class SelfUpdater:
 
         Oracle 审查 P0-1：此前 server.py 直接 append 到 self.history 但不调 _save()，
         元认知日志重启即丢。此 API 保证 append + 原子落盘 + 版本快照。
+        v0.38 ⭐ SQLite 优先：增量 INSERT（<1KB），不再触发 5.3MB 全量 _save。
         """
         self.history.append({
             "timestamp": datetime.now().isoformat(),
@@ -173,6 +213,12 @@ class SelfUpdater:
             "subject": subject or "",
             "reflection": reflection,
         })
+        if self._ref_store is not None:
+            try:
+                self._ref_store.append(learner_id, reflection, concept=concept, subject=subject)
+                return  # SQLite 已落盘，跳过全量 _save
+            except Exception as _re:
+                print(f"[PAEG] reflections SQLite 写入失败（降级全量）: {_re}")
         try:
             self._save()
         except Exception:
