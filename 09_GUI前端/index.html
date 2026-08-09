@@ -2085,7 +2085,8 @@ function renderMastery(masteries) {
     return;
   }
   list.innerHTML = entries.map(([subj, v]) => {
-    const m = typeof v === 'object' ? (v.mastery || 0) : v;
+    // v0.36.3 ⭐ 修复：兼容两种掌握度结构（旧 mastery / 新 level——LLM 建模写入的 evidence 结构）
+    const m = typeof v === 'object' ? (v.mastery ?? v.level ?? 0) : v;
     const pct = Math.round((m || 0) * 100);
     const label = SUBJECT_LABELS[subj] || subj;
     return `
@@ -2151,7 +2152,7 @@ function updateStats() {
   document.getElementById('stat-sessions').textContent = STATE.sessions;
   document.getElementById('stat-reflect').textContent = STATE.reflections;
   document.getElementById('stat-version').textContent = STATE.versions;
-  const vals = Object.values(STATE.masteries).map(v => typeof v === 'object' ? (v.mastery || 0) : v);
+  const vals = Object.values(STATE.masteries).map(v => typeof v === 'object' ? (v.mastery ?? v.level ?? 0) : v);
   document.getElementById('stat-avg').textContent = vals.length
     ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '-';
 }
@@ -3032,21 +3033,43 @@ askBtn.addEventListener('click', () => {
     return;
   }
   let recognizing = false;
+  let recogTimer = null;
   const recog = new SR();
   recog.lang = 'zh-CN';
   recog.continuous = false;
   recog.interimResults = false;
   // v0.36 ⭐ 录音态图标切换：麦克风 → 红色停止方块
+  // v0.36.3 ⭐ 修复：①图标 src 切换失败时用 CSS 背景兜底（微信 X5 对 SVG 缓存/渲染不稳）
+  // ②录音 10 秒无结果自动停止（X5 的 start() 后可能不触发 onend，导致 recognizing 卡死"按停止无反应"）
+  // ③停止改用 abort()（比 stop() 更可靠，确保触发 onend）④onend/onerror 强制重置状态
+  function _resetRecording() {
+    recognizing = false;
+    if (recogTimer) { clearTimeout(recogTimer); recogTimer = null; }
+    try { voiceBtn.classList.remove('recording'); } catch (e) {}
+    try {
+      if (voiceIcon) voiceIcon.src = 'assets/icons/mic.svg';
+      voiceBtn.style.background = '';
+      voiceBtn.style.color = '';
+    } catch (e) {}
+    voiceBtn.title = '语音输入（Chrome/Edge 推荐）';
+  }
   function setRecording(on) {
     recognizing = on;
     if (on) {
       voiceBtn.classList.add('recording');
       if (voiceIcon) voiceIcon.src = 'assets/icons/square.svg';
+      // CSS 兜底：即使 SVG 加载失败，按钮也明显变红
+      voiceBtn.style.background = 'rgba(239,68,68,.15)';
+      voiceBtn.style.color = '#ef4444';
       voiceBtn.title = '点击停止录音';
+      // 超时兜底：10 秒无结果自动停止（防 X5 卡死）
+      if (recogTimer) clearTimeout(recogTimer);
+      recogTimer = setTimeout(() => {
+        try { recog.abort(); } catch (e) {}
+        _resetRecording();
+      }, 10000);
     } else {
-      voiceBtn.classList.remove('recording');
-      if (voiceIcon) voiceIcon.src = 'assets/icons/mic.svg';
-      voiceBtn.title = '语音输入（Chrome/Edge 推荐）';
+      _resetRecording();
     }
   }
   recog.onstart = () => {
@@ -3054,10 +3077,10 @@ askBtn.addEventListener('click', () => {
     addMsg('paeg', '<small>🎙 正在聆听…（麦克风已变红，再按一次停止）</small>');
   };
   recog.onend = () => {
-    setRecording(false);
+    _resetRecording();
   };
   recog.onerror = (e) => {
-    setRecording(false);
+    _resetRecording();
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
       addMsg('paeg', '<small>🎙 麦克风权限被拒绝。请在浏览器地址栏左侧的🔒图标 → 网站设置中允许麦克风，然后重试。</small>');
     } else if (e.error === 'network') {
@@ -3071,7 +3094,7 @@ askBtn.addEventListener('click', () => {
     }
   };
   recog.onresult = (e) => {
-    setRecording(false);
+    _resetRecording();
     const text = e.results[0][0].transcript;
     const input = document.getElementById('question-input');
     if (input && text) {
@@ -3081,15 +3104,18 @@ askBtn.addEventListener('click', () => {
     }
   };
   voiceBtn.addEventListener('click', () => {
-    if (recognizing) { recog.stop(); }
-    else {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        addMsg('paeg', '<small>🎙 当前环境不支持麦克风（需 HTTPS 或 localhost）。</small>');
-        return;
-      }
-      try { recog.start(); }
-      catch (err) { addMsg('paeg', '<small>🎙 无法启动语音识别：' + (err && err.message ? err.message : err) + '</small>'); }
+    if (recognizing) {
+      // 停止：abort 确保触发 onend → 状态重置（比 stop() 更可靠）
+      try { recog.abort(); } catch (e) { try { recog.stop(); } catch (e2) {} }
+      _resetRecording();
+      return;
     }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      addMsg('paeg', '<small>🎙 当前环境不支持麦克风（需 HTTPS 或 localhost）。</small>');
+      return;
+    }
+    try { recog.start(); }
+    catch (err) { addMsg('paeg', '<small>🎙 无法启动语音识别：' + (err && err.message ? err.message : err) + '</small>'); }
   });
 })();
 
