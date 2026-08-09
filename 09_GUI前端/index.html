@@ -3310,28 +3310,109 @@ askBtn.addEventListener('click', () => {
     if (askBtn) { askBtn.click(); }
     else { addMsg('paeg', '<small>🎙 已输入，请点击发送。</small>'); }
   };
+  // v0.41 ⭐ 后端 STT（MediaRecorder → /api/voice/stt，faster-whisper 本地识别）
+  // 解决：Web Speech API 转文字在 Google 云端（国内不可达）→"能启动能说话不能识别"
+  let mediaRecorder = null;
+  let mediaChunks = [];
+  function _startBackendSTT() {
+    return new Promise((resolve, reject) => {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+          reject(new Error('no_mediarecorder')); return;
+        }
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+          try {
+            const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+              ? 'audio/webm;codecs=opus' : 'audio/webm';
+            mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
+            mediaChunks = [];
+            mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) mediaChunks.push(e.data); };
+            mediaRecorder.onstop = () => {
+              stream.getTracks().forEach(t => t.stop());
+              const blob = new Blob(mediaChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+              _submitAudio(blob);
+            };
+            mediaRecorder.start();
+            _showRecordingUI();
+            addMsg('paeg', '<small>🎙 正在录音（后端识别）…说完点停止，或长按松开发送。</small>');
+            // 15 秒自动停止
+            setTimeout(() => { if (mediaRecorder && mediaRecorder.state === 'recording') { try { mediaRecorder.stop(); } catch(e){} } }, 15000);
+            resolve();
+          } catch (e) { reject(e); }
+        }).catch(err => {
+          if (err && err.name === 'NotAllowedError') {
+            addMsg('paeg', '<small>🎙 麦克风权限被拒绝。请点击地址栏🔒图标允许麦克风后重试。</small>');
+          } else {
+            addMsg('paeg', '<small>🎙 无法获取麦克风：' + (err && err.message ? err.message : err) + '</small>');
+          }
+          reject(err);
+        });
+      } catch (e) { reject(e); }
+    });
+  }
+  function _stopBackendSTT() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      try { mediaRecorder.stop(); } catch (e) {}
+      return true;
+    }
+    return false;
+  }
+  function _submitAudio(blob) {
+    _resetRecording();
+    addMsg('paeg', '<small>🎙 正在识别…</small>');
+    const fd = new FormData();
+    fd.append('audio', blob, 'voice.webm');
+    fetch(API_BASE + '/api/voice/stt', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => {
+        if (j && j.ok && j.text) {
+          const input = document.getElementById('question-input');
+          if (input) {
+            addMsg('user', j.text);
+            input.value = j.text;
+            const askBtn = document.getElementById('ask-btn');
+            if (askBtn) askBtn.click();
+          }
+        } else {
+          addMsg('paeg', '<small>🎙 ' + ((j && j.error) || '未识别到语音内容') + '。可直接打字输入。</small>');
+        }
+      })
+      .catch(() => addMsg('paeg', '<small>🎙 识别服务暂不可用，请直接打字输入。</small>'));
+  }
   // v0.40 P0-2 ⭐ 点击立即视觉反馈（不依赖 start() 结果）
+  // v0.41 ⭐ 优先后端 STT（MediaRecorder），不支持才回退 Web Speech
   voiceBtn.addEventListener('click', () => {
     if (recognizing) {
-      // 停止：abort 确保触发 onend → 状态重置（比 stop() 更可靠）
-      // v0.40.3 手动停止置位（onend 不再提示"未识别到"）
+      // 停止：优先后端 recorder，回退 Web Speech abort
       _manualStop = true;
       _resetRecording();
-      try { recog.abort(); } catch (e) { try { recog.stop(); } catch (e2) {} }
+      if (!_stopBackendSTT()) {
+        try { recog.abort(); } catch (e) { try { recog.stop(); } catch (e2) {} }
+      }
       return;
     }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       addMsg('paeg', '<small>🎙 当前环境不支持麦克风（需 HTTPS 或 localhost）。</small>');
       return;
     }
-    // 立即视觉反馈（豆包式：点了马上有反应）
+    // 优先后端 STT（faster-whisper 本地，国内可用）；无 MediaRecorder 才走 Web Speech
+    if (window.MediaRecorder) {
+      _startBackendSTT().catch(() => {
+        // 回退 Web Speech
+        _resetRecording();
+        _fallbackWebSpeechStart();
+      });
+    } else {
+      _fallbackWebSpeechStart();
+    }
+  });
+  function _fallbackWebSpeechStart() {
+    // 立即视觉反馈
     _showRecordingUI();
     addMsg('paeg', '<small>🎙 正在启动麦克风…</small>');
-    // v0.40 P0-3 ⭐ start() 3 秒未触发 onstart 的兜底提示（修复 Chrome 静默拒绝）
     if (startDeadline) clearTimeout(startDeadline);
     startDeadline = setTimeout(() => {
       if (!recognizing) {
-        // onstart 未触发 → 启动失败
         _resetRecording();
         addMsg('paeg', '<small>🎙 麦克风启动失败：浏览器未授权或安全策略限制。请：' +
           '①检查地址栏🔒图标允许麦克风 ②改用 http://127.0.0.1:5000 访问。</small>');
@@ -3344,7 +3425,7 @@ askBtn.addEventListener('click', () => {
       addMsg('paeg', '<small>🎙 无法启动语音识别：' + (err && err.message ? err.message : err) +
         '（请检查麦克风权限或用 127.0.0.1 访问）。</small>');
     }
-  });
+  }
   // v0.40 P2-6 ⭐ 长按输入框触发录音（豆包式：长按 500ms 开始）
   // v0.40.2 ⭐ 浮动气泡：长按时浮现微信式"按住说话"面板（更激进视觉反馈）
   const inputEl = document.getElementById('question-input');
