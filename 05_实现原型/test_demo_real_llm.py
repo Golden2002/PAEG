@@ -1,5 +1,5 @@
 """
-PAEG v0.3 真实 LLM 接入版 Demo
+PAEG v0.38 真实 LLM 接入版 Demo
 
 使用 MockLLM（默认）或环境变量配置的真实 LLM：
   export ANTHROPIC_API_KEY=xxx     # 使用 Claude
@@ -40,7 +40,7 @@ def run_demo(paeg: PAEG, learner: LearnerProfile, subject: str, question: str) -
     print(f"  时长：{summary['duration_min']} min")
     print(f"  主导世界观：{summary['worldview_used']}")
 
-    # v0.3 新增：显示真实 LLM 输出（首个呈现的前 150 字）
+    # v0.38 新增：显示真实 LLM 输出（首个呈现的前 150 字）
     if result["session"].history:
         first = result["session"].history[0]
         content = str(first.get("content", ""))[:150]
@@ -50,13 +50,13 @@ def run_demo(paeg: PAEG, learner: LearnerProfile, subject: str, question: str) -
 
 
 def main():
-    parser = argparse.ArgumentParser(description="PAEG v0.3 真实 LLM Demo")
+    parser = argparse.ArgumentParser(description="PAEG v0.38 真实 LLM Demo")
     parser.add_argument("--provider", default="auto",
                         choices=["auto", "mock", "anthropic", "openai", "deepseek"])
     parser.add_argument("--model", default=None)
     args = parser.parse_args()
 
-    print("PAEG v0.3 真实 LLM 接入 Demo")
+    print("PAEG v0.38 真实 LLM 接入 Demo")
     print("=" * 70)
     print(f"Provider: {args.provider}")
     if args.model:
@@ -118,7 +118,7 @@ def main():
             total_tokens += getattr(paeg.model.last_response, 'output_tokens', 0)
 
     print(f"\n{'='*70}")
-    print(f"v0.3 真实 LLM Demo 完成 ✓")
+    print(f"v0.38 真实 LLM Demo 完成 ✓")
     print(f"{'='*70}")
 
 
