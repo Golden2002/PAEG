@@ -29,6 +29,11 @@ PROFILE_EMA_ALPHA = 0.3
 ROLLBACK_WINDOW_DAYS = 7
 VERSION_KEEP = 10
 
+# v0.37.2 ⭐ Oracle P0-A 修复：进程内文件写锁（跨实例共享）。
+# Windows 下 _save() 的 tmp.replace() 无锁时并发抛 WinError 32（多测试/多 SSE 流实测复现）。
+import threading as _threading
+_SAVE_LOCK = _threading.Lock()
+
 
 class SelfUpdater:
     def __init__(self, knowledge_base, data_dir: Optional[str] = None):
@@ -68,31 +73,47 @@ class SelfUpdater:
             except (ValueError, OSError):
                 self.version = 0
 
-    def _save(self):
-        """原子写入 + 版本快照。"""
-        self._ensure_dirs()
-        self.version += 1
-        # 原子写当前状态
-        for name, payload in (
-            ("reflections.json", self.history),
-            ("strategies.json", self.strategies_discovered),
-        ):
-            tmp = self.data_dir / (name + ".tmp")
-            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
-                           encoding="utf-8")
-            tmp.replace(self.data_dir / name)
-        (self.data_dir / "version.txt").write_text(str(self.version), encoding="utf-8")
-        # 版本快照（保留最近 VERSION_KEEP 版）
-        snap_dir = self.data_dir / "versions"
-        snap = snap_dir / f"v{self.version:04d}.json"
-        snap.write_text(json.dumps({
-            "version": self.version,
-            "timestamp": datetime.now().isoformat(),
-            "history": self.history,
-            "strategies": self.strategies_discovered,
-        }, ensure_ascii=False, indent=2), encoding="utf-8")
-        for old in sorted(snap_dir.glob("v*.json"))[:-VERSION_KEEP]:
-            old.unlink(missing_ok=True)
+    def _save(self, _retries: int = 3):
+        """原子写入 + 版本快照。
+
+        v0.37.2 ⭐ Oracle P0-A 修复：进程内锁 + 重试——Windows 下 tmp.replace()
+        在并发 _save() 时抛 PermissionError（WinError 32，多测试/多 SSE 流实测复现）。
+        生产环境 chat 每轮都触发 _save()，无锁会丢数据。
+        """
+        import time as _time
+        with _SAVE_LOCK:  # 进程内互斥（跨实例共享），杜绝并发写
+            for _attempt in range(_retries):
+                try:
+                    self._ensure_dirs()
+                    self.version += 1
+                    # 原子写当前状态
+                    for name, payload in (
+                        ("reflections.json", self.history),
+                        ("strategies.json", self.strategies_discovered),
+                    ):
+                        tmp = self.data_dir / (name + ".tmp")
+                        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                                       encoding="utf-8")
+                        tmp.replace(self.data_dir / name)
+                    (self.data_dir / "version.txt").write_text(str(self.version), encoding="utf-8")
+                    # 版本快照（保留最近 VERSION_KEEP 版）
+                    snap_dir = self.data_dir / "versions"
+                    snap = snap_dir / f"v{self.version:04d}.json"
+                    snap.write_text(json.dumps({
+                        "version": self.version,
+                        "timestamp": datetime.now().isoformat(),
+                        "history": self.history,
+                        "strategies": self.strategies_discovered,
+                    }, ensure_ascii=False, indent=2), encoding="utf-8")
+                    for old in sorted(snap_dir.glob("v*.json"))[:-VERSION_KEEP]:
+                        old.unlink(missing_ok=True)
+                    return  # 成功
+                except (PermissionError, OSError) as _pe:
+                    # Windows 文件占用：等待后重试
+                    if _attempt < _retries - 1:
+                        _time.sleep(0.05 * (_attempt + 1))
+                        continue
+                    print(f"[PAEG] self_update._save 写入失败（{_retries} 次重试后）: {_pe}")
 
     # ------------------------------------------------------------------
     # 更新
