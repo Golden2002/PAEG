@@ -2904,6 +2904,8 @@ let authMode = 'login';  // login | register
 function applyLogin(result) {
   STATE.learnerId = result.user_id;
   STATE.nickname = result.nickname || '学生';
+  // v0.41.2 ⭐ 修复：登录后重置头像状态（此前残留匿名头像，登录用户头像不显示）
+  STATE.avatarUrl = '';
   document.getElementById('user-badge').textContent = STATE.nickname;
   document.getElementById('user-badge').style.display = '';
   document.getElementById('user-btn').textContent = '退出';
@@ -2916,8 +2918,10 @@ function applyLogin(result) {
     localStorage.setItem('paeg-user', JSON.stringify({ learnerId: STATE.learnerId, nickname: STATE.nickname }));
   } catch (e) { /* 隐私模式等场景忽略 */ }
   // 加载持久化的自我描述 + 历史会话（v0.18.1）
+  // v0.41.2 ⭐ 修复：补 loadMetaLog——此前登录后元认知日志不刷新（用户反馈"登录后仍无反思记录"）
   loadProfile();
   loadConversations();
+  loadMetaLog();
 }
 
 // v0.18.1：加载历史会话列表
