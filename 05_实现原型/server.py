@@ -1405,8 +1405,31 @@ def teach_stream():
         # 诊断
         yield f"event: diagnosis\ndata: {json.dumps({'status': 'diagnosing'})}\n\n"
         # v0.27 ⭐ 需求：对话输出前检索状态标志（前端小徽章"已完成知识库检索"）
+        # v0.36.1 ⭐ 修复：教学路径联网检索——知识库无匹配时自动联网补充，badge 动态显示
+        # （此前硬编码"知识库检索"，教学管线不走 run_agent_loop → 永远无 web_searched，用户反馈"从不显示网络检索"）
+        _teach_badge = "知识库检索"
+        _teach_web_ctx = ""
         try:
-            yield f"event: retrieval\ndata: {json.dumps({'done': '知识库检索', 'subject': subject}, ensure_ascii=False)}\n\n"
+            _kb_hit = None
+            try:
+                _kb_hit = kb.resolve_node(concept, subject) or kb.get_subject(concept) or kb.get_humanity(concept)
+            except Exception:
+                _kb_hit = None
+            if not _kb_hit:
+                # 知识库未收录该概念（如"矩阵的质"这类自创/偏门概念）→ 联网补充，badge 显示"网络检索"
+                from web_search_tool import web_search
+                _web_raw = web_search(f"{subject} {concept}", max_results=3)
+                if _web_raw and "搜索未返回" not in str(_web_raw):
+                    _teach_badge = "网络检索"
+                    _teach_web_ctx = str(_web_raw)[:600]
+                    try:
+                        learner._teach_web_ctx = _teach_web_ctx  # type: ignore[attr-defined]  # 供 Presenter 消费
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        try:
+            yield f"event: retrieval\ndata: {json.dumps({'done': _teach_badge, 'subject': subject}, ensure_ascii=False)}\n\n"
         except Exception:
             pass
         # v0.27 ⭐ 需求A：教学模式一次识别（入口用原句，存 learner 供 Presenter 全程消费）
@@ -2901,6 +2924,42 @@ def general_chat_stream():
                     print(f"[PAEG] 个体化画像已持久化: learner_id={learner_id}")
             except Exception as _pe:
                 print(f"[PAEG] 个体化持久化失败（不影响主流程）: {_pe}")
+            # v0.36.1 ⭐ 修复：chat 路径也写 user_modeling 到元认知日志
+            # （此前只有 teach_stream 写 → u 账号 meta-log 只有 self_reflect/adaptation，
+            #   前端 fallback 显示用户提问 → 元认知日志看起来像"对话历史"）
+            try:
+                from datetime import datetime as _dt_chat
+                _trait_chat = (_ind_result or {}).get("trait") or {}
+                _facts_chat = (_ind_result or {}).get("facts") or []
+                if paeg.self_updater is not None:
+                    paeg.self_updater.history.append({
+                        "timestamp": _dt_chat.now().isoformat(),
+                        "learner_id": learner_id,
+                        "concept": text[:60],
+                        "subject": data.get("subject", "general"),
+                        "reflection": {
+                            "type": "user_modeling",
+                            "timestamp": _dt_chat.now().isoformat(),
+                            "learner_id": learner_id,
+                            "concept": text[:60],
+                            "subject": data.get("subject", "general"),
+                            "llm_modeled": bool((_ind_result or {}).get("llm_modeled")),
+                            "learning_style": _trait_chat.get("learning_style"),
+                            "knowledge_strengths": _trait_chat.get("knowledge_strengths", []) or [],
+                            "knowledge_gaps": _trait_chat.get("knowledge_gaps", []) or [],
+                            "emotional_tendency": _trait_chat.get("emotional_tendency"),
+                            "motivation": _trait_chat.get("motivation"),
+                            "interests": _trait_chat.get("interests", []) or [],
+                            "facts": _facts_chat,
+                            "reflection": (
+                                f"建模：风格 {_trait_chat.get('learning_style') or '未知'}, "
+                                f"擅长 {_trait_chat.get('knowledge_strengths') or '[]'}, "
+                                f"薄弱 {_trait_chat.get('knowledge_gaps') or '[]'}"
+                            ),
+                        },
+                    })
+            except Exception as _mce:
+                print(f"[PAEG] chat meta-log 建模记录跳过: {_mce}")
         # v0.19.7：自我改进——记录对话案例（轻量，不阻塞）
         try:
             from self_improve import SelfImprover
