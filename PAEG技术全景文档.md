@@ -4110,3 +4110,76 @@ python arch_check.py          # 输出连通性报告 + arch_report.json
 ---
 
 *本文档由 Sisyphus 编写，基于当前系统实际状态。修改代码前请先备份；重大改动后运行 §10.2 测试确认无回归。*
+
+### 10.2.21 ⭐ 成熟项目可借鉴结构（v0.41 调研）
+
+> **调研动机**：server.py 突破 4500 行，单文件维护窗口已到上限。决定参考已验证的成熟项目结构做**渐进演进**，本节沉淀借鉴清单与目标形态。
+
+#### 借鉴来源（6 个成熟项目）
+
+| 项目 | 领域 | 借鉴要点 |
+|---|---|---|
+| Flask 官方 | Web 框架 | Application Factory / Blueprints / extensions.py 三件套 |
+| cookiecutter-flask | 项目模板 | 项目骨架标准布局（src/ + tests/ + config/） |
+| Kraken | 电商生产系统 | 大型单体拆分案例（config/services/utils 分层） |
+| EAS Station | 数据采集系统 | 工具注册表（tool registry）+ 模块门控模式 |
+| llama-index | RAG 框架 | `query()` 包装模式 / 多 agent 协作 / Context 契约 |
+| langchain | Agent 框架 | Tool Registry 集中管理 / LCEL 声明式组合 |
+
+#### Flask 三件套（Web 通用最佳实践）
+
+- **Application Factory**（`create_app()`）：把 app 实例化推迟到函数内 → 支持多配置/多实例测试
+- **Blueprints**（`bp = Blueprint('name', __name__)`）：按功能切分路由模块 → 每个蓝图独立注册到 app
+- **extensions.py**：所有扩展（db/migrate/login）在此初始化但**不绑定 app**，由工厂方法 `init_app(app)` 注入 → 解决循环引用 + 测试隔离
+
+#### AI 项目特定模式（llama-index / langchain）
+
+- **query() 包装模式**：所有 LLM 调用统一包成 `query(prompt, context) -> response` 接口 → 行为可观察/可替换/可 mock
+- **多 agent 协作**：每个 subagent 是独立单元，Context 契约（输入/输出 schema）保证组合性
+- **Tool Registry**：工具集中注册（名称→处理函数），agent 按名调用 → 新增工具零侵入
+
+#### 拆分铁律（Kraken / EAS Station 验证）
+
+- **Expand-Migrate-Contract**：先加新接口（Expand）→ 迁移调用方（Migrate）→ 删除旧接口（Contract），每步都可回滚
+- **ratchet**（单向棘轮）：拆分只前进不后退——已迁移的代码禁止回到旧模块
+- **行为不变性**：拆分过程 API 响应字节级一致 → 跑回归测试做安全网
+
+#### 目标目录结构（PAEG v0.41+ 演进方向）
+
+```
+05_实现原型/
+├── server.py              # 入口薄壳（仅 app factory + 蓝图注册）
+├── config/                # 配置层：settings.py / secrets.py / env loader
+├── utils/                 # 纯函数工具：text_utils / json_utils / time_utils
+├── services/              # 业务服务：tts_service / user_service / llm_service
+├── blueprints/            # HTTP 蓝图：api_bp / admin_bp / voice_bp
+├── agents/                # subagent 实现：planner / presenter / evaluator / ...
+├── infra/                 # 基础设施：db / cache / file_lock / audit
+└── tests/                 # 镜像结构测试：test_blueprints/ test_services/ test_agents/
+```
+
+#### 与现状映射（4500 行 server.py → 目标）
+
+| 当前 server.py 块 | 行数（约） | 目标位置 |
+|---|---|---|
+| 配置加载 + secrets | 100 | `config/` |
+| 纯文本/JSON 工具 | 300 | `utils/` |
+| LLM 调用 + subagent | 1500 | `services/` + `agents/` |
+| HTTP 路由 | 1200 | `blueprints/` |
+| 文件锁/审计/缓存 | 400 | `infra/` |
+| 全局变量 + 入口 | 1000 | `server.py`（保留入口 + 注册蓝图） |
+
+#### 参考资料
+
+- Flask docs: [Application Factories](https://flask.palletsprojects.com/en/latest/patterns/appfactories/) / [Blueprints](https://flask.palletsprojects.com/en/latest/blueprints/)
+- cookiecutter-flask: https://github.com/cookiecutter/cookiecutter-flask
+- llama-index: https://github.com/run-llama/llama_index
+- langchain: https://github.com/langchain-ai/langchain
+- Kraken (GitHub): 大型 Flask 单体拆分参考案例
+- EAS Station: https://github.com/ggelashvili/EAS-Station
+
+#### v0.41 起步动作（已落地）
+
+- Phase 1：`config/` + `utils/` 已拆分（行为不变，回归通过）
+- Phase 2：`services/` 抽离 LLM 调用（规划中，§维护手册 §六 详述）
+
