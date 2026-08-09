@@ -1,4 +1,4 @@
-﻿"""PAEG 通用工具函数层(v0.40 P1-1 server.py Phase1 拆分)。
+"""PAEG 通用工具函数层(v0.40 P1-1 server.py Phase1 拆分)。
 
 集中托管 server.py 中"无 server 模块级全局依赖"的纯函数:
   - 路径安全解析(_safe_resolve_user_library_file)
