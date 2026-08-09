@@ -221,7 +221,7 @@ def static_files(filename):
             from module_registry import is_enabled
             if not is_enabled("weather"):
                 return "气象模块已下架（在 paeg_modules.json 中启用）", 403
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] static_files 异常忽略: {_e}")
             pass
             pass
@@ -388,7 +388,7 @@ def _mode_auto_correct(text: str, requested_mode: str, learner, learner_id: str,
             _pr_data["requested_mode"] = requested_mode
             _pr_data["was_redirected"] = True
             return jsonify(_pr_data)
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] _mode_auto_correct 异常忽略: {_e}")
         pass
         pass
@@ -416,7 +416,7 @@ def _polish_text(text: str, context: str = "") -> str:
             has_issues = False
             try:
                 has_issues = len(paeg.refiner._check_ellipsis(text)) > 0
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][server.py] _polish_text 异常忽略: {_e}")
                 pass
                 pass
@@ -424,7 +424,7 @@ def _polish_text(text: str, context: str = "") -> str:
                 refined = paeg.refiner.refine(text, context=context)
                 if refined:
                     return refined
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] _polish_text 异常忽略: {_e}")
         pass
         pass
@@ -506,7 +506,7 @@ def _steer_subject(concept: str, subject: str, learner, learner_id: str) -> dict
             if EVOLVER is not None:
                 try:
                     EVOLVER.record_subject_request(uname, concept, learner_id)
-                except Exception:
+                except Exception as _e:
                     print(f"[PAEG][server.py] _steer_subject 异常忽略: {_e}")
                     pass
                     pass
@@ -547,13 +547,13 @@ def _steer_subject(concept: str, subject: str, learner, learner_id: str) -> dict
                 old_label = get_style(subject)["label"]
                 new_label = get_style(new_subject)["label"]
                 print(f"[PAEG][steering] {old_label} → {new_label}（问题: {concept[:30]}）")
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][server.py] _steer_subject 异常忽略: {_e}")
                 pass
                 pass
             return {"subject": new_subject, "unknown": False, "unknown_name": None,
                     "switched": True, "response": None}
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] _steer_subject 异常忽略: {_e}")
         pass
         pass
@@ -607,11 +607,11 @@ def health():
                 mcp_stats["connected"] = n
                 mcp_stats["tools"] = len(MCP_CLIENT._tools)
                 mcp_stats["last_error"] = MCP_CLIENT._last_error
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][server.py] health 异常忽略: {_e}")
                 pass
                 pass
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] health 异常忽略: {_e}")
         pass
         pass
@@ -623,7 +623,7 @@ def health():
     if SKILL_REGISTRY is not None:
         try:
             skill_count = SKILL_REGISTRY.stats().get("count", 0) or 0
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] health 异常忽略: {_e}")
             pass
             pass
@@ -747,7 +747,7 @@ def teach():
             return _steer["response"]  # 未收录学科反馈
         if _steer.get("switched"):
             subject = _steer["subject"]
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
         pass
@@ -773,7 +773,7 @@ def teach():
                     "subjects_mastery": learner.subjects_mastery,
                 },
             })
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
         pass
@@ -783,7 +783,7 @@ def teach():
         from meta_router import is_knowledge_query
         if is_knowledge_query(concept):
             return jsonify(_handle_knowledge_query(learner, subject))
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
         pass
@@ -810,7 +810,7 @@ def teach():
                     "subjects_mastery": learner.subjects_mastery,
                 },
             })
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
         pass
@@ -854,7 +854,7 @@ def teach():
         from meta_router import is_method_advice
         if is_method_advice(concept):
             return _handle_method_advice(learner, concept, subject)
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
         pass
@@ -864,7 +864,7 @@ def teach():
         from meta_router import is_problem_request
         if is_problem_request(concept):
             return _handle_problem_request(learner, concept, subject)
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
         pass
@@ -895,7 +895,7 @@ def teach():
                     "subjects_mastery": learner.subjects_mastery,
                 },
             })
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
         pass
@@ -935,7 +935,7 @@ def teach():
                             "grade_level": learner.grade_level,
                             "subjects_mastery": learner.subjects_mastery},
             })
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
         pass
@@ -1123,7 +1123,7 @@ def teach_stream():
                 try:
                     _gb_json = _gb.get_json()
                     _gb_content = _gb_json.get("presentations", [{}])[0].get("content", "")
-                except Exception:
+                except Exception as _e:
                     print(f"[PAEG][server.py] gen_aff 异常忽略: {_e}")
                     pass
                     pass
@@ -1191,7 +1191,7 @@ def teach_stream():
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_ui(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_ui 异常忽略: {_e}")
         pass
         pass
@@ -1217,7 +1217,7 @@ def teach_stream():
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_rec(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_rec 异常忽略: {_e}")
         pass
         pass
@@ -1237,7 +1237,7 @@ def teach_stream():
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_kb(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_kb 异常忽略: {_e}")
         pass
         pass
@@ -1257,7 +1257,7 @@ def teach_stream():
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_map(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_map 异常忽略: {_e}")
         pass
         pass
@@ -1291,7 +1291,7 @@ def teach_stream():
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_composite(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_composite 异常忽略: {_e}")
         pass
         pass
@@ -1320,7 +1320,7 @@ def teach_stream():
                 yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'ppt'}, ensure_ascii=False)}\n\n"
             return Response(gen_ppt(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_ppt 异常忽略: {_e}")
         pass
         pass
@@ -1402,7 +1402,7 @@ def teach_stream():
                     yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
                 return Response(gen_intent(), mimetype="text/event-stream",
                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_intent 异常忽略: {_e}")
         pass
         pass
@@ -1420,7 +1420,7 @@ def teach_stream():
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_ma(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_ma 异常忽略: {_e}")
         pass
         pass
@@ -1438,7 +1438,7 @@ def teach_stream():
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_pr(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_pr 异常忽略: {_e}")
         pass
         pass
@@ -1460,7 +1460,7 @@ def teach_stream():
                 yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'affection'}, ensure_ascii=False)}\n\n"
             return Response(gen_emo(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_emo 异常忽略: {_e}")
         pass
         pass
@@ -1483,7 +1483,7 @@ def teach_stream():
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_meta(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_meta 异常忽略: {_e}")
         pass
         pass
@@ -1495,7 +1495,7 @@ def teach_stream():
             # v0.22.1：用完整对话历史推 user_model（原只用当前 concept 单条，质量差——Presenter/Diagnostor 依赖）
             inject_user_model(learner, SESSIONS.get(f"chat_hist_{learner_id}", []),
                               getattr(learner, "self_description", ""))
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -1521,17 +1521,17 @@ def teach_stream():
                     _teach_web_ctx = str(_web_raw)[:600]
                     try:
                         learner._teach_web_ctx = _teach_web_ctx  # type: ignore[attr-defined]  # 供 Presenter 消费
-                    except Exception:
+                    except Exception as _e:
                         print(f"[PAEG][server.py] generate 异常忽略: {_e}")
                         pass
                         pass
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
         try:
             yield f"event: retrieval\ndata: {json.dumps({'done': _teach_badge, 'subject': subject}, ensure_ascii=False)}\n\n"
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -1539,7 +1539,7 @@ def teach_stream():
         try:
             from subagents import _detect_teaching_mode
             learner._teaching_mode = _detect_teaching_mode(concept, llm)  # type: ignore[attr-defined]
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -1613,7 +1613,7 @@ def teach_stream():
                 _uc_stream = read_user_corpus(str(_uid_stream), max_files=3, per_file=300)
                 if _uc_stream:
                     learner._user_corpus = _uc_stream  # type: ignore[attr-defined]
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -1631,7 +1631,7 @@ def teach_stream():
                     "role": _h.get("role", "user"),
                     "step_type": "history",
                 })
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -1724,7 +1724,7 @@ def teach_stream():
                     "score": min(0.95, 0.6 + 0.08 * len(_assistant_parts)),
                     "step": "summary_estimate",
                 })
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -1843,7 +1843,7 @@ def teach_stream():
             doc_evt = _handle_keyword_doc(concept, "", learner, data)
             if doc_evt:
                 yield f"event: doc\ndata: {json.dumps(doc_evt, ensure_ascii=False)}\n\n"
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -1860,7 +1860,7 @@ def teach_stream():
                     _done_extra["required_grade"] = _steer.get("response").get_json().get("required_grade", "")
                 except Exception:
                     _done_extra["required_grade"] = ""
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -2041,7 +2041,7 @@ def meta_log(learner_id):
         if _rs is not None:
             logs = _rs.query(learner_id, limit=limit)
             return jsonify({"logs": logs, "total": _rs.count(learner_id)})
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] meta_log 异常忽略: {_e}")
         pass
         pass
@@ -2254,7 +2254,7 @@ def upload_avatar():
                 if _os.path.exists(_old):
                     try:
                         _os.remove(_old)
-                    except Exception:
+                    except Exception as _e:
                         print(f"[PAEG][server.py] upload_avatar 异常忽略: {_e}")
                         pass
                         pass
@@ -2780,7 +2780,7 @@ def general_chat_stream():
         um['bdi'] = infer_bdi([{'content': text}], learner.self_description or "")
         learner._user_model = um  # type: ignore[attr-defined]
         system = build_general_chat_system(learner)
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
         pass
         pass
@@ -2791,7 +2791,7 @@ def general_chat_stream():
         _tm = load_teaching_memory()
         if _tm:
             system = system + "\n\n" + _tm
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
         pass
         pass
@@ -2801,7 +2801,7 @@ def general_chat_stream():
         _ulib = get_user_library(learner_id)
         if _ulib:
             system = system + "\n\n" + _ulib
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
         pass
         pass
@@ -2815,7 +2815,7 @@ def general_chat_stream():
             system = system + (
                 "\n\n## 用户说过的事实（v0.21.8 记忆锚点，回答相关问题时必须引用）\n"
                 + _facts_str)
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
         pass
         pass
@@ -2926,7 +2926,7 @@ def general_chat_stream():
                 f"{'学生' if m['role']=='user' else 'Émile'}: {m['content'][:300]}"
                 for m in _ctx_result.messages)
             mem_ctx = f"【最近对话】\n{hist_str}"
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_file_op 异常忽略: {_e}")
         pass
         pass
@@ -2945,7 +2945,7 @@ def general_chat_stream():
         page_ctx = (f"【当前设定】教学模式：{'学科教学' if data.get('mode')=='teach' else '闲聊'}；"
                     f"学段：{grade_cn}" + (f"；学科：{subject_cn}" if subject_cn else ""))
         ctx_parts.insert(0, page_ctx)
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] gen_file_op 异常忽略: {_e}")
         pass
         pass
@@ -2971,7 +2971,7 @@ def general_chat_stream():
                     _time.sleep(0.02)
                 yield f"event: done\ndata: {json.dumps({'ok': True, 'mode': 'affection'}, ensure_ascii=False)}\n\n"
                 return
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -2993,7 +2993,7 @@ def general_chat_stream():
                     _time.sleep(0.02)
                 yield f"event: done\ndata: {json.dumps({'ok': True}, ensure_ascii=False)}\n\n"
                 return
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -3065,7 +3065,7 @@ def general_chat_stream():
             try:
                 _badge_text = "网络检索" if _ar.get("web_searched") else "知识库检索"
                 yield f"event: retrieval\ndata: {json.dumps({'done': _badge_text}, ensure_ascii=False)}\n\n"
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][server.py] generate 异常忽略: {_e}")
                 pass
                 pass
@@ -3078,7 +3078,7 @@ def general_chat_stream():
             # 前端看不到"已完成知识库检索"——看似没检索）
             try:
                 yield f"event: retrieval\ndata: {json.dumps({'done': '知识库检索'}, ensure_ascii=False)}\n\n"
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][server.py] generate 异常忽略: {_e}")
                 pass
                 pass
@@ -3087,7 +3087,7 @@ def general_chat_stream():
         try:
             from expert_guard import ExpertGuard
             reply = ExpertGuard(llm).refine(text, reply, subject=data.get("subject", "chat"))
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -3103,7 +3103,7 @@ def general_chat_stream():
                 record_metric("paeg.tool.duration", 1, {"tool": tc.get("name", "")})
                 emit_event("item.completed", type="tool_call",
                            tool=tc.get("name", ""), session=learner_id[:8])
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][server.py] generate 异常忽略: {_e}")
                 pass
                 pass
@@ -3126,7 +3126,7 @@ def general_chat_stream():
             doc_evt = _handle_keyword_doc(text, reply, learner, data)
             if doc_evt:
                 yield f"event: doc\ndata: {json.dumps(doc_evt, ensure_ascii=False)}\n\n"
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -3139,7 +3139,7 @@ def general_chat_stream():
             try:
                 mem.short_term = chat_hist[-10:]
                 mem.compress_if_needed()
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][server.py] generate 异常忽略: {_e}")
                 pass
                 pass
@@ -3192,14 +3192,14 @@ def general_chat_stream():
             _improver = SelfImprover(llm=llm)
             _improver.record(text, reply, {"subject": data.get("subject", "chat"),
                                            "learner_id": str(learner_id)[:12]})
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
         # v0.19.21：标记调度器活跃（周期自我更新的前提）
         try:
             PERIODIC_UPDATER.mark_activity()
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
             pass
@@ -3224,7 +3224,7 @@ def general_chat_stream():
                 cid = CONV_STORE.add_message(learner_id, "chat", text[:30],
                                              "assistant", reply, conv_id=cid)
                 SESSIONS[f"conv_chat_{learner_id}"] = cid
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][server.py] generate 异常忽略: {_e}")
                 pass
                 pass
@@ -3277,7 +3277,7 @@ def general_chat():
         um['bdi'] = infer_bdi([{'content': text}], learner.self_description or "")
         learner._user_model = um  # type: ignore[attr-defined]
         system = _bgcs(learner)
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
         pass
         pass
@@ -3287,7 +3287,7 @@ def general_chat():
         _ulib_chat = get_user_library(learner_id)
         if _ulib_chat:
             system = system + "\n\n" + _ulib_chat
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
         pass
         pass
@@ -3415,7 +3415,7 @@ def general_chat():
         from expert_guard import ExpertGuard
         _guard = ExpertGuard(llm)
         reply = _guard.refine(text, reply, subject=data.get("subject", "chat"))
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
         pass
         pass
@@ -3440,7 +3440,7 @@ def general_chat():
                 "filename": os.path.basename(_md),
             }
             reply = reply + f"\n\n（已将本次回答保存为文档：{doc_urls['filename']}）"
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
         pass
         pass
@@ -3462,7 +3462,7 @@ def general_chat():
         try:
             mem.short_term = chat_hist[-10:]
             mem.compress_if_needed()
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
             pass
             pass
@@ -3495,7 +3495,7 @@ def general_chat():
         _doc = _handle_keyword_doc(text, reply, learner, data)
         if _doc and not doc_urls:
             doc_urls = _doc
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
         pass
         pass
@@ -3588,7 +3588,7 @@ def answer_api():
                 cid = CONV_STORE.add_message(learner_id, "answer", f"找答案：{question[:30]}",
                                              "assistant", result.get("answer") or "", conv_id=cid)
                 SESSIONS[f"conv_answer_{learner_id}"] = cid
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][server.py] answer_api 异常忽略: {_e}")
                 pass
                 pass
@@ -3599,7 +3599,7 @@ def answer_api():
                 _ch.append({"role": "user", "content": question})
                 _ch.append({"role": "assistant", "content": result.get("answer") or ""})
                 SESSIONS[f"chat_hist_{learner_id}"] = _ch[-20:]  # v0.26 统一窗口 20
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][server.py] answer_api 异常忽略: {_e}")
                 pass
                 pass
@@ -3665,7 +3665,7 @@ def _anon_learner_id(request_data: dict, request_obj=None) -> str:
             cid = _req.cookies.get("paeg_anon_id")
             if cid:
                 return cid
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] _anon_learner_id 异常忽略: {_e}")
         pass
         pass
@@ -3980,7 +3980,7 @@ def method_advice():
         _correct = _mode_auto_correct(concept, "method", learner, learner_id, subject)
         if _correct is not None:
             return _correct
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] method_advice 异常忽略: {_e}")
         pass
         pass
@@ -4034,7 +4034,7 @@ def knowledge_query():
             _correct = _mode_auto_correct(_q, "knowledge", learner, learner_id, subject)
             if _correct is not None:
                 return _correct
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] knowledge_query 异常忽略: {_e}")
         pass
         pass
@@ -4086,7 +4086,7 @@ def affection_support():
         _correct = _mode_auto_correct(text, "affection", learner, learner_id, "general")
         if _correct is not None:
             return _correct
-    except Exception:
+    except Exception as _e:
         print(f"[PAEG][server.py] affection_support 异常忽略: {_e}")
         pass
         pass
@@ -4460,7 +4460,7 @@ def self_update_from_feedback():
                     p for p in library_paths
                     if os.path.isfile(p)
                 ][:5]
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][server.py] self_update_from_feedback 异常忽略: {_e}")
                 pass
                 pass
