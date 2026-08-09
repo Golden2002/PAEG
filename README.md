@@ -235,3 +235,84 @@ python D:\桌面\智能体架构与开发（含大模型）_教育者Agent项�
 ## 检索徽章（v0.27 + v0.36.1）
 
 回答前显示"已完成知识库检索 / 网络检索"徽章：知识库有该概念 → 知识库检索；知识库无匹配（如偏门/自创概念）→ **自动联网补充**并显示"网络检索"。推荐类问题（"推荐几本书"）始终真联网。
+
+---
+
+## 架构与维护（v0.41 ⭐）
+
+> 本节是 PAEG 工程化层面的总览——项目目录怎么组织、怎么检视健康度、下一步往哪里走。面向**接手维护者**和**未来想二次开发**的读者。
+
+### 目录结构
+
+```
+05_实现原型/
+├── server.py              # 入口薄壳（app factory + 蓝图注册）
+├── config/                # 配置层（settings / secrets / env loader）
+├── utils/                 # 纯函数工具（text / json / time）
+├── services/              # 业务服务（tts / user / llm — Phase 2 拆分中）
+├── blueprints/            # HTTP 蓝图（api / admin / voice — Phase 3 规划）
+├── agents/                # subagent 实现（planner / presenter / evaluator）
+├── infra/                 # 基础设施（db / cache / file_lock / audit）
+├── subagents.py           # 子代理注册 + 调度
+├── voice_service.py       # TTS/STT 接口抽象（v0.36+）
+├── reflection_store.py    # 反思日志持久化
+├── prompt_loader.py       # 提示词模板加载
+├── paeg_modules.json      # 模块门控配置
+└── tests/                 # 镜像结构测试
+```
+
+**关键文件**：
+- `config/`：所有配置集中，secrets 从环境变量读取（无硬编码密钥）
+- `subagents.py`：9 个子代理的注册与调度（v0.25+）
+- `voice_service.py`：TTS/STT provider 抽象（v0.36，edge-tts 默认）
+- `reflection_store.py`：自我进化反思日志（v0.30+）
+- `paeg_modules.json`：模块开关门控（运行时动态启用/禁用）
+
+### 检视命令（每次改动前后必跑）
+
+```powershell
+# 1. 静态检视（P0/P1 必须全过）
+python audit_check.py
+
+# 2. 端点冒烟（27 秒内验证关键 API）
+python smoke_test.py
+
+# 3. 全量回归（pytest 必须全绿）
+python -m pytest tests/ -q
+
+# 4. 三处一致（本地 ↔ GitHub ↔ Release）
+python sync_check.py --fix
+
+# 5. 架构连通性（每季度跑一次）
+python arch_check.py
+```
+
+**检视铁律**：
+- 改核心链路（server.py / subagents.py / prompts.py）后**至少**跑 smoke_test + pytest
+- 发版前必须 5 个命令全过
+- 任何 `bare except: pass` 会被 audit_check 抓住（P0）
+- 任何写端点缺 `_is_registered` 校验会被抓住（P0）
+
+### 优化方向（v0.41+ 演进路线）
+
+PAEG 不止"功能完整"，更要"结构优秀"。参考 Flask / Kraken / EAS Station / llama-index / langchain 六个成熟项目的结构做渐进拆分：
+
+| Phase | 内容 | 状态 | 触发条件 |
+|---|---|---|---|
+| Phase 1 | `config/` + `utils/` 拆分 | ✅ 完成 | server.py > 4000 行 |
+| Phase 2 | `services/` 抽离 LLM 调用 | 🔄 进行中 | LLM 调用跨层耦合 |
+| Phase 3 | `blueprints/` 拆分 | 📋 规划 | HTTP 路由难以独立维护 |
+| Phase 4 | `agents/` 独立单元 | 📋 规划 | subagent 行为难观测 |
+
+**拆分铁律**：
+1. **行为不变性**：拆分前后 API 响应字节级一致（回归测试做安全网）
+2. **Expand-Migrate-Contract**：扩展→迁移→收缩三阶段，每步可回滚
+3. **ratchet**：拆分只前进不后退，已迁移禁止回旧模块
+
+### 进一步阅读
+
+- 详细技术全景：[《PAEG技术全景文档》§10.2.21 成熟项目可借鉴结构](./PAEG技术全景文档.md)
+- 维护操作流程：[《维护手册》§六 成熟项目结构借鉴](./维护手册.md)
+- 元能力沉淀：[《元能力文档》§6.15 成熟项目结构借鉴元技术](./元能力文档.md)
+- 投资人视角亮点：[《亮点总览》§六 架构可维护性](./亮点总览.md)
+
