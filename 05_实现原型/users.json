@@ -393,20 +393,11 @@
    "salt": "c01d3cd39a02bf29",
    "learner": {
     "id": "u106",
-    "nickname": "团聚体",
+    "nickname": "学生",
     "grade_level": "high_school",
     "age": 17,
     "cognitive_style": "visual",
-    "subjects_mastery": {
-     "矩阵的基本概念": {
-      "level": 0.3,
-      "evidence_pos": [],
-      "evidence_neg": [
-       "individuality_LLM"
-      ],
-      "recency": ""
-     }
-    },
+    "subjects_mastery": {},
     "world_view_blend": {
      "1": 0.2,
      "2": 0.35,
@@ -431,17 +422,9 @@
       "summary": ""
      }
     },
-    "_teach_web_ctx": "[来源 1] literature - 搜索 词典\nURL: https://global.bing.com/dict/search?q=literature&amp;FORM=BDVSP6&amp;cc=cn\n必应词典为您提供literature的释义，美 [ˈlɪt (ə)rəˌtʃʊr]，英 [ˈlɪtrətʃə (r)]，n. 文学；文学作品；资料； 网络释义： 文献；文艺；著作；\n\n[来源 2] LITERATURE中文 (简体)翻译：剑桥词典\nURL: https://dictionary.cambridge.org/zhs/%E8%AF%8D%E5%85%B8/%E8%8B%B1%E8%AF%AD-%E6%B1%89%E8%AF%AD-%E7%AE%80%E4%BD%93/literature\nliterature noun [U] (INFORMATION) printed material published by a company that is intended to encourage people to buy that company's products or services; material that an organization publishes …\n\n[来源 3] literature是什么意思_literature的翻译_音标_读音_",
-    "_teaching_mode": "normal",
     "_individuality_trait": {
      "learning_style": "visual",
-     "knowledge_gaps": [
-      "矩阵的基本概念"
-     ],
-     "motivation": "主动寻求诗歌赏析，表现出对文学学习的兴趣",
-     "interests": [
-      "海子的诗歌"
-     ]
+     "motivation": "主动要求整理导数讲义，显示有整理知识、系统化学习的意愿"
     },
     "_individuality_trait_obj": {
      "identity": {
@@ -451,17 +434,7 @@
      },
      "cognitive_style": "visual",
      "native_language": "zh",
-     "mastery": {
-      "矩阵的基本概念": {
-       "level": 0.3,
-       "evidence_pos": [],
-       "evidence_neg": [
-        "individuality_LLM",
-        "LLM建模:矩阵的基本概念是薄弱点"
-       ],
-       "recency": ""
-      }
-     },
+     "mastery": {},
      "study_goal": {
       "exam": null,
       "specialty": null,
@@ -484,14 +457,8 @@
      "collaboration": "unknown",
      "media_preference": "unknown",
      "accessibility": [],
-     "interests": [
-      "海子的诗歌"
-     ],
      "schema_version": "2"
-    },
-    "interests": [
-     "海子的诗歌"
-    ]
+    }
    },
    "created_at": 1786128095.595146,
    "last_login": 1786285502.4912338

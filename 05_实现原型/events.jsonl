@@ -30,3 +30,6 @@
 {"ts": 1786261248.2325318, "type": "tool_call", "tool": "web_search", "session": "u3"}
 {"ts": 1786261248.233374, "type": "tool_call", "tool": "web_search", "session": "u3"}
 {"ts": 1786261248.2342033, "type": "tool_call", "tool": "web_search", "session": "u3"}
+{"ts": 1786298015.0682154, "type": "tool_call", "tool": "save_document", "session": "u106"}
+{"ts": 1786298015.0723498, "type": "tool_call", "tool": "save_document", "session": "u106"}
+{"ts": 1786298015.0750904, "type": "tool_call", "tool": "save_document", "session": "u106"}
