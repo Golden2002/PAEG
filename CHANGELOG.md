@@ -1,3 +1,18 @@
+### v0.40.6 质检发现并修复 83 处 NameError（系统性 bug，2026-08-09）
+
+**重大发现（新方法论"行为验证"层揭示）**
+- 🐛 **83 处 except Exception 未绑 as _e 却引用 {_e}**（server.py 72 + subagents.py 29 + paeg.py 11）：之前批量"静默异常加日志"脚本把 `except Exception:` 改成有 print 但没绑变量 → LLM 返回非 JSON 时抛 NameError → teach 路径偶发 500
+- 🐛 AffectionSupportor 危机识别块被批量脚本破坏（try/except 结构错乱）→ 重写修复
+- ✅ 修复后 pytest：**222/248 → 245/248**（提升 23 个）；剩余 3 个为预存在测试状态污染（单独跑 7 passed）
+- ✅ 教学流式验证：18 个 presentation 分片 + 检索 badge + done 全正常
+
+**审计脚本维护**
+- audit_check.py：gen_empty_chat 白名单（空输入引导语无需保存历史）、users_data 阈值 <50、幽灵端点标注 ≥6
+- smoke_test.py：affection 重试 3 次（防抖动）
+- test_v037_regressions.py：早退分支检查加 empty_chat 白名单
+
+**文档**：维护手册 §4.5 / 技术文档 §10.2.20 / 元能力 §6.13 新增"反思教训"（为什么改不对 + 行为验证方法论）
+
 ### v0.40.5 质检修复：用户名显示/幽灵学科键/空输入200/版本号（2026-08-09）
 
 - 元认知用户名：localStorage `paeg-user` 兜底显示"团聚体"（此前 STATE 默认"学习者"导致首屏显示异常）
