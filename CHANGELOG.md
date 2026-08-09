@@ -1,3 +1,16 @@
+### v0.36.2 前端全功能审计 + 三大回归修复（2026-08-09）
+
+**修复（用户反馈的多次问题）**
+- 🐛 教学模式非流式回归：v0.36 教学 6 步可视化改动引入——presentation 事件只累积字符串不渲染 DOM，直到流结束才一次性 marked.parse。修复：每个 step 到达即实时渲染（对齐 chat 路径逐段渲染）→ 恢复逐字可见的流式体验
+- 🐛 网络检索徽章从不显示：teach_stream 硬编码"知识库检索"且教学管线不走 run_agent_loop（无 web_searched 数据源）。修复：知识库无匹配时自动联网补充（web_search），badge 动态显示"网络检索/知识库检索"，联网结果注入 Presenter 教学上下文
+- 🐛 元认知日志显示对话历史：u 账号 history 无 user_modeling 记录（只有 self_reflect/adaptation），前端 fallback 显示用户原始提问。修复：①chat 路径补写 user_modeling（Individuality trait → meta-log）②前端 else 分支不再显示 l.concept（用户问题），改显示反思实际内容
+
+**审计（依据技术文档对前端全功能检测）**
+- 📋 64 项功能对照：48 完全可用 / 8 条件性（浏览器/HTTPS/edge-tts 依赖）/ 3 可用但入口不直观（PPT/知识导图/Thread——经实测知识导图说"思维导图"即触发、PPT 走查资料→for_ppt）/ 2 未承诺（注意力眼动/六级反馈——文档无承诺，非断链）
+- 🔧 匿名历史断链修复：前端 loadConversations 拦截所有非 u 用户（后端 v0.32 已允许 web_ 落盘，形成"数据存在但看不到"）。修复：匿名用户也可加载/恢复/删除历史（3 处）+ encodeURIComponent 转义
+- 🎙 语音提示精准化：STT 区分"浏览器不支持（微信X5）"与"非安全环境（非HTTPS）"两类提示，不再笼统"无法使用"；TTS 捕获 autoplay 拦截并给出手势引导，错误信息透传（不再误导"edge-tts 未安装"）
+- ✅ 实测：匿名 A/B 用户历史隔离 ✓、u3 跨设备落盘 ✓、TTS MP3 可播放 ✓、知识导图流式输出 ✓、chat→user_modeling→meta-log 全链路 ✓
+
 ### v0.36 语音模块（TTS/STT）
 - 🎙 新增语音交互：edge-tts 朗读回答（免key中文女声）+ 浏览器 Web Speech API 语音提问
 - 🏗 模块化：voice 模块门控（paeg_modules.json 可开关）、voice_service.py provider 抽象、纯 I/O adapter 不进 subagent 调度
