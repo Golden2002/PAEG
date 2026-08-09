@@ -1662,13 +1662,20 @@ def teach_stream():
                         if _refined and _refined != _r_content:
                             presentation["content"] = _refined
                             presentation["refined"] = True
-                except Exception:
-                    print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-                    pass
-                    pass
+                except Exception as _refine_e:
+                    print(f"[PAEG][server.py] generate 异常忽略: {_refine_e}")
             _assistant_parts.append(presentation.get("content") or "")  # v0.21.3
             _prev_presentations.append(presentation)  # v0.21.8：累积讲解供下一轮参考
-            yield f"event: presentation\ndata: {json.dumps(presentation, ensure_ascii=False)}\n\n"
+            # v0.40.2 ⭐ 修复：教学主循环 presentation 分片 yield（此前整段一次性 yield → 前端"等很久突然一大段"）
+            # 对齐早退分支（[i:i+60] 分片）与 chat 的 seg 模式——用户感知逐步输出
+            import time as _t_split
+            _pres_content = presentation.get("content") or ""
+            if _pres_content:
+                for _pc_i in range(0, len(_pres_content), 60):
+                    yield f"event: presentation\ndata: {json.dumps({'step_id': presentation.get('step_id', i + 1), 'content': _pres_content[_pc_i:_pc_i+60], 'step_type': presentation.get('step_type', 'teach')}, ensure_ascii=False)}\n\n"
+                    _t_split.sleep(0.02)  # 与 chat_stream 同节奏
+            else:
+                yield f"event: presentation\ndata: {json.dumps(presentation, ensure_ascii=False)}\n\n"
 
             # 评估
             evaluation = paeg.evaluator.run(step, learner, presentation)
