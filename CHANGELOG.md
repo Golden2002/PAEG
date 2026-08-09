@@ -1,3 +1,22 @@
+### v0.41 架构优化（成熟项目借鉴 + STT 前端接入，2026-08-09）
+
+**架构优化（用户核心需求：优秀结构，修改更容易）**
+- ⭐ server.py 拆分 Phase1：抽 config.py（82 行配置/路径常量）+ utils.py（140 行纯函数）→ server.py 4500→4441 行，建立分层
+- ⭐ 调研成熟项目结构（Flask blueprint/application factory/llama-index/langchain/Kraken）→ 5 份文档同步（技术§10.2.21/维护§六/元能力§6.15/亮点§六/README）
+- ⭐ 需求表：audit/requirements_v041.md（P0/P1/P2 分级 + 触发条件）
+
+**STT 前端接后端（解决"能说话不能识别"）**
+- 🐛 根因：Web Speech API 转文字在 Google 云端（国内不可达）→ 能录音不能识别
+- ⭐ 前端 MediaRecorder 录音 → POST /api/voice/stt（faster-whisper 本地）→ 回填输入框发送；Web Speech 保留作 fallback
+- ✅ 验证：前端页面含新代码 + STT 端点 400 正确响应 + 教学流 26 分片
+
+**测试与安全**
+- 🐛 测试隔离根治：conftest.py tmp_path+monkeypatch → test_individuality/test_routing 连跑 28 passed（此前状态污染失败）
+- ⭐ SECRET_KEY 从环境变量读取（PAEG_SECRET_KEY）+ pip-audit 已装
+- ✅ 拆分后验证：health 200 + 教学流 presentation 26 + audit_check 14/15（users_data 清理后应 15/15）
+
+**监督改进**：2 个后台 agent 卡死已取消，改为直接执行（更可靠）
+
 ### v0.40.6 质检发现并修复 83 处 NameError（系统性 bug，2026-08-09）
 
 **重大发现（新方法论"行为验证"层揭示）**
