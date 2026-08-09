@@ -3463,6 +3463,41 @@ answer / chat（纯 LLM 判断，无规则函数）
 | OpenAI Realtime | ❌ 否决（绕过 DeepSeek，违背哲学） | developers.openai.com realtime |
 | AssemblyAI+DeepSeek+ElevenLabs | 架构参考（STT+LLM+TTS 三段式） | assemblyai.com voice-agent 配方 |
 
+### 10.2.19 ⭐ v0.39 标准化检视方法论（新检视标准）
+
+> 目标：把"检视项目隐患"从经验驱动升级为**标准驱动**——业界方法论 × 项目结构洞察，整合成可执行检查脚本 `audit_check.py`。
+
+**方法论来源**（联网检索整合）：
+- 测试金字塔（Martin Fowler / Ham Vocke）：70/20/10 分层
+- 代码审查清单（Google eng-practices）：10 维度
+- 架构审查（C4 + ADR + Fitness Functions）
+- 安全（OWASP Top 10 + LLM Top 10 + pip-audit）
+- 数据完整性（Liquibase/Flyway：migration 不可变 + backup 演练）
+- LLM 特有（Arthur AI / DeepEval / RAGAS / ContextOS：可观测/guardrail/工具纪律）
+- CI 门禁（AEEF / MinimumCD：fail fast）
+- Python 专项（pytest strict / ruff / mypy）
+
+**PAEG 7 大检视维度**（audit_check.py 实现，15 项检查）：
+
+| 维度 | 核心检查 | 教训来源 |
+|---|---|---|
+| 早退分支完整性 | 所有 gen_ 生成器必须保存历史 | v0.36.3（15 早退分支跳过保存） |
+| 静默异常 | 无 except:pass 静默吞异常 | v0.37.1（12+ 处静默） |
+| 接线完整性 | 前端 API 全有后端路由 | 前后端契约对齐 |
+| 持久化安全 | 写锁+内存上限+SQLite | v0.37.2（WinError 32）+ v0.38 |
+| 版本一致性 | 核心文件版本号对齐 | v0.38.1 |
+| 测试盲区 | 高流量端点有测试 | v0.34 盲区反思 |
+| 数据健康 | users_data 精简+无大快照 | v0.38.1 清理 |
+
+**检视流程**：`audit_check.py` → `smoke_test.py`（27s）→ `pytest` → `sync_check` → Release 快照
+
+**检视铁律**（防"修复未生效"复发）：
+1. 任何早退分支必须 _save_teach_turn（回归测试抓）
+2. 禁止 bare except: pass（audit_check 抓）
+3. 每个写端点必须 _is_registered 校验
+4. 前端读字段必须双兼容（mastery/level 教训）
+5. 大测试后台运行不阻塞对话
+
 ## 10.3 版本历史
 
 > 完整修改日志已拆分至独立文档：**[CHANGELOG.md](./CHANGELOG.md)**（v0.1 → v0.21.4 全部记录）。
