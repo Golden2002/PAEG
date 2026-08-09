@@ -227,6 +227,193 @@ def audit_handler_completeness():
         record("处理器完整", "P1", "头像上传保存 STATE+localStorage", True, "")
 
 
+# ---------------------------------------------------------------------------
+# 维度 10：教学会话必有反思（v0.41.4 教训——u106 有 7 个教学会话但元认知日志 0 条）
+# ---------------------------------------------------------------------------
+def audit_reflection_consistency():
+    """每个注册用户若存在教学会话，则必须已有对应 user_modeling 反思。
+
+    u106 教训：users_data/u106/conversations.json 有 7 个 teach/chat 会话，
+    但 SQLite reflections 0 条 → 元认知日志空白（数据缺口，非前端问题）。
+    此检查常驻 audit，防止"学了但日志空"再次发生。
+    """
+    try:
+        sys.path.insert(0, str(BASE))
+        os.chdir(BASE)
+        import json as _json
+        import sqlite3
+        db_path = BASE / "data" / "paeg.db"
+        if not db_path.exists():
+            record("反思一致", "P0", "教学会话必有反思记录", False, "paeg.db 不存在")
+            return
+        ud = BASE / "users_data"
+        if not ud.exists():
+            record("反思一致", "P0", "教学会话必有反思记录", True, "无 users_data")
+            return
+        # 收集所有注册用户（u<digits>）的 teach/chat 会话
+        import re as _re
+        users_with_teach = {}
+        for d in sorted(os.listdir(ud)):
+            dd = ud / d
+            if not dd.is_dir():
+                continue
+            conv_f = dd / "conversations.json"
+            if not conv_f.exists():
+                continue
+            m = _re.match(r"^u\d+$", d)
+            if not m:
+                continue
+            try:
+                data = _json.loads(conv_f.read_text(encoding="utf-8"))
+                convs = data.get("conversations", []) if isinstance(data, dict) else data
+                teach_cnt = sum(1 for c in convs if c.get("mode") == "teach")
+                if teach_cnt > 0:
+                    users_with_teach[d] = teach_cnt
+            except Exception:
+                continue
+        # 查 SQLite 反思数（含 user_modeling）
+        with sqlite3.connect(str(db_path)) as conn:
+            gaps = []
+            for uid, tcnt in sorted(users_with_teach.items()):
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM reflections WHERE learner_id=?",
+                    (uid,)).fetchone()
+                rcnt = row[0] if row else 0
+                if rcnt == 0:
+                    gaps.append(f"{uid}(教学{tcnt}会话/反思{rcnt})")
+        record("反思一致", "P0", "教学会话必有反思记录（注册用户）",
+               not gaps, f"缺反思: {gaps}" if gaps else f"{len(users_with_teach)} 用户均正常")
+    except Exception as e:
+        record("反思一致", "P0", "教学会话必有反思记录", False, str(e))
+
+
+# ---------------------------------------------------------------------------
+# 维度 11：值域/展示质量（v0.41.4 教训——"风 visual / 情 neutral"直出）
+# ---------------------------------------------------------------------------
+def audit_display_quality():
+    """检查 LLM 枚举值是否被前端/后端规范化，杜绝英文枚举原样直出。
+
+    v0.41.4 教训：LLM 建模输出英文枚举（visual/neutral 等）+ 越界长句，
+    此前 server.py 原样写入、前端原样显示 → 元认知日志出现"风 visual / 情 neutral"。
+    结构性自检全过（数据落了库、路由有、锁有），但展示质量无人把关。
+    此检查确保：①写入端有规范化函数 ②前端有中文映射表 ③无单字标签（风/情/擅/薄）。
+    """
+    srv = SRV.read_text(encoding="utf-8")
+    html = GUI.read_text(encoding="utf-8")
+    # 1) 后端：写入端必须调用规范化函数（_norm_trait_scalar）
+    ok_norm = "_norm_trait_scalar" in srv and "_TRAIT_LS_CN" in srv and "_TRAIT_EMO_CN" in srv
+    record("展示质量", "P0", "后端值域规范化函数存在", ok_norm,
+           "" if ok_norm else "server.py 缺 _norm_trait_scalar/_TRAIT_LS_CN/_TRAIT_EMO_CN")
+    # 2) 前端：必须有中文映射表（visual→视觉型 等）
+    ok_map = ("视觉型" in html and "听觉型" in html and "动觉型" in html)
+    record("展示质量", "P0", "前端枚举→中文映射表", ok_map,
+           "" if ok_map else "index.html 缺 LS_CN/EMO_CN 中文映射")
+    # 3) 前端：不得有单字缩写标签（风/情/擅/薄 直出）
+    bad_labels = []
+    for kw in ["`风 ${ls}`", "`情 ${emo}`", "`擅 ${ks}`", "`薄 ${kg}`"]:
+        if kw in html:
+            bad_labels.append(kw)
+    record("展示质量", "P1", "无单字缩写标签", not bad_labels,
+           f"残留: {bad_labels}" if bad_labels else "")
+    # 4) 数据层：现有 user_modeling 记录不得残留英文枚举（visual/neutral/anxious 等）
+    try:
+        sys.path.insert(0, str(BASE))
+        os.chdir(BASE)
+        import sqlite3
+        db_path = BASE / "data" / "paeg.db"
+        en_vals = ["visual", "auditory", "reading", "kinesthetic", "mixed",
+                   "anxious", "engaged", "neutral", "withdrawn"]
+        leaked = []
+        if db_path.exists():
+            with sqlite3.connect(str(db_path)) as conn:
+                rows = conn.execute(
+                    "SELECT learner_id, concept, reflection_json FROM reflections"
+                    " WHERE reflection_json LIKE '%user_modeling%' ORDER BY ts DESC LIMIT 200").fetchall()
+            import json as _json
+            for uid, concept, rj in rows:
+                try:
+                    r = _json.loads(rj)
+                except Exception:
+                    continue
+                if r.get("type") != "user_modeling":
+                    continue
+                ls = r.get("learning_style") or ""
+                emo = r.get("emotional_tendency") or ""
+                mot = r.get("motivation") or ""
+                for v in en_vals:
+                    if v in str(ls) or v in str(emo) or v in str(mot):
+                        leaked.append(f"{uid}:{v}")
+                        break
+        record("展示质量", "P1", "历史 user_modeling 无英文枚举残留", not leaked,
+               f"残留 {len(leaked)} 处: {leaked[:6]}" if leaked else "")
+    except Exception as e:
+        record("展示质量", "P1", "历史 user_modeling 无英文枚举残留", False, str(e))
+
+
+# ---------------------------------------------------------------------------
+# 维度 12：昵称双源一致性（v0.41.5 教训——u106 users.json=团聚体/profile.json=学生）
+# ---------------------------------------------------------------------------
+def audit_nickname_consistency():
+    """users.json.learner.nickname vs users_data/<uid>/profile.json.nickname vs
+    users.json[user].nickname（根昵称）三方必须一致。
+
+    v0.41.5 教训：LearnerProfile.nickname dataclass 默认"小李"，端点兜底"学生"/
+    "学习者"，占位符被刻进 profile.json → 前端显示"学生"而 users.json 是"团聚体"。
+    写入侧（register/save_learner/persist）零一致性保护，只有读取侧 v0.26 回退。
+    """
+    try:
+        import re as _re
+        users_json = BASE / "users.json"
+        ud = BASE / "users_data"
+        if not users_json.exists() or not ud.exists():
+            record("昵称双源", "P0", "三方昵称一致", False, "users.json 或 users_data 缺失")
+            return
+        data = json.loads(users_json.read_text(encoding="utf-8"))
+        bad = []
+        for uid_dir in sorted(ud.iterdir()):
+            if not uid_dir.is_dir():
+                continue
+            m = _re.match(r"^u\d+$", uid_dir.name)
+            if not m:
+                continue
+            profile = uid_dir / "profile.json"
+            if not profile.exists():
+                continue
+            try:
+                p = json.loads(profile.read_text(encoding="utf-8"))
+                p_nick = (p.get("nickname") or "").strip()
+                root_nick, learner_nick = None, None
+                for u in data.get("users", {}).values():
+                    if u.get("user_id") == uid_dir.name:
+                        root_nick = (u.get("nickname") or "").strip()
+                        learner = u.get("learner") or {}
+                        learner_nick = (learner.get("nickname") or "").strip()
+                        break
+                # 三方一致（占位符等价于空——占位符另查）
+                norm = lambda s: "" if s in ("学生", "学习者", "小李") else s
+                if norm(p_nick) != norm(root_nick) or (
+                        learner_nick and norm(p_nick) != norm(learner_nick)):
+                    bad.append(f"{uid_dir.name}: profile={p_nick!r} learner={learner_nick!r} root={root_nick!r}")
+            except Exception:
+                continue
+        record("昵称双源", "P0", "profile.json/learner/users.json 三方昵称一致",
+               not bad, f"不一致: {bad[:5]}" if bad else "")
+        # 注册用户昵称不得是占位符（学生/学习者/小李/空）
+        placeholders = {"学生", "学习者", "小李", ""}
+        placebad = []
+        for u in data.get("users", {}).values():
+            uid = u.get("user_id", "")
+            if not _re.match(r"^u\d+$", uid):
+                continue
+            nick = (u.get("nickname") or "").strip()
+            if nick in placeholders:
+                placebad.append(f"{uid}:{nick!r}")
+        record("昵称双源", "P1", "注册用户昵称非占位符",
+               not placebad, f"占位符: {placebad[:5]}" if placebad else "")
+    except Exception as e:
+        record("昵称双源", "P0", "三方昵称一致", False, str(e))
+
+
 def main():
     audit_early_exit()
     audit_silent_except()
@@ -237,6 +424,9 @@ def main():
     audit_handler_completeness()
     audit_security()
     audit_data()
+    audit_reflection_consistency()
+    audit_display_quality()
+    audit_nickname_consistency()
 
     p0 = [r for r in REPORT if r["level"] == "P0" and not r["ok"]]
     p1 = [r for r in REPORT if r["level"] == "P1" and not r["ok"]]
