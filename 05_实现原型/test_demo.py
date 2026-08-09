@@ -1,5 +1,5 @@
 """
-PAEG v0.1 端到端测试：5 个学科的完整 demo。
+PAEG v0.38 端到端测试：5 个学科的完整 demo。
 """
 
 from paeg import PAEG, LearnerProfile
@@ -7,7 +7,7 @@ from knowledge_base import KnowledgeBase
 
 
 class MockModel:
-    """模拟模型 API（v0.1 不接真实 LLM）。"""
+    """模拟模型 API（v0.38 不接真实 LLM）。"""
     def messages_create(self, **kwargs):
         return {"content": [{"text": "[模拟回复]"}]}
 
