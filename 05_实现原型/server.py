@@ -222,6 +222,8 @@ def static_files(filename):
             if not is_enabled("weather"):
                 return "气象模块已下架（在 paeg_modules.json 中启用）", 403
         except Exception:
+            print(f"[PAEG][server.py] static_files 异常忽略: {_e}")
+            pass
             pass
     resp = send_from_directory(str(GUI_DIR), filename)
     # v0.21.7：静态资源也 no-cache（前端功能更新频繁，避免旧 JS 缓存）
@@ -387,6 +389,8 @@ def _mode_auto_correct(text: str, requested_mode: str, learner, learner_id: str,
             _pr_data["was_redirected"] = True
             return jsonify(_pr_data)
     except Exception:
+        print(f"[PAEG][server.py] _mode_auto_correct 异常忽略: {_e}")
+        pass
         pass
     return None
 
@@ -413,12 +417,16 @@ def _polish_text(text: str, context: str = "") -> str:
             try:
                 has_issues = len(paeg.refiner._check_ellipsis(text)) > 0
             except Exception:
+                print(f"[PAEG][server.py] _polish_text 异常忽略: {_e}")
+                pass
                 pass
             if ai_prob >= 0.4 or has_issues:
                 refined = paeg.refiner.refine(text, context=context)
                 if refined:
                     return refined
     except Exception:
+        print(f"[PAEG][server.py] _polish_text 异常忽略: {_e}")
+        pass
         pass
     return text
 
@@ -499,6 +507,8 @@ def _steer_subject(concept: str, subject: str, learner, learner_id: str) -> dict
                 try:
                     EVOLVER.record_subject_request(uname, concept, learner_id)
                 except Exception:
+                    print(f"[PAEG][server.py] _steer_subject 异常忽略: {_e}")
+                    pass
                     pass
             reply = (
                 f"我注意到你问的是「{uname}」领域的问题。\n\n"
@@ -538,10 +548,14 @@ def _steer_subject(concept: str, subject: str, learner, learner_id: str) -> dict
                 new_label = get_style(new_subject)["label"]
                 print(f"[PAEG][steering] {old_label} → {new_label}（问题: {concept[:30]}）")
             except Exception:
+                print(f"[PAEG][server.py] _steer_subject 异常忽略: {_e}")
+                pass
                 pass
             return {"subject": new_subject, "unknown": False, "unknown_name": None,
                     "switched": True, "response": None}
     except Exception:
+        print(f"[PAEG][server.py] _steer_subject 异常忽略: {_e}")
+        pass
         pass
     return {"subject": subject, "unknown": False, "unknown_name": None,
             "switched": False, "response": None}
@@ -594,8 +608,12 @@ def health():
                 mcp_stats["tools"] = len(MCP_CLIENT._tools)
                 mcp_stats["last_error"] = MCP_CLIENT._last_error
             except Exception:
+                print(f"[PAEG][server.py] health 异常忽略: {_e}")
+                pass
                 pass
     except Exception:
+        print(f"[PAEG][server.py] health 异常忽略: {_e}")
+        pass
         pass
     mcp_status = "ok" if mcp_stats.get("connected", 0) > 0 else (
         "degraded" if mcp_stats.get("configured", 0) > 0 else "not_configured")
@@ -606,6 +624,8 @@ def health():
         try:
             skill_count = SKILL_REGISTRY.stats().get("count", 0) or 0
         except Exception:
+            print(f"[PAEG][server.py] health 异常忽略: {_e}")
+            pass
             pass
 
     # AgentEngine
@@ -728,6 +748,8 @@ def teach():
         if _steer.get("switched"):
             subject = _steer["subject"]
     except Exception:
+        print(f"[PAEG][server.py] teach 异常忽略: {_e}")
+        pass
         pass
 
     # v0.19.27：界面自指涉拦截——"界面/按钮/怎么用"类问题返回结构化说明
@@ -752,6 +774,8 @@ def teach():
                 },
             })
     except Exception:
+        print(f"[PAEG][server.py] teach 异常忽略: {_e}")
+        pass
         pass
 
     # v0.19.21：知识库查询拦截必须先于 meta——"知识库/你学过什么"应清点 Library 而非讲身份
@@ -760,6 +784,8 @@ def teach():
         if is_knowledge_query(concept):
             return jsonify(_handle_knowledge_query(learner, subject))
     except Exception:
+        print(f"[PAEG][server.py] teach 异常忽略: {_e}")
+        pass
         pass
 
     # v0.20.5：知识导图拦截——"画知识导图/列提纲/思维导图/知识结构/脉络/系统"
@@ -785,6 +811,8 @@ def teach():
                 },
             })
     except Exception:
+        print(f"[PAEG][server.py] teach 异常忽略: {_e}")
+        pass
         pass
 
     # v0.17.1：元问题/寒暄拦截——用户问"你是谁/能做什么/能调用知识库吗"或打招呼，
@@ -827,6 +855,8 @@ def teach():
         if is_method_advice(concept):
             return _handle_method_advice(learner, concept, subject)
     except Exception:
+        print(f"[PAEG][server.py] teach 异常忽略: {_e}")
+        pass
         pass
 
     # v0.19：出题意图拦截——"给我一道经典题目" → 结合学段/学科/画像生成题目
@@ -835,6 +865,8 @@ def teach():
         if is_problem_request(concept):
             return _handle_problem_request(learner, concept, subject)
     except Exception:
+        print(f"[PAEG][server.py] teach 异常忽略: {_e}")
+        pass
         pass
 
     # v0.19.27：情绪与心理支持拦截——情绪/心理/人生困惑走 AffectionSupportor
@@ -864,6 +896,8 @@ def teach():
                 },
             })
     except Exception:
+        print(f"[PAEG][server.py] teach 异常忽略: {_e}")
+        pass
         pass
 
     # v0.21.9：复合输入拦截（同步版）——"指令+资料"走资源分析，不走教学 harness
@@ -902,6 +936,8 @@ def teach():
                             "subjects_mastery": learner.subjects_mastery},
             })
     except Exception:
+        print(f"[PAEG][server.py] teach 异常忽略: {_e}")
+        pass
         pass
 
     # v0.19.21：意向性层 ⭐——规则都没拦住的输入，用 LLM 判断是否为教学意图。
@@ -1088,6 +1124,8 @@ def teach_stream():
                     _gb_json = _gb.get_json()
                     _gb_content = _gb_json.get("presentations", [{}])[0].get("content", "")
                 except Exception:
+                    print(f"[PAEG][server.py] gen_aff 异常忽略: {_e}")
+                    pass
                     pass
 
                 def gen_grade_blocked():
@@ -1154,6 +1192,8 @@ def teach_stream():
             return Response(gen_ui(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
+        print(f"[PAEG][server.py] gen_ui 异常忽略: {_e}")
+        pass
         pass
 
     # v0.35 ⭐ 推荐类问题优先处理（在知识库拦截之前）——"有什么推荐/推荐几本/哪个软件好"
@@ -1178,6 +1218,8 @@ def teach_stream():
             return Response(gen_rec(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
+        print(f"[PAEG][server.py] gen_rec 异常忽略: {_e}")
+        pass
         pass
 
     # v0.19.22：知识库查询拦截必须先于 meta（流式版本）——"知识库/你学过什么"应清点 Library
@@ -1196,6 +1238,8 @@ def teach_stream():
             return Response(gen_kb(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
+        print(f"[PAEG][server.py] gen_kb 异常忽略: {_e}")
+        pass
         pass
 
     # v0.20.5：知识导图拦截（流式版本）——"画知识导图/列提纲/知识结构"
@@ -1214,6 +1258,8 @@ def teach_stream():
             return Response(gen_map(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
+        print(f"[PAEG][server.py] gen_map 异常忽略: {_e}")
+        pass
         pass
 
     # v0.21.9：复合输入拦截（流式版）——"指令+资料"走资源分析，不走教学 harness
@@ -1246,6 +1292,8 @@ def teach_stream():
             return Response(gen_composite(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
+        print(f"[PAEG][server.py] gen_composite 异常忽略: {_e}")
+        pass
         pass
 
     # v0.35 ⭐ PPT / 演示文稿生成（流式版本兜底分支）——
@@ -1273,6 +1321,8 @@ def teach_stream():
             return Response(gen_ppt(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
+        print(f"[PAEG][server.py] gen_ppt 异常忽略: {_e}")
+        pass
         pass
 
     # v0.19.22：意向性层（流式版本）——非教学意图走一般化响应
@@ -1353,6 +1403,8 @@ def teach_stream():
                 return Response(gen_intent(), mimetype="text/event-stream",
                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
+        print(f"[PAEG][server.py] gen_intent 异常忽略: {_e}")
+        pass
         pass
 
     # v0.19.7：学习方法咨询拦截（流式版本）——v0.35 ⭐ LLM 优先
@@ -1369,6 +1421,8 @@ def teach_stream():
             return Response(gen_ma(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
+        print(f"[PAEG][server.py] gen_ma 异常忽略: {_e}")
+        pass
         pass
 
     # v0.19：出题意图拦截（流式版本）——v0.35 ⭐ LLM 优先
@@ -1385,6 +1439,8 @@ def teach_stream():
             return Response(gen_pr(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
+        print(f"[PAEG][server.py] gen_pr 异常忽略: {_e}")
+        pass
         pass
 
     # v0.19.27：情绪与心理支持拦截（流式版本）——v0.35 ⭐ LLM 优先（emotion LLM 路由含危机检测）
@@ -1405,6 +1461,8 @@ def teach_stream():
             return Response(gen_emo(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
+        print(f"[PAEG][server.py] gen_emo 异常忽略: {_e}")
+        pass
         pass
 
     # v0.17.1：元问题/寒暄走闲聊（流式版本直接返回单段回答）——v0.35 ⭐ LLM 优先
@@ -1426,6 +1484,8 @@ def teach_stream():
             return Response(gen_meta(), mimetype="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception:
+        print(f"[PAEG][server.py] gen_meta 异常忽略: {_e}")
+        pass
         pass
 
     def generate():
@@ -1436,6 +1496,8 @@ def teach_stream():
             inject_user_model(learner, SESSIONS.get(f"chat_hist_{learner_id}", []),
                               getattr(learner, "self_description", ""))
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
         # 诊断
         yield f"event: diagnosis\ndata: {json.dumps({'status': 'diagnosing'})}\n\n"
@@ -1460,18 +1522,26 @@ def teach_stream():
                     try:
                         learner._teach_web_ctx = _teach_web_ctx  # type: ignore[attr-defined]  # 供 Presenter 消费
                     except Exception:
+                        print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+                        pass
                         pass
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
         try:
             yield f"event: retrieval\ndata: {json.dumps({'done': _teach_badge, 'subject': subject}, ensure_ascii=False)}\n\n"
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
         # v0.27 ⭐ 需求A：教学模式一次识别（入口用原句，存 learner 供 Presenter 全程消费）
         try:
             from subagents import _detect_teaching_mode
             learner._teaching_mode = _detect_teaching_mode(concept, llm)  # type: ignore[attr-defined]
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
         diagnosis = paeg.diagnostor.run(learner, concept, subject)
         yield f"event: diagnosis\ndata: {json.dumps(diagnosis, ensure_ascii=False)}\n\n"
@@ -1544,6 +1614,8 @@ def teach_stream():
                 if _uc_stream:
                     learner._user_corpus = _uc_stream  # type: ignore[attr-defined]
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
 
         # 教学循环
@@ -1560,6 +1632,8 @@ def teach_stream():
                     "step_type": "history",
                 })
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
         # v0.26 ⭐ subtopic 注入每个 step（前端三级选择；空则不注入）
         if subtopic:
@@ -1589,6 +1663,8 @@ def teach_stream():
                             presentation["content"] = _refined
                             presentation["refined"] = True
                 except Exception:
+                    print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+                    pass
                     pass
             _assistant_parts.append(presentation.get("content") or "")  # v0.21.3
             _prev_presentations.append(presentation)  # v0.21.8：累积讲解供下一轮参考
@@ -1642,6 +1718,8 @@ def teach_stream():
                     "step": "summary_estimate",
                 })
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
         reflection = paeg._reflect(_fs_shared)
 
@@ -1759,6 +1837,8 @@ def teach_stream():
             if doc_evt:
                 yield f"event: doc\ndata: {json.dumps(doc_evt, ensure_ascii=False)}\n\n"
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
 
         # v0.26 ⭐ done 事件携带 steering 信息：前端据此自动更新学段/学科下拉（自动切换）
@@ -1774,6 +1854,8 @@ def teach_stream():
                 except Exception:
                     _done_extra["required_grade"] = ""
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
         _done_payload = {"status": "completed"}
         _done_payload.update(_done_extra)
@@ -1953,6 +2035,8 @@ def meta_log(learner_id):
             logs = _rs.query(learner_id, limit=limit)
             return jsonify({"logs": logs, "total": _rs.count(learner_id)})
     except Exception:
+        print(f"[PAEG][server.py] meta_log 异常忽略: {_e}")
+        pass
         pass
     learner_logs = [h for h in paeg.self_updater.history if h.get("learner_id") == learner_id]
     return jsonify({
@@ -2164,6 +2248,8 @@ def upload_avatar():
                     try:
                         _os.remove(_old)
                     except Exception:
+                        print(f"[PAEG][server.py] upload_avatar 异常忽略: {_e}")
+                        pass
                         pass
         from urllib.parse import quote
         return jsonify({"ok": True, "url": f"/uploads/avatar/{quote(fname)}"})
@@ -2655,6 +2741,8 @@ def general_chat_stream():
         learner._user_model = um  # type: ignore[attr-defined]
         system = build_general_chat_system(learner)
     except Exception:
+        print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
+        pass
         pass
 
     # v0.19.7：注入可编辑教学记忆（teaching_memory，CLAUDE.md 风格）
@@ -2664,6 +2752,8 @@ def general_chat_stream():
         if _tm:
             system = system + "\n\n" + _tm
     except Exception:
+        print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
+        pass
         pass
 
     # v0.19.11：注入用户专属资料库（上传的资料，回答相关问题时参考）
@@ -2672,6 +2762,8 @@ def general_chat_stream():
         if _ulib:
             system = system + "\n\n" + _ulib
     except Exception:
+        print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
+        pass
         pass
 
     # v0.21.8：注入用户关键事实（多轮注意力——"我喜欢蓝绿色"第N轮追问仍可见）
@@ -2684,6 +2776,8 @@ def general_chat_stream():
                 "\n\n## 用户说过的事实（v0.21.8 记忆锚点，回答相关问题时必须引用）\n"
                 + _facts_str)
     except Exception:
+        print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
+        pass
         pass
 
     # v0.22.3：个体化注入（Individuality subagent——16 维画像 + LLM 建模 + 母语控制）
@@ -2793,6 +2887,8 @@ def general_chat_stream():
                 for m in _ctx_result.messages)
             mem_ctx = f"【最近对话】\n{hist_str}"
     except Exception:
+        print(f"[PAEG][server.py] gen_file_op 异常忽略: {_e}")
+        pass
         pass
 
     user = build_general_chat_user(text)
@@ -2810,6 +2906,8 @@ def general_chat_stream():
                     f"学段：{grade_cn}" + (f"；学科：{subject_cn}" if subject_cn else ""))
         ctx_parts.insert(0, page_ctx)
     except Exception:
+        print(f"[PAEG][server.py] gen_file_op 异常忽略: {_e}")
+        pass
         pass
     if ctx_parts:
         user = f"{chr(10).join(ctx_parts)}\n\n【学生现在说】\n{text}"
@@ -2834,6 +2932,8 @@ def general_chat_stream():
                 yield f"event: done\ndata: {json.dumps({'ok': True, 'mode': 'affection'}, ensure_ascii=False)}\n\n"
                 return
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
 
         # v0.35 ⭐ 推荐类问题优先于知识库拦截——闲聊端点里用户也可能问"有什么推荐"。
@@ -2854,6 +2954,8 @@ def general_chat_stream():
                 yield f"event: done\ndata: {json.dumps({'ok': True}, ensure_ascii=False)}\n\n"
                 return
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
 
         # v0.19.16：知识库查询——闲聊模式下问"你学过什么/知识库"也走知识库总结
@@ -2924,6 +3026,8 @@ def general_chat_stream():
                 _badge_text = "网络检索" if _ar.get("web_searched") else "知识库检索"
                 yield f"event: retrieval\ndata: {json.dumps({'done': _badge_text}, ensure_ascii=False)}\n\n"
             except Exception:
+                print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+                pass
                 pass
         except Exception:
             reply = None
@@ -2935,6 +3039,8 @@ def general_chat_stream():
             try:
                 yield f"event: retrieval\ndata: {json.dumps({'done': '知识库检索'}, ensure_ascii=False)}\n\n"
             except Exception:
+                print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+                pass
                 pass
 
         # 2) 深度守门
@@ -2942,6 +3048,8 @@ def general_chat_stream():
             from expert_guard import ExpertGuard
             reply = ExpertGuard(llm).refine(text, reply, subject=data.get("subject", "chat"))
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
 
         # 3) SSE 推送工具记录
@@ -2956,6 +3064,8 @@ def general_chat_stream():
                 emit_event("item.completed", type="tool_call",
                            tool=tc.get("name", ""), session=learner_id[:8])
             except Exception:
+                print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+                pass
                 pass
 
         # 4) 分段推送回复（模拟流式，兼顾 P1-5 体验）
@@ -2977,6 +3087,8 @@ def general_chat_stream():
             if doc_evt:
                 yield f"event: doc\ndata: {json.dumps(doc_evt, ensure_ascii=False)}\n\n"
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
 
         # 5) 保存历史 + 记忆
@@ -2988,6 +3100,8 @@ def general_chat_stream():
                 mem.short_term = chat_hist[-10:]
                 mem.compress_if_needed()
             except Exception:
+                print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+                pass
                 pass
         # v0.23.0 ⭐ 个体化画像持久化闭环——把本轮 LLM 建模结果写回 learner
         # 并落盘（仅注册用户 u<digits>；匿名 web_xxx 仅内存保留）
@@ -3039,11 +3153,15 @@ def general_chat_stream():
             _improver.record(text, reply, {"subject": data.get("subject", "chat"),
                                            "learner_id": str(learner_id)[:12]})
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
         # v0.19.21：标记调度器活跃（周期自我更新的前提）
         try:
             PERIODIC_UPDATER.mark_activity()
         except Exception:
+            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+            pass
             pass
         # v0.19.22：自进化——工具调用经验学习（从 tool_log 提炼）
         if EVOLVER is not None:
@@ -3067,6 +3185,8 @@ def general_chat_stream():
                                              "assistant", reply, conv_id=cid)
                 SESSIONS[f"conv_chat_{learner_id}"] = cid
             except Exception:
+                print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+                pass
                 pass
 
         yield f"event: done\ndata: {json.dumps({'ok': True}, ensure_ascii=False)}\n\n"
@@ -3118,6 +3238,8 @@ def general_chat():
         learner._user_model = um  # type: ignore[attr-defined]
         system = _bgcs(learner)
     except Exception:
+        print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
+        pass
         pass
 
     # v0.26 ⭐ 连接修复：/api/chat 非流式补用户资料注入（对齐 chat_stream 2046-2048）
@@ -3126,6 +3248,8 @@ def general_chat():
         if _ulib_chat:
             system = system + "\n\n" + _ulib_chat
     except Exception:
+        print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
+        pass
         pass
 
     # v0.24 修复 6：/api/chat 补 Individuality 注入（与 chat_stream 行为对齐）
@@ -3252,6 +3376,8 @@ def general_chat():
         _guard = ExpertGuard(llm)
         reply = _guard.refine(text, reply, subject=data.get("subject", "chat"))
     except Exception:
+        print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
+        pass
         pass
     if not reply:
         reply = f"我听到你说：{text}。想多说说吗？我会认真听。"
@@ -3275,6 +3401,8 @@ def general_chat():
             }
             reply = reply + f"\n\n（已将本次回答保存为文档：{doc_urls['filename']}）"
     except Exception:
+        print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
+        pass
         pass
 
     # v0.17：按 【NEXT】 切分为多段（自我反思与迭代：核心回应→补充→推荐）
@@ -3295,6 +3423,8 @@ def general_chat():
             mem.short_term = chat_hist[-10:]
             mem.compress_if_needed()
         except Exception:
+            print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
+            pass
             pass
 
     # v0.18：保存完整对话到 conversations（前端可恢复）
@@ -3326,6 +3456,8 @@ def general_chat():
         if _doc and not doc_urls:
             doc_urls = _doc
     except Exception:
+        print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
+        pass
         pass
 
     return jsonify({
@@ -3417,6 +3549,8 @@ def answer_api():
                                              "assistant", result.get("answer") or "", conv_id=cid)
                 SESSIONS[f"conv_answer_{learner_id}"] = cid
             except Exception:
+                print(f"[PAEG][server.py] answer_api 异常忽略: {_e}")
+                pass
                 pass
         # v0.21.8：answer 也写入 chat_hist（修复多轮上下文丢失——"那 x³ 呢"必须记得上文在讲积分）
         if learner_id:
@@ -3426,6 +3560,8 @@ def answer_api():
                 _ch.append({"role": "assistant", "content": result.get("answer") or ""})
                 SESSIONS[f"chat_hist_{learner_id}"] = _ch[-20:]  # v0.26 统一窗口 20
             except Exception:
+                print(f"[PAEG][server.py] answer_api 异常忽略: {_e}")
+                pass
                 pass
         return jsonify(result)
     except Exception as e:
@@ -3490,6 +3626,8 @@ def _anon_learner_id(request_data: dict, request_obj=None) -> str:
             if cid:
                 return cid
     except Exception:
+        print(f"[PAEG][server.py] _anon_learner_id 异常忽略: {_e}")
+        pass
         pass
     # 3. 无 cookie 上下文 → 生成会话级 ID（本请求内稳定；有 cookie 时后续请求复用）
     return "web_" + uuid.uuid4().hex[:10]
@@ -3803,6 +3941,8 @@ def method_advice():
         if _correct is not None:
             return _correct
     except Exception:
+        print(f"[PAEG][server.py] method_advice 异常忽略: {_e}")
+        pass
         pass
     result = _handle_method_advice(learner, concept, subject)
     # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
@@ -3855,6 +3995,8 @@ def knowledge_query():
             if _correct is not None:
                 return _correct
     except Exception:
+        print(f"[PAEG][server.py] knowledge_query 异常忽略: {_e}")
+        pass
         pass
     result = _handle_knowledge_query(learner, subject)
     # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
@@ -3905,6 +4047,8 @@ def affection_support():
         if _correct is not None:
             return _correct
     except Exception:
+        print(f"[PAEG][server.py] affection_support 异常忽略: {_e}")
+        pass
         pass
     from subagents import AffectionSupportor
     _emo = AffectionSupportor()
@@ -4277,6 +4421,8 @@ def self_update_from_feedback():
                     if os.path.isfile(p)
                 ][:5]
             except Exception:
+                print(f"[PAEG][server.py] self_update_from_feedback 异常忽略: {_e}")
+                pass
                 pass
 
         # 4) 追加建议记录（供人工/调度器后续处理）
