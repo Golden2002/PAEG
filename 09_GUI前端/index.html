@@ -1163,8 +1163,8 @@ body {
       <div class="conv-list" id="conv-list">
 <div class="empty-state" role="status">
           <img class="empty-icon" src="assets/icons/message-circle.svg" alt="" aria-hidden="true" />
-          <div class="empty-title">登录后可恢复历史会话</div>
-          <div class="empty-desc">右上角"登录/注册"开启后，对话会自动归档到这里。</div>
+          <div class="empty-title">正在加载历史会话…</div>
+          <div class="empty-desc">对话会自动归档到这里；登录账号可跨设备同步。</div>
         </div>
       </div>
     </div>
@@ -1950,8 +1950,10 @@ function restoreLoginState() {
     } else {
       // 匿名用户：不显示登录状态（保持"登录/注册"按钮 + 无徽章），只恢复唯一 ID
       // v0.36.2 ⭐ 修复：匿名用户也加载历史（后端已支持 web_xxx 落盘），不再"数据存在但看不到"
+      // v0.36.2 ⭐ 修复：匿名用户也可清空全部会话（与注册用户一致）
       document.getElementById('user-badge').style.display = 'none';
       document.getElementById('user-btn').textContent = '登录/注册';
+      document.getElementById('conv-clear').style.display = '';
       loadConversations();
     }
   } catch (e) {
