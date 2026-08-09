@@ -1017,13 +1017,19 @@ body {
 .resource-card .rc-ppt-btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ─── 元认知日志 ─── */
-.log-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+.log-list { display: flex; flex-direction: column; gap: 12px; max-height: 260px; overflow-y: auto; }
 .log-item {
-  background: var(--surface-2); border-radius: 8px; padding: 8px 12px;
+  background: var(--surface-2); border-radius: 8px; padding: 10px 14px;
   font-size: var(--fs-sm); border-left: 3px solid var(--accent);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;  /* v0.40.5 flex 布局修复 */
 }
-.log-item .time { color: var(--text-dim); font-size: 11px; }
-.log-item .txt { margin-top: 3px; color: var(--text); }
+.log-item .log-head { display: flex; align-items: baseline; gap: 8px; width: 100%; }
+.log-item .time { color: var(--text-dim); font-size: 11px; flex-shrink: 0; }
+.log-item .name { color: var(--accent); font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.log-item .txt {
+  color: var(--text); flex: 1; min-width: 0;
+  word-break: break-word; white-space: pre-wrap;  /* v0.40.5 换行修复 */
+}
 /* v0.40.4 ⭐ 元认知建模 SVG 图标（无 emoji） */
 .log-item .log-icon {
   width: 13px; height: 13px;
@@ -1412,9 +1418,8 @@ const SUBJECT_LABELS = {
   geography: '地理', chinese: '语文', politics: '思想政治', history: '历史', law: '法学',
   english: '英语', french: '法语', german: '德语', japanese: '日语',
   philosophy: '哲学', aesthetics: '美学', literature: '文学',
-  ethics: '道德', phenomenology: '现象学',
-  cs: '计算机', logic: '逻辑', art: '艺术',
-  linguistics: '语言学', atmospheric_science: '大气科学',
+    ethics: '道德', phenomenology: '现象学',
+    linguistics: '语言学', atmospheric_science: '大气科学',
   writing: '写作',  // v0.37.1 补全：SUBJECT_GRADES 32 学科全覆盖
   coding: '信息科技', thinking: '批判性思维', learning: '高效学习法', expression: '公众表达',
   economics: '经济学',
@@ -2254,11 +2259,26 @@ function renderLogs(logs) {
     }
     // v0.40.4 ⭐ user_modeling 记录显示 SVG 图标（替代 emoji，符合无 emoji 规范）
     const isModeling = !!(l.reflection && typeof l.reflection === 'object' && l.reflection.type === 'user_modeling');
+    // v0.40.5 ⭐ 修复：①渲染用户名（localStorage paeg-user 优先 → STATE.nickname → 日志字段 → learner_id）
+    // ②txt 用 escapeHtml（防特殊字符/换行错乱）
+    // 根因：此前 STATE.nickname 默认"学习者"，且未读 localStorage 真实昵称"团聚体"
+    let _savedNick = '';
+    try {
+      const _rawUser = localStorage.getItem('paeg-user');
+      const _savedUser = _rawUser ? JSON.parse(_rawUser) : null;
+      if (_savedUser && _savedUser.nickname) _savedNick = String(_savedUser.nickname).trim();
+    } catch (e) { /* 忽略 */ }
+    const _stateNick = (window.STATE && STATE.nickname) ? String(STATE.nickname).trim() : '';
+    const _logNick = l.nickname ? String(l.nickname).trim() : '';
+    const displayName = _savedNick || _stateNick || _logNick || l.learner_id || '匿名';
     return `
     <div class="log-item">
-      <div class="time">${(l.timestamp || '').slice(5, 16)}</div>
+      <div class="log-head">
+        <div class="time">${(l.timestamp || '').slice(5, 16)}</div>
+        <div class="name">${escapeHtml(String(displayName).slice(0, 12))}</div>
+      </div>
       ${isModeling ? `<svg class="log-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>` : ''}
-      <div class="txt">${String(txt).slice(0, 60)}</div>
+      <div class="txt">${escapeHtml(String(txt).slice(0, 80))}</div>
     </div>`;
   }).join('');
 }
