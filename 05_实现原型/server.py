@@ -33,11 +33,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 from flask import Flask, Response, jsonify, request, send_from_directory
 from flask_cors import CORS
 
-from knowledge_base import KnowledgeBase
-from llm_adapter import create_llm
-from paeg import PAEG
-from self_update import SelfUpdater
-
 # v0.27 ⭐ P0-1 模块化门控：让 paeg_modules.json 真正控制路由可达性
 from module_registry import is_enabled, require_module
 
@@ -60,6 +55,21 @@ from utils import (
 # v0.42 ⭐ 重构：把 13 处 LearnerProfile 获取/创建内联实现统一到 services 包。
 # 见 services/_learner_session.py docstring 中列出的 13 处原位置。
 from services._learner_session import ensure_learner_session
+from infra.runtime import (
+    get_agent_engine,
+    get_conv_store,
+    get_evolver,
+    get_file_generator,
+    get_kb,
+    get_library,
+    get_llm,
+    get_mcp_client,
+    get_paeg,
+    get_periodic_updater,
+    get_skill_registry,
+    get_user_store,
+)
+from infra.sessions import SESSIONS
 
 # ─────────────────────────────────────
 # Flask 应用初始化
@@ -74,25 +84,19 @@ if SECRET_KEY_IS_DEV_DEFAULT:
     print("[PAEG Server][SECURITY] PAEG_SECRET_KEY 未设置，使用开发默认值（生产环境必须设置！）")
 app.secret_key = SECRET_KEY
 
-# 初始化 PAEG（v0.5：默认 auto 自动发现真实 LLM 凭据）
-llm = create_llm(LLM_PROVIDER, model=LLM_MODEL)
-print(f"[PAEG Server] LLM: {LLM_PROVIDER}/{LLM_MODEL or 'default'} -> {llm.name}")
-
-kb = KnowledgeBase()
-
-# v0.11：加载 Library 知识库扩展（若有）
-try:
-    from library_loader import KnowledgeLibrary
-    _lib = KnowledgeLibrary()
-    _lib_added = _lib.register(kb)
-    if _lib_added:
-        print(f"[PAEG Server] Library 知识库扩展: 新增 {_lib_added} 个节点")
-    print(f"[PAEG Server] Library 可索引源文件: {len(_lib.raw_files)} 个")
-except Exception as _e:
-    _lib = None
-    print(f"[PAEG Server] Library 加载跳过: {_e}")
-
-paeg = PAEG(llm, kb, enable_self_update=True, verbose=False)
+# 运行时依赖由 infra.runtime 统一托管；保留兼容别名，避免既有调用点改动。
+llm = get_llm()
+kb = get_kb()
+_lib = get_library()
+paeg = get_paeg()
+SKILL_REGISTRY = get_skill_registry()
+MCP_CLIENT, HEALTH_MCP_STATS = get_mcp_client()
+AGENT_ENGINE = get_agent_engine()
+EVOLVER = get_evolver()
+fgen = get_file_generator()
+DOWNLOAD_DIR = fgen.download_dir if fgen is not None else FALLBACK_DOWNLOAD_DIR
+USER_STORE = get_user_store()
+CONV_STORE = get_conv_store()
 
 # ─────────────────────────────────────
 # v0.41.4 ⭐ 元认知日志值域规范化（LLM 输出 → 中文可读）
@@ -120,64 +124,6 @@ def _norm_trait_scalar(value, mapping):
         return mapping[v]
     return v[:16] + ("…" if len(v) > 16 else "")
 
-# v0.24 ⭐ 工具链修复：SkillRegistry 注入 system prompt（MCP/AgentEngine 同源）
-# —— 之前 SkillRegistry 扫描了 skills/ 下 10 个 SKILL.md 但从未被任何调用方注入；
-# —— 这里实例化一份全局单例，供 /api/chat、/api/chat/stream、/api/skills、/api/health 复用。
-try:
-    from skill_registry import SkillRegistry
-    SKILL_REGISTRY = SkillRegistry()
-    _sr_stats = SKILL_REGISTRY.stats()
-    print(f"[PAEG Server] SkillRegistry 就绪：{_sr_stats['count']} 个技能 (L1 目录将注入 system prompt)")
-except Exception as _e:
-    SKILL_REGISTRY = None
-    print(f"[PAEG Server] SkillRegistry 初始化失败（不影响主服务）: {_e}")
-
-# v0.24 ⭐ 工具链修复：MCP 客户端按需连接（启动期容错，不阻塞 server）
-# —— 修复前 server.py 完全没调用 MCPClientManager（连接数/health 一片空白）；
-# —— /api/health 用 HEALTH_MCP_STATS 字段呈现真实连接状态。
-try:
-    from mcp_client import get_mcp_client
-    MCP_CLIENT = get_mcp_client()
-    # 启动期尝试 connect_all（npx 不可用时静默降级，不影响主流程）
-    HEALTH_MCP_STATS = {"configured": 0, "connected": 0, "tools": 0, "last_error": ""}
-    try:
-        n = MCP_CLIENT.connect_all()
-        HEALTH_MCP_STATS["connected"] = n
-        HEALTH_MCP_STATS["configured"] = sum(1 for c in MCP_CLIENT.config.values() if c.get("enabled", True))
-        HEALTH_MCP_STATS["tools"] = len(MCP_CLIENT._tools)
-        HEALTH_MCP_STATS["last_error"] = MCP_CLIENT._last_error
-        print(f"[PAEG Server] MCP 连接：成功 {n}/{HEALTH_MCP_STATS['configured']} 个 server, "
-              f"暴露 {HEALTH_MCP_STATS['tools']} 个工具")
-        if n == 0 and HEALTH_MCP_STATS["last_error"]:
-            print(f"[PAEG Server] MCP 提示：{HEALTH_MCP_STATS['last_error'][:200]}（容错继续）")
-    except Exception as _me:
-        HEALTH_MCP_STATS["last_error"] = f"connect_all 异常: {str(_me)[:120]}"
-        print(f"[PAEG Server] MCP connect_all 异常（容错继续）: {_me}")
-except Exception as _e:
-    MCP_CLIENT = None
-    HEALTH_MCP_STATS = {"configured": 0, "connected": 0, "tools": 0, "last_error": f"导入失败: {str(_e)[:120]}"}
-    print(f"[PAEG Server] MCP 客户端初始化失败（不影响主服务）: {_e}")
-
-# v0.24 ⭐ 工具链修复：AgentEngine 实例化（Plan→Act→Observe→Reflect 主循环）
-# —— 修复前 agent_engine.py 整个工程 0 调用，这里暴露全局单例；
-# —— /api/chat/stream 可选 mode=agent 走 AgentEngine.run_agent；现有 run_agent_loop 路径不变。
-try:
-    from agent_engine import AgentEngine
-    AGENT_ENGINE = AgentEngine(llm=llm, max_iterations=3, replan_limit=2)
-    print("[PAEG Server] AgentEngine 就绪（Plan→Act→Observe→Reflect 循环 max_iter=3）")
-except Exception as _e:
-    AGENT_ENGINE = None
-    print(f"[PAEG Server] AgentEngine 初始化失败（不影响主服务）: {_e}")
-
-# v0.19.22：自进化模块（知识提炼/提示词进化/工具经验，全部经 QualityGate 过滤）
-try:
-    from self_evolution import SelfEvolution
-    EVOLVER = SelfEvolution(llm=llm, verbose=True)
-    print("[PAEG Server] 自进化模块就绪（知识库/提示词/工具经验，质量门禁过滤）")
-except Exception as _e:
-    EVOLVER = None
-    print(f"[PAEG Server] 自进化模块初始化失败（不影响主服务）: {_e}")
-
 def _inject_skill_catalog(system: str) -> str:
     """v0.24 修复 1：把 SkillRegistry 的 L1 技能目录注入 system prompt。
 
@@ -198,44 +144,6 @@ def _inject_skill_catalog(system: str) -> str:
     if "## 可用技能" in system:
         return system
     return system + "\n\n" + catalog
-
-# v0.12：文件生成器（练习题/文章/讲义下载）
-try:
-    from file_generator import FileGenerator
-    fgen = FileGenerator(llm)
-    DOWNLOAD_DIR = fgen.download_dir
-except Exception as _e:
-    fgen = None
-    DOWNLOAD_DIR = FALLBACK_DOWNLOAD_DIR
-    print(f"[PAEG Server] 文件生成器初始化失败: {_e}")
-
-# v0.14：用户注册与画像持久化
-try:
-    from user_store import UserStore
-    USER_STORE = UserStore()
-    print(f"[PAEG Server] 用户系统就绪: {USER_STORE.stats()['users']} 个已注册用户")
-except Exception as _e:
-    USER_STORE = None
-    print(f"[PAEG Server] 用户系统初始化失败: {_e}")
-
-# v0.18：对话历史持久化（保存/读取/删除/定期清理）
-try:
-    from user_store import ConversationStore
-    CONV_STORE = ConversationStore()
-    # 启动时惰性清理超期会话
-    try:
-        removed = CONV_STORE.cleanup()
-        if removed:
-            print(f"[PAEG Server] 对话清理: 已删除 {removed} 个超期会话")
-    except Exception as _e:
-        print(f"[PAEG Server] 对话清理失败: {_e}")
-    print(f"[PAEG Server] 对话历史存储就绪（保留 {CONV_STORE.retention_days} 天）")
-except Exception as _e:
-    CONV_STORE = None
-    print(f"[PAEG Server] 对话历史初始化失败: {_e}")
-
-# 全局 session 存储（生产环境用 Redis/DB）
-SESSIONS: Dict[str, Any] = {}
 
 # ─────────────────────────────────────
 # 静态文件（GUI 前端）
@@ -4199,9 +4107,7 @@ def cleanup_conversations():
 # ─────────────────────────────────────
 # v0.19.21：周期自我更新调度器
 # ─────────────────────────────────────
-from periodic_self_update import PeriodicSelfUpdater
-
-PERIODIC_UPDATER = PeriodicSelfUpdater(llm=llm, paeg=paeg, verbose=True)
+PERIODIC_UPDATER = get_periodic_updater()
 
 @app.route("/api/self-update/run", methods=["POST"])
 @require_module("self_update")
