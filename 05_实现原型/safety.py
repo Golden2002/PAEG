@@ -179,7 +179,29 @@ class RiskClassifier:
         try:
             return _json.loads(path.read_text(encoding="utf-8"))
         except Exception:
-            return {"levels": [], "patterns": {}, "opt_out": {}}
+            # v0.37.2 ⭐ Oracle P1 修复：加载失败时返回"内置高危保守规则"兜底，
+            # 而非空规则（空规则会让 classify() 恒 0 → 高危漏判）。与 subagents 的
+            # 保守回退保持一致（宁可误报不漏报）——内置规则至少覆盖最危险信号。
+            return {
+                "levels": [
+                    {"level": 0, "name": "none", "desc": "", "behavior": "", "opt_out_suppressible": True},
+                    {"level": 1, "name": "distress", "desc": "", "behavior": "", "opt_out_suppressible": True},
+                    {"level": 2, "name": "passive_ideation", "desc": "", "behavior": "", "opt_out_suppressible": True},
+                    {"level": 3, "name": "active_ideation", "desc": "", "behavior": "", "opt_out_suppressible": False},
+                    {"level": 4, "name": "plan_or_means", "desc": "", "behavior": "", "opt_out_suppressible": False},
+                    {"level": 5, "name": "imminent", "desc": "", "behavior": "", "opt_out_suppressible": False},
+                ],
+                "patterns": {
+                    "imminent": ["已经(吃|割|跳|服)", "正在(做|准备|实施)", "现在就要"],
+                    "plan_or_means": ["(买了|准备了|查了|搜了).{0,4}(药|刀|绳|方法)",
+                                      "写了.{0,4}(遗书|告别信)", "想好.{0,4}(怎么|如何)"],
+                    "active_ideation": ["想死", "想结束", "不想活", "自杀", "自残", "不想醒"],
+                    "passive_ideation": ["没意思", "消失就好", "活着没意义", "不想坚持"],
+                    "distress": ["崩溃", "撑不住", "绝望", "失眠", "受不了"],
+                },
+                "opt_out": {"suppress_levels": [1, 2], "force_levels_min": 3,
+                            "reask_after_days": 7, "hotline": "12356", "emergency": "120"},
+            }
 
     def classify(self, text: str) -> int:
         """关键词分级（0-5）。调用方如需 LLM 复核，取 max(关键词, LLM) 保守。"""
