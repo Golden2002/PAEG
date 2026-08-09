@@ -75,18 +75,29 @@ class UserStore:
         user_id = f"u{self._data['next_id']}"
         self._data["next_id"] += 1
         salt = secrets.token_hex(8)
+        root_nick = nickname or identifier.split('@')[0]
         self._data["users"][identifier] = {
             "user_id": user_id,
             "identifier": identifier,
-            "nickname": nickname or identifier.split('@')[0],
+            "nickname": root_nick,
             "password_hash": self._hash_password(password, salt),
             "salt": salt,
-            "learner": None,          # 持久化的学习者画像
+            # v0.41.5 ⭐ 修复：入参昵称预 seed learner（此前 learner=None，
+            # 首次 user_dir()/persist 用 dataclass 默认"小李"/"学生"刻入
+            # profile.json → 双源不一致）。注册即对齐两源，杜绝占位符漂移。
+            "learner": {
+                "id": user_id,
+                "nickname": root_nick,
+                "grade_level": "high_school",
+                "age": 17,
+                "cognitive_style": "visual",
+                "self_description": "",
+            },
             "created_at": time.time(),
             "last_login": time.time(),
         }
         self._save()
-        return {"ok": True, "user_id": user_id, "nickname": self._data["users"][identifier]["nickname"]}
+        return {"ok": True, "user_id": user_id, "nickname": root_nick}
 
     def login(self, identifier: str, password: str) -> Dict[str, Any]:
         """登录。identifier 为邮箱或手机号。"""
