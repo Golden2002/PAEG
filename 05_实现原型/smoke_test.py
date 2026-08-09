@@ -95,9 +95,12 @@ def main():
     # 8. 情绪支持端点（不调 LLM，只看路由存在；带一次重试防抖动）
     s, head = post_quick("/api/affection",
                          {"learner_id": "smoke", "text": "测试", "subject": "general"})
-    if s == -1:
-        s, head = post_quick("/api/affection",
-                             {"learner_id": "smoke", "text": "测试", "subject": "general"})
+    for _retry in range(2):
+        if s == -1:
+            import time as _t
+            _t.sleep(0.5 * (_retry + 1))
+            s, head = post_quick("/api/affection",
+                                 {"learner_id": "smoke", "text": "测试", "subject": "general"})
     check("affection 可达", s == 200 or s == 500, f"got {s}")
 
     # 9. 知识导图（teach_stream 触发，首事件；LLM 慢用 STREAM_TIMEOUT）
