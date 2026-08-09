@@ -183,7 +183,7 @@ class PAEG:
               f"（{session.diagnosis.get('diagnosed_by', 'rule')}）")
         try:
             if _tr: _tr("diagnosis", ready_to_teach=session.diagnosis.get("ready_to_teach", True))
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
             pass
             pass
@@ -204,7 +204,7 @@ class PAEG:
         try:
             if _tr: _tr("plan", steps=len(session.plan.get("steps") or []),
                         subtopic=subtopic or "")
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
             pass
             pass
@@ -337,7 +337,7 @@ class PAEG:
                             topic=step.get("topic", "")[:80],
                             content=(presentation.get("content") or "")[:300],
                             llm_generated=presentation.get("llm_generated", False))
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
                 pass
                 pass
@@ -358,7 +358,7 @@ class PAEG:
                 if _tr: _tr("evaluation", step_id=i + 1,
                             score=evaluation.get("score", 0),
                             ready_to_advance=evaluation.get("ready_to_advance", True))
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
                 pass
                 pass
@@ -445,7 +445,7 @@ class PAEG:
                                 if _refined and _refined != _rc:
                                     _retry_presentation["content"] = _refined
                                     _retry_presentation["refined"] = True
-                            except Exception:
+                            except Exception as _e:
                                 print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
                                 pass
                                 pass
@@ -468,7 +468,7 @@ class PAEG:
                                         decision=decision,
                                         score=_retry_eval.get("score", 0),
                                         ready=_retry_eval.get("ready_to_advance", True))
-                        except Exception:
+                        except Exception as _e:
                             print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
                             pass
                             pass
@@ -549,7 +549,7 @@ class PAEG:
                 _tr("summary", avg_score=_summary.get("avg_score", 0),
                     steps_completed=_summary.get("steps_completed", 0),
                     duration_min=_summary.get("duration_min", 0))
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
             pass
             pass
@@ -578,7 +578,7 @@ class PAEG:
             if getattr(_sr, "blocked", False) and "self_harm" in (
                     getattr(_sr, "categories", None) or []):
                 crisis = True
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][paeg.py] _affection_gate_check 异常忽略: {_e}")
             pass
             pass
@@ -604,7 +604,7 @@ class PAEG:
                     emo_hit = sum(1 for k in emo_kw if k in q)
                     if (not has_subject) and emo_hit >= 1 and len(q) <= 60:
                         emotion_only = True
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][paeg.py] _affection_gate_check 异常忽略: {_e}")
                 pass
                 pass
@@ -613,7 +613,7 @@ class PAEG:
             try:
                 if getattr(learner, "_crisis_flag", False):
                     crisis = True
-            except Exception:
+            except Exception as _e:
                 print(f"[PAEG][paeg.py] _affection_gate_check 异常忽略: {_e}")
                 pass
                 pass
@@ -662,7 +662,7 @@ class PAEG:
                         check["issues"].append(f"第{len(check['issues'])+1}步有 AI 味（概率{s.ai_likelihood:.2f}）")
                         check["improvements"].append("下次生成后应加强薇依式改写")
                         break
-        except Exception:
+        except Exception as _e:
             print(f"[PAEG][paeg.py] _self_reflect 异常忽略: {_e}")
             pass
             pass
