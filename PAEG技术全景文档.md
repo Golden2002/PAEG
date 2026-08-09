@@ -2131,6 +2131,49 @@ flowchart TB
 4. `cloudflared tunnel route dns paeg 你的域名` 绑域名
 5. 配置 config.yml → 固定 URL，永久不变
 
+## 6.4 多用户扩展性（v0.38 ⭐ 大用户量架构）
+
+> 目标：从单用户 demo 升级为支撑**数百到数千并发用户**的成熟项目。Oracle 扩展性审查方案，分 3 批次实施。
+
+### 6.4.1 架构决策（Oracle 分析）
+
+| 组件 | 原设计（单用户） | v0.38 方案 | 理由 |
+|---|---|---|---|
+| 反思日志 | `data/reflections.json` 每次 chat 全量重写（5.3MB） | **SQLite**（`data/paeg.db` 表 reflections，append-only <1KB/条） | 消除写放大；索引查询 |
+| 用户/画像 | `users.json` 单文件 | SQLite 表 users/profiles（批次1） | 多用户读写竞争 |
+| 多轮记忆 | `SESSIONS[chat_hist_*]` 仅内存（重启丢） | SQLite 表 chat_hist（批次1） | 重启不丢上下文 |
+| Web server | `app.run(threaded=True)` | **waitress** 多 worker（批次2） | Windows 生产部署 |
+| 认证 | learner_id 参数（任何人可改） | **JWT + HttpOnly cookie**（批次2） | 多用户安全隔离 |
+| LLM 成本 | 每次调用 | 两级缓存（内存 LRU + SQLite，批次3） | 教学概念去重 -40% |
+
+### 6.4.2 已实施（v0.38）
+
+- ✅ **`reflection_store.py`**：SQLite 反思存储（append-only，WAL 模式，索引 learner_id+ts）
+- ✅ **迁移**：启动时自动从 `reflections.json` 迁移历史（幂等，已迁移 9959 条）
+- ✅ **写放大消除**：`SelfUpdater._save()` 不再全量重写 reflections.json（SQLite 增量写）；版本快照从复制 5MB 改为轻量计数
+- ✅ **并发写锁**：`_SAVE_LOCK` 进程内互斥 + 重试（Windows WinError 32 已实测复现并解决）
+- ✅ **meta-log 端点**：SQLite 带索引查询（替代全量内存过滤）
+- ✅ **版本快照**：VERSION_KEEP 10→3（53MB → 15MB）
+
+### 6.4.3 待实施（批次2/3）
+
+- 批次2：waitress 4 worker + JWT 认证 + 规则优先学科检测
+- 批次3：LLM 两级缓存 + 监控端点 + 多机评估
+
+### 6.4.4 生产部署拓扑（批次2 后）
+
+```mermaid
+flowchart LR
+    U[用户浏览器] -->|HTTPS| NG[nginx/Caddy 反代]
+    NG --> W1[Waitress worker 1]
+    NG --> W2[Waitress worker 2]
+    NG --> W3[Waitress worker 3]
+    NG --> W4[Waitress worker 4]
+    W1 & W2 & W3 & W4 --> DB[(SQLite paeg.db WAL)]
+    W1 & W2 & W3 & W4 --> FS[users_data/ 文件]
+    W1 & W2 & W3 & W4 --> LLM[LLM API]
+```
+
 ---
 
 # 7. 日常维护与排错
