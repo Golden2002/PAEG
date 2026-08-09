@@ -1525,13 +1525,16 @@ class AffectionSupportor:
         user = f"学生说：{text}"
         # v0.37 ⭐ Oracle 方案 C：风险分级注入（替代二元 crisis_context，向后兼容）
         # 关键词毫秒级分级 + opt_out 结构化判断；level>=3 强制资源，opt_out 不可压制
+        # v0.37.1 ⭐ Oracle P0-3 修复：RiskClassifier 异常时保守回退到 3 级（宁可误报不漏报），
+        # 不再静默降级到 0（否则高危信号因分类器故障被漏掉）
         _risk_level = 0
         try:
             from safety import RiskClassifier
             _rc = RiskClassifier()
             _risk_level = _rc.classify(text)
-        except Exception:
-            _risk_level = 3 if _crisis_context == "active" else 0
+        except Exception as _rc_e:
+            print(f"[PAEG] RiskClassifier 加载失败，保守回退 3 级: {_rc_e}")
+            _risk_level = 3 if _crisis_context in ("active",) else max(3, (3 if _crisis_context == "active" else 3))
         # opt_out 状态读取（兼容旧 bool + 新 dict）
         _opt_out_state = None
         try:
