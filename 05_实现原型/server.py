@@ -1,5 +1,5 @@
 """
-PAEG Flask 后端服务（v0.3 - 联通 GUI）
+PAEG Flask 后端服务（v0.38 多用户扩展+SQLite）
 
 实现 API 契约（详见 07_参考与勘误/01_API契约.md）：
 - POST /api/teach - 同步教学
@@ -231,6 +231,7 @@ def static_files(filename):
 
 @app.route("/api/modules", methods=["GET"])
 def modules_status():
+    # v0.38 内部 API（模块状态查询，供运维面板）
     """查询功能模块启用状态（v0.21 ⭐ 模块化元技能）。"""
     try:
         from module_registry import module_status
@@ -246,6 +247,7 @@ def modules_status():
 @app.route("/api/threads", methods=["POST"])
 @require_module("history")
 def create_thread():
+    # v0.38 内部 API（前端未直接调用；供 MCP/外部 Agent 接入）
     """创建教学会话 Thread（跨课次持久容器）。"""
     data = request.get_json(force=True) or {}
     student_id = data.get("student_id") or data.get("learner_id") or "anonymous"
@@ -1961,6 +1963,7 @@ def meta_log(learner_id):
 
 @app.route("/api/batch", methods=["POST"])
 def batch():
+    # v0.38 内部 API（周期批处理，由调度器触发）
     """批处理（每周）。"""
     result = paeg.self_updater.batch_update()
     return jsonify(result)
@@ -2189,6 +2192,7 @@ def voice_tts():
 @app.route("/api/voice/stt", methods=["POST"])
 @require_module("voice")
 def voice_stt():
+    # v0.38 内部 API（STT 由浏览器 Web Speech API 完成；保留供未来 v2 provider）
     """v0.36 ⭐ 语音转文本契约（v1 由浏览器 Web Speech API 完成）。
     保留端点供未来 v2 provider 替换（讯飞/Azure）。"""
     from voice_service import stt_transcribe
@@ -4158,6 +4162,7 @@ PERIODIC_UPDATER = PeriodicSelfUpdater(llm=llm, paeg=paeg, verbose=True)
 @app.route("/api/self-update/run", methods=["POST"])
 @require_module("self_update")
 def run_self_update():
+    # v0.38 内部 API（自我进化后台任务，由调度器触发）
     """手动触发一次周度自我更新（洞察提取 + 批处理 + 失败分析）。"""
     try:
         result = PERIODIC_UPDATER.run_now()
@@ -4169,6 +4174,7 @@ def run_self_update():
 @app.route("/api/self-update/status", methods=["GET"])
 @require_module("self_update")
 def self_update_status():
+    # v0.38 内部 API（自我进化状态查询，供运维）
     """查看调度器状态。"""
     return jsonify({
         "ok": True,
@@ -4182,6 +4188,7 @@ def self_update_status():
 @app.route("/api/self-update/from-feedback", methods=["POST"])
 @require_module("self_update")
 def self_update_from_feedback():
+    # v0.38 内部 API（自我进化反馈入口，供外部）
     """v0.21.4：从反馈/反思生成自我更新建议（第 8 个子代理 SelfUpdateAgent）。
 
     请求：{"text": str, "learner_id": str, "include_insights": bool(默认true),
