@@ -2310,8 +2310,10 @@ def voice_stt():
     if _text is None:
         if not stt_ready():
             return jsonify({"error": "模型加载中，请稍候"}), 503
-        return jsonify({"error": "语音识别服务不可用，请改用键盘输入"}), 500
-    return jsonify({"text": _text})
+        # v0.41 ⭐ 修复：无识别结果（静音/无语音）是正常场景 → 200 + 空文本
+        # 此前返回 500 → 前端误报"服务不可用"，实际是"没识别到语音"
+        return jsonify({"text": "", "ok": False, "error": "未识别到语音内容"})
+    return jsonify({"text": _text, "ok": True})
 
 
 @app.route("/uploads/<path:filename>")
