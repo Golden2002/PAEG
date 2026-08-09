@@ -91,6 +91,34 @@ except Exception as _e:
 
 paeg = PAEG(llm, kb, enable_self_update=True, verbose=False)
 
+# ─────────────────────────────────────
+# v0.41.4 ⭐ 元认知日志值域规范化（LLM 输出 → 中文可读）
+# ─────────────────────────────────────
+# 教训：LLM 建模直接输出英文枚举（visual/neutral 等）或越界长句，
+# 原样写入 user_modeling → 前端显示"风 visual / 情 neutral"等奇怪词。
+# 统一在写入端规范化：枚举→中文映射，长句截断（≤16 字）。
+_TRAIT_LS_CN = {
+    "visual": "视觉型", "auditory": "听觉型", "reading": "读写型",
+    "kinesthetic": "动觉型", "mixed": "混合型",
+}
+_TRAIT_EMO_CN = {
+    "anxious": "焦虑", "engaged": "投入", "neutral": "平静",
+    "withdrawn": "退缩", "unknown": "未知",
+}
+
+
+def _norm_trait_scalar(value, mapping):
+    """LLM trait 标量规范化：英文枚举→中文；未知/空→''；长句截断 16 字。"""
+    if not isinstance(value, str):
+        return ""
+    v = value.strip()
+    if not v or v in ("unknown", "null", "None"):
+        return ""
+    if v in mapping:
+        return mapping[v]
+    return v[:16] + ("…" if len(v) > 16 else "")
+
+
 # v0.24 ⭐ 工具链修复：SkillRegistry 注入 system prompt（MCP/AgentEngine 同源）
 # —— 之前 SkillRegistry 扫描了 skills/ 下 10 个 SKILL.md 但从未被任何调用方注入；
 # —— 这里实例化一份全局单例，供 /api/chat、/api/chat/stream、/api/skills、/api/health 复用。
@@ -808,16 +836,28 @@ def teach():
 
     # v0.17.1：元问题/寒暄拦截——用户问"你是谁/能做什么/能调用知识库吗"或打招呼，
     # 走闲聊模式回答，避免被当成学科概念去教学（幻觉/答非所问）。
+    # v0.41.5 ⭐ 加固：功能/使用/界面类问题（"你有什么功能""怎么用"）复用
+    # handle_interface_query 确定性模板（含完整功能清单），不交给 LLM 自由发挥。
     try:
         from meta_router import is_meta_question, is_greeting
         if is_meta_question(concept) or is_greeting(concept):
-            from prompts import build_general_chat_system, build_general_chat_user
-            from subagents import _safe_chat
-            m_sys = build_general_chat_system(learner)
-            m_usr = build_general_chat_user(concept)
-            m_reply = _safe_chat(llm, m_sys, m_usr, max_tokens=700)
-            if not m_reply:
-                m_reply = "我是 Émile Novis，你的老师。关于我、我的能力或知识库，你可以具体问我。"
+            _ui_reply_sync = None
+            try:
+                from self_referential import is_interface_query, handle_interface_query
+                if is_interface_query(concept):
+                    _ui_reply_sync = handle_interface_query(concept, learner)
+            except Exception:
+                _ui_reply_sync = None
+            if _ui_reply_sync:
+                m_reply = _ui_reply_sync
+            else:
+                from prompts import build_general_chat_system, build_general_chat_user
+                from subagents import _safe_chat
+                m_sys = build_general_chat_system(learner)
+                m_usr = build_general_chat_user(concept)
+                m_reply = _safe_chat(llm, m_sys, m_usr, max_tokens=700)
+                if not m_reply:
+                    m_reply = "我是 Émile Novis，你的老师。关于我、我的能力或知识库，你可以具体问我。"
             return jsonify({
                 "session_id": f"meta_{learner_id}",
                 "summary": {"avg_score": 0},
@@ -1149,11 +1189,14 @@ def teach_stream():
     # 大模型先判断用户意图（在 14 项里选一个）；置信度 ≥0.6 时作为分支选择的第一依据
     # ——置信度不足或 LLM 不可用时保留所有现有规则链（向后兼容）。
     # 设计：_llm_intent is None = 完全走规则链；_llm_intent == "teach"/"answer" = 教学请求必走完整管线（核心修复）
+    # v0.41.6 ⭐ 模式短路：前端已选模式（mode 字段）是最强确定性信号——
+    # 用户点了"闲聊"就不必让 LLM 再判断意图，直接走 chat 分支。
     _llm_intent = None
     _llm_conf = 0.0
     try:
         from meta_router import route_intent as _route_intent_v035
-        _intent_res = _route_intent_v035(concept, llm=llm)
+        # 传入前端 mode：命中则短路返回（LLM 不重复判断）；未命中（teach 默认/无 mode）走 LLM
+        _intent_res = _route_intent_v035(concept, llm=llm, mode=data.get("mode"))
         _llm_conf = float(_intent_res.get("confidence", 0.0) or 0.0)
         if _llm_conf >= 0.6 and _intent_res.get("intent") in {
             "teach", "knowledge", "knowledge_map", "recommend", "method",
@@ -1164,9 +1207,27 @@ def teach_stream():
     except Exception as _re:
         _llm_intent = None
         _llm_conf = 0.0
+    # v0.41.6 ⭐ 规则兜底接入（消除 rule_fallback_intent 死代码）：
+    # LLM 未判断出（低置信/异常/无 LLM）时，用统一规则链兜底——
+    # 此前散落在各分支的 is_xxx() 规则，现由 rule_fallback_intent 一次性接管。
+    if _llm_intent is None:
+        try:
+            from meta_router import rule_fallback_intent as _rule_fb
+            _fb_res = _rule_fb(concept)
+            if _fb_res.get("confidence", 0) >= 0.7 and _fb_res.get("intent") in {
+                "teach", "knowledge", "knowledge_map", "recommend", "method",
+                "emotion", "problem", "meta", "greeting", "material",
+                "interface", "ppt", "answer", "chat",
+            }:
+                _llm_intent = _fb_res.get("intent")
+                _llm_conf = float(_fb_res.get("confidence", 0.0))
+                print(f"[PAEG][v0.41.6-RULE-FB] intent={_llm_intent!r} conf={_llm_conf:.2f} reason={_fb_res.get('reason','')!r}",
+                      file=__import__("sys").stderr, flush=True)
+        except Exception as _rfe:
+            _llm_intent = None
     # v0.35 调试：可观察一次 LLM 路由结果（不影响行为）
     if _llm_intent is not None:
-        print(f"[PAEG][v0.35-LLM-ROUTE] intent={_llm_intent!r} conf={_llm_conf:.2f} text={concept[:40]!r}",
+        print(f"[PAEG][v0.35-LLM-ROUTE] intent={_llm_intent!r} conf={_llm_conf:.2f} text={concept[:40]!r} mode={data.get('mode')!r}",
               file=__import__("sys").stderr, flush=True)
 
     # v0.19.27：界面自指涉拦截（流式版本）——v0.35 ⭐ LLM 优先（LLM 判 interface → 跳过规则）
@@ -1459,14 +1520,28 @@ def teach_stream():
     # v0.17.1：元问题/寒暄走闲聊（流式版本直接返回单段回答）——v0.35 ⭐ LLM 优先
     try:
         from meta_router import is_meta_question, is_greeting
+        # v0.41.5 ⭐ 兜底加固：LLM 判 meta/greeting 或规则命中时——
+        # 若输入是"功能/使用/界面"类（"你有什么功能""怎么用"），复用
+        # handle_interface_query 确定性模板回答（含完整功能清单），
+        # 而不是让 LLM 自由发挥（此前 LLM 回答无功能说明）。
         if _llm_intent in ("meta", "greeting") or \
                 (_llm_intent is None and (is_meta_question(concept) or is_greeting(concept))):
-            from prompts import build_general_chat_system, build_general_chat_user
-            from subagents import _safe_chat
-            m_sys = build_general_chat_system(learner)
-            m_usr = build_general_chat_user(concept)
-            m_reply = _safe_chat(llm, m_sys, m_usr, max_tokens=700) or \
-                "我是 Émile Novis，你的老师。关于我、我的能力或知识库，你可以具体问我。"
+            _ui_guide = None
+            try:
+                from self_referential import is_interface_query, handle_interface_query
+                if is_interface_query(concept):
+                    _ui_guide = handle_interface_query(concept, learner)
+            except Exception:
+                _ui_guide = None
+            if _ui_guide:
+                m_reply = _ui_guide
+            else:
+                from prompts import build_general_chat_system, build_general_chat_user
+                from subagents import _safe_chat
+                m_sys = build_general_chat_system(learner)
+                m_usr = build_general_chat_user(concept)
+                m_reply = _safe_chat(llm, m_sys, m_usr, max_tokens=700) or \
+                    "我是 Émile Novis，你的老师。关于我、我的能力或知识库，你可以具体问我。"
 
             def gen_meta():
                 _save_teach_turn("chat", m_reply)  # v0.36.2 早退分支补保存
@@ -1572,6 +1647,13 @@ def teach_stream():
                 _trait_stream = _ind_res.get("trait") or {}
                 _facts_stream = _ind_res.get("facts") or []
                 _llm_modeled_stream = bool(_ind_res.get("llm_modeled"))
+                # v0.41.4 ⭐ 值域规范化：英文枚举→中文、长句截断（否则前端显示"风 visual"）
+                _ls_stream = _norm_trait_scalar(
+                    _trait_stream.get("learning_style"), _TRAIT_LS_CN)
+                _emo_stream = _norm_trait_scalar(
+                    _trait_stream.get("emotional_tendency"), _TRAIT_EMO_CN)
+                _mot_stream = _norm_trait_scalar(
+                    _trait_stream.get("motivation"), {})
                 _modeling_reflections.append({
                         "type": "user_modeling",
                         "timestamp": _dt.now().isoformat(),
@@ -1579,24 +1661,48 @@ def teach_stream():
                         "concept": concept,
                         "subject": subject,
                         "llm_modeled": _llm_modeled_stream,
-                        "learning_style": _trait_stream.get("learning_style"),
+                        "learning_style": _ls_stream or None,
                         "knowledge_strengths": _trait_stream.get("knowledge_strengths", []) or [],
                         "knowledge_gaps": _trait_stream.get("knowledge_gaps", []) or [],
-                        "emotional_tendency": _trait_stream.get("emotional_tendency"),
-                        "motivation": _trait_stream.get("motivation"),
+                        "emotional_tendency": _emo_stream or None,
+                        "motivation": _mot_stream or None,
                         "interests": _trait_stream.get("interests", []) or [],
                         "facts": _facts_stream,
                         "reflection": (
-                            f"建模：风格 {_trait_stream.get('learning_style') or '未知'}, "
+                            f"建模：风格 {_ls_stream or '未知'}, "
                             f"擅长 {_trait_stream.get('knowledge_strengths') or '[]'}, "
                             f"薄弱 {_trait_stream.get('knowledge_gaps') or '[]'}, "
-                            f"情绪 {_trait_stream.get('emotional_tendency') or '未知'}"
+                            f"情绪 {_emo_stream or '未知'}"
                         ),
                     })
             except Exception as _me:
                 print(f"[PAEG] teach_stream meta-log 建模记录跳过: {_me}")
         except Exception as _ie:
             print(f"[PAEG] teach_stream 个体化注入跳过: {_ie}")
+            # v0.41.4 ⭐ 兜底：LLM 建模偶发失败时也写一条 user_modeling（llm_modeled=False）
+            # —— 此前 _ind_stream.run 抛异常 → _modeling_reflections 保持空 → 该次教学无反思
+            # —— 实测偶发（3 连发中 1 次）→ 元认知日志缺记录；现兜底保证"每次教学必有反思"
+            try:
+                _modeling_reflections.append({
+                    "type": "user_modeling",
+                    "timestamp": _dt.now().isoformat(),
+                    "learner_id": learner.id,
+                    "concept": concept,
+                    "subject": subject,
+                    "llm_modeled": False,
+                    "learning_style": None,
+                    "knowledge_strengths": [],
+                    "knowledge_gaps": [],
+                    "emotional_tendency": None,
+                    "motivation": None,
+                    "interests": [],
+                    "facts": [],
+                    "reflection": (
+                        f"建模：LLM 个体化调用失败（{str(_ie)[:80]}），本次未完成建模"
+                    ),
+                })
+            except Exception as _mfe:
+                print(f"[PAEG] teach_stream 兜底建模记录失败: {_mfe}")
         try:
             _uid_stream = getattr(learner, "id", "") or ""
             if _uid_stream:
@@ -2726,7 +2832,7 @@ def general_chat_stream():
         learner.self_description = data["self_description"]
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
-    system = build_general_chat_system(learner)
+    system = build_general_chat_system(learner, mode=data.get("mode"))
 
     # 用户画像 + BDI
     try:
@@ -2734,7 +2840,7 @@ def general_chat_stream():
         um = infer_user_model([{'content': text}], learner.self_description or "")
         um['bdi'] = infer_bdi([{'content': text}], learner.self_description or "")
         learner._user_model = um  # type: ignore[attr-defined]
-        system = build_general_chat_system(learner)
+        system = build_general_chat_system(learner, mode=data.get("mode"))
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
         pass
@@ -3116,6 +3222,13 @@ def general_chat_stream():
                 _trait_chat = (_ind_result or {}).get("trait") or {}
                 _facts_chat = (_ind_result or {}).get("facts") or []
                 if paeg.self_updater is not None:
+                    # v0.41.4 ⭐ 值域规范化：英文枚举→中文、长句截断（与 teach_stream 一致）
+                    _ls_chat = _norm_trait_scalar(
+                        _trait_chat.get("learning_style"), _TRAIT_LS_CN)
+                    _emo_chat = _norm_trait_scalar(
+                        _trait_chat.get("emotional_tendency"), _TRAIT_EMO_CN)
+                    _mot_chat = _norm_trait_scalar(
+                        _trait_chat.get("motivation"), {})
                     paeg.self_updater.append_reflection(
                         learner_id,
                         {
@@ -3124,15 +3237,15 @@ def general_chat_stream():
                             "concept": text[:60],
                             "subject": data.get("subject", "general"),
                             "llm_modeled": bool((_ind_result or {}).get("llm_modeled")),
-                            "learning_style": _trait_chat.get("learning_style"),
+                            "learning_style": _ls_chat or None,
                             "knowledge_strengths": _trait_chat.get("knowledge_strengths", []) or [],
                             "knowledge_gaps": _trait_chat.get("knowledge_gaps", []) or [],
-                            "emotional_tendency": _trait_chat.get("emotional_tendency"),
-                            "motivation": _trait_chat.get("motivation"),
+                            "emotional_tendency": _emo_chat or None,
+                            "motivation": _mot_chat or None,
                             "interests": _trait_chat.get("interests", []) or [],
                             "facts": _facts_chat,
                             "reflection": (
-                                f"建模：风格 {_trait_chat.get('learning_style') or '未知'}, "
+                                f"建模：风格 {_ls_chat or '未知'}, "
                                 f"擅长 {_trait_chat.get('knowledge_strengths') or '[]'}, "
                                 f"薄弱 {_trait_chat.get('knowledge_gaps') or '[]'}"
                             ),
@@ -3222,7 +3335,7 @@ def general_chat():
         learner.self_description = data["self_description"]
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
-    system = build_general_chat_system(learner)
+    system = build_general_chat_system(learner, mode=data.get("mode"))
 
     # v0.16：注入用户画像 + BDI（让"随便说说"也有个体性）
     try:
