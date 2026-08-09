@@ -1,3 +1,18 @@
+### v0.37.2 Oracle 最终复检修复：并发写安全 + 多用户扩展性准备（2026-08-09）
+
+**Oracle 最终复检（第二轮深度）发现并修复**
+- 🐛 **P0-A 文件写并发不安全**：`self_update._save()` 的 `tmp.replace()` 在 Windows 并发时抛 PermissionError（WinError 32，多线程实测复现）→ 加进程内线程锁 `_SAVE_LOCK` + 重试机制。并发 8 线程实测无异常 ✅
+- 🐛 **P1 RiskRules 加载失败静默降级 0**：`safety.py:_load_rules` 失败返回空规则 → classify 恒 0（高危漏判）→ 改为返回内置保守规则（覆盖最危险信号），与 subagents 的 3 级回退对齐
+- 🐛 **P2 playMsgTTS 缺 abort**：连续点读会重叠播放/edge-tts 卡住无限等待 → 加 AbortController（取消上一次）+ 8s 超时
+- 🐛 **P2 chat_stream 兜底不发 retrieval 徽章**：run_agent_loop 失败走 _safe_chat 时补发"知识库检索"事件
+
+**多用户扩展性准备（Oracle 分析中，将按批次实施）**
+- reflections.json 已 4.7MB 且每次 chat 全量重写（O(n)）——后续批次将迁移 JSONL append-only 或 SQLite
+- SESSIONS 内存无界增长——后续设上限/持久化
+- 认证从 learner_id 参数升级 token/session——多用户必需
+
+**测试**：29/29 通过（v0.37 回归 22 + safety 7）；并发 _save 压力测试通过
+
 ### v0.37.1 Oracle 全面审查修复（杜绝"修复有时未生效"复发，2026-08-09）
 
 **Oracle 审查发现并修复（全部基于实际代码验证）**
