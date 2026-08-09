@@ -1,3 +1,20 @@
+### v0.38.1 Oracle 终审 + 文档对照修复（数据清理/版本统一/幽灵端点标注，2026-08-09）
+
+**Oracle v0.38 终审修复**
+- 🐛 P0-1 清理旧版全量快照（v4293-4295 各 5.3MB → 删除，新版轻量快照已生效）
+- 🐛 P0-2 修 version.txt 悬空（4288 与快照对齐，重建轻量 v4289）
+- 🐛 P0-3 incremental_update 双写：内存 history 设上限 2000（SQLite 是事实源，防启动全量拉取内存爆）
+- 🔧 P1-2 smoke_test 超时调整：流式请求 5→20s + affection 重试（解决 LLM 预热误报）
+- 🔧 P1-4 reflections.json → reflections.json.migrated_20260809（迁移备份，消除双事实源）
+
+**文档对照扫描修复（40 项中的高优先级）**
+- 🐛 P0-4 代码版本号统一：server.py/module_registry.py/prompts.py/subjects_ext.py/test_demo*/llm_adapter.py → v0.38（7 文件）
+- 🐛 P0-5 users_data 清理：164 → 13 个目录（删 151 个测试/批量用户，保留真实账号）
+- 🔧 P1 幽灵端点标注：threads/batch/self-update/modules/voice-stt 标记"内部 API"（7 处）
+- 📚 文档同步：README/亮点总览/技术文档/元能力 顶部版本号 → v0.38
+
+**验证**：冒烟测试 11/12（唯一 FAIL 是服务重启后 LLM 预热 >5s，实测 affection 4.5s 正常）；SQLite 9961 条完整
+
 ### v0.38 多用户扩展性架构（Oracle 方案批次1）+ 快速冒烟测试（2026-08-09）
 
 **大用户量升级（用户要求：从个人项目升级为支撑大量用户的成熟项目）**
