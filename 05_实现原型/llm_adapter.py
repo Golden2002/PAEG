@@ -1,7 +1,7 @@
 """
 PAEG LLM 适配器（v0.5 - 统一为 llm_api 的薄兼容层）。
 
-历史：v0.3 的 llm_adapter 使用独立实现（generate 接口 + LLMResponse）。
+历史：v0.38 的 llm_adapter 使用独立实现（generate 接口 + LLMResponse）。
 v0.5 起统一到 llm_api.ModelAPI（auto_detect 自动发现凭据，已实测可用）。
 
 本文件保留旧接口兼容性：
