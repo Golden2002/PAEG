@@ -4178,10 +4178,17 @@ python arch_check.py          # 输出连通性报告 + arch_report.json
 - Kraken (GitHub): 大型 Flask 单体拆分参考案例
 - EAS Station: https://github.com/ggelashvili/EAS-Station
 
-#### v0.41 起步动作（已落地）
+#### v0.41.6 落地进度（持续更新）
 
-- Phase 1：`config/` + `utils/` 已拆分（行为不变，回归通过）
-- Phase 2：`services/` 抽离 LLM 调用（规划中，§维护手册 §六 详述）
+- ✅ Phase 1：`config/` + `utils/` 已拆分（行为不变，回归通过）
+- ✅ Phase 2：`infra/`（12 运行时单例 getter + SESSIONS）+ `services/`（learner_session / polish / steering / routing / handlers）已落地
+  - server.py 4556 → ~4000 行（-550 行样板与基础设施）
+  - `services/_learner_session.py`：12 处 LearnerProfile 样板 → 单点 `ensure_learner_session()`
+  - `services/polish.py` / `services/steering.py` / `services/routing.py`：业务函数迁出，函数体内 import 防循环
+  - `infra/runtime.py`：12 个懒加载 getter（get_llm/get_kb/get_paeg/...）；`infra/sessions.py`：SESSIONS 独立
+  - audit_check 24/24 全绿，行为零变化（回归 + 端到端验证）
+- 📋 Phase 3：`blueprints/` 拆分（45 路由按域分组；teach/chat 含 SSE 闭包最后做）
+- 📋 Phase 4：`agents/` 重新导出（subagent 类已在 subagents.py）
 
 
 
