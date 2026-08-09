@@ -3123,23 +3123,35 @@ askBtn.addEventListener('click', () => {
 // v0.36 ⭐ TTS 播放：调后端 /api/voice/tts 生成音频并播放
 // v0.36.2 ⭐ 修复：autoplay 拦截精准提示（微信 X5 等浏览器需用户手势）；
 // 真实错误透传（不再笼统"语音暂不可用"误导）
+// v0.37.2 ⭐ Oracle P2 修复：AbortController 取消上一次 + 8s 超时（防连续点读重叠/卡死）
+let _ttsAbort = null;
+let _ttsAudio = null;
 async function playMsgTTS(btn) {
   const bubble = btn.closest('.msg-bubble');
   const text = (bubble ? bubble.textContent : '').replace(/[🔊复制\n]+/g, '').trim().slice(0, 2000);
   if (!text) return;
+  // 取消上一次未完成的 TTS（防重叠播放）
+  if (_ttsAbort) { try { _ttsAbort.abort(); } catch (e) {} }
+  if (_ttsAudio) { try { _ttsAudio.pause(); _ttsAudio = null; } catch (e) {} }
+  const ac = new AbortController();
+  _ttsAbort = ac;
+  const timeoutId = setTimeout(() => { try { ac.abort(); } catch (e) {} }, 8000);
   // 微信内置浏览器（X5）播放前先确保用户手势链（点击按钮即手势，此处主要捕获 rejection）
   try {
     const r = await fetch(API_BASE + '/api/voice/tts', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text, learner_id: STATE.learnerId })
+      body: JSON.stringify({ text: text, learner_id: STATE.learnerId }),
+      signal: ac.signal
     });
     const j = await r.json();
     if (j.ok && j.url) {
       const audio = new Audio(j.url);
+      _ttsAudio = audio;
       console.log('[TTS] url=', j.url, 'ok=', j.ok);
       const p = audio.play();
       if (p && p.catch) {
         p.catch((e) => {
+          if (e && e.name === 'AbortError') return; // 主动取消，不提示
           console.error('[TTS] play rejected:', e);
           addMsg('paeg', '<small>🔊 播放被浏览器拦截（自动播放限制）。请点击页面任意位置后，再点一次 🔊 重试。</small>');
         });
@@ -3148,8 +3160,12 @@ async function playMsgTTS(btn) {
       addMsg('paeg', `<small>语音暂不可用：${(j.error || 'edge-tts 合成失败')}（可稍后重试，不影响打字交流）。</small>`);
     }
   } catch (err) {
+    if (err && err.name === 'AbortError') return; // 主动取消/超时，不提示
     console.error('[TTS] fetch error', err);
     addMsg('paeg', `<small>语音服务暂时不可用：${(err && err.message ? err.message : '网络错误')}。</small>`);
+  } finally {
+    clearTimeout(timeoutId);
+    if (_ttsAbort === ac) _ttsAbort = null;
   }
 }
 
