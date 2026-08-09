@@ -1024,6 +1024,13 @@ body {
 }
 .log-item .time { color: var(--text-dim); font-size: 11px; }
 .log-item .txt { margin-top: 3px; color: var(--text); }
+/* v0.40.4 ⭐ 元认知建模 SVG 图标（无 emoji） */
+.log-item .log-icon {
+  width: 13px; height: 13px;
+  color: var(--accent);
+  vertical-align: -2px;
+  margin-right: 5px;
+}
 
 /* v0.29 P1-3：空状态四要素（图标 + 标题 + 说明 + 文字引导） */
 .empty-state {
@@ -2228,7 +2235,8 @@ function renderLogs(logs) {
       if (kg) parts.push(`薄 ${kg}`);
       if (ls) parts.push(`风 ${ls}`);
       if (emo && emo !== '未知') parts.push(`情 ${emo}`);
-      txt = parts.length ? `🎯 建模 · ${parts.join(' · ')}` : (m.reflection || '建模');
+      // v0.40.4 ⭐ 修复：emoji 🎯 → 无 emoji（用户要求）；SVG 图标在 log-item 模板中渲染
+      txt = parts.length ? `建模 · ${parts.join(' · ')}` : (m.reflection || '建模');
     } else {
       // v0.36.1 ⭐ 修复：非 user_modeling 记录（self_reflect/adaptation 等）不再显示用户原始提问（l.concept），
       // 否则元认知日志看起来像"对话历史"。改为展示反思实际内容（notes/总结/决策）。
@@ -2244,9 +2252,12 @@ function renderLogs(logs) {
         txt = r || l.note || '教学记录';
       }
     }
+    // v0.40.4 ⭐ user_modeling 记录显示 SVG 图标（替代 emoji，符合无 emoji 规范）
+    const isModeling = !!(l.reflection && typeof l.reflection === 'object' && l.reflection.type === 'user_modeling');
     return `
     <div class="log-item">
       <div class="time">${(l.timestamp || '').slice(5, 16)}</div>
+      ${isModeling ? `<svg class="log-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>` : ''}
       <div class="txt">${String(txt).slice(0, 60)}</div>
     </div>`;
   }).join('');
@@ -3158,6 +3169,8 @@ askBtn.addEventListener('click', () => {
   let recogTimer = null;
   let startDeadline = null;
   let _timeoutFired = false;
+  let _hadResult = false;   // v0.40.3 本次录音是否有识别结果（每次重置）
+  let _manualStop = false;  // v0.40.3 用户是否手动停止（手动停止不提示）
   const recog = new SR();
   recog.lang = 'zh-CN';
   recog.continuous = false;
@@ -3197,6 +3210,8 @@ askBtn.addEventListener('click', () => {
     else { _resetRecording(); }
   }
   recog.onstart = () => {
+    _hadResult = false;
+    _manualStop = false;
     _showRecordingUI();
     if (startDeadline) { clearTimeout(startDeadline); startDeadline = null; }
     addMsg('paeg', '<small>🎙 正在聆听…（请说话，说完自动停止，或再按一次麦克风停止）</small>');
@@ -3210,11 +3225,21 @@ askBtn.addEventListener('click', () => {
   recog.onend = () => {
     const timedOut = _timeoutFired;
     _timeoutFired = false;
+    const wasManual = _manualStop;
     _resetRecording();
-    // v0.40 P1-5 ⭐ 超时明确提示（此前静默）
-    if (timedOut && !window._voiceResultHandled) {
-      addMsg('paeg', '<small>🎙 录音超时（10 秒未识别到语音）。请靠近麦克风再说一次，或直接打字。</small>');
+    // v0.40.4 ⭐ 修复：任何"录音结束但无识别结果"都必须提示（含手动停止——用户期望
+    // "我说完话手动停止但没识别到文字"也要告知；此前 _manualStop 时静默 = 用户看不到提示）
+    if (!_hadResult) {
+      if (timedOut) {
+        addMsg('paeg', '<small>🎙 录音超时（10 秒未识别到语音）。请靠近麦克风再说一次，或直接打字。</small>');
+      } else if (wasManual) {
+        addMsg('paeg', '<small>🎙 未识别到语音内容（可能网络识别服务不可达、太安静或未含中文）。请再试一次，或直接打字。</small>');
+      } else {
+        addMsg('paeg', '<small>🎙 未识别到语音内容（可能太安静或未含中文）。请再试一次，或直接打字。</small>');
+      }
     }
+    _hadResult = false;
+    _manualStop = false;
   };
   recog.onerror = (e) => {
     const err = e && e.error;
@@ -3241,7 +3266,7 @@ askBtn.addEventListener('click', () => {
     }
   };
   recog.onresult = (e) => {
-    window._voiceResultHandled = true;
+    _hadResult = true;
     _resetRecording();
     // v0.40 P1-4 ⭐ 空 transcript 明确提示（此前静默）
     let text = '';
@@ -3269,6 +3294,8 @@ askBtn.addEventListener('click', () => {
   voiceBtn.addEventListener('click', () => {
     if (recognizing) {
       // 停止：abort 确保触发 onend → 状态重置（比 stop() 更可靠）
+      // v0.40.3 手动停止置位（onend 不再提示"未识别到"）
+      _manualStop = true;
       _resetRecording();
       try { recog.abort(); } catch (e) { try { recog.stop(); } catch (e2) {} }
       return;
@@ -3484,6 +3511,17 @@ function applyTheme(theme) {
 document.getElementById('theme-btn').addEventListener('click', () => {
   const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
   applyTheme(cur === 'dark' ? 'light' : 'dark');
+});
+// v0.40.4 ⭐ 修复：系统主题实时联动——用户未手动固定偏好时，系统切换深浅色网页实时跟随
+// （此前只有"用户从没点过按钮"才跟随系统；点过一次后 localStorage 固化，系统变化不再生效 = 用户感觉"功能没了"）
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+  try {
+    if (!localStorage.getItem('paeg-theme')) {
+      document.documentElement.removeAttribute('data-theme');  // 让 CSS 媒体查询重新生效
+      document.getElementById('theme-icon').src = e.matches
+        ? 'assets/icons/lightbulb.svg' : 'assets/icons/sparkles.svg';
+    }
+  } catch (err) { /* 忽略 */ }
 });
 
 // ─── v0.x：资料检索（需求C）───
