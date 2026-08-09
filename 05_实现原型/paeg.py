@@ -33,6 +33,9 @@ class LearnerProfile:
     specialty_target: Optional[str] = None
     # v0.10：用户自我描述（"我是怎样的人/目标/擅长与不擅长"），每次对话自动注入
     self_description: str = ""
+    # v0.37 ⭐ 危机状态机（Oracle 方案 C）：opt_out 结构化 + 风险历史 + 现实锚点
+    # 兼容旧 _crisis_opt_out(bool)：读取时优先 _crisis_state，缺失则迁移旧值
+    _crisis_state: Optional[dict] = field(default=None)
 
 
 @dataclass
