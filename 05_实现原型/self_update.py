@@ -159,6 +159,11 @@ class SelfUpdater:
                 "subject": getattr(session, "subject", ""),
                 "reflection": reflection
             })
+        # v0.38.1 ⭐ Oracle P0-3 修复：内存 history 设上限（SQLite 是事实源，内存仅热缓存）
+        # 此前无限增长 → 启动时 query("*") 全量拉取 → 10K-100K 条时内存爆
+        MAX_MEM_HISTORY = 2000
+        if len(self.history) > MAX_MEM_HISTORY:
+            self.history = self.history[-MAX_MEM_HISTORY:]
         # v0.38 ⭐ SQLite 增量写（append-only，单条 <1KB IO，替代全量重写）
         if self._ref_store is not None and session.reflections:
             try:
