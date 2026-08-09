@@ -1,6 +1,7 @@
-# PAEG 前后端 API 契约 v0.2
+# PAEG 前后端 API 契约 v0.3
 
-> 时间：2026-08-05
+> 时间：2026-08-09（v0.41.6 更新）
+> 服务端实现：v0.41.6（提示词结构化 + 模式短路路由）
 > 目的：定义 GUI 前端 ↔ PAEG 后端的接口规范
 > 协议：REST + WebSocket
 > 数据格式：JSON
@@ -36,8 +37,15 @@
 {
   "learner_id": "hs_001",
   "concept": "什么是熵？",
-  "subject": "physics"
+  "subject": "physics",
+  "mode": "teach"
 }
+```
+
+> **v0.41.6 ⭐ mode 字段**：前端把用户已选择的对话模式作为确定性信号传给后端。
+> 取值：`teach`（学科教学）/ `chat`（闲聊）/ `answer`（找答案）/ `method`（学习方法）/
+> `knowledge`（知识库）/ `affection`（倾诉）/ `ppt`（PPT 生成）。
+> 后端据此短路 LLM 意图判断（模式确定时直接路由），并在 system prompt 注入对应场景段。
 ```
 
 响应：

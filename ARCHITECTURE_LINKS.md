@@ -38,6 +38,26 @@ flowchart TB
 
 ---
 
+## L1 · 意图路由闭环（v0.41.6 ⭐ 模式短路）
+
+> 聚焦：提示词结构化管线——确定性信号（模式按钮）先行，LLM 判断次之，规则兜底兜尾。
+
+```mermaid
+flowchart LR
+    B["前端模式按钮<br/>teach/chat/answer/method/knowledge/affection"] -->|"mode 字段随请求发送"| R["route_intent(text, llm, mode)"]
+    R -->|"mode 命中 → 短路返回<br/>conf 0.95 不调 LLM"| D["直接路由到对应分支"]
+    R -->|"mode 未命中 → LLM 判断<br/>14 意图选项内选一"| L["LLM 语义判断"]
+    L -->|"低置信/异常 →"| FB["rule_fallback_intent<br/>规则兜底（interface 优先 meta）"]
+    L -->|"teach/answer →"| D
+    FB --> D
+    D --> P["build_general_chat_system(learner, mode)<br/>注入用户画像 + 模式场景段"]
+    P --> O["输出 → language_refiner<br/>语言规范性（AI 味≥0.4 才改写）"]
+```
+
+**说明**：判断成本分层——确定性信号（免费）> 规则（廉价）> LLM（昂贵）。用户已选模式时 LLM 不必重复判断；画像+历史+模式场景段一并注入 system prompt（结构化提示词管线）。
+
+---
+
 ## L1 · 教学闭环（九个 subagent 如何协同）
 
 > 聚焦：一次教学对话中，9 个 subagent 的分工与协作。
