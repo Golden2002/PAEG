@@ -202,6 +202,31 @@ def audit_data():
         record("数据健康", "P1", "无 >1MB 版本快照", not big_snaps, f"{big_snaps}")
 
 
+
+
+# ---------------------------------------------------------------------------
+# 维度 9：事件处理器完整性（v0.41.2 教训——登录后状态刷新）
+# ---------------------------------------------------------------------------
+def audit_handler_completeness():
+    html = GUI.read_text(encoding="utf-8")
+    # applyLogin 必须调用必备加载函数（否则登录后元认知/画像/会话不刷新）
+    m = re.search(r'function applyLogin\(result\) \{(.*?)\n\}', html, re.S)
+    if m:
+        body = m.group(1)
+        required = ['loadProfile', 'loadMetaLog', 'loadConversations']
+        missing = [fn for fn in required if fn not in body]
+        record("处理器完整", "P0", "applyLogin 调用必备加载函数",
+               not missing, f"缺: {missing}" if missing else "")
+    else:
+        record("处理器完整", "P0", "applyLogin 调用必备加载函数", False, "未找到 applyLogin")
+    # 头像上传成功回调必须保存 STATE+localStorage
+    m2 = re.search(r'avatar-input.*?addEventListener.*?\{.*?\}', html, re.S)
+    if m2 and 'avatarUrl' in m2.group(0):
+        record("处理器完整", "P1", "头像上传保存 STATE+localStorage", 'localStorage.setItem' in m2.group(0), "")
+    else:
+        record("处理器完整", "P1", "头像上传保存 STATE+localStorage", True, "")
+
+
 def main():
     audit_early_exit()
     audit_silent_except()
@@ -209,6 +234,7 @@ def main():
     audit_version()
     audit_test_coverage()
     audit_persistence()
+    audit_handler_completeness()
     audit_security()
     audit_data()
 
