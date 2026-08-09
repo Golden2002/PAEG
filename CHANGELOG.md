@@ -1,3 +1,15 @@
+### v0.41.3 登录后状态刷新修复 + 事件处理器完整性检查（2026-08-09）
+
+**登录后状态不刷新（用户反馈"登录后元认知仍空/头像没保存"）**
+- 🐛 根因：applyLogin（登录成功处理器）缺 loadMetaLog、未重置 STATE.avatarUrl → 登录后元认知日志/头像不刷新
+- 🐛 修复：applyLogin 补 loadMetaLog + loadProfile + loadConversations + 头像重置
+- ✅ 验证：applyLogin 含全部必备加载；头像上传保存 STATE+localStorage
+
+**三次反思（自检为何反复漏）**
+- 根因：自检测"数据流"不测"交互事件驱动的流程"——applyLogin 缺函数测不出
+- ⭐ audit_check 新增"处理器完整性"检查（P0：applyLogin 必须含 loadProfile/loadMetaLog/loadConversations）→ 17/17 通过
+- 文档：技术§10.2.24 / 维护§8.6 / 元能力§6.18（事件驱动自检元技术）
+
 ### v0.41.2 昵称传播修复 + 用户旅程测试（2026-08-09）
 
 **昵称不匹配修复（用户反馈"智能体称呼我为学生"）**
