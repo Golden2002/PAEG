@@ -138,6 +138,25 @@ class SelfUpdater:
         self._save_profile(session.learner)
         self._save()
 
+    def append_reflection(self, learner_id: str, reflection: dict,
+                          concept: str = "", subject: str = "") -> None:
+        """v0.37.1 ⭐ 单条反思落盘 API（chat_stream 等轻量路径用）。
+
+        Oracle 审查 P0-1：此前 server.py 直接 append 到 self.history 但不调 _save()，
+        元认知日志重启即丢。此 API 保证 append + 原子落盘 + 版本快照。
+        """
+        self.history.append({
+            "timestamp": datetime.now().isoformat(),
+            "learner_id": learner_id,
+            "concept": str(concept or "")[:60],
+            "subject": subject or "",
+            "reflection": reflection,
+        })
+        try:
+            self._save()
+        except Exception:
+            pass
+
     def _save_profile(self, learner):
         """画像快照落盘。"""
         profiles_path = self.data_dir / "profiles.json"
