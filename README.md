@@ -226,3 +226,12 @@ python D:\桌面\智能体架构与开发（含大模型）_教育者Agent项�
 - **STT（语音提问）**：浏览器 Web Speech API（Chrome/Edge/Safari），转文本后复用现有发送管线
 - 模块门控：paeg_modules.json 可开关；纯 I/O adapter，不进 subagent 调度
 - v2 规划：讯飞/微软/Azure 替换 provider（接口已抽象在 voice_service.py）
+
+### 环境限制（真实可用边界）
+
+- **STT 语音输入**：依赖浏览器 `webkitSpeechRecognition`（Chrome/Edge/Safari 桌面版）+ HTTPS 或 localhost 安全环境。微信内置浏览器（X5 内核）与非 HTTPS 局域网 IP 访问**不支持**——此时麦克风按钮会明确提示原因，可直接打字交流。
+- **TTS 朗读**：需后端已安装 `edge-tts`（`pip install edge-tts`）；播放可能被浏览器自动播放策略拦截（点一次页面任意处再点 🔊 即可）。
+
+## 检索徽章（v0.27 + v0.36.1）
+
+回答前显示"已完成知识库检索 / 网络检索"徽章：知识库有该概念 → 知识库检索；知识库无匹配（如偏门/自创概念）→ **自动联网补充**并显示"网络检索"。推荐类问题（"推荐几本书"）始终真联网。
