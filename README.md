@@ -300,7 +300,7 @@ PAEG 不止"功能完整"，更要"结构优秀"。参考 Flask / Kraken / EAS S
 | Phase | 内容 | 状态 | 触发条件 |
 |---|---|---|---|
 | Phase 1 | `config/` + `utils/` 拆分 | ✅ 完成 | server.py > 4000 行 |
-| Phase 2 | `services/` 抽离 LLM 调用 | 🔄 进行中 | LLM 调用跨层耦合 |
+| Phase 2 | `infra/`（12 单例 + SESSIONS）+ `services/`（learner_session/polish/steering/routing/handlers） | ✅ 完成 | LLM 调用跨层耦合 |
 | Phase 3 | `blueprints/` 拆分 | 📋 规划 | HTTP 路由难以独立维护 |
 | Phase 4 | `agents/` 独立单元 | 📋 规划 | subagent 行为难观测 |
 
@@ -315,4 +315,13 @@ PAEG 不止"功能完整"，更要"结构优秀"。参考 Flask / Kraken / EAS S
 - 维护操作流程：[《维护手册》§六 成熟项目结构借鉴](./维护手册.md)
 - 元能力沉淀：[《元能力文档》§6.15 成熟项目结构借鉴元技术](./元能力文档.md)
 - 投资人视角亮点：[《亮点总览》§六 架构可维护性](./亮点总览.md)
+
+## 最近变更（v0.41.6）
+
+- **提示词结构化**：前端模式选择（闲聊/找答案/学习方法/知识库/倾诉）作为确定性信号传入后端 → 模式短路路由（LLM 不必重复判断意图）→ 规则兜底 → 语言规范。详见 [CHANGELOG](./CHANGELOG.md) v0.41.6。
+- **展示质量自检**：LLM 英文枚举→中文映射（visual→视觉型），audit_check 新增展示质量维度，24/24 全绿。
+- **数据双源一致**：注册即对齐 users.json 与画像文件，杜绝昵称占位符漂移。
+- **模块化落地**：server.py 4556→~4000 行（infra/ + services/ 五模块），行为零变化。
+
+详细变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
