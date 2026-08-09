@@ -1,0 +1,289 @@
+{"hash": "2139e48c17959a27", "ts": "2026-08-07T03:47:47.893725", "category": "prompt_update", "priority": "P1", "target": "subagents.Tutor (system prompt / teaching template)"}
+{"hash": "813eda05f54fe37b", "ts": "2026-08-07T03:47:47.893725", "category": "knowledge_update", "priority": "P1", "target": "Library/KnowledgeBase/subjects/common_examples.json"}
+{"hash": "6f721847bf4186ff", "ts": "2026-08-07T03:47:47.893725", "category": "tool_adjustment", "priority": "P2", "target": "subagents.ContextBundle (context_bundle_tool)"}
+{"hash": "71a24363518baaef", "ts": "2026-08-07T03:48:03.307991", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "ec5279c11d078ad4", "ts": "2026-08-07T03:49:44.671437", "category": "prompt_update", "priority": "P1", "target": "system_prompt"}
+{"hash": "c8f38db6de9854b7", "ts": "2026-08-07T03:49:45.551909", "category": "prompt_update", "priority": "P2", "target": "self_update"}
+{"hash": "bf1a414fb96b97b0", "ts": "2026-08-07T03:50:00.148594", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学回复模板"}
+{"hash": "44c3247e53e9f654", "ts": "2026-08-07T04:06:52.963265", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学对话主模板)"}
+{"hash": "d0038838ead599f3", "ts": "2026-08-07T04:21:15.783314", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学回复模板）"}
+{"hash": "5abfce3be88db2d4", "ts": "2026-08-07T04:22:05.249811", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学模板（core 指令中的讲解段落）"}
+{"hash": "00f14ba08f2f3982", "ts": "2026-08-07T04:42:21.947780", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学模块通用指令段)"}
+{"hash": "6288fe50319eb8fc", "ts": "2026-08-07T05:24:43.347977", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学对话主模板)"}
+{"hash": "ee3b7e18e34c1e3d", "ts": "2026-08-07T05:52:47.320012", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter"}
+{"hash": "8f0c0c7a5120138b", "ts": "2026-08-07T05:53:42.418892", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学主模板)"}
+{"hash": "27209429936f5239", "ts": "2026-08-07T06:26:14.071928", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter / 主对话 system prompt"}
+{"hash": "35b7814120baaab8", "ts": "2026-08-07T06:31:28.417594", "category": "prompt_update", "priority": "P1", "target": "system_prompt (teaching_style_section)"}
+{"hash": "de1b500f50b4a7f9", "ts": "2026-08-07T06:32:13.185788", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学风格指令段)"}
+{"hash": "26ab7a0b00e1cc09", "ts": "2026-08-07T06:39:35.672553", "category": "prompt_update", "priority": "P1", "target": "system_prompt_teaching_style"}
+{"hash": "899194941fec599c", "ts": "2026-08-07T06:48:52.098571", "category": "prompt_update", "priority": "P1", "target": "system_prompt / tutor_response_template"}
+{"hash": "ddb6d375d265ade6", "ts": "2026-08-07T06:49:24.897887", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学主提示词)"}
+{"hash": "d9b54295f742b19e", "ts": "2026-08-07T06:54:37.181778", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学风格约束段)"}
+{"hash": "565c9077eaf44220", "ts": "2026-08-07T07:39:07.870348", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学主模板)"}
+{"hash": "e7e786a003d22f58", "ts": "2026-08-07T07:41:45.867885", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter (system prompt 中的讲解模板)"}
+{"hash": "5249fb4986367f16", "ts": "2026-08-07T07:42:07.608459", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学模板（PAEG_PEDAGOGY.md 关联的教学输出模板）"}
+{"hash": "f2db9a77203f5beb", "ts": "2026-08-07T07:44:32.701317", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter / system prompt (教学回复模板)"}
+{"hash": "aa38ec4b41ce9971", "ts": "2026-08-07T07:45:10.511224", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学回答模板"}
+{"hash": "30e7cd2713aa03ef", "ts": "2026-08-07T08:05:57.095822", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学回复模板)"}
+{"hash": "b8dafdc4243d03c6", "ts": "2026-08-07T08:07:21.629543", "category": "prompt_update", "priority": "P1", "target": "system_prompts.tutor_explain_template"}
+{"hash": "147eb60626de7a86", "ts": "2026-08-07T13:41:26.693748", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学回复模板"}
+{"hash": "fedac680f62915c9", "ts": "2026-08-07T13:43:47.783738", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学风格模板 (memory/PAEG_PEDAGOGY.md)"}
+{"hash": "c157481eb4d5982c", "ts": "2026-08-07T13:52:28.044279", "category": "prompt_update", "priority": "P1", "target": "system_prompt 或教学主提示词（teaching_prompt）"}
+{"hash": "ad0ef3614690c31b", "ts": "2026-08-07T13:55:57.372411", "category": "prompt_update", "priority": "P1", "target": "system_prompt（对话主模板）"}
+{"hash": "38077690d0968e4b", "ts": "2026-08-07T14:01:40.057476", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学引导模块）"}
+{"hash": "ae99927582ec53d0", "ts": "2026-08-07T14:09:09.339392", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学对话主模板"}
+{"hash": "d0552e6e0af73381", "ts": "2026-08-07T14:09:41.588917", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter"}
+{"hash": "17514e61f8dce3a7", "ts": "2026-08-07T14:13:55.789766", "category": "prompt_update", "priority": "P1", "target": "system_prompt / teaching_style_section"}
+{"hash": "138732a5e7582738", "ts": "2026-08-07T14:44:39.438649", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学回答模板)"}
+{"hash": "ba0d691e2192bdb9", "ts": "2026-08-07T14:46:20.436641", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学指令模板)"}
+{"hash": "0295e863f8339ba7", "ts": "2026-08-07T14:51:06.953711", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学引导模板)"}
+{"hash": "8d9ba2088902d532", "ts": "2026-08-07T14:53:59.764516", "category": "prompt_update", "priority": "P1", "target": "system_prompt (teaching_style_section)"}
+{"hash": "0018af11b40a5392", "ts": "2026-08-07T14:57:26.011063", "category": "prompt_update", "priority": "P1", "target": "system_prompt（核心教学指令）"}
+{"hash": "c205ca35a2d86f7e", "ts": "2026-08-07T15:09:35.972847", "category": "prompt_update", "priority": "P1", "target": "prompts/tutor_system_prompt.md"}
+{"hash": "f6a56b5be98f3793", "ts": "2026-08-07T15:10:01.487861", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学风格段)"}
+{"hash": "0d602a187495ea27", "ts": "2026-08-07T15:11:39.492177", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学对话模板）"}
+{"hash": "0daff3dfa77eb0e1", "ts": "2026-08-07T15:12:07.876121", "category": "prompt_update", "priority": "P1", "target": "system_prompt / PAEG_PEDAGOGY.md"}
+{"hash": "d3c4bbd35b93efd1", "ts": "2026-08-07T15:15:38.841037", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学模块通用提示词）"}
+{"hash": "9363cf12d355de44", "ts": "2026-08-07T15:17:28.027012", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学主模板"}
+{"hash": "9d275ed99da9f1c2", "ts": "2026-08-07T15:17:46.933766", "category": "prompt_update", "priority": "P1", "target": "system_prompt (主对话 system prompt 的教学讲解段落)"}
+{"hash": "89a86f56d8d174b6", "ts": "2026-08-07T15:18:40.108338", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学对话主模板）"}
+{"hash": "7d73a59d5fc526c1", "ts": "2026-08-07T15:18:41.828932", "category": "prompt_update", "priority": "P2", "target": "SelfUpdateAgent"}
+{"hash": "05bfffa74c016793", "ts": "2026-08-07T15:20:58.959086", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学回复模板"}
+{"hash": "908860a175a6c031", "ts": "2026-08-07T15:21:43.976485", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学主模板）"}
+{"hash": "38bd7165f9ec22fa", "ts": "2026-08-07T15:22:08.253602", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学主模板"}
+{"hash": "1e719c835666920b", "ts": "2026-08-07T15:22:09.966009", "category": "prompt_update", "priority": "P2", "target": "SelfUpdateAgent"}
+{"hash": "30ac0340e4286d66", "ts": "2026-08-07T15:22:26.964117", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter（教学适配器）"}
+{"hash": "beb178c51d21c8ca", "ts": "2026-08-07T15:23:40.811277", "category": "prompt_update", "priority": "P1", "target": "system_prompt (teaching_style_section)"}
+{"hash": "6663afc7aec91d54", "ts": "2026-08-07T15:24:20.172969", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学风格部分)"}
+{"hash": "375fca20c58d73d1", "ts": "2026-08-07T15:24:22.646470", "category": "error_pattern", "priority": "P1", "target": "SelfEvolution.promote_or_purge"}
+{"hash": "48ee3e727d769cba", "ts": "2026-08-07T15:25:13.248935", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学对话主模板)"}
+{"hash": "a305623daa238783", "ts": "2026-08-07T15:25:38.378232", "category": "prompt_update", "priority": "P1", "target": "system_prompt (Émile 教学对话模块)"}
+{"hash": "7a47ffa95dd65177", "ts": "2026-08-07T15:26:19.393913", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter"}
+{"hash": "ed63cf307d154842", "ts": "2026-08-07T15:26:55.644819", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学模板（PAEG_PEDAGOGY.md 对应的 prompt 部分）"}
+{"hash": "d811ffd3b9a23b06", "ts": "2026-08-07T15:28:03.024129", "category": "prompt_update", "priority": "P1", "target": "system_prompt / main_agent_instructions"}
+{"hash": "c8d25d2945f52d44", "ts": "2026-08-07T15:30:46.633474", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学回复模板（general_explanation）"}
+{"hash": "cdcaa0db22ef61ce", "ts": "2026-08-07T15:33:03.944348", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学对话主模板）"}
+{"hash": "51ec33bcc6bf640b", "ts": "2026-08-07T15:33:06.962686", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "b0f5592ead00d93e", "ts": "2026-08-07T15:33:06.962686", "category": "tool_adjustment", "priority": "P1", "target": "orchestrator.SelfEvolution"}
+{"hash": "49f3dbfb0b9cafa5", "ts": "2026-08-07T18:00:18.979093", "category": "prompt_update", "priority": "P1", "target": "prompts/core_tutor.md"}
+{"hash": "bb7412d2f4ed4cea", "ts": "2026-08-07T18:03:05.924488", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学回复模板)"}
+{"hash": "3e51410448c86d63", "ts": "2026-08-07T19:21:05.417188", "category": "knowledge_update", "priority": "P1", "target": "Library/KnowledgeBase/subjects/psychology.json"}
+{"hash": "703c06f90f0ca385", "ts": "2026-08-07T19:28:25.921437", "category": "knowledge_update", "priority": "P1", "target": "Library/KnowledgeBase/subjects/psychology.json"}
+{"hash": "d301b8b1bba6202c", "ts": "2026-08-07T19:28:25.921437", "category": "prompt_update", "priority": "P1", "target": "subagents.SubjectRouter"}
+{"hash": "1c274728bba07482", "ts": "2026-08-07T19:34:06.428512", "category": "knowledge_update", "priority": "P1", "target": "Library/KnowledgeBase/subjects/psychology.json"}
+{"hash": "d4c1082549ca75c9", "ts": "2026-08-07T19:38:19.361127", "category": "knowledge_update", "priority": "P1", "target": "Library/KnowledgeBase/subjects/psychology.json"}
+{"hash": "5f6d65fb3d72570b", "ts": "2026-08-07T20:18:20.945389", "category": "knowledge_update", "priority": "P1", "target": "Library/KnowledgeBase/subjects/psychology.json"}
+{"hash": "76abdddce3954d24", "ts": "2026-08-07T20:18:20.945389", "category": "knowledge_update", "priority": "P1", "target": "Library/KnowledgeBase/subjects/catalog.json"}
+{"hash": "034f799e22063fee", "ts": "2026-08-07T20:23:53.981842", "category": "knowledge_update", "priority": "P1", "target": "Library/KnowledgeBase/subjects/psychology.json"}
+{"hash": "ec3043130b1d612a", "ts": "2026-08-07T20:37:47.581115", "category": "knowledge_update", "priority": "P1", "target": "Library/KnowledgeBase/subjects/psychology.json"}
+{"hash": "556f98d79e2a6a02", "ts": "2026-08-07T20:46:26.992291", "category": "knowledge_update", "priority": "P1", "target": "Library/KnowledgeBase/subjects/psychology.json"}
+{"hash": "2435572c4f60f8c6", "ts": "2026-08-07T20:55:21.034400", "category": "knowledge_update", "priority": "P1", "target": "Library/KnowledgeBase/subjects/psychology.json"}
+{"hash": "d8b2216a097269e4", "ts": "2026-08-07T20:55:21.034400", "category": "knowledge_update", "priority": "P2", "target": "Library/KnowledgeBase/subject_index.json"}
+{"hash": "ebb5c547bb60e02e", "ts": "2026-08-07T20:59:33.577896", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter / subagents.Tutor (system prompt)"}
+{"hash": "29ba38e9715b72c5", "ts": "2026-08-07T23:31:00.432574", "category": "prompt_update", "priority": "P1", "target": "system_prompt_teaching_style"}
+{"hash": "0b036f41733fe923", "ts": "2026-08-07T23:50:26.001480", "category": "prompt_update", "priority": "P1", "target": "system_prompt / subagents.Teacher"}
+{"hash": "601b594e9d1ffa30", "ts": "2026-08-08T02:12:00.657782", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学对话主模板）"}
+{"hash": "385eb518b3424449", "ts": "2026-08-08T02:22:27.269442", "category": "prompt_update", "priority": "P1", "target": "subagents.Tutor (system prompt)"}
+{"hash": "8478efb640a27e0b", "ts": "2026-08-08T02:45:29.787682", "category": "prompt_update", "priority": "P1", "target": "system/prompts/tutor_base.md"}
+{"hash": "c4ac44f41dc09875", "ts": "2026-08-08T03:09:44.041216", "category": "prompt_update", "priority": "P1", "target": "system_prompt"}
+{"hash": "cd13094fd96829d5", "ts": "2026-08-08T03:21:51.822245", "category": "prompt_update", "priority": "P1", "target": "subagents.Tutor"}
+{"hash": "502cfaf21462eaa3", "ts": "2026-08-08T03:58:44.441471", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学主提示词)"}
+{"hash": "a1879cc7feacb150", "ts": "2026-08-08T04:01:32.849919", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学对话模板"}
+{"hash": "673cbebf6da753f7", "ts": "2026-08-08T04:03:43.278544", "category": "prompt_update", "priority": "P1", "target": "system_prompt 或主对话模板"}
+{"hash": "e6333e738f436862", "ts": "2026-08-08T04:06:07.473504", "category": "prompt_update", "priority": "P1", "target": "system_prompt / pedagogical_response_template"}
+{"hash": "f3267d7df21ddcdf", "ts": "2026-08-08T04:07:50.436409", "category": "prompt_update", "priority": "P1", "target": "subagents.Explainer (system prompt)"}
+{"hash": "e1ff41f36568f341", "ts": "2026-08-08T04:09:56.872459", "category": "prompt_update", "priority": "P1", "target": "system/prompts/teaching_core.md"}
+{"hash": "7b905aca355bb6fa", "ts": "2026-08-08T04:14:14.499332", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学引导模板)"}
+{"hash": "68482dd5a2902feb", "ts": "2026-08-08T04:24:04.694922", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学对话主模板"}
+{"hash": "ad7515b1aadec5e0", "ts": "2026-08-08T04:31:31.503473", "category": "prompt_update", "priority": "P1", "target": "system_prompt (主对话模板)"}
+{"hash": "d66a7be461a14982", "ts": "2026-08-08T04:44:26.352646", "category": "prompt_update", "priority": "P1", "target": "system_prompt (teaching_context_section)"}
+{"hash": "c0a042e2454402be", "ts": "2026-08-08T04:59:05.268828", "category": "prompt_update", "priority": "P1", "target": "system prompt / 教学对话主模板"}
+{"hash": "9b65c008f26d0448", "ts": "2026-08-08T05:08:46.401085", "category": "prompt_update", "priority": "P1", "target": "prompt_templates (教学/讲解类通用模板)"}
+{"hash": "2fca0727310579ff", "ts": "2026-08-08T05:11:32.715433", "category": "prompt_update", "priority": "P1", "target": "subagents.Explainer"}
+{"hash": "033edc09fc59e19d", "ts": "2026-08-08T05:15:56.824207", "category": "prompt_update", "priority": "P1", "target": "system_prompt / main_agent"}
+{"hash": "104ee509ed7cfe45", "ts": "2026-08-08T05:19:54.361734", "category": "prompt_update", "priority": "P1", "target": "system_prompt（讲解类回复模板）"}
+{"hash": "3637685790c88388", "ts": "2026-08-08T05:37:43.992899", "category": "prompt_update", "priority": "P1", "target": "system_prompt"}
+{"hash": "fb07a3a782071206", "ts": "2026-08-08T05:45:50.268685", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学对话主模板）"}
+{"hash": "575ced79c22e28c7", "ts": "2026-08-08T06:02:54.927785", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学指令模板）"}
+{"hash": "a555283223605004", "ts": "2026-08-08T06:06:30.905873", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学/讲解模板)"}
+{"hash": "7911480549297170", "ts": "2026-08-08T06:09:19.233711", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学主提示词"}
+{"hash": "0e95a58c16cb5142", "ts": "2026-08-08T06:21:30.405388", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学核心指令)"}
+{"hash": "f45fd43f409085af", "ts": "2026-08-08T06:29:51.418584", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学对话主模板）"}
+{"hash": "465d8d50c96bde5f", "ts": "2026-08-08T06:35:35.117122", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学回应模板)"}
+{"hash": "e65c47b0ce9fa4ec", "ts": "2026-08-08T06:45:43.582596", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学模块）"}
+{"hash": "911e653c95d95793", "ts": "2026-08-08T06:51:23.437892", "category": "prompt_update", "priority": "P1", "target": "system_prompt / teaching_style_template"}
+{"hash": "76f55739a03e1aff", "ts": "2026-08-08T06:59:24.328345", "category": "prompt_update", "priority": "P1", "target": "system_prompt"}
+{"hash": "76b23696d8ababe4", "ts": "2026-08-08T07:03:44.959220", "category": "prompt_update", "priority": "P1", "target": "system_prompt (tutor_instruction)"}
+{"hash": "8549afedb32ecfc2", "ts": "2026-08-08T07:07:14.657049", "category": "prompt_update", "priority": "P1", "target": "prompt_templates/explain_prompt.md"}
+{"hash": "2de7f750983ff834", "ts": "2026-08-08T07:09:31.278247", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学对话模板)"}
+{"hash": "aa748b4584121709", "ts": "2026-08-08T07:11:50.164663", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学对话生成模块)"}
+{"hash": "748b350fcfd39f57", "ts": "2026-08-08T07:18:15.612524", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学对话模板"}
+{"hash": "27691702e24d9c35", "ts": "2026-08-08T07:21:55.500849", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学风格模板（memory/PAEG_PEDAGOGY.md 中的讲解约束）"}
+{"hash": "d807cd507e7c76a5", "ts": "2026-08-08T12:02:15.747431", "category": "prompt_update", "priority": "P1", "target": "system_prompt (通用教学模板)"}
+{"hash": "31a21b9eca9b0ff8", "ts": "2026-08-08T12:15:42.465470", "category": "prompt_update", "priority": "P1", "target": "subagents.Tutor"}
+{"hash": "d136045b17a54a13", "ts": "2026-08-08T12:33:03.106768", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter"}
+{"hash": "41b9255c7547abf1", "ts": "2026-08-08T12:42:33.111952", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter"}
+{"hash": "9231f64924e7f063", "ts": "2026-08-08T12:42:33.111952", "category": "knowledge_update", "priority": "P2", "target": "Library/KnowledgeBase/subjects/unknown.json"}
+{"hash": "1b8f0a5628af6f99", "ts": "2026-08-08T12:53:08.670783", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学对话生成模板)"}
+{"hash": "32e11316a164eee1", "ts": "2026-08-08T12:53:54.523328", "category": "prompt_update", "priority": "P1", "target": "system_prompt（Émile 主提示词·教学风格段）"}
+{"hash": "489fd4a4c3b9acd7", "ts": "2026-08-08T12:54:44.957761", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学对话模板)"}
+{"hash": "0ac55f899c62f122", "ts": "2026-08-08T12:58:24.938091", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学模板（teaching_template）"}
+{"hash": "a6e528d09986d3b6", "ts": "2026-08-08T13:04:25.665440", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学回复模板)"}
+{"hash": "caef3c81facc83c5", "ts": "2026-08-08T13:05:54.721844", "category": "prompt_update", "priority": "P1", "target": "system prompt / tutor_response_generator"}
+{"hash": "93873c662252874e", "ts": "2026-08-08T13:12:20.807618", "category": "prompt_update", "priority": "P1", "target": "subagents.Tutor"}
+{"hash": "782ee649f2057cc7", "ts": "2026-08-08T13:19:44.227394", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学主提示词）"}
+{"hash": "f799f85ea831288e", "ts": "2026-08-08T13:21:11.901801", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学对话模板"}
+{"hash": "8c560f3e26bf210a", "ts": "2026-08-08T14:42:26.717653", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学风格约束段)"}
+{"hash": "7a0fe02251e40f39", "ts": "2026-08-08T15:13:55.792408", "category": "prompt_update", "priority": "P1", "target": "system_prompt (主对话模板)"}
+{"hash": "340254f4c3d94acb", "ts": "2026-08-08T15:18:28.636651", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学回应模板)"}
+{"hash": "8f0b8783d3c27762", "ts": "2026-08-08T15:49:46.979607", "category": "prompt_update", "priority": "P1", "target": "system_prompt"}
+{"hash": "5e82a37d544f6c00", "ts": "2026-08-08T16:01:25.275504", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学对话主提示词）"}
+{"hash": "672a55861c10dc25", "ts": "2026-08-08T16:10:42.245441", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter"}
+{"hash": "efd85d2c387aec6e", "ts": "2026-08-08T16:15:46.122643", "category": "prompt_update", "priority": "P1", "target": "system_prompt (通用教学模板)"}
+{"hash": "eb5a580ff07574f7", "ts": "2026-08-08T16:29:33.914666", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学指令模板)"}
+{"hash": "000c8c46d9565c4c", "ts": "2026-08-08T18:14:18.321499", "category": "prompt_update", "priority": "P1", "target": "system_prompt"}
+{"hash": "8b9d1a7afec617cd", "ts": "2026-08-08T18:14:23.155103", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "ff82db722a8e68c2", "ts": "2026-08-08T18:14:23.155103", "category": "error_pattern", "priority": "P1", "target": "subagents.QualityGate"}
+{"hash": "73b7a2a4fd996b00", "ts": "2026-08-08T18:14:23.155103", "category": "tool_adjustment", "priority": "P2", "target": "SelfEvolution.extract_insights"}
+{"hash": "0b9ce8af1eb8c612", "ts": "2026-08-08T20:00:09.202000", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学风格约束段)"}
+{"hash": "98c67db4c015720b", "ts": "2026-08-08T20:00:13.275093", "category": "prompt_update", "priority": "P1", "target": "subagents.ReflectionAgent"}
+{"hash": "c9a431e231452924", "ts": "2026-08-08T20:00:13.275093", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfEvolution"}
+{"hash": "1091aa8b61221979", "ts": "2026-08-08T20:00:13.275093", "category": "prompt_update", "priority": "P2", "target": "subagents.ReflectionAgent"}
+{"hash": "94e63449b4a49d2c", "ts": "2026-08-08T20:27:07.808109", "category": "prompt_update", "priority": "P1", "target": "system_prompt / subagents.Tutor"}
+{"hash": "b401ec90f90892fc", "ts": "2026-08-08T20:27:10.704215", "category": "error_pattern", "priority": "P1", "target": "subagents.ReflectionExtractor"}
+{"hash": "48011c22d8ff04bb", "ts": "2026-08-08T20:27:10.704215", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent (system prompt)"}
+{"hash": "424d6b268cbb3dd3", "ts": "2026-08-08T21:10:08.301065", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 讲解类回复模板"}
+{"hash": "2053be35ba2710de", "ts": "2026-08-08T21:10:12.508638", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "5f69fa3854a7e9f3", "ts": "2026-08-08T21:10:12.508638", "category": "error_pattern", "priority": "P1", "target": "SelfEvolution.reflection_pipeline"}
+{"hash": "74d0aa03c487b09b", "ts": "2026-08-08T21:10:12.508638", "category": "tool_adjustment", "priority": "P2", "target": "SelfEvolution.reflection_filter"}
+{"hash": "1fc93c8f80ceb87d", "ts": "2026-08-08T22:16:08.260841", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学风格配置"}
+{"hash": "374d492edc8c17de", "ts": "2026-08-08T22:16:12.977102", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfEvolution"}
+{"hash": "dfe7c21661ae6b1b", "ts": "2026-08-08T22:16:12.977102", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfEvolution / 反思采集 prompt"}
+{"hash": "0b1945ec37e98e65", "ts": "2026-08-08T22:16:12.977102", "category": "error_pattern", "priority": "P2", "target": "subagents.QualityGate"}
+{"hash": "a6841f68f1de994c", "ts": "2026-08-08T22:27:46.607417", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学主提示词)"}
+{"hash": "283aed6239814c4e", "ts": "2026-08-08T22:27:51.719869", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfEvolution"}
+{"hash": "029e243b683b5dc5", "ts": "2026-08-08T22:27:51.719869", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfEvolution (prompt/instruction for reflection input)"}
+{"hash": "806bda7ad724fc94", "ts": "2026-08-08T22:27:51.719869", "category": "error_pattern", "priority": "P2", "target": "subagents.QualityGate"}
+{"hash": "a27f6f6fa30b0f37", "ts": "2026-08-08T23:33:38.089670", "category": "prompt_update", "priority": "P1", "target": "system_prompt"}
+{"hash": "126a5375730fdd68", "ts": "2026-08-08T23:33:45.164013", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "781b07f0179a42f4", "ts": "2026-08-08T23:33:45.164013", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfEvolution"}
+{"hash": "491098031a38f9d7", "ts": "2026-08-08T23:33:45.164013", "category": "prompt_update", "priority": "P1", "target": "subagents.ReflectionGenerator"}
+{"hash": "85b3d380909ddceb", "ts": "2026-08-08T23:33:45.164013", "category": "error_pattern", "priority": "P1", "target": "subagents.QualityGate"}
+{"hash": "7b6a26525f5e0977", "ts": "2026-08-08T23:33:45.164013", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent"}
+{"hash": "759a4457e8274504", "ts": "2026-08-09T00:13:14.081343", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学对话生成器)"}
+{"hash": "3f7f446da12366c6", "ts": "2026-08-09T00:13:18.880539", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfReflection"}
+{"hash": "8d4fff441aaab186", "ts": "2026-08-09T00:13:18.880539", "category": "prompt_update", "priority": "P1", "target": "prompts/self_reflection.md"}
+{"hash": "8821c24d0cffde79", "ts": "2026-08-09T00:13:18.880539", "category": "tool_adjustment", "priority": "P2", "target": "subagents.SelfEvolution"}
+{"hash": "b7915f7f0f24baac", "ts": "2026-08-09T08:42:26.821941", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter"}
+{"hash": "df828a9b5bc11238", "ts": "2026-08-09T08:42:31.550973", "category": "error_pattern", "priority": "P1", "target": "subagents.ReflectionAgent"}
+{"hash": "4a2be54679d47cb3", "ts": "2026-08-09T08:42:31.550973", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfEvolution.extract_insights"}
+{"hash": "cfa8b3c016df0473", "ts": "2026-08-09T08:42:31.550973", "category": "prompt_update", "priority": "P1", "target": "prompts/reflection_agent_system.md"}
+{"hash": "bb9502642264d987", "ts": "2026-08-09T11:02:01.087433", "category": "prompt_update", "priority": "P1", "target": "system_prompts/teaching_tutor.md"}
+{"hash": "eae2da4244b2d97e", "ts": "2026-08-09T11:02:06.978488", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfReflection"}
+{"hash": "9a5e03ca0528153f", "ts": "2026-08-09T11:02:06.978488", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfReflection (system prompt)"}
+{"hash": "d627a1ba1e568464", "ts": "2026-08-09T11:02:06.978488", "category": "tool_adjustment", "priority": "P2", "target": "SelfEvolution.extract_insights"}
+{"hash": "54392864b22fd73d", "ts": "2026-08-09T11:02:06.978488", "category": "error_pattern", "priority": "P2", "target": "subagents.SelfEvolution (orchestrator)"}
+{"hash": "5fdd452a908774fc", "ts": "2026-08-09T11:15:50.966820", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学风格模板"}
+{"hash": "d96da6842ff1eee3", "ts": "2026-08-09T11:15:56.494578", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "7591187f485ec351", "ts": "2026-08-09T11:15:56.494578", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent 的 system prompt"}
+{"hash": "4ead34083e81dd2c", "ts": "2026-08-09T11:15:56.494578", "category": "tool_adjustment", "priority": "P2", "target": "SelfEvolution.filter_insights 或 QualityGate 前置过滤函数"}
+{"hash": "a4751ae8a4e887d4", "ts": "2026-08-09T12:18:06.760705", "category": "prompt_update", "priority": "P1", "target": "system_prompt"}
+{"hash": "5213edac8587a39e", "ts": "2026-08-09T12:18:12.212156", "category": "error_pattern", "priority": "P1", "target": "subagents.ReflectionExtractor"}
+{"hash": "fb1f01dd82fc6ab2", "ts": "2026-08-09T12:18:12.212156", "category": "prompt_update", "priority": "P1", "target": "subagents.ReflectionExtractor (system prompt)"}
+{"hash": "a5bd925562f28523", "ts": "2026-08-09T12:18:12.212156", "category": "tool_adjustment", "priority": "P2", "target": "subagents.SelfEvolution (input filter)"}
+{"hash": "054da856f644f79f", "ts": "2026-08-09T12:18:12.212156", "category": "error_pattern", "priority": "P1", "target": "subagents.QualityGate (evaluation criteria)"}
+{"hash": "8b638c25c040970d", "ts": "2026-08-09T12:19:40.291868", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter"}
+{"hash": "0b35a91faf939ee7", "ts": "2026-08-09T12:19:41.598201", "category": "prompt_update", "priority": "P1", "target": "subagents.Explainer (system prompt)"}
+{"hash": "152e5dd8ee1065cd", "ts": "2026-08-09T12:19:46.013168", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfEvolution.extract_insights"}
+{"hash": "4effe962da26fb6e", "ts": "2026-08-09T12:19:46.013168", "category": "error_pattern", "priority": "P2", "target": "subagents.SelfEvolution.extract_insights"}
+{"hash": "2242d7fdcfe8da8b", "ts": "2026-08-09T12:19:46.013168", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfEvolution.prompt"}
+{"hash": "f62d5605e89b0731", "ts": "2026-08-09T12:19:47.256733", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfReflection"}
+{"hash": "ddf68b87e51a48b6", "ts": "2026-08-09T12:19:47.256733", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfReflection.prompt"}
+{"hash": "b37a37d7292ff325", "ts": "2026-08-09T12:19:47.256733", "category": "prompt_update", "priority": "P2", "target": "subagents.ReflectionExtractor.prompt"}
+{"hash": "865663b923c410bd", "ts": "2026-08-09T12:19:47.256733", "category": "tool_adjustment", "priority": "P1", "target": "SelfEvolution.promote_or_purge"}
+{"hash": "5fa492a1c9ae70c1", "ts": "2026-08-09T12:19:47.256733", "category": "error_pattern", "priority": "P2", "target": "subagents.SelfReflection.input_source"}
+{"hash": "5b23b7a872af8166", "ts": "2026-08-09T18:06:37.591804", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学回复模板"}
+{"hash": "6ea8a2bc2ade6cf8", "ts": "2026-08-09T18:06:41.817792", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "db4ace601210b54c", "ts": "2026-08-09T18:06:41.817792", "category": "tool_adjustment", "priority": "P1", "target": "subagents.SelfEvolution"}
+{"hash": "7b469ed7d0d56c14", "ts": "2026-08-09T18:06:41.817792", "category": "prompt_update", "priority": "P2", "target": "prompts/reflection_prompt.md"}
+{"hash": "8163720c24c5687d", "ts": "2026-08-09T18:24:16.122299", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 通用讲解模板"}
+{"hash": "fb540a74c47a607d", "ts": "2026-08-09T18:24:20.879435", "category": "error_pattern", "priority": "P1", "target": "subagents.ReflectionExtractor"}
+{"hash": "8743a52b80284b72", "ts": "2026-08-09T18:24:20.879435", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfEvolution"}
+{"hash": "d6058a836e167e92", "ts": "2026-08-09T18:24:20.879435", "category": "prompt_update", "priority": "P2", "target": "subagents.ReflectionExtractor.system_prompt"}
+{"hash": "95d8d8f5a20046c8", "ts": "2026-08-09T18:24:20.879435", "category": "tool_adjustment", "priority": "P2", "target": "subagents.SelfUpdateAgent.input_filter"}
+{"hash": "d4b5c958a5d1e51a", "ts": "2026-08-09T18:26:38.043570", "category": "prompt_update", "priority": "P1", "target": "prompt_templates/subject_explanation.json"}
+{"hash": "5904505905449c26", "ts": "2026-08-09T18:26:44.250420", "category": "error_pattern", "priority": "P1", "target": "subagents.ReflectionGenerator"}
+{"hash": "052861b01b08f809", "ts": "2026-08-09T18:26:44.250420", "category": "prompt_update", "priority": "P1", "target": "subagents.ReflectionGenerator (system prompt)"}
+{"hash": "9908b13a59001c99", "ts": "2026-08-09T18:26:44.250420", "category": "error_pattern", "priority": "P2", "target": "subagents.SelfEvolution (insight extraction)"}
+{"hash": "a0de1170af9175f8", "ts": "2026-08-09T18:26:44.250420", "category": "knowledge_update", "priority": "P2", "target": "Library/KnowledgeBase/subjects/french_apps.json"}
+{"hash": "ac659ed4b34a60c7", "ts": "2026-08-09T18:53:26.870194", "category": "prompt_update", "priority": "P1", "target": "system_prompt / teaching_template"}
+{"hash": "5543292f07dcdabd", "ts": "2026-08-09T18:53:32.809594", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfEvolution"}
+{"hash": "8d249bb499844e81", "ts": "2026-08-09T18:53:32.809594", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfEvolution.prompt"}
+{"hash": "612c1b45d3647be2", "ts": "2026-08-09T18:53:32.809594", "category": "error_pattern", "priority": "P2", "target": "subagents.QualityGate"}
+{"hash": "00d0e75d0932030d", "ts": "2026-08-09T18:53:32.809594", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent.system_prompt"}
+{"hash": "98683d6ce35c8dea", "ts": "2026-08-09T18:55:20.264300", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学回答模板"}
+{"hash": "f52238f1e6f227a5", "ts": "2026-08-09T18:55:24.745833", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfEvolution"}
+{"hash": "fab24418a3b102f1", "ts": "2026-08-09T18:55:24.745833", "category": "error_pattern", "priority": "P1", "target": "subagents.QualityGate"}
+{"hash": "f47c9cd77d6274ff", "ts": "2026-08-09T18:55:24.745833", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent"}
+{"hash": "58dc06a508950f65", "ts": "2026-08-09T19:07:42.550730", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学风格段落)"}
+{"hash": "7b4b04f6a34eac9a", "ts": "2026-08-09T19:07:48.324286", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfEvolution"}
+{"hash": "8bc60f577cc01142", "ts": "2026-08-09T19:07:48.324286", "category": "error_pattern", "priority": "P1", "target": "subagents.QualityGate"}
+{"hash": "1318fe24d0b47ede", "ts": "2026-08-09T19:07:48.324286", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent"}
+{"hash": "9690be38313e5d2d", "ts": "2026-08-09T19:07:48.324286", "category": "knowledge_update", "priority": "P2", "target": "Library/KnowledgeBase/subjects/french.json"}
+{"hash": "2d2df91f41c239e9", "ts": "2026-08-09T19:09:16.799415", "category": "prompt_update", "priority": "P1", "target": "system_prompt (主教学提示词)"}
+{"hash": "0d3185159320b872", "ts": "2026-08-09T19:09:21.383823", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent / memory/PAEG_PEDAGOGY.md"}
+{"hash": "9e7709c459e5c486", "ts": "2026-08-09T19:09:21.383823", "category": "tool_adjustment", "priority": "P1", "target": "subagents.SelfEvolution / QualityGate"}
+{"hash": "05215409afa8f35c", "ts": "2026-08-09T19:09:21.383823", "category": "error_pattern", "priority": "P2", "target": "subagents.SelfUpdateAgent"}
+{"hash": "75eaf59a68fe9af5", "ts": "2026-08-09T19:37:27.763540", "category": "prompt_update", "priority": "P1", "target": "prompt_templates/teaching_base.md"}
+{"hash": "afc9dd70141e0a35", "ts": "2026-08-09T19:37:31.936181", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "66ef30e6cdbf826d", "ts": "2026-08-09T19:37:31.936181", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfEvolution"}
+{"hash": "eb37ff5bce1bb442", "ts": "2026-08-09T19:37:31.936181", "category": "error_pattern", "priority": "P2", "target": "subagents.QualityGate"}
+{"hash": "cb5cd2a3df6d491a", "ts": "2026-08-09T19:40:41.749857", "category": "prompt_update", "priority": "P1", "target": "system_prompt / teaching_template"}
+{"hash": "f6c6df6a2d612368", "ts": "2026-08-09T19:40:49.237570", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "8ca39dc890010d14", "ts": "2026-08-09T19:40:49.237570", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "049f344c9ab2957e", "ts": "2026-08-09T19:40:49.237570", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "8c29b0b5fbf776c2", "ts": "2026-08-09T19:40:49.237570", "category": "tool_adjustment", "priority": "P2", "target": "subagents.SelfUpdateAgent.input_validator"}
+{"hash": "e1c803955d48d494", "ts": "2026-08-09T19:40:49.237570", "category": "knowledge_update", "priority": "P2", "target": "memory/self_update_lessons.md"}
+{"hash": "a73a1f598da9c99a", "ts": "2026-08-09T19:46:40.035123", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学主提示词)"}
+{"hash": "08ab5a183a796ef0", "ts": "2026-08-09T19:46:44.455559", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "265d1a921d7e9b35", "ts": "2026-08-09T19:46:44.455559", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent"}
+{"hash": "e01f69e7767d1e34", "ts": "2026-08-09T19:46:44.455559", "category": "knowledge_update", "priority": "P2", "target": "Library/KnowledgeBase/subjects/french_apps.json"}
+{"hash": "78759db134023852", "ts": "2026-08-09T19:56:32.252743", "category": "prompt_update", "priority": "P1", "target": "system_prompt (主对话模板)"}
+{"hash": "3b77d05c38e6d6e5", "ts": "2026-08-09T19:56:35.972567", "category": "prompt_update", "priority": "P1", "target": "subagents.ReflectionExtractor"}
+{"hash": "7cdf2ed352a81db1", "ts": "2026-08-09T19:56:35.972567", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent"}
+{"hash": "b6b919815c179458", "ts": "2026-08-09T20:02:33.995709", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学引导模板（教学风格相关 prompt）"}
+{"hash": "da99786e69f62909", "ts": "2026-08-09T20:02:38.642126", "category": "prompt_update", "priority": "P1", "target": "subagents.ReflectionExtractor"}
+{"hash": "db1133fc48b44b60", "ts": "2026-08-09T20:02:38.642126", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "8f3814f13017eeb8", "ts": "2026-08-09T20:02:38.642126", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent"}
+{"hash": "bc4024e25a7854f0", "ts": "2026-08-09T20:08:33.574972", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 教学风格引导段"}
+{"hash": "fb0d0bd4e7054389", "ts": "2026-08-09T20:08:37.098608", "category": "prompt_update", "priority": "P1", "target": "subagents.ReflectionAgent"}
+{"hash": "7c20a79eac6d3f81", "ts": "2026-08-09T20:08:37.098608", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent"}
+{"hash": "7ef238ec231dbc47", "ts": "2026-08-09T20:15:21.129250", "category": "prompt_update", "priority": "P1", "target": "system_prompt (pedagogical_style_section)"}
+{"hash": "14a25793cf65f49b", "ts": "2026-08-09T20:15:28.383291", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "27541acce8e7755f", "ts": "2026-08-09T20:15:28.383291", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfEvolution"}
+{"hash": "cfa6f094dff6c1cc", "ts": "2026-08-09T20:15:28.383291", "category": "knowledge_update", "priority": "P2", "target": "Library/KnowledgeBase/subjects/french.json"}
+{"hash": "34dea5e72f569e41", "ts": "2026-08-09T20:15:28.383291", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "b99733f94e0a2ce3", "ts": "2026-08-09T20:15:28.383291", "category": "tool_adjustment", "priority": "P2", "target": "subagents.SelfEvolution.extract_insight"}
+{"hash": "84a6bcb576fed55e", "ts": "2026-08-09T20:18:18.380718", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学引导模板）"}
+{"hash": "bb12a539fb7886ff", "ts": "2026-08-09T20:18:24.484624", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "fb05c67ce90d3e97", "ts": "2026-08-09T20:18:24.484624", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "1df3d35958dc34cb", "ts": "2026-08-09T20:18:24.484624", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "b307c7cd0b33b368", "ts": "2026-08-09T20:18:24.484624", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent"}
+{"hash": "89a82e3937c9dfe4", "ts": "2026-08-09T20:30:17.637532", "category": "prompt_update", "priority": "P1", "target": "subagents.Tutor"}
+{"hash": "709a82bcc98b22fb", "ts": "2026-08-09T20:30:23.318833", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "4b08f4a0b30daf92", "ts": "2026-08-09T20:30:23.318833", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "fd9a4a1d5e15d229", "ts": "2026-08-09T20:30:23.318833", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "cd17aa1dfad24c73", "ts": "2026-08-09T20:47:30.727263", "category": "prompt_update", "priority": "P1", "target": "subagents.Adapter"}
+{"hash": "a2c3633975475e78", "ts": "2026-08-09T20:47:35.228209", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "2a783fb71bba8e33", "ts": "2026-08-09T20:47:35.228209", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "e934b2531092c2af", "ts": "2026-08-09T20:47:35.228209", "category": "prompt_update", "priority": "P2", "target": "memory/PAEG_PEDAGOGY.md"}
+{"hash": "c1d1ef3d7b897f66", "ts": "2026-08-09T20:51:39.795261", "category": "prompt_update", "priority": "P1", "target": "subagents.Tutor"}
+{"hash": "7592fc806f278a9c", "ts": "2026-08-09T20:51:44.925989", "category": "prompt_update", "priority": "P1", "target": "subagents.ReflectionExtractor (prompt)"}
+{"hash": "2256c092894a2f0e", "ts": "2026-08-09T20:51:44.925989", "category": "error_pattern", "priority": "P1", "target": "subagents.ReflectionExtractor"}
+{"hash": "c03112f1d917f9c9", "ts": "2026-08-09T20:51:44.925989", "category": "knowledge_update", "priority": "P2", "target": "Library/KnowledgeBase/methods.json"}
+{"hash": "7ec2af4aa27cff00", "ts": "2026-08-09T20:51:44.925989", "category": "prompt_update", "priority": "P2", "target": "subagents.LanguageAdapter (prompt)"}
+{"hash": "a2f9616b7ebab8a4", "ts": "2026-08-09T21:15:41.246122", "category": "prompt_update", "priority": "P1", "target": "system_prompt (教学主prompt)"}
+{"hash": "427e47230e8c8a4d", "ts": "2026-08-09T21:15:47.855771", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfUpdateAgent.prompt"}
+{"hash": "3fc4c1580e292c44", "ts": "2026-08-09T21:15:47.855771", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent.prompt"}
+{"hash": "0d3ca65fb2210023", "ts": "2026-08-09T21:15:47.855771", "category": "knowledge_update", "priority": "P1", "target": "memory/PAEG_PEDAGOGY.md"}
+{"hash": "7d4f97f1955204d6", "ts": "2026-08-09T21:15:47.855771", "category": "error_pattern", "priority": "P2", "target": "subagents.SelfUpdateAgent"}

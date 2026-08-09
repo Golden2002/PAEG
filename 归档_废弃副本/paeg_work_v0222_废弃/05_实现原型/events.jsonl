@@ -1,0 +1,4 @@
+{"ts": 1786041096.7077258, "type": "thread.started", "thread_id": "thr_test"}
+{"ts": 1786041202.5299885, "type": "tool_call", "tool": "web_search", "session": "qa_fresh"}
+{"ts": 1786041202.5315459, "type": "tool_call", "tool": "web_search", "session": "qa_fresh"}
+{"ts": 1786041202.5329537, "type": "tool_call", "tool": "web_search", "session": "qa_fresh"}

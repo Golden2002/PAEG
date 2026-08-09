@@ -1,0 +1,60 @@
+{
+  "round": 3,
+  "timestamp": "2026-08-08 16:51",
+  "passed": 13,
+  "total": 13,
+  "results": [
+    {
+      "name": "跨学科:解释能量守恒和动量守恒的",
+      "pass": true
+    },
+    {
+      "name": "跨学科:微分和积分的区别",
+      "pass": true
+    },
+    {
+      "name": "跨学科:小说和散文的区别",
+      "pass": true
+    },
+    {
+      "name": "教学续接(导数接函数)",
+      "pass": true
+    },
+    {
+      "name": "边界:(空)",
+      "pass": true
+    },
+    {
+      "name": "边界:aaaaaaaa",
+      "pass": true
+    },
+    {
+      "name": "边界:？？？？",
+      "pass": true
+    },
+    {
+      "name": "边界:!!!123!!",
+      "pass": true
+    },
+    {
+      "name": "边界:什么是什么是什么",
+      "pass": true
+    },
+    {
+      "name": "学段middle_school:力",
+      "pass": true
+    },
+    {
+      "name": "学段high_school:力",
+      "pass": true
+    },
+    {
+      "name": "学段undergraduate:力",
+      "pass": true
+    },
+    {
+      "name": "资料检索ML",
+      "pass": true
+    }
+  ]
+}

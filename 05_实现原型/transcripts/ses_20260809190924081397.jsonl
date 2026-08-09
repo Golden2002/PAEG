@@ -1,0 +1,13 @@
+{"ts": 1786273764.0814686, "session_id": "ses_20260809190924081397", "item_type": "user_input", "text": "为什么人会感到孤独？", "subject": "phenomenology"}
+{"ts": 1786273764.0843418, "session_id": "ses_20260809190924081397", "item_type": "diagnosis", "ready_to_teach": true}
+{"ts": 1786273764.0850916, "session_id": "ses_20260809190924081397", "item_type": "plan", "steps": 3, "subtopic": ""}
+{"ts": 1786273764.08893, "session_id": "ses_20260809190924081397", "item_type": "presentation", "step_id": 1, "step_type": "present", "topic": "直观讲解：为什么人会感到孤独？（本步讲直觉和现象）", "content": "熵是热力学描述系统无序度的状态函数。", "llm_generated": true}
+{"ts": 1786273764.0900142, "session_id": "ses_20260809190924081397", "item_type": "evaluation", "step_id": 1, "score": 0.433, "ready_to_advance": false}
+{"ts": 1786273764.0939488, "session_id": "ses_20260809190924081397", "item_type": "retry", "step_id": 1, "decision": "switch_style", "score": 0.433, "ready": false}
+{"ts": 1786273764.097774, "session_id": "ses_20260809190924081397", "item_type": "presentation", "step_id": 2, "step_type": "present", "topic": "形式定义/方法：为什么人会感到孤独？（本步讲机制和定义，在上一步基础上深入）", "content": "熵是热力学描述系统无序度的状态函数。", "llm_generated": true}
+{"ts": 1786273764.098483, "session_id": "ses_20260809190924081397", "item_type": "evaluation", "step_id": 2, "score": 0.433, "ready_to_advance": false}
+{"ts": 1786273764.1021569, "session_id": "ses_20260809190924081397", "item_type": "retry", "step_id": 2, "decision": "switch_style", "score": 0.433, "ready": false}
+{"ts": 1786273764.1074197, "session_id": "ses_20260809190924081397", "item_type": "presentation", "step_id": 3, "step_type": "practice", "topic": "应用与反思：为什么人会感到孤独？（本步讲应用/辨析/练习，不重复前两步）", "content": "熵是热力学描述系统无序度的状态函数。", "llm_generated": true}
+{"ts": 1786273764.1085708, "session_id": "ses_20260809190924081397", "item_type": "evaluation", "step_id": 3, "score": 0.433, "ready_to_advance": false}
+{"ts": 1786273764.1125531, "session_id": "ses_20260809190924081397", "item_type": "retry", "step_id": 3, "decision": "switch_style", "score": 0.433, "ready": false}
+{"ts": 1786273764.1784766, "session_id": "ses_20260809190924081397", "item_type": "summary", "avg_score": 0.433, "steps_completed": 6, "duration_min": 12}

@@ -1,0 +1,13 @@
+{"ts": 1786164155.66606, "session_id": "ses_20260808124235665994", "item_type": "user_input", "text": "什么是导数？", "subject": "math"}
+{"ts": 1786164155.6699548, "session_id": "ses_20260808124235665994", "item_type": "diagnosis", "ready_to_teach": true}
+{"ts": 1786164155.6709354, "session_id": "ses_20260808124235665994", "item_type": "plan", "steps": 3, "subtopic": ""}
+{"ts": 1786164155.6762948, "session_id": "ses_20260808124235665994", "item_type": "presentation", "step_id": 1, "step_type": "present", "topic": "精讲：一个核心目标，讲透：什么是导数？（本步讲直觉和现象）", "content": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。", "llm_generated": true}
+{"ts": 1786164155.6776464, "session_id": "ses_20260808124235665994", "item_type": "evaluation", "step_id": 1, "score": 0.462, "ready_to_advance": false}
+{"ts": 1786164155.6829808, "session_id": "ses_20260808124235665994", "item_type": "retry", "step_id": 1, "decision": "switch_style", "score": 0.462, "ready": false}
+{"ts": 1786164155.6884449, "session_id": "ses_20260808124235665994", "item_type": "presentation", "step_id": 2, "step_type": "practice", "topic": "小测：5-7 题形成性测验：什么是导数？（本步讲机制和定义，在上一步基础上深入）", "content": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。", "llm_generated": true}
+{"ts": 1786164155.6893418, "session_id": "ses_20260808124235665994", "item_type": "evaluation", "step_id": 2, "score": 0.462, "ready_to_advance": false}
+{"ts": 1786164155.6947486, "session_id": "ses_20260808124235665994", "item_type": "retry", "step_id": 2, "decision": "switch_style", "score": 0.462, "ready": false}
+{"ts": 1786164155.7000763, "session_id": "ses_20260808124235665994", "item_type": "presentation", "step_id": 3, "step_type": "feedback", "topic": "矫正：针对错题再教一遍：什么是导数？（本步讲应用/辨析/练习，不重复前两步）", "content": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。", "llm_generated": true}
+{"ts": 1786164155.7009764, "session_id": "ses_20260808124235665994", "item_type": "evaluation", "step_id": 3, "score": 0.462, "ready_to_advance": false}
+{"ts": 1786164155.7062037, "session_id": "ses_20260808124235665994", "item_type": "retry", "step_id": 3, "decision": "switch_style", "score": 0.462, "ready": false}
+{"ts": 1786164155.9022317, "session_id": "ses_20260808124235665994", "item_type": "summary", "avg_score": 0.462, "steps_completed": 6, "duration_min": 12}

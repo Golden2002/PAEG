@@ -1,0 +1,12 @@
+{"ts": 1786236136.4728127, "session_id": "ses_20260809084216472770", "item_type": "user_input", "text": "为什么特洛伊战争持续十年？", "subject": "literature"}
+{"ts": 1786236136.4739916, "session_id": "ses_20260809084216472770", "item_type": "diagnosis", "ready_to_teach": true}
+{"ts": 1786236136.4746659, "session_id": "ses_20260809084216472770", "item_type": "plan", "steps": 3, "subtopic": ""}
+{"ts": 1786236136.4759197, "session_id": "ses_20260809084216472770", "item_type": "presentation", "step_id": 1, "step_type": "question", "topic": "引问：先让学生说出自己的想法：为什么特洛伊战争持续十年？（本步讲直觉和现象）", "content": "[contemplative] 关于 '引问：先让学生说出自己的想法：为什么特洛伊战争持续十年？（本步讲直觉和现象）' 的讲解", "llm_generated": false}
+{"ts": 1786236136.476752, "session_id": "ses_20260809084216472770", "item_type": "evaluation", "step_id": 1, "score": 0.552, "ready_to_advance": false}
+{"ts": 1786236136.4773834, "session_id": "ses_20260809084216472770", "item_type": "retry", "step_id": 1, "decision": "reinforce", "score": 0.856, "ready": false}
+{"ts": 1786236136.4780142, "session_id": "ses_20260809084216472770", "item_type": "presentation", "step_id": 2, "step_type": "question", "topic": "追问：请举例/找反例/说明依据：为什么特洛伊战争持续十年？（本步讲机制和定义，在上一步基础上深入）", "content": "[contemplative] 关于 '追问：请举例/找反例/说明依据：为什么特洛伊战争持续十年？（本步讲机制和定义，在上一步基础上深入）' 的讲解\n\n[v0.24 适配决策：reinforce 追加补例子] 学生该步理解度低（confusion/分数不足），请补一个不同角度的例子，或换一种切入方式复述核心要点。当前 step 主题：引问：先让学生说出自己的想法：为什么特洛伊战争持续十年？（本步讲直觉和现象）", "llm_generated": false}
+{"ts": 1786236136.4786007, "session_id": "ses_20260809084216472770", "item_type": "evaluation", "step_id": 2, "score": 0.927, "ready_to_advance": false}
+{"ts": 1786236136.4791923, "session_id": "ses_20260809084216472770", "item_type": "presentation", "step_id": 3, "step_type": "guide", "topic": "收敛：引导学生自己总结：为什么特洛伊战争持续十年？（本步讲应用/辨析/练习，不重复前两步）", "content": "[contemplative] 关于 '收敛：引导学生自己总结：为什么特洛伊战争持续十年？（本步讲应用/辨析/练习，不重复前两步）' 的讲解", "llm_generated": false}
+{"ts": 1786236136.4797716, "session_id": "ses_20260809084216472770", "item_type": "evaluation", "step_id": 3, "score": 0.564, "ready_to_advance": false}
+{"ts": 1786236136.4803853, "session_id": "ses_20260809084216472770", "item_type": "retry", "step_id": 3, "decision": "reinforce", "score": 0.878, "ready": false}
+{"ts": 1786236136.6560528, "session_id": "ses_20260809084216472770", "item_type": "summary", "avg_score": 0.7554000000000001, "steps_completed": 5, "duration_min": 10}

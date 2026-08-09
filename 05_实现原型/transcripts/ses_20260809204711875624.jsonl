@@ -1,0 +1,12 @@
+{"ts": 1786279631.875665, "session_id": "ses_20260809204711875624", "item_type": "user_input", "text": "什么是熵？", "subject": "physics"}
+{"ts": 1786279631.8765078, "session_id": "ses_20260809204711875624", "item_type": "diagnosis", "ready_to_teach": true}
+{"ts": 1786279631.877176, "session_id": "ses_20260809204711875624", "item_type": "plan", "steps": 3, "subtopic": ""}
+{"ts": 1786279631.8787394, "session_id": "ses_20260809204711875624", "item_type": "presentation", "step_id": 1, "step_type": "present", "topic": "精讲：一个核心目标，讲透：什么是熵？（本步讲直觉和现象）", "content": "[rigorous_cold] 关于 '精讲：一个核心目标，讲透：什么是熵？（本步讲直觉和现象）' 的讲解", "llm_generated": false}
+{"ts": 1786279631.8798409, "session_id": "ses_20260809204711875624", "item_type": "evaluation", "step_id": 1, "score": 0.536, "ready_to_advance": false}
+{"ts": 1786279631.8805969, "session_id": "ses_20260809204711875624", "item_type": "retry", "step_id": 1, "decision": "switch_style", "score": 0.671, "ready": false}
+{"ts": 1786279631.8812363, "session_id": "ses_20260809204711875624", "item_type": "presentation", "step_id": 2, "step_type": "practice", "topic": "小测：5-7 题形成性测验：什么是熵？（本步讲机制和定义，在上一步基础上深入）", "content": "[rigorous_cold+adapted(analogy)] 关于 '小测：5-7 题形成性测验：什么是熵？（本步讲机制和定义，在上一步基础上深入）' 的讲解\n\n[v0.24 适配决策：switch_style→analogy] 请用日常生活的类比讲这个概念，避免抽象公式（学生当前理解度低）。", "llm_generated": false}
+{"ts": 1786279631.8818, "session_id": "ses_20260809204711875624", "item_type": "evaluation", "step_id": 2, "score": 0.783, "ready_to_advance": false}
+{"ts": 1786279631.8823686, "session_id": "ses_20260809204711875624", "item_type": "presentation", "step_id": 3, "step_type": "feedback", "topic": "矫正：针对错题再教一遍：什么是熵？（本步讲应用/辨析/练习，不重复前两步）", "content": "[rigorous_cold] 关于 '矫正：针对错题再教一遍：什么是熵？（本步讲应用/辨析/练习，不重复前两步）' 的讲解", "llm_generated": false}
+{"ts": 1786279631.8830435, "session_id": "ses_20260809204711875624", "item_type": "evaluation", "step_id": 3, "score": 0.55, "ready_to_advance": false}
+{"ts": 1786279631.8838434, "session_id": "ses_20260809204711875624", "item_type": "retry", "step_id": 3, "decision": "reinforce", "score": 0.853, "ready": false}
+{"ts": 1786279631.9214578, "session_id": "ses_20260809204711875624", "item_type": "summary", "avg_score": 0.6786000000000001, "steps_completed": 5, "duration_min": 10}

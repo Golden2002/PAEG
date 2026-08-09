@@ -1,0 +1,13 @@
+{"ts": 1786198575.905919, "session_id": "ses_20260808221615905868", "item_type": "user_input", "text": "电车难题该拉开关吗？", "subject": "ethics"}
+{"ts": 1786198575.9084709, "session_id": "ses_20260808221615905868", "item_type": "diagnosis", "ready_to_teach": true}
+{"ts": 1786198575.9091678, "session_id": "ses_20260808221615905868", "item_type": "plan", "steps": 3, "subtopic": ""}
+{"ts": 1786198575.9129193, "session_id": "ses_20260808221615905868", "item_type": "presentation", "step_id": 1, "step_type": "question", "topic": "引问：先让学生说出自己的想法：电车难题该拉开关吗？（本步讲直觉和现象）", "content": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。", "llm_generated": true}
+{"ts": 1786198575.914044, "session_id": "ses_20260808221615905868", "item_type": "evaluation", "step_id": 1, "score": 0.462, "ready_to_advance": false}
+{"ts": 1786198575.9191685, "session_id": "ses_20260808221615905868", "item_type": "retry", "step_id": 1, "decision": "switch_style", "score": 0.462, "ready": false}
+{"ts": 1786198575.9237607, "session_id": "ses_20260808221615905868", "item_type": "presentation", "step_id": 2, "step_type": "question", "topic": "追问：请举例/找反例/说明依据：电车难题该拉开关吗？（本步讲机制和定义，在上一步基础上深入）", "content": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。", "llm_generated": true}
+{"ts": 1786198575.9245615, "session_id": "ses_20260808221615905868", "item_type": "evaluation", "step_id": 2, "score": 0.462, "ready_to_advance": false}
+{"ts": 1786198575.9290648, "session_id": "ses_20260808221615905868", "item_type": "retry", "step_id": 2, "decision": "switch_style", "score": 0.462, "ready": false}
+{"ts": 1786198575.9334316, "session_id": "ses_20260808221615905868", "item_type": "presentation", "step_id": 3, "step_type": "guide", "topic": "收敛：引导学生自己总结：电车难题该拉开关吗？（本步讲应用/辨析/练习，不重复前两步）", "content": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。", "llm_generated": true}
+{"ts": 1786198575.9343219, "session_id": "ses_20260808221615905868", "item_type": "evaluation", "step_id": 3, "score": 0.462, "ready_to_advance": false}
+{"ts": 1786198575.9383624, "session_id": "ses_20260808221615905868", "item_type": "retry", "step_id": 3, "decision": "switch_style", "score": 0.462, "ready": false}
+{"ts": 1786198576.1130035, "session_id": "ses_20260808221615905868", "item_type": "summary", "avg_score": 0.462, "steps_completed": 6, "duration_min": 12}

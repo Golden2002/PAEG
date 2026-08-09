@@ -1,0 +1,58 @@
+{
+ "threads": [
+  {
+   "id": "thr_95eab7b976c0",
+   "student_id": "demo_student",
+   "subject": "math",
+   "title": "导数的几何意义",
+   "status": "active",
+   "parent_thread_id": null,
+   "created_at": 1786041756.906351,
+   "updated_at": 1786041756.9741423,
+   "last_event_id": 4,
+   "turns": [
+    "trn_1a7e9fd909ac"
+   ],
+   "events": [
+    {
+     "event_id": 1,
+     "turn_id": "trn_1a7e9fd909ac",
+     "type": "turn_started",
+     "payload": {
+      "agent": "tutor"
+     },
+     "ts": 1786041756.9349482
+    },
+    {
+     "event_id": 2,
+     "turn_id": "trn_1a7e9fd909ac",
+     "type": "user_message",
+     "payload": {
+      "content": "什么是导数"
+     },
+     "ts": 1786041756.9474485
+    },
+    {
+     "event_id": 3,
+     "turn_id": "trn_1a7e9fd909ac",
+     "type": "agent_message",
+     "payload": {
+      "content": "导数是..."
+     },
+     "ts": 1786041756.962386
+    },
+    {
+     "event_id": 4,
+     "turn_id": "trn_1a7e9fd909ac",
+     "type": "turn_completed",
+     "payload": {
+      "token_input": 100,
+      "token_output": 50
+     },
+     "ts": 1786041756.9889357
+    }
+   ]
+  }
+ ],
+ "next_event_id": 5
+}

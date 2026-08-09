@@ -1,0 +1,4034 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PAEG · 教育者智能体</title>
+<!-- v0.19.6：Markdown 渲染（本地优先 + CDN 兜底，摆脱国内 CDN 不稳定） -->
+<script src="assets/vendor/marked.min.js"></script>
+<script>
+// 本地 marked 加载失败 → CDN 兜底
+if (typeof marked === 'undefined') {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"><\/script>');
+}
+</script>
+<!-- v0.19.9：数学公式渲染（KaTeX——完全自包含，替代 MathJax。
+     之前 MathJax tex-chtml.js 内置 autoload 会按需加载 input/tex/extensions/*.js，
+     本地缺失导致 404 → startup.promise reject → 公式全部不渲染。
+     KaTeX 同步渲染、无需按需加载、throwOnError 天然降级，最适合离线单 HTML。 -->
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<script src="assets/vendor/katex/katex.min.js"></script>
+<script src="assets/vendor/katex/auto-render.min.js"></script>
+<script>
+// KaTeX 本地加载失败 → CDN 兜底
+(function () {
+  if (typeof window.katex === 'undefined') {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js';
+    document.head.appendChild(s);
+  }
+})();
+// v0.19.9：统一公式渲染——KaTeX 同步渲染（替代 MathJax typesetPromise）
+function renderMath(el) {
+  if (!el) return;
+  if (window.renderMathInElement) {
+    try {
+      renderMathInElement(el, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '\\[', right: '\\]', display: true }
+        ],
+        throwOnError: false,   // 渲染失败显示原始 LaTeX，不崩溃
+        ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      });
+    } catch (e) {}
+  }
+}
+</script>
+<script>
+// v0.19.5：marked 公式保护扩展——$...$ / $$...$$ / \(...\) / \[...\] 原样保留给 MathJax。
+// 参考 marked 官方 extension 模式 + MathJax 集成最佳实践：
+//   marked.parse → innerHTML → MathJax.typesetPromise
+(function () {
+  if (typeof marked === 'undefined' || !marked.use) return;
+  try {
+    // 合并的行内/块级数学 extension（tokenizer 在 marked 内置规则之前执行）
+    marked.use({
+      extensions: [
+        {
+          name: 'mathInline',
+          level: 'inline',
+          start(src) {
+            const m = src.match(/\\\(|\$\$|\$(?!\$)/);
+            return m ? m.index : undefined;
+          },
+          tokenizer(src) {
+            // 优先 $$...$$（display），再 $...$（inline，支持转义 \$ 和 \(...\)）
+            const m = /^(\$\$(?:\\.|[^$\\])*?\$\$|\\\[(?:\\.|[^\\])*?\\\]|\$(?!\$)(?:\\.|[^$\\])+\$|\\\((?:\\.|[^\\])*?\\\))/.exec(src);
+            if (m) {
+              return { type: 'mathInline', raw: m[0], text: m[0] };
+            }
+            return undefined;
+          },
+          renderer(token) {
+            // 原样输出（含 $ 分隔符），MathJax 从文本节点识别
+            return token.text;
+          }
+        }
+      ]
+    });
+  } catch (e) { /* 扩展失败不影响基本渲染 */ }
+})();
+</script>
+<script>
+// 若 CDN 加载失败，用极简内置渲染器
+if (typeof marked === 'undefined') {
+  window.marked = {
+    parse: function (md) {
+      var html = md
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/^### (.*)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.*)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.*)$/gm, '<h1>$1</h1>')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/\n/g, '<br>');
+      return html;
+    }
+  };
+}
+</script>
+<style>
+/* ============================================================
+   PAEG GUI v0.8 - 简约·美观·大方
+   真实对接后端 API（/api/teach, /api/profile, /api/meta-log, /api/knowledge/search）
+   ============================================================ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* v0.19.3：温暖可信的学习伙伴配色（参考 Claude 暖白 + Khan Academy 学科色） */
+  --bg: #FAF8F4;             /* 暖白画布 */
+  --surface: #FFFFFF;        /* 卡片表面 */
+  --surface-2: #F5F2EC;      /* 次级表面（暖灰） */
+  --text: #1F1B16;           /* 深褐黑文字 */
+  --text-dim: #5C534A;       /* 次级文字（v0.31 P0-4：原 #6B6259 在 #F5F2EC 上 4.4:1，未达 AA 4.5:1，加深） */
+  --accent: #4F6BFF;         /* 教育蓝（信任+专注） */
+  --accent-hover: #3D55E8;
+  --accent-soft: rgba(79, 107, 255, 0.12);
+  --coral: #FF8A65;          /* 珊瑚橙点缀（每日一句/鼓励） */
+  --coral-soft: rgba(255, 138, 101, 0.15);
+  --success: #10A37F;
+  --warning: #F5A623;
+  --danger: #E5484D;
+  --border: rgba(31, 27, 22, 0.10);
+  --border-subtle: rgba(31, 27, 22, 0.06);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 20px;
+  --shadow: 0 1px 3px rgba(31,27,22,.06), 0 1px 2px rgba(31,27,22,.04);
+  --shadow-lg: 0 8px 24px rgba(31,27,22,.08);
+  /* 玻璃质感 */
+  --elevated: rgba(255, 255, 255, 0.72);
+  --sidebar-bg: #F5F2EC;
+  /* 字体 */
+  --font-display: 'Lora', 'Noto Serif SC', Georgia, serif;
+  /* 动效 */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* v0.29 P1-1：硬编码色收敛（教育蓝/紫渐变/气泡/标签/徽章统一 token） */
+  --accent-2: #7c5cff;        /* 紫渐变副色 */
+  --grad-from: #4f7cff;       /* 蓝渐变起点 */
+  --user-bubble-bg: #eef2f7;  /* 用户头像底色 */
+  --tone-tag-bg: #f3f4f6;     /* 语气标签背景 */
+  --danger-2: #c0392b;        /* 删除红 hover */
+  --kb-badge: #4f6bff;        /* 知识库徽章主色 */
+  --lib-badge: #059669;       /* 本地库徽章主色 */
+  --web-badge: #b45309;       /* 网页徽章主色 */
+  /* v0.29 P1-2：字号节奏（11 / 12 / 14 / 16 / 20） */
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-base: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+}
+
+/* v0.19.3：深色模式（系统偏好 + 手动切换） */
+[data-theme="dark"] {
+  --bg: #14151B;
+  --surface: #1C1E26;
+  --surface-2: #23252F;
+  --text: #EDEAE3;
+  --text-dim: #A8A296;        /* v0.31 P0-4：原 #B5AFA4 在 #23252F 上对比度不足（<4.5:1），微调加深 */
+  --accent: #7B91FF;
+  --accent-hover: #95A8FF;
+  --accent-soft: rgba(123, 145, 255, 0.18);
+  --coral: #FFAB91;
+  --coral-soft: rgba(255, 171, 145, 0.18);
+  --success: #34D399;
+  --warning: #FBBF24;
+  --danger: #F87171;
+  --border: rgba(237, 234, 227, 0.14);
+  --border-subtle: rgba(237, 234, 227, 0.08);
+  --shadow: 0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.4);
+  --elevated: rgba(28, 30, 38, 0.75);
+  --sidebar-bg: #181A21;
+  /* v0.29 P1-1：硬编码色收敛（深色模式对应色） */
+  --accent-2: #a78bfa;
+  --grad-from: #7b91ff;
+  --user-bubble-bg: #2a2e3a;
+  --tone-tag-bg: #2f323d;
+  --danger-2: #f87171;
+  --kb-badge: #7b91ff;
+  --lib-badge: #34d399;
+  --web-badge: #fbbf24;
+}
+
+/* v0.29 P2-1：系统暗色自动跟随（用户从未手动选过时生效；手动选 light 后由 data-theme="light" 屏蔽） */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14151B;
+    --surface: #1C1E26;
+    --surface-2: #23252F;
+    --text: #EDEAE3;
+    --text-dim: #A8A296;
+    --accent: #7B91FF;
+    --accent-hover: #95A8FF;
+    --accent-soft: rgba(123, 145, 255, 0.18);
+    --coral: #FFAB91;
+    --coral-soft: rgba(255, 171, 145, 0.18);
+    --success: #34D399;
+    --warning: #FBBF24;
+    --danger: #F87171;
+    --border: rgba(237, 234, 227, 0.14);
+    --border-subtle: rgba(237, 234, 227, 0.08);
+    --shadow: 0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,.4);
+    --elevated: rgba(28, 30, 38, 0.75);
+    --sidebar-bg: #181A21;
+    --accent-2: #a78bfa;
+    --grad-from: #7b91ff;
+    --user-bubble-bg: #2a2e3a;
+    --tone-tag-bg: #2f323d;
+    --danger-2: #f87171;
+    --kb-badge: #7b91ff;
+    --lib-badge: #34d399;
+    --web-badge: #fbbf24;
+  }
+}
+
+/* 全局过渡（主题切换平滑） */
+body, .sidebar, .card, .msg-bubble, .topbar, .input-bar, .chat-window {
+  transition: background-color .3s ease, color .3s ease, border-color .3s ease;
+}
+
+/* v0.19.25：独立对话类型标签（学习方法/知识库） */
+.mode-tag {
+  display: inline-block;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 20px;
+  padding: 2px 10px;
+  margin-bottom: 8px;
+  letter-spacing: .3px;
+}
+.mode-tag + * { margin-top: 4px; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  /* v0.19.3：柔和渐变背景（蓝+橙双色光晕） */
+  background-image:
+    radial-gradient(at 20% 0%, var(--accent-soft), transparent 50%),
+    radial-gradient(at 80% 100%, var(--coral-soft), transparent 50%);
+  background-attachment: fixed;
+  color: var(--text);
+  line-height: 1.65;
+  min-height: 100vh;
+}
+
+/* ─── 顶栏 ─── */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 28px;
+  /* v0.19.3：玻璃微质感 */
+  background: var(--elevated);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-logo {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 15px;
+  box-shadow: 0 2px 8px var(--accent-soft);
+}
+.logo-svg {
+  width: 20px; height: 20px; filter: brightness(0) invert(1);
+  display: block;
+}
+.brand-name { font-size: 17px; font-weight: 650; letter-spacing: .02em; }
+.brand-sub { font-size: 12px; color: var(--text-dim); margin-top: -2px; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.theme-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 8px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border-subtle);
+  transition: background .15s var(--ease-out);
+}
+.theme-btn:hover { background: var(--accent-soft); }
+.theme-btn img { width: 16px; height: 16px; opacity: .7; }
+.conn-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+.conn-dot::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--success); box-shadow: 0 0 0 3px rgba(16,185,129,.15);
+}
+.conn-dot.offline::before { background: var(--danger); box-shadow: 0 0 0 3px rgba(239,68,68,.15); }
+.mode-switch { display: flex; background: var(--surface-2); border-radius: 8px; padding: 3px; gap: 2px; }
+.mode-btn {
+  border: none; background: transparent; padding: 6px 14px;
+  border-radius: 6px; font-size: 13px; color: var(--text-dim); cursor: pointer;
+  transition: all .2s;
+}
+.mode-btn.active { background: var(--surface); color: var(--accent); font-weight: 600; box-shadow: var(--shadow); }
+
+/* ─── 主布局：两栏 ─── */
+.main {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+  max-width: 1280px;
+  margin: 20px auto;
+  padding: 0 24px;
+}
+
+/* ─── 左栏：学习者画像 ─── */
+.sidebar {
+  display: flex; flex-direction: column; gap: 16px;
+  background: var(--sidebar-bg);
+  padding: 16px;
+  border-radius: 16px;
+}
+.card {
+  background: var(--surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow);
+  padding: 18px;
+  transition: box-shadow .2s var(--ease-out), transform .2s var(--ease-out);
+}
+.card:hover { box-shadow: var(--shadow-lg); }
+.card h3 {
+  font-size: 13px; font-weight: 600; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 14px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.profile-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--grad-from), var(--accent-2));
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 18px; font-weight: 600;
+  cursor: pointer; overflow: hidden;
+  flex-shrink: 0; position: relative;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.avatar:hover { transform: scale(1.04); box-shadow: 0 4px 14px rgba(79,124,255,.35); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-hint {
+  position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
+  background: var(--surface-1, #1e2333); color: var(--text-dim, #8a93a6);
+  font-size: 11px; padding: 2px 8px; border-radius: 6px;
+  opacity: 0; pointer-events: none; white-space: nowrap;
+  transition: opacity .15s ease, bottom .15s ease;
+}
+.avatar:hover .avatar-hint { opacity: 1; bottom: -28px; }
+.profile-name { font-size: 16px; font-weight: 650; }
+.profile-meta { font-size: 12px; color: var(--text-dim); }
+.mastery-list { display: flex; flex-direction: column; gap: 10px; }
+.mastery-item { display: flex; flex-direction: column; gap: 4px; }
+.mastery-row { display: flex; justify-content: space-between; font-size: var(--fs-sm); }
+.mastery-row .subj { color: var(--text-dim); }
+.mastery-row .val { font-weight: 600; }
+.mastery-bar { height: 6px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.mastery-bar > i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--grad-from), var(--accent-2)); transition: width .4s ease; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.stat-cell { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.stat-cell .num { font-size: var(--fs-xl); font-weight: 700; color: var(--accent); }
+.stat-cell .lbl { font-size: var(--fs-xs); color: var(--text-dim); margin-top: 2px; }
+
+/* ─── 右栏：对话主区 ─── */
+.chat-area { display: flex; flex-direction: column; min-height: calc(100vh - 120px); }
+.chat-header { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px 12px; }
+.chat-header .title { font-size: 15px; font-weight: 650; }
+.chat-header .meta { font-size: 12px; color: var(--text-dim); }
+
+.chat-window {
+  flex: 1; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 24px; overflow-y: auto; min-height: 420px; max-height: calc(100vh - 300px);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.msg { display: flex; gap: 10px; max-width: 85%; }
+.msg.user { align-self: flex-end; flex-direction: row-reverse; }
+.msg-avatar {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
+.msg.paeg .msg-avatar { background: var(--accent-soft); color: var(--accent); }
+.msg.user .msg-avatar { background: var(--user-bubble-bg); color: var(--text-dim); }
+.msg-bubble {
+  background: var(--surface-2); border-radius: 12px; padding: 11px 15px;
+  font-size: 14px; line-height: 1.7; word-break: break-word;
+}
+.msg.user .msg-bubble {
+  background: var(--accent); color: #fff;
+  font-weight: 500;                       /* v0.29 P1-4：14px 普通体 → 500，蓝底白字可读性提升 */
+  border-radius: 12px 12px 3px 12px;
+}
+/* v0.29 P1-4：深色模式 #7B91FF + #fff 仅约 3.4:1，加深气泡底保 ≥4.5:1 对比 */
+[data-theme="dark"] .msg.user .msg-bubble {
+  background: color-mix(in srgb, var(--accent) 55%, var(--surface));
+  color: #fff;
+}
+.msg.paeg .msg-bubble { border-radius: 12px 12px 12px 3px; }
+.msg-bubble .step-tag {
+  display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 6px;
+  background: var(--accent-soft); color: var(--accent); margin-bottom: 6px; font-weight: 600;
+}
+.msg-bubble .tone-tag {
+  display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 6px;
+  background: var(--tone-tag-bg); color: var(--text-dim); margin-left: 6px;
+}
+.msg.user .msg-bubble .step-tag { background: rgba(255,255,255,.2); color: #fff; }
+
+/* v0.28：检索状态徽章——对话输出前的"已完成检索"小标志。
+   复用 .step-tag 的 token 体系（accent-soft/border/text-dim），保证视觉一致。 */
+.retrieval-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--fs-xs); line-height: 1; padding: 4px 8px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  font-weight: 500;
+  animation: retrieval-badge-in .25s ease-out;
+}
+.retrieval-badge .check {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 12px;
+}
+.retrieval-badge .label-name {
+  color: var(--accent);
+  font-weight: 600;
+  margin-left: 2px;
+}
+@keyframes retrieval-badge-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* v0.14：Markdown 内容样式 */
+.msg-bubble .md-content { line-height: 1.75; }
+.msg-bubble .md-content p { margin: 6px 0; }
+.msg-bubble .md-content h1, .msg-bubble .md-content h2, .msg-bubble .md-content h3 {
+  margin: 10px 0 6px; font-weight: 650;
+}
+.msg-bubble .md-content h1 { font-size: 16px; }
+.msg-bubble .md-content h2 { font-size: 15px; }
+.msg-bubble .md-content h3 { font-size: 14px; }
+.msg-bubble .md-content ul, .msg-bubble .md-content ol { margin: 6px 0 6px 20px; }
+.msg-bubble .md-content li { margin: 3px 0; }
+.msg-bubble .md-content code {
+  background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 4px;
+  font-size: 0.9em; font-family: 'SF Mono', Consolas, monospace;
+}
+.msg-bubble .md-content pre {
+  background: rgba(0,0,0,.06); padding: 10px; border-radius: 8px;
+  overflow-x: auto; margin: 8px 0;
+}
+.msg-bubble .md-content pre code { background: none; padding: 0; }
+.msg-bubble .md-content blockquote {
+  border-left: 3px solid var(--accent); padding-left: 10px;
+  color: var(--text-dim); margin: 8px 0;
+}
+.msg-bubble .md-content a { color: var(--accent); text-decoration: none; }
+.msg-bubble .md-content a:hover { text-decoration: underline; }
+.msg-bubble .md-content table { border-collapse: collapse; margin: 8px 0; }
+.msg-bubble .md-content th, .msg-bubble .md-content td {
+  border: 1px solid var(--border); padding: 5px 10px; font-size: 13px;
+}
+.msg-bubble .md-content th { background: var(--surface-2); }
+.typing { display: flex; gap: 5px; padding: 4px 0; }
+.typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); animation: blink 1.2s infinite; }
+.typing span:nth-child(2) { animation-delay: .2s; }
+.typing span:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%,80%,100% { opacity: .25 } 40% { opacity: 1 } }
+
+/* v0.17：阶段化思考提示（等待时不空转，展示思考过程） */
+.thinking-box {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 2px; font-size: var(--fs-base); color: var(--text-dim);
+}
+.thinking-box .th-spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: th-spin .8s linear infinite; flex-shrink: 0;
+}
+@keyframes th-spin { to { transform: rotate(360deg) } }
+.thinking-box .th-text { line-height: 1.4; }
+.thinking-box .th-text b { color: var(--text); font-weight: 600; }
+.thinking-box .th-dots::after {
+  content: ''; display: inline-block; width: 1.2em; text-align: left;
+  animation: th-dots 1.5s steps(4, end) infinite;
+}
+@keyframes th-dots { 0% { content: '' } 25% { content: '.' } 50% { content: '..' } 75% { content: '...' } }
+@media (prefers-reduced-motion: reduce) {
+  .thinking-box .th-spinner { animation: none; }
+  .thinking-box .th-dots::after { animation: none; content: ''; }
+}
+
+/* v0.17：每日一句卡片 */
+/* v0.19.3：每日一句 → 撕角便签风格 */
+.quote-card {
+  padding: 18px 20px; text-align: center;
+  background: linear-gradient(160deg, var(--accent-soft), transparent 60%);
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.quote-card::before {
+  content: '"';
+  font-family: var(--font-display), serif;
+  font-size: 72px; color: var(--accent); opacity: .15;
+  position: absolute; top: -12px; left: 12px;
+}
+.quote-card .q-text {
+  font-family: var(--font-display), 'Georgia', 'Songti SC', 'STSong', serif;
+  font-size: 15px; line-height: 1.8; color: var(--text);
+  letter-spacing: .02em; font-style: italic;
+  transition: transform .2s var(--ease-out);
+}
+.quote-card:hover .q-text { transform: rotate(-1deg); }
+.quote-card .q-author {
+  margin-top: 8px; font-size: 12px; color: var(--coral);
+  font-family: var(--font-display), 'Georgia', 'Songti SC', 'STSong', serif;
+  font-weight: 600;
+}
+.quote-card .q-source { font-size: 11px; color: var(--text-dim); opacity: .7; }
+
+/* v0.18.1：历史会话列表 */
+.conv-list { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+.conv-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  background: var(--surface-2); transition: background .15s;
+}
+.conv-item:hover { background: var(--border); }
+.conv-item .conv-mode {
+  font-size: 10.5px; padding: 1px 6px; border-radius: 4px;
+  background: var(--surface); color: var(--text-dim); flex-shrink: 0;
+}
+.conv-item .conv-title {
+  flex: 1; font-size: 13px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.conv-item .conv-del {
+  font-size: 12px; color: var(--text-dim); padding: 4px 10px;   /* v0.31 P0-6：加大命中区 */
+  border-radius: 4px; flex-shrink: 0; opacity: 0;
+  transition: opacity .15s;
+  min-height: 28px; display: inline-flex; align-items: center;
+}
+.conv-item:hover .conv-del { opacity: 1; }
+.conv-item .conv-del:hover { color: var(--danger-2); background: color-mix(in srgb, var(--danger-2) 10%, transparent); }
+
+/* v0.19.5：数学公式 */
+.math-block { margin: 12px 0; overflow-x: auto; }
+.math-inline { white-space: nowrap; }
+
+/* v0.19.3：复制/选择/生成文档 */
+.msg-actions {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 8px; opacity: 0; transition: opacity .2s;
+}
+.msg.paeg:hover .msg-actions { opacity: 1; }
+.msg-copy {
+  font-size: 11px; padding: 4px 10px; border-radius: 6px;   /* v0.31 P0-6：垂直内边距 2→4 增命中区 */
+  background: var(--surface-2); border: 1px solid var(--border-subtle);
+  color: var(--text-dim); cursor: pointer; transition: all .15s;
+  min-height: 28px; display: inline-flex; align-items: center;
+}
+.msg-copy:hover { background: var(--accent-soft); color: var(--accent); }
+.msg-select {
+  width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent);
+}
+.select-bar {
+  display: none; align-items: center; gap: 10px;
+  position: sticky; bottom: 0; z-index: 20;
+  padding: 8px 14px; margin-top: 8px;
+  background: var(--elevated); backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle); border-radius: 12px;
+  font-size: 13px; color: var(--text);
+}
+.sel-btn {
+  font-size: 12px; padding: 4px 14px; border-radius: 8px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border-subtle);
+  color: var(--text); transition: all .15s;
+}
+.sel-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.sel-btn.ghost { background: transparent; border-color: transparent; color: var(--text-dim); }
+.sel-btn:hover { filter: brightness(1.1); }
+
+/* v0.19：工具调用可视化卡片 */
+.tool-card {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 3px 10px; margin: 2px 4px 2px 0;
+  font-size: 12px; color: var(--text-dim);
+}
+.tool-card .tool-icon { font-size: 11px; }
+.tool-card .tool-icon-svg { width: 13px; height: 13px; opacity: .65; }
+.tool-card .tool-name { font-weight: 600; color: var(--text); }
+.tool-card .tool-args { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* v0.19.2：SVG 图标统一样式（替代 emoji） */
+.link-icon { width: 13px; height: 13px; vertical-align: -2px; display: inline-block; }
+.action-btn .link-icon { width: 14px; height: 14px; vertical-align: -3px; }
+.upload-btn-icon { width: 17px; height: 17px; opacity: .7; display: block; }
+.file-chip { display: inline-flex; align-items: center; gap: 5px; }
+.file-chip-icon { width: 14px; height: 14px; opacity: .7; }
+
+/* v0.19 P2-10：上传按钮 */
+.upload-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+  background: var(--surface-2); color: var(--text-dim);
+  font-size: 18px; line-height: 1; flex-shrink: 0; transition: all .15s;
+}
+.upload-btn:hover { background: var(--border); color: var(--accent); }
+/* v0.36 ⭐ 语音按钮：录音态红色提示 */
+#voice-btn.recording { color: #ef4444; background: rgba(239,68,68,.1); }
+/* v0.40 ⭐ 录音动画：圆环脉冲 + 波形条（豆包式视觉反馈） */
+@keyframes voice-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(239,68,68,.45); }
+  70% { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+}
+#voice-btn.recording { animation: voice-pulse 1.2s ease-out infinite; }
+#voice-btn.recording .upload-btn-icon { animation: voice-wave 0.8s ease-in-out infinite alternate; }
+@keyframes voice-wave {
+  from { transform: scale(1); }
+  to { transform: scale(1.25); }
+}
+/* 录音波形指示器（输入框上方） */
+.voice-waves { display: none; align-items: center; gap: 3px; height: 20px; padding: 2px 8px; background: rgba(239,68,68,.08); border-radius: 10px; margin-right: 8px; }
+.voice-waves.active { display: inline-flex; }
+.voice-waves span { width: 3px; height: 100%; background: #ef4444; border-radius: 2px; animation: wave-bar 0.9s ease-in-out infinite; }
+.voice-waves span:nth-child(2) { animation-delay: .15s; }
+.voice-waves span:nth-child(3) { animation-delay: .3s; }
+.voice-waves span:nth-child(4) { animation-delay: .45s; }
+.voice-waves span:nth-child(5) { animation-delay: .6s; }
+@keyframes wave-bar {
+  0%, 100% { transform: scaleY(.3); }
+  50% { transform: scaleY(1); }
+}
+/* v0.40.2 ⭐ 长按输入框反馈：按压高亮（豆包式长按准备态） */
+.question-input.voice-press {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239,68,68,.18);
+  background: rgba(239,68,68,.04);
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+/* v0.40.2 ⭐ 长按语音浮动气泡（微信"按住说话"式）——半透明浅绿 + SVG 图标 */
+.voice-popover {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%) scale(.85);
+  background: rgba(74, 222, 128, .14);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(74, 222, 128, .3);
+  color: #166534;
+  border-radius: 18px;
+  padding: 12px 20px;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0,0,0,.12);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity .18s ease, transform .18s ease;
+  pointer-events: none;
+}
+.voice-popover.active {
+  display: block;
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+.voice-popover .vp-mic {
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 8px;
+  display: block;
+  color: #16a34a;
+}
+.voice-popover .vp-text {
+  font-size: 13px;
+  color: rgba(22, 101, 52, .9);
+  white-space: nowrap;
+  font-weight: 500;
+}
+.voice-popover .vp-waves {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  height: 18px;
+  margin-top: 8px;
+  align-items: center;
+}
+.voice-popover .vp-waves span {
+  width: 3px;
+  height: 100%;
+  background: #16a34a;
+  border-radius: 2px;
+  animation: wave-bar 0.9s ease-in-out infinite;
+}
+.voice-popover .vp-waves span:nth-child(2) { animation-delay: .15s; }
+.voice-popover .vp-waves span:nth-child(3) { animation-delay: .3s; }
+.voice-popover .vp-waves span:nth-child(4) { animation-delay: .45s; }
+.voice-popover .vp-waves span:nth-child(5) { animation-delay: .6s; }
+/* 录音中气泡状态（已触发）——浅绿加深 */
+.voice-popover.listening {
+  background: rgba(22, 163, 74, .22);
+  border-color: rgba(22, 163, 74, .45);
+}
+.voice-popover.listening .vp-text { color: #14532d; font-weight: 600; }
+.upload-msg { font-size: 12px; color: var(--text-dim); margin-left: 8px; }
+.upload-preview img { max-height: 120px; border-radius: 8px; border: 1px solid var(--border); }
+
+/* ─── 输入区 ─── */
+.input-bar {
+  display: flex; gap: 8px; margin-top: 14px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 8px 8px 8px 14px;
+  box-shadow: var(--shadow); align-items: center;
+  position: relative; /* v0.40.2 语音浮动气泡定位基准 */
+}
+/* v0.28：学段 / 学科 / 二级学科 — 三件一组统一控件 */
+.subject-select {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  height: 36px; line-height: 1;
+  padding: 0 32px 0 12px;
+  font-size: var(--fs-base); font-weight: 500; color: var(--text);
+  background-color: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer; flex-shrink: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 10px 6px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+  transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, color .18s ease;
+}
+/* 宽度梯度：学段 < 学科 < 二级学科；长文本省略 */
+#grade-select    { min-width: 92px;  max-width: 110px; }
+#subject-select  { min-width: 116px; max-width: 150px; }
+#subfield-select { min-width: 128px; max-width: 170px; }
+.subject-select:hover:not(:disabled) {
+  background-color: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%234F6BFF'/%3E%3C/svg%3E");
+}
+.subject-select:focus-visible {
+  outline: none;                          /* v0.29 P1-5：用 box-shadow 自带环，避免与全局 :focus-visible 双环叠加 */
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  background-color: var(--surface);
+}
+.subject-select:focus-visible option { color: var(--text); }
+/* v0.27：三级学科禁用态 */
+.subject-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--surface-2);
+  color: var(--text-dim);
+}
+.question-input {
+  flex: 1; border: none; outline: none; font-size: var(--fs-base); color: var(--text);
+  background: transparent; padding: 8px 4px;
+}
+.question-input::placeholder { color: var(--text-dim); opacity: .85; }   /* v0.31 P0-4：原 #9ca3af 过浅无法辨识，绑定 token */
+.ask-btn {
+  border: none; background: linear-gradient(135deg, var(--grad-from), var(--accent-2));
+  color: #fff; font-size: 14px; font-weight: 600;
+  padding: 10px 22px; border-radius: 10px; cursor: pointer;
+  transition: all .2s; flex-shrink: 0;
+  min-width: 88px;   /* v0.31 P2-6：固定宽度，切换"发送"↔"■ 停止"时不跳动 */
+}
+.ask-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(79,124,255,.35); }
+.ask-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+/* v0.31 P2-6：生成中停止按钮保持不透明（覆盖 disabled 的 opacity .6）+ 危险色 token 化 */
+.ask-btn[data-generating="1"] {
+  opacity: 1;
+  padding: 10px 14px; font-size: 13px; letter-spacing: .5px; white-space: nowrap;
+  background: linear-gradient(135deg, var(--danger), color-mix(in srgb, var(--danger) 75%, #000));
+}
+.ask-btn[data-generating="1"]:hover { transform: none; box-shadow: none; }
+.ask-btn[data-generating="1"]:disabled { opacity: 1; cursor: pointer; }
+
+/* ─── 学科快速入口 ─── */
+.subject-chips { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.chips-icon { width: 14px; height: 14px; opacity: .6; align-self: center; }
+.chip {
+  border: 1px solid var(--border); background: var(--surface);
+  padding: 6px 14px; border-radius: 20px; font-size: var(--fs-sm); color: var(--text-dim);
+  cursor: pointer; transition: all .2s;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+/* ─── 教学动作按钮（v0.9） ─── */
+.action-bar { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.action-btn {
+  border: 1px solid var(--border); background: var(--surface);
+  padding: 6px 14px; border-radius: 20px; font-size: var(--fs-sm); color: var(--text-dim);
+  cursor: pointer; transition: all .2s;
+}
+.action-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.action-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* 教学意图标签 */
+.intent-tag {
+  display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 6px;
+  background: var(--accent-soft); color: var(--accent); margin-left: 8px; font-weight: 600;
+}
+
+/* ─── 自我描述编辑（v0.10） ─── */
+.desc-toggle {
+  border: 1px solid var(--border); background: var(--surface);
+  padding: 5px 12px; border-radius: 14px; font-size: var(--fs-xs); color: var(--text-dim);
+  cursor: pointer; transition: all .2s;
+}
+.desc-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.desc-editor { display: none; margin-top: 10px; }
+.desc-editor.open { display: block; }
+.desc-textarea {
+  width: 100%; min-height: 110px; border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: var(--fs-sm); color: var(--text);
+  background: var(--surface-2); resize: vertical; font-family: inherit; line-height: 1.6;
+}
+.desc-textarea:focus { outline: none; border-color: var(--accent); }
+.desc-save {
+  margin-top: 8px; border: none; background: linear-gradient(135deg, var(--grad-from), var(--accent-2));
+  color: #fff; font-size: 12px; font-weight: 600; padding: 6px 16px; border-radius: 8px;
+  cursor: pointer; transition: all .2s;
+}
+.desc-save:hover { opacity: .9; }
+.desc-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; line-height: 1.5; }
+
+/* ─── 文件生成栏（v0.12） ─── */
+.generate-bar { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+.generate-btn {
+  border: 1px dashed var(--accent); background: var(--accent-soft);
+  padding: 6px 14px; border-radius: 20px; font-size: var(--fs-sm); color: var(--accent);
+  cursor: pointer; transition: all .2s;
+}
+.generate-btn:hover { background: var(--accent); color: #fff; }
+.generate-btn:disabled { opacity: .5; cursor: not-allowed; }
+.generate-num {
+  border: 1px solid var(--border); background: var(--surface); border-radius: 6px;
+  padding: 4px 8px; font-size: 12px; color: var(--text); width: 48px;
+}
+
+/* ─── 用户注册/登录（v0.14） ─── */
+.user-btn {
+  border: 1px solid var(--border); background: var(--surface);
+  padding: 6px 14px; border-radius: 20px; font-size: var(--fs-sm); color: var(--text);
+  cursor: pointer; transition: all .2s;
+}
+/* ─── 气象链接（v0.20.5） ─── */
+.weather-link {
+  border: 1px solid var(--border); background: var(--surface);
+  padding: 6px 14px; border-radius: 20px; font-size: var(--fs-sm);
+  color: var(--accent); text-decoration: none; cursor: pointer;
+  transition: all .2s;
+}
+.weather-link:hover { background: color-mix(in srgb, var(--accent) 15%, var(--surface)); }
+.user-btn:hover { border-color: var(--accent); color: var(--accent); }
+.auth-modal {
+  display: none; position: fixed; inset: 0; z-index: 100;
+  background: rgba(15, 23, 42, 0.5); align-items: center; justify-content: center;
+}
+.auth-modal.open { display: flex; }
+.auth-card {
+  background: var(--surface); border-radius: 16px; padding: 28px;
+  width: 380px; max-width: 92vw; box-shadow: var(--shadow-lg);
+}
+.auth-card h2 { font-size: 18px; margin-bottom: 18px; color: var(--text); }
+.auth-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.auth-tab {
+  border: 1px solid var(--border); background: var(--surface); padding: 6px 16px;
+  border-radius: 8px; font-size: 13px; cursor: pointer; color: var(--text-dim);
+}
+.auth-tab.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.auth-input {
+  width: 100%; border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; font-size: 14px; margin-bottom: 12px; color: var(--text);
+  background: var(--surface); box-sizing: border-box;
+}
+.auth-input:focus { outline: none; border-color: var(--accent); }
+.auth-submit {
+  width: 100%; border: none; background: linear-gradient(135deg, var(--grad-from), var(--accent-2));
+  color: #fff; font-size: 14px; font-weight: 600; padding: 11px; border-radius: 10px;
+  cursor: pointer; margin-top: 4px; transition: all .2s;
+}
+.auth-submit:hover { opacity: .9; }
+.auth-msg { font-size: var(--fs-sm); margin-top: 10px; min-height: 18px; }
+.auth-msg.ok { color: var(--success); }
+.auth-msg.err { color: var(--danger); }
+.auth-close {
+  float: right; border: none; background: none; font-size: 18px;
+  cursor: pointer; color: var(--text-dim); line-height: 1;
+}
+.user-badge {
+  font-size: var(--fs-sm); color: var(--accent); font-weight: 600;
+  padding: 4px 10px; background: var(--accent-soft); border-radius: 14px;
+}
+.download-link {
+  display: inline-block; margin-top: 4px; font-size: var(--fs-sm); color: var(--accent);
+  text-decoration: none; font-weight: 600;
+}
+.download-link:hover { text-decoration: underline; }
+
+/* ─── v0.x：资料检索（需求C）─── */
+/* 进度条 + 检索阶段提示 */
+.resource-progress {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px 16px; margin: 4px 0;
+  background: var(--surface-2); border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  font-size: 13px; color: var(--text-dim);
+}
+.resource-progress .rp-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.resource-progress .rp-spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  animation: resource-spin .9s linear infinite; flex-shrink: 0;
+}
+@keyframes resource-spin { to { transform: rotate(360deg); } }
+.resource-progress .rp-text {
+  color: var(--text); font-weight: 600; flex: 1;
+}
+.resource-progress .rp-stage {
+  font-size: var(--fs-xs); color: var(--text-dim); font-weight: 400;
+  padding: 2px 8px; border-radius: 8px; background: var(--accent-soft); color: var(--accent);
+}
+.resource-progress .rp-bar {
+  width: 100%; height: 4px; background: var(--border);
+  border-radius: 2px; overflow: hidden;
+}
+.resource-progress .rp-bar > i {
+  display: block; height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--grad-from), var(--accent-2));
+  border-radius: 2px;
+  animation: resource-indeterminate 1.4s ease-in-out infinite;
+}
+@keyframes resource-indeterminate {
+  0%   { margin-left: -40%; width: 40%; }
+  50%  { width: 60%; }
+  100% { margin-left: 100%; width: 40%; }
+}
+
+/* 资料卡片列表（容器） */
+.resource-list {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-top: 4px;
+}
+.resource-list .rl-header {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 12px; color: var(--text-dim);
+  padding: 0 2px;
+}
+.resource-list .rl-header b { color: var(--text); font-size: var(--fs-base); font-weight: 600; }
+
+/* 单张资料卡片 */
+.resource-card {
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px;
+  transition: border-color .15s, transform .15s;
+}
+.resource-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.resource-card .rc-title {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.resource-card .rc-title-text {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  word-break: break-word; flex: 1; min-width: 0;
+}
+/* 类型徽章 */
+.resource-card .rc-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+  flex-shrink: 0; white-space: nowrap;
+}
+/* v0.29 P1-1：徽章统一用 color-mix 跟随 token，深浅色下均自动适配 */
+.resource-card .rc-badge.kb   { background: color-mix(in srgb, var(--kb-badge) 12%, transparent); color: var(--kb-badge); }
+.resource-card .rc-badge.lib  { background: color-mix(in srgb, var(--lib-badge) 14%, transparent); color: var(--lib-badge); }
+.resource-card .rc-badge.web  { background: color-mix(in srgb, var(--web-badge) 16%, transparent); color: var(--web-badge); }
+.resource-card .rc-badge.unknown { background: var(--surface-2); color: var(--text-dim); }
+.resource-card .rc-snippet {
+  font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.6;
+  word-break: break-word;
+}
+.resource-card .rc-link {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-sm); color: var(--accent); text-decoration: none;
+  font-weight: 600; align-self: flex-start; margin-top: 2px;
+}
+.resource-card .rc-link:hover { text-decoration: underline; }
+.resource-card .rc-link .link-icon { opacity: .8; }
+
+/* PPT 引导按钮 */
+.resource-card .rc-ppt-btn {
+  align-self: flex-start;
+  margin-top: 6px;
+  border: 1px solid var(--accent); background: var(--accent-soft);
+  color: var(--accent); font-size: 12px; font-weight: 600;
+  padding: 5px 12px; border-radius: 8px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: all .15s;
+}
+.resource-card .rc-ppt-btn:hover { background: var(--accent); color: #fff; }
+.resource-card .rc-ppt-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ─── 元认知日志 ─── */
+.log-list { display: flex; flex-direction: column; gap: 12px; max-height: 260px; overflow-y: auto; }
+.log-item {
+  background: var(--surface-2); border-radius: 8px; padding: 10px 14px;
+  font-size: var(--fs-sm); border-left: 3px solid var(--accent);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;  /* v0.40.5 flex 布局修复 */
+}
+.log-item .log-head { display: flex; align-items: baseline; gap: 8px; width: 100%; }
+.log-item .time { color: var(--text-dim); font-size: 11px; flex-shrink: 0; }
+.log-item .name { color: var(--accent); font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.log-item .txt {
+  color: var(--text); flex: 1; min-width: 0;
+  word-break: break-word; white-space: pre-wrap;  /* v0.40.5 换行修复 */
+}
+/* v0.40.4 ⭐ 元认知建模 SVG 图标（无 emoji） */
+.log-item .log-icon {
+  width: 13px; height: 13px;
+  color: var(--accent);
+  vertical-align: -2px;
+  margin-right: 5px;
+}
+
+/* v0.29 P1-3：空状态四要素（图标 + 标题 + 说明 + 文字引导） */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 18px 10px; text-align: center;
+  color: var(--text-dim);
+  background: transparent;
+}
+.empty-state .empty-icon {
+  width: 32px; height: 32px; opacity: .55;
+  margin-bottom: 2px;
+}
+.empty-state .empty-title {
+  font-size: var(--fs-sm); font-weight: 600; color: var(--text);
+}
+.empty-state .empty-desc {
+  font-size: var(--fs-xs); line-height: 1.6; color: var(--text-dim);
+  max-width: 220px;
+}
+
+/* ─── 响应式 ─── */
+/* v0.31 P0-5 / P0-6：多档断点 + 触控目标扩大
+   1280 以下：主区缩内边距、模式条压缩
+   1024 以下：消息接近满宽
+   960  及以下：原布局（单栏 + 侧栏 wrap）
+   768  及以下：顶栏/输入区紧凑、按钮全宽
+   480  及以下：模式条 2 列网格，键盘不缩防 iOS 缩放 */
+@media (max-width: 1280px) {
+  .main { padding: 0 16px; }
+  .mode-switch { flex-wrap: wrap; max-width: 320px; justify-content: flex-end; }
+  .mode-btn { padding: 5px 10px; font-size: var(--fs-sm); }
+}
+@media (max-width: 1024px) {
+  .msg { max-width: 94%; }
+  .mode-btn { font-size: 12px; padding: 5px 9px; }
+  /* v0.31 P2-7：769–1024px 输入栏换行，修复横向溢出 */
+  .input-bar { flex-wrap: wrap; }
+  .input-bar .subject-select { flex: 1 1 30%; min-width: 90px; }
+  .question-input { flex: 1 1 100%; order: 5; }
+  .ask-btn { flex: 1 1 100%; order: 6; }
+}
+@media (max-width: 960px) {
+  .main { grid-template-columns: 1fr; }
+  .sidebar { flex-direction: row; flex-wrap: wrap; }
+  .sidebar .card { flex: 1; min-width: 260px; }
+  .msg { max-width: 92%; }
+}
+@media (max-width: 768px) {
+  .topbar { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
+  .brand-sub { display: none; }
+  .chat-window { padding: 16px; }
+  .input-bar { flex-wrap: wrap; padding: 8px; }
+  .input-bar .subject-select { flex: 1 1 30%; min-width: 90px; }
+  .question-input { flex: 1 1 100%; order: 5; }
+  .ask-btn { flex: 1 1 100%; order: 6; }
+  .input-bar .upload-btn { order: 3; }
+  .msg { max-width: 96%; }
+  /* v0.31 P0-6：触控目标 ≥ 40px */
+  .theme-btn { width: 40px; height: 40px; }
+  .upload-btn { width: 40px; height: 40px; }
+  .msg-copy { min-height: 32px; padding: 6px 12px; }
+}
+@media (max-width: 480px) {
+  .topbar { padding: 8px 12px; }
+  .topbar-right { gap: 8px; flex-wrap: wrap; }
+  .mode-switch {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    width: 100%;
+    max-width: none;
+    padding: 4px;
+    gap: 4px;
+  }
+  .mode-btn { padding: 8px 6px; font-size: 12px; }
+  .subject-chips .chip,
+  .action-bar .action-btn,
+  .generate-bar .generate-btn { font-size: 12px; padding: 6px 10px; }
+  /* iOS 输入框 16px 以下会自动缩放——v0.29 P1-2 归入 --fs-base（14px），正文不缩；若需恢复 14.5 在此处覆盖即可 */
+  .question-input { font-size: var(--fs-base); }
+  .msg { max-width: 100%; }
+  .chat-window { padding: 12px; }
+}
+
+/* v0.29 P1-5：全局焦点环（WCAG 2.4.7 / 2.4.13）
+   解决 outline:none 处（.question-input / .desc-textarea / .auth-input）失去可见焦点的问题；
+   .subject-select 已有专属 box-shadow 环，本块在其内部 outline:none 抑制叠加。 */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* v0.29 P2-2：键盘跳过导航（WCAG 2.4.1）—— 视觉隐藏，键盘聚焦时显形 */
+.skip-link {
+  position: absolute; left: -9999px; top: 0;
+  background: var(--accent); color: #fff;
+  padding: 8px 16px; border-radius: 0 0 8px 0;
+  font-size: 13px; font-weight: 600; z-index: 999;
+  text-decoration: none;
+}
+.skip-link:focus-visible { left: 0; outline-offset: 0; }
+
+/* v0.29 P2-4：思考提示的骨架占位（与消息气泡同节奏，模拟 2-3 行待渲染文本） */
+.skeleton-bubble {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px; margin-top: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  max-width: 70%;
+}
+.skeleton-line {
+  height: 10px; border-radius: 4px;
+  background: linear-gradient(90deg,
+    var(--border-subtle) 0%,
+    var(--border) 40%,
+    var(--border-subtle) 80%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-line.w-100 { width: 100%; }
+.skeleton-line.w-90  { width: 90%; animation-delay: .15s; }
+.skeleton-line.w-70  { width: 70%; animation-delay: .3s; }
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line { animation: none; background: var(--border); }
+}
+</style>
+</head>
+<body>
+
+<!-- v0.29 P2-2：键盘跳过导航（WCAG 2.4.1） -->
+<a class="skip-link" href="#chat-window">跳到对话区</a>
+
+<!-- 顶栏 -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo"><img src="assets/icons/graduation-cap.svg" alt="毕业帽" class="logo-svg" /></div>
+    <div>
+      <div class="brand-name">Émile Novis · 教育者</div>
+      <div class="brand-sub">Pedagogical Agent with Evolving Growth · 自我更新的教育者</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" title="切换深色/浅色模式" aria-label="切换深色/浅色模式">
+      <img src="assets/icons/lightbulb.svg" alt="主题" id="theme-icon" />
+    </button>
+    <span class="conn-dot" id="conn-status">服务在线</span>
+    <span class="user-badge" id="user-badge" style="display:none"></span>
+    <button class="user-btn" id="user-btn">登录/注册</button>
+    <a class="weather-link" href="/weather.html" title="查看气象图（Windy + 位置共享）">气象</a>
+    <div class="mode-switch" role="tablist" aria-label="对话模式">
+      <button class="mode-btn active" data-mode="teach" role="tab" aria-selected="true">学科教学</button>
+      <button class="mode-btn" data-mode="chat" role="tab" aria-selected="false">闲聊~</button>
+      <button class="mode-btn" data-mode="answer" title="直接给完整答案（论述/计算/证明题）" role="tab" aria-selected="false">找答案</button>
+      <button class="mode-btn" data-mode="method" title="问某门课该怎么学、怎么复习、怎么规划" role="tab" aria-selected="false">学习方法</button>
+      <button class="mode-btn" data-mode="knowledge" title="查看我的知识库：我收着哪些资料" role="tab" aria-selected="false">知识库</button>
+      <button class="mode-btn" data-mode="affection" title="难过、焦虑、迷茫……想找人说说话" role="tab" aria-selected="false">倾诉</button>
+    </div>
+  </div>
+</header>
+
+<!-- v0.14：注册/登录弹窗 -->
+<div class="auth-modal" id="auth-modal" role="dialog" aria-modal="true" aria-label="登录或注册">
+  <div class="auth-card">
+    <button class="auth-close" id="auth-close">×</button>
+    <h2>PAEG 学习账户</h2>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login">登录</button>
+      <button class="auth-tab" id="tab-register">注册</button>
+    </div>
+    <input class="auth-input" id="auth-identifier" type="text" placeholder="邮箱或手机号" aria-label="邮箱或手机号" />
+    <input class="auth-input" id="auth-password" type="password" placeholder="密码（至少 6 位）" aria-label="密码" />
+    <input class="auth-input" id="auth-nickname" type="text" placeholder="昵称（注册时填写，可选）" aria-label="昵称（可选）" style="display:none" />
+    <button class="auth-submit" id="auth-submit">登录</button>
+    <div class="auth-msg" id="auth-msg"></div>
+  </div>
+</div>
+
+<!-- 主体 -->
+<main class="main">
+
+  <!-- 左栏 -->
+  <aside class="sidebar">
+    <div class="card">
+      <h3>学习者画像 <button class="desc-toggle" id="desc-toggle">告诉老师你是谁</button></h3>
+      <div class="profile-head">
+        <div class="avatar" id="learner-avatar" title="点击更换头像"><span class="avatar-text">学</span><span class="avatar-hint">点击更换头像</span></div>
+        <div>
+          <div class="profile-name" id="learner-name">学习者</div>
+          <div class="profile-meta" id="learner-meta">高中 · 视觉型</div>
+        </div>
+      </div>
+      <input type="file" id="avatar-input" accept="image/*" style="display:none"/>
+      <div class="desc-editor" id="desc-editor">
+        <textarea class="desc-textarea" id="desc-textarea"
+          placeholder="例如：我是小林，高三理科生。目标是通过高考考上复旦大学，未来想学医。我擅长物理数学，不擅长死记硬背，喜欢理解原理。最近有点焦虑…"
+          aria-label="描述你的学习情况和目标"></textarea>
+        <button class="desc-save" id="desc-save">保存（每次对话都会记住）</button>
+        <div class="desc-hint">写下你是怎样的人、学习目标、擅长与不擅长——之后每一次对话，PAEG 都会带着这段描述来教你。</div>
+      </div>
+      <div class="mastery-list" id="mastery-list"><!-- 动态 --></div>
+    </div>
+
+    <div class="card">
+      <h3>学习数据</h3>
+      <div class="stat-grid">
+        <div class="stat-cell"><div class="num" id="stat-sessions">-</div><div class="lbl">教学会话</div></div>
+        <div class="stat-cell"><div class="num" id="stat-avg">-</div><div class="lbl">平均掌握</div></div>
+        <div class="stat-cell"><div class="num" id="stat-reflect">-</div><div class="lbl">反思记录</div></div>
+        <div class="stat-cell"><div class="num" id="stat-version">-</div><div class="lbl">版本迭代</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>元认知日志</h3>
+      <div class="log-list" id="log-list">
+<div class="empty-state" role="status">
+          <img class="empty-icon" src="assets/icons/brain.svg" alt="" aria-hidden="true" />
+          <div class="empty-title">还没有反思记录</div>
+          <div class="empty-desc">开始几次对话后，老师会在这里整理你的学习轨迹与建议。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- v0.18.1：历史会话（登录后可用） -->
+    <div class="card" id="conv-card">
+      <h3>历史会话 <button class="desc-toggle" id="conv-clear" title="清空全部会话" style="display:none">清空</button></h3>
+      <div class="conv-list" id="conv-list">
+<div class="empty-state" role="status">
+          <img class="empty-icon" src="assets/icons/message-circle.svg" alt="" aria-hidden="true" />
+          <div class="empty-title">正在加载历史会话…</div>
+          <div class="empty-desc">对话会自动归档到这里；登录账号可跨设备同步。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- v0.17：每日一句 -->
+    <div class="card quote-card" id="quote-card">
+      <h3>今日一句</h3>
+      <div class="q-text" id="quote-text">—</div>
+      <div class="q-author" id="quote-author"></div>
+    </div>
+  </aside>
+
+  <!-- 右栏：对话 -->
+  <section class="chat-area">
+    <div class="chat-header">
+      <span class="title">与 PAEG 对话</span>
+      <span class="meta">基于 DeepSeek 大模型 · 本地中转 · 数据不落第三方</span>
+    </div>
+
+    <div class="chat-window" id="chat-window">
+      <div class="msg paeg">
+        <div class="msg-avatar">É</div>
+        <div class="msg-bubble">
+          你好，我是 <b>Émile Novis</b>，你的老师。<br><br>
+          想学点什么，或者想聊点什么，都可以从这里开始：<br>
+          · <b>学知识</b> —— 数学、物理、哲学……从初高中到考研<br>
+          · <b>做题目</b> —— 说"给我一道经典题"，我给你出题并讲解<br>
+          · <b>聊想法</b> —— 困惑、焦虑、好奇，都可以跟我说<br>
+          · <b>看我的知识库</b> —— 问「<b>知识库</b>」或「<b>你学过什么</b>」，我把收着的资料清点给你看<br>
+           · <b>画知识导图</b> —— 说「<b>思维导图</b>」或「<b>知识框架</b>」，我把知识整理成结构图给你<br>
+           · <b>查资料</b> —— 点输入框旁的「<b>查资料</b>」按钮，我把知识库和网上的资料整理成卡片给你，可点击查看<br>
+           · <b>做 PPT</b> —— 说「<b>根据这些资料制作 PPT</b>」或「<b>把这个主题整理成演示文稿</b>」，我把内容做成可下载的演示文稿<br>
+           · <b>认识我</b> —— 问「<b>你是谁</b>」或「<b>你有哪些功能</b>」，我把我的身份和能做的事讲给你听<br><br>
+          <span style="font-size:12.5px;color:var(--text-dim)">想生成文档？对话里带上：<b>讲义</b> / <b>要点</b> / <b>例题</b> / <b>笔记</b>，我会把讨论内容整理成文件供你下载。想让我记住你的情况，点左侧栏「告诉老师你是谁」。</span><br><br>
+          试着问我：「什么是熵？」——或者，就从你现在心里想的那件事开始。<br>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-bar">
+      <!-- v0.40.2 ⭐ 长按语音浮动气泡（微信"按住说话"式）：长按输入框时浮现，半透明浅绿 -->
+      <div class="voice-popover" id="voice-popover" role="status" aria-live="polite">
+        <svg class="vp-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        <div class="vp-text" id="vp-text">松开发送 · 上滑取消</div>
+        <div class="vp-waves"><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
+      <select class="subject-select" id="grade-select" aria-label="学段">
+        <option value="">不限</option>
+        <option value="middle_school">初中</option>
+        <option value="high_school" selected>高中</option>
+        <option value="undergraduate">大学本科</option>
+        <option value="graduate_exam">考研</option>
+        <option value="all_grades">通识素养</option>
+      </select>
+      <select class="subject-select" id="subject-select" aria-label="学科">
+        <!-- 学科选项由 JS 按学段动态生成（v0.25 学段-学科联动） -->
+      </select>
+      <select class="subject-select" id="subfield-select" disabled title="三级学科：按学段与一级学科过滤" aria-label="二级学科">
+        <option value="">不限</option>
+      </select>
+      <input class="question-input" id="question-input" type="text" placeholder="输入你想学习的内容…" autocomplete="off" aria-label="输入你想学习的内容" />
+      <!-- v0.40 ⭐ 录音波形指示器（豆包式：录音时显示音波动画） -->
+      <div class="voice-waves" id="voice-waves" role="status" aria-label="正在录音"><span></span><span></span><span></span><span></span><span></span></div>
+      <!-- v0.19 P2-10：图片/文件上传 -->
+      <label class="upload-btn" id="upload-btn" title="上传图片/文件" aria-label="上传图片或文件">
+        <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.md,.txt" style="display:none" />
+        <img class="upload-btn-icon" src="assets/icons/upload.svg" alt="上传" />
+      </label>
+      <!-- v0.19.11：资料上传（存入个人资料库，Agent 回答时参考） -->
+      <label class="upload-btn" id="lib-upload-btn" title="上传资料到个人资料库（回答时自动参考）" aria-label="上传资料到个人资料库">
+        <input type="file" id="lib-input" accept=".pdf,.md,.txt,.docx,.csv,.json,.png,.jpg" style="display:none" />
+        <img class="upload-btn-icon" src="assets/icons/book-open.svg" alt="资料" />
+      </label>
+      <!-- v0.36 ⭐ 语音输入按钮（Web Speech API，Chrome/Edge 推荐） -->
+      <button class="upload-btn" id="voice-btn" title="语音输入（Chrome/Edge 推荐）" aria-label="语音输入">
+        <img class="upload-btn-icon" src="assets/icons/mic.svg" alt="语音" />
+      </button>
+      <button class="ask-btn" id="ask-btn">发送</button>
+    </div>
+
+    <div class="subject-chips">
+      <img src="assets/icons/sparkles.svg" alt="" class="chips-icon" />
+      <span style="font-size:12px;color:var(--text-dim);line-height:26px">试试：</span>
+      <button class="chip" data-q="什么是熵？">什么是熵？</button>
+      <button class="chip" data-q="为什么负负得正？">为什么负负得正？</button>
+      <button class="chip" data-q="电车难题该拉开关吗？">电车难题</button>
+      <button class="chip" data-q="为什么人会感到孤独？">孤独</button>
+      <button class="chip" data-q="极限的 ε-δ 定义是什么？">ε-δ 定义</button>
+    </div>
+
+    <div class="action-bar" id="action-bar">
+      <button class="action-btn" id="act-hint">给我个提示</button>
+      <button class="action-btn" id="act-reexplain">换一种解释</button>
+      <button class="action-btn" id="act-test">测试我一下</button>
+      <button class="action-btn" id="act-example">举个类似例子</button>
+      <!-- v0.x：资料检索（需求C） -->
+      <button class="action-btn" id="resource-btn" title="从知识库/资料库/互联网检索资料">
+        <img class="link-icon" src="assets/icons/search.svg" alt="" style="margin-right:4px"/>查资料
+      </button>
+    </div>
+
+    <div class="generate-bar">
+      <span style="font-size:12px;color:var(--text-dim)">生成文件：</span>
+      <button class="generate-btn" id="gen-quiz">出练习题</button>
+      <button class="generate-btn" id="gen-article">写讲解文章</button>
+      <input class="generate-num" id="gen-num" type="number" min="1" max="10" value="5" title="题目数量" />
+      <span id="gen-result" style="font-size:12px;color:var(--text-dim)"></span>
+    </div>
+  </section>
+</main>
+
+<script>
+// ============================================================
+// PAEG GUI v0.8 - 真实对接后端 API
+// ============================================================
+const API_BASE = '';  // 同源部署，留空
+
+const STATE = {
+  learnerId: (() => {
+    // v0.26：匿名用户"一个用户一个 ID"——优先复用 localStorage 的 ID，否则生成并保存
+    try {
+      const saved = localStorage.getItem('paeg-user');
+      if (saved) {
+        const s = JSON.parse(saved);
+        if (s && s.learnerId) return s.learnerId;
+      }
+    } catch (e) { /* 忽略 */ }
+    const id = 'web_' + Math.random().toString(36).slice(2, 10);
+    try { localStorage.setItem('paeg-user', JSON.stringify({ learnerId: id, nickname: '学习者' })); } catch (e) {}
+    return id;
+  })(),
+  nickname: '学习者',
+  avatarUrl: '',  // v0.27：用户自定义头像 URL（注册用户由服务器返回，匿名用户存 localStorage）
+  subject: 'physics',
+  sessions: 0,
+  reflections: 0,
+  versions: 0,
+  masteries: {},
+};
+
+const SUBJECT_LABELS = {
+  physics: '物理', math: '数学', chemistry: '化学', biology: '生物',
+  geography: '地理', chinese: '语文', politics: '思想政治', history: '历史', law: '法学',
+  english: '英语', french: '法语', german: '德语', japanese: '日语',
+  philosophy: '哲学', aesthetics: '美学', literature: '文学',
+    ethics: '道德', phenomenology: '现象学',
+    linguistics: '语言学', atmospheric_science: '大气科学',
+  writing: '写作',  // v0.37.1 补全：SUBJECT_GRADES 32 学科全覆盖
+  coding: '信息科技', thinking: '批判性思维', learning: '高效学习法', expression: '公众表达',
+  economics: '经济学',
+  electronics: '电子科学与技术', computer_science: '计算机科学与技术', artificial_intelligence: '人工智能',
+  // 大学起分键（v0.x：与中学/考研键共存，按学段互斥显示）
+  college_chinese: '大学语文', college_english: '大学英语', college_politics: '政治学（专业）',
+};
+
+const TONE_LABELS = {
+  rigorous_cold: '严谨冷峻', contemplative: '沉思内省', warm_caring: '温和关怀',
+  pragmatic: '务实直接', balanced: '平衡中立',
+};
+
+// ─── DOM ───
+const chatWin = document.getElementById('chat-window');
+const questionInput = document.getElementById('question-input');
+const askBtn = document.getElementById('ask-btn');
+
+// ─── v0.25 学段-学科联动 + v0.27 三级级联（学段→一级学科→二级学科）───
+const SUBJECT_MIN_GRADE = {
+  // 初中起（基础学科）
+  'math': 'middle_school', 'physics': 'middle_school', 'chemistry': 'middle_school',
+  'biology': 'middle_school', 'geography': 'middle_school', 'chinese': 'middle_school',
+  'politics': 'middle_school', 'history': 'middle_school',
+  'english': 'middle_school', 'french': 'middle_school', 'german': 'middle_school', 'japanese': 'middle_school',
+  // 高中起（进阶学科）
+  'law': 'high_school', 'economics': 'high_school', 'philosophy': 'high_school',
+  'aesthetics': 'high_school', 'literature': 'high_school', 'ethics': 'high_school',
+  // 通识素养学段（all_grades）：技能/素养类学科——任意学段可见，但选"通识素养"时仅显示这些
+  'coding': 'all_grades', 'thinking': 'all_grades', 'learning': 'all_grades', 'expression': 'all_grades',
+  // 大学起（专业学科，v0.25 新增）
+  'phenomenology': 'undergraduate', 'linguistics': 'undergraduate', 'atmospheric_science': 'undergraduate',
+  'electronics': 'undergraduate', 'computer_science': 'undergraduate', 'artificial_intelligence': 'undergraduate',
+  // 大学起分键（v0.x：仅本科，与对应中学键互斥）
+  'college_chinese': 'undergraduate', 'college_english': 'undergraduate', 'college_politics': 'undergraduate',
+  // 注：原 kaoyan_math / kaoyan_politics 已下沉为 math / politics 的 graduate_exam 二级，无独立一级键
+};
+
+// ─── v0.27：硬编码兜底 SUBFIELD_TREE（API 失败时使用）───
+// 结构：{subject_key: {grade: [{name, tip}]}}
+const SUBFIELD_TREE = {
+  physics: {
+    undergraduate: [
+      { name: '普通物理', tip: '力学、热学、电磁学、光学、原子物理等基础内容' },
+      { name: '数学物理方法', tip: '复变函数、数学物理方程、特殊函数等数学工具' },
+      { name: '四大力学', tip: '理论力学、电动力学、量子力学、热力学与统计物理' },
+    ],
+    graduate_exam: [
+      { name: '量子场论', tip: '场的量子化、规范场论、重整化等研究生阶段内容' },
+    ],
+  },
+  // 其他学科的二级细分由 API 注入；离线兜底仅覆盖已有约定的关键学科
+};
+
+// 本地缓存的学科树（API 加载后填充）
+let SUBJECT_TREE_API = null;  // { grades: [...], subjects: {key: {label, min_grade, grades, subfields}} }
+
+// 按学段过滤可教学科（v0.25 v0.27 兼容 API 数据 + 硬编码兜底）
+// 大学/中学互斥对：避免本科下拉同时出现 chinese 与 college_chinese 等
+const COLLEGE_PAIRS = [
+  ['chinese', 'college_chinese'],
+  ['english', 'college_english'],
+  ['politics', 'college_politics'],
+];
+
+function getAvailableSubjects(grade) {
+  const subjects = {};
+  if (SUBJECT_TREE_API && SUBJECT_TREE_API.subjects) {
+    // 优先 API 数据：用后端的 grades 字段精确过滤（避免 min_grade 累积导致的中学/大学同时出现）
+    Object.keys(SUBJECT_TREE_API.subjects).forEach(k => {
+      const info = SUBJECT_TREE_API.subjects[k] || {};
+      const gradesList = Array.isArray(info.grades) ? info.grades : null;
+      let include;
+      if (!grade || grade === '') {
+        include = true;  // 不限学段：全显示
+      } else if (gradesList) {
+        include = gradesList.includes(grade);
+      } else {
+        // 兜底：grades 字段缺失时退化到 min_grade 累积
+        const minGrade = info.min_grade || SUBJECT_MIN_GRADE[k] || 'middle_school';
+        include = matchesGrade(minGrade, grade);
+      }
+      if (include) subjects[k] = info.label || SUBJECT_LABELS[k] || k;
+    });
+  } else {
+    // 硬编码兜底：用 SUBJECT_MIN_GRADE 累积；再用 college/中学互斥规则消除重复
+    Object.keys(SUBJECT_MIN_GRADE).forEach(k => {
+      if (matchesGrade(SUBJECT_MIN_GRADE[k], grade)) {
+        subjects[k] = SUBJECT_LABELS[k] || k;
+      }
+    });
+    // 互斥：grade 非空时，college_* 与中学键同显则隐藏中学键（college_* 仅本科，语义更精确）
+    if (grade && grade !== '') {
+      COLLEGE_PAIRS.forEach(([mid, college]) => {
+        if (subjects[college] && subjects[mid] && grade === 'undergraduate') {
+          delete subjects[mid];
+        }
+      });
+    }
+  }
+  return subjects;
+}
+
+function matchesGrade(minGrade, grade) {
+  if (!grade || grade === '') return true;  // 不限学段：显示全部
+  // 通识素养学段：仅显示 minGrade === 'all_grades' 的学科
+  if (grade === 'all_grades') return minGrade === 'all_grades';
+  // 通识素养学科：任意学段可见
+  if (minGrade === 'all_grades') return true;
+  if (grade === 'graduate_exam') return minGrade === 'graduate_exam';
+  // 非考研学段：graduate_exam 学科不应出现在此
+  if (minGrade === 'graduate_exam') return false;
+  const order = { middle_school: 0, high_school: 1, undergraduate: 2 };
+  return (order[minGrade] || 0) <= (order[grade] || 0);
+}
+
+function refreshSubjectOptions() {
+  const grade = document.getElementById('grade-select').value;
+  const sel = document.getElementById('subject-select');
+  const current = sel.value;
+  sel.innerHTML = '';
+  // 首项"不限"
+  const optAll = document.createElement('option');
+  optAll.value = '';
+  optAll.textContent = '不限';
+  sel.appendChild(optAll);
+  // 按学段过滤的学科
+  const subjects = getAvailableSubjects(grade);
+  Object.keys(subjects).forEach(k => {
+    const opt = document.createElement('option');
+    opt.value = k;
+    opt.textContent = subjects[k];
+    sel.appendChild(opt);
+  });
+  // 恢复或默认选择
+  if ([...sel.options].some(o => o.value === current)) sel.value = current;
+  else if (sel.options.length) sel.value = '';
+
+  // 刷新后联动刷新二级学科
+  refreshSubfields();
+  if (typeof STATE !== 'undefined') STATE.subject = sel.value;
+}
+
+// 按 (grade, subject) 级联刷新二级学科
+function refreshSubfields() {
+  const grade = document.getElementById('grade-select').value;
+  const subject = document.getElementById('subject-select').value;
+  const sel = document.getElementById('subfield-select');
+  const current = sel.value;
+
+  // 仅当 (grade, subject) 都具体（无空）且该组合定义了 subfields 时启用
+  let subfields = [];
+  if (grade && subject) {
+    // 优先 API 数据
+    if (SUBJECT_TREE_API && SUBJECT_TREE_API.subjects && SUBJECT_TREE_API.subjects[subject]) {
+      const sInfo = SUBJECT_TREE_API.subjects[subject];
+      subfields = (sInfo.subfields && sInfo.subfields[grade]) || [];
+    }
+    // 兜底硬编码
+    if (!subfields.length && SUBFIELD_TREE[subject] && SUBFIELD_TREE[subject][grade]) {
+      subfields = SUBFIELD_TREE[subject][grade];
+    }
+  }
+
+  sel.innerHTML = '';
+  const optAll = document.createElement('option');
+  optAll.value = '';
+  if (!subfields.length) {
+    optAll.textContent = '（本学段无细分）';
+    sel.disabled = true;
+    sel.title = grade && subject ? '本学段与一级学科下暂无二级细分' : '请先选择学段与一级学科';
+  } else {
+    optAll.textContent = '不限';
+    sel.disabled = false;
+    sel.title = '三级学科';
+  }
+  sel.appendChild(optAll);
+
+  subfields.forEach(sf => {
+    const opt = document.createElement('option');
+    opt.value = sf.name;
+    opt.textContent = sf.name;
+    if (sf.tip) opt.title = sf.tip;  // 悬浮显示细分说明
+    sel.appendChild(opt);
+  });
+
+  // 恢复或默认选择（仅当选项仍有效时）
+  if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+  else sel.value = '';
+}
+
+// 加载科目树（API 优先，失败回退硬编码）
+async function loadSubjectTree() {
+  try {
+    const r = await fetch(API_BASE + '/api/subject-tree');
+    if (!r.ok) throw new Error('API ' + r.status);
+    const data = await r.json();
+    if (data && data.subjects) {
+      SUBJECT_TREE_API = data;
+      console.log('[PAEG] subject-tree loaded from API');
+    } else {
+      throw new Error('empty data');
+    }
+  } catch (e) {
+    SUBJECT_TREE_API = null;
+    console.warn('[PAEG] /api/subject-tree 加载失败，使用硬编码回退:', e.message);
+  }
+  // 首次加载或刷新后，重建下拉
+  refreshSubjectOptions();
+}
+
+document.getElementById('grade-select').addEventListener('change', () => {
+  refreshSubjectOptions();   // 切学段→清空一级学科+二级学科
+  // v0.32 ⭐ 学段切换同步到后端画像（防止 SESSIONS 缓存陈旧——此前后端只在首次请求读学段）
+  if (typeof STATE !== 'undefined' && STATE.learnerId) {
+    const _grade = document.getElementById('grade-select').value;
+    fetch(API_BASE + '/api/profile/' + STATE.learnerId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ grade_level: _grade }),
+    }).catch(function (e) {
+      console.warn('[PAEG] 学段同步到后端失败（下次请求仍会带上，不影响使用）:', e);
+    });
+  }
+});
+
+const subjectSelect = document.getElementById('subject-select');
+const subfieldSelect = document.getElementById('subfield-select');
+subjectSelect.addEventListener('change', () => {
+  refreshSubfields();         // 切一级学科→刷新二级学科
+  if (typeof STATE !== 'undefined') STATE.subject = subjectSelect.value;
+});
+
+// ─── 消息渲染 ───
+const INTENT_LABELS = {
+  question: '引导思考', present: '讲解', guide: '启发',
+  practice: '练习', feedback: '反馈', evaluate: '检查理解',
+};
+// v0.17.1：修复 LLM 把公式包在括号里的问题（如 "函数 (f(x)=x^2)"）→ 转为 "$...$"
+// 增强：支持嵌套括号、更多 LaTeX 命令、单字母变量、更长公式（≤120 字符）
+function isFormulaLike(inner) {
+  const s = (inner || '').trim();
+  if (!s) return false;
+  // 特征1：含 = < > ^ 或数学符号
+  if (/[=<>^≤≥≠≈]/.test(s)) return true;
+  // 特征2：含 LaTeX 命令（\ 开头，含常用希腊字母）
+  if (/\\[a-zA-Z]+/.test(s)) return true;
+  // 特征3：数学函数调用形式 f(x) 且含变量/数字/运算符
+  if (/^[a-zA-Zα-ωπ]\s*\([^()]*\)/.test(s) && /[+\-*/×÷0-9a-zA-Zα-ωπ]/.test(s)) return true;
+  // 特征4：纯数学表达式（无汉字，含数字/希腊字母和运算符）
+  if (!/[\u4e00-\u9fff]/.test(s) && /[0-9a-zA-Zα-ωπ]/.test(s) && /[+\-*/^=<>]/.test(s)) return true;
+  // 特征5：单个数学变量（单字母或希腊字母）
+  if (/^[a-zA-Zα-ωπ]$/.test(s)) return true;
+  return false;
+}
+function fixBracketedFormulas(text) {
+  if (!text) return text;
+  let out = '';
+  let i = 0;
+  const len = text.length;
+  while (i < len) {
+    const ch = text[i];
+    // 跳过已存在的 $...$ 或 $$...$$（已被 MathJax 渲染，不二次处理）
+    if (ch === '$') {
+      // 判断是 $$ 还是 $
+      if (text[i + 1] === '$') {
+        // $$...$$ 块级公式
+        let j = i + 2;
+        while (j < len && !(text[j] === '$' && text[j + 1] === '$')) j++;
+        if (j < len) { out += text.slice(i, j + 2); i = j + 2; continue; }
+      } else {
+        // $...$ 行内公式
+        let j = i + 1;
+        let found = false;
+        while (j < len) {
+          if (text[j] === '$') { found = true; break; }
+          if (text[j] === '\n') break;
+          j++;
+        }
+        if (found) { out += text.slice(i, j + 1); i = j + 1; continue; }
+      }
+      out += ch; i++;
+      continue;
+    }
+    if (ch === '(' || ch === '（') {
+      // 找匹配右括号（支持一层嵌套）
+      let depth = 1, j = i + 1, inner = '';
+      while (j < len && depth > 0) {
+        if (text[j] === '(' || text[j] === '（') depth++;
+        else if (text[j] === ')' || text[j] === '）') depth--;
+        if (depth > 0) { inner += text[j]; j++; }
+      }
+      if (depth === 0 && isFormulaLike(inner) && inner.length <= 120) {
+        out += '$' + inner + '$';
+        i = j + 1;
+        continue;
+      }
+      out += ch; i++;
+    } else if (ch === '[') {
+      let j = i + 1, inner = '';
+      while (j < len && text[j] !== ']') { inner += text[j]; j++; }
+      if (j < len && isFormulaLike(inner) && inner.length <= 120) {
+        out += '$' + inner + '$';
+        i = j + 1;
+        continue;
+      }
+      out += ch; i++;
+    } else {
+      out += ch; i++;
+    }
+  }
+  return out;
+}
+
+// v0.17.2：处理 ```math ... ``` 代码块（LLM 常用它包数学）。
+// 提取内容、清理错乱的 $ 分隔符、统一包成 $$...$$（MathJax 显示公式）。
+function fixMathCodeBlocks(text) {
+  if (!text) return text;
+  return text.replace(/```math\s*\n?([\s\S]*?)```/g, (m, inner) => {
+    let body = inner.trim();
+    if (!body) return m;
+    // 去掉混入的行内 $ 分隔符（错乱的），保留 LaTeX 命令和运算符
+    body = body.replace(/\$/g, '').trim();
+    // 如果本身已是 $$...$$ 包裹则保留
+    return '\n\n$$' + body + '$$\n\n';
+  });
+}
+
+// v0.19.1：最终公式消毒——处理不成对/错位的 $（LLM 偶发输出问题）
+function sanitizeFormulas(text) {
+  if (!text) return text;
+  // 计算 $ 总数，若为奇数，说明有未闭合的公式（多半是 LLM 少写了一个 $）
+  // 策略：不强行配对（可能误伤），只修复明显的 `$$` 后跟单个 `$` 的错位
+  // 1) `$$...$$$` → `$$...$$`（块级后多一个 $）
+  text = text.replace(/\$\$([\s\S]*?)\$\$\$/g, '$$$1$$');
+  // 2) `$...$$` → `$...$`（行内闭合符写成了两个）
+  text = text.replace(/(?<!\$)\$([^$\n]{1,120}?)\$\$/g, '$$1$');
+  return text;
+}
+
+function addMsg(role, html, tone, intent, preHtml) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  const avatar = role === 'paeg' ? 'É' : '你';
+  let toneTag = '';
+  if (tone && TONE_LABELS[tone]) toneTag = `<span class="tone-tag">${TONE_LABELS[tone]}</span>`;
+  let intentTag = '';
+  if (intent && INTENT_LABELS[intent]) intentTag = `<span class="intent-tag">${INTENT_LABELS[intent]}</span>`;
+  // v0.14：Markdown 渲染（PAEG 消息是 markdown 内容）
+  // v0.16：preHtml（如 step-tag）不进入 markdown 渲染，避免被转义
+  // v0.17：渲染前修复括号包住的公式（如 "函数 (f(x)=x^2)" → "函数 $f(x)=x^2$"）
+  // v0.17.2：修复 ```math 代码块
+  // v0.19.1：最终公式消毒
+  let fixed = role === 'paeg' ? html : html;
+  if (role === 'paeg') {
+    fixed = fixMathCodeBlocks(fixed);
+    fixed = fixBracketedFormulas(fixed);
+    fixed = sanitizeFormulas(fixed);
+  }
+  let contentHtml;
+  if (role === 'paeg' && typeof marked !== 'undefined' && !fixed.startsWith('出错了')) {
+    try {
+      contentHtml = '<div class="md-content">' + marked.parse(fixed) + '</div>';
+    } catch (e) {
+      contentHtml = fixed;
+    }
+  } else {
+    contentHtml = fixed;
+  }
+  const pre = preHtml || '';
+  // v0.19.3：功能性——复制按钮 + 选择复选框（生成文档）
+  const copyBtn = role === 'paeg'
+    ? `<button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button>` : '';
+  // v0.36 ⭐ 语音播放按钮（调后端 /api/voice/tts 朗读回复）
+  const speakBtn = role === 'paeg'
+    ? `<button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button>` : '';
+  const checkBox = role === 'paeg'
+    ? `<input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" />` : '';
+  div.innerHTML = `
+    <div class="msg-avatar">${avatar}</div>
+    <div class="msg-bubble">${pre}${contentHtml}${intentTag}${toneTag}
+      <div class="msg-actions">${checkBox}${copyBtn}${speakBtn}</div>
+    </div>`;
+  // 保存原始文本（复制用）
+  div._rawText = fixed || html;
+  chatWin.appendChild(div);
+  // v0.16：渲染后触发 MathJax 处理公式
+  renderMath(div);
+  chatWin.scrollTop = chatWin.scrollHeight;
+  return div;
+}
+
+// ─── v0.19.3：复制 + 多选生成文档 ───
+function copyMsg(btn) {
+  const msgDiv = btn.closest('.msg');
+  const text = msgDiv && msgDiv._rawText ? msgDiv._rawText : '';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '已复制';
+      setTimeout(() => { btn.textContent = '复制'; }, 1500);
+    }).catch(() => fallbackCopy(text, btn));
+  } else fallbackCopy(text, btn);
+}
+function fallbackCopy(text, btn) {
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); btn.textContent = '已复制';
+        setTimeout(() => { btn.textContent = '复制'; }, 1500); } catch (e) {}
+  document.body.removeChild(ta);
+}
+let selBar = null;
+function ensureSelectBar() {
+  if (selBar) return selBar;
+  selBar = document.createElement('div');
+  selBar.className = 'select-bar';
+  selBar.innerHTML = `<span>已选 <b id="sel-count">0</b> 条</span>
+    <button class="sel-btn" id="sel-copy">复制选中</button>
+    <button class="sel-btn primary" id="sel-doc">生成文档下载</button>
+    <button class="sel-btn ghost" id="sel-clear">取消</button>`;
+  chatWin.parentNode.insertBefore(selBar, chatWin.nextSibling);
+  document.getElementById('sel-copy').addEventListener('click', copySelected);
+  document.getElementById('sel-doc').addEventListener('click', genSelectedDoc);
+  document.getElementById('sel-clear').addEventListener('click', clearSelection);
+  return selBar;
+}
+function updateSelCount() {
+  const n = document.querySelectorAll('.msg-select:checked').length;
+  const bar = ensureSelectBar();
+  const cnt = document.getElementById('sel-count');
+  if (cnt) cnt.textContent = n;
+  bar.style.display = n > 0 ? 'flex' : 'none';
+}
+document.addEventListener('change', (e) => {
+  if (e.target.classList && e.target.classList.contains('msg-select')) updateSelCount();
+});
+function clearSelection() {
+  document.querySelectorAll('.msg-select:checked').forEach(c => c.checked = false);
+  updateSelCount();
+}
+function copySelected() {
+  const texts = [];
+  document.querySelectorAll('.msg.paeg').forEach(m => {
+    if (m.querySelector('.msg-select:checked') && m._rawText) texts.push(m._rawText);
+  });
+  if (!texts.length) return;
+  const all = texts.join('\n\n---\n\n');
+  if (navigator.clipboard) navigator.clipboard.writeText(all).then(() => alert('已复制选中内容'));
+}
+async function genSelectedDoc() {
+  const items = [];
+  document.querySelectorAll('.msg.paeg').forEach(m => {
+    if (m.querySelector('.msg-select:checked') && m._rawText) {
+      items.push({ role: 'Émile', content: m._rawText });
+    }
+  });
+  if (!items.length) { alert('请先选择回复'); return; }
+  const title = 'PAEG学习笔记_' + new Date().toISOString().slice(0, 10);
+  const content = items.map(it => `## Émile\n\n${it.content}`).join('\n\n');
+  try {
+    const r = await api('/api/save-document', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, content, subject: '学习笔记' }),
+    });
+    if (r.ok) { alert(`文档已生成：${r.filename}`); window.open(r.md_url, '_blank'); clearSelection(); }
+    else alert('生成失败: ' + (r.error || ''));
+  } catch (e) { alert('生成失败: ' + e.message); }
+}
+
+// v0.17：阶段化思考提示（教学 vs 闲聊不同阶段文案，参考 Perplexity/Claude 等待设计）
+const THINK_STAGES_TEACH = [
+  '正在理解你的问题',
+  '正在检索相关的知识点',
+  '正在构思适合你的讲解',
+  '正在写下讲解',
+];
+const THINK_STAGES_CHAT = [
+  '正在听你说',
+  '正在琢磨你说的意思',
+  '正在想怎样回应你',
+];
+function addThinking(mode) {
+  const div = document.createElement('div');
+  div.className = 'msg paeg';
+  const stages = mode === 'chat' ? THINK_STAGES_CHAT : THINK_STAGES_TEACH;
+  let si = 0;
+  const inner = document.createElement('div');
+  inner.className = 'msg-bubble';
+  const box = document.createElement('div');
+  box.className = 'thinking-box';
+  box.innerHTML = `<span class="th-spinner"></span><span class="th-text">${stages[0]}<span class="th-dots"></span></span>`;
+  inner.appendChild(box);
+  /* v0.29 P2-4：骨架占位（与思考文字同级，显示待渲染内容的视觉提示） */
+  const skeleton = document.createElement('div');
+  skeleton.className = 'skeleton-bubble';
+  skeleton.setAttribute('role', 'status');
+  skeleton.setAttribute('aria-live', 'polite');
+  skeleton.setAttribute('aria-label', '正在生成回答');
+  skeleton.innerHTML = '<div class="skeleton-line w-100"></div><div class="skeleton-line w-90"></div><div class="skeleton-line w-70"></div>';
+  inner.appendChild(skeleton);
+  div.appendChild(inner);
+  chatWin.appendChild(div);
+  chatWin.scrollTop = chatWin.scrollHeight;
+  // 阶段轮换：每 2.2s 进入下一阶段（纯前端预制，不等后端）
+  div._stageTimer = setInterval(() => {
+    si = (si + 1) % stages.length;
+    const t = box.querySelector('.th-text');
+    if (t) t.firstChild.textContent = stages[si];
+  }, 2200);
+  return div;
+}
+
+// 移除思考提示（清理定时器；P2-4：骨架随消息容器一起被 div.remove() 回收，无需单独清）
+function removeThinking(div) {
+  if (div && div._stageTimer) { clearInterval(div._stageTimer); div._stageTimer = null; }
+  if (div) div.remove();
+}
+
+// v0.36 ⭐ 教学阶段指示器：SSE 事件驱动更新思考框文字
+// addThinking 创建的 th-text 结构：firstChild(纯文字) + <span.th-dots/>
+// 无 <b>，用 firstChild 直接替换文字最兼容；3 秒后自动恢复"正在思考"
+let _stageRestoreTimer = null;
+function updateTeachingStage(text) {
+  const box = document.querySelector('.thinking-box .th-text');
+  if (!box) return;
+  // 直接替换首文本节点（th-text 结构为：[text, <span.th-dots>]）
+  if (box.firstChild && box.firstChild.nodeType === 3) {
+    box.firstChild.nodeValue = text;
+  } else {
+    // 兜底：插入文字节点并补上 dots
+    box.innerHTML = `${text}<span class="th-dots"></span>`;
+  }
+  // 阶段文字 3 秒后恢复默认（避免残留）；期间后续事件会覆盖
+  if (_stageRestoreTimer) clearTimeout(_stageRestoreTimer);
+  _stageRestoreTimer = setTimeout(() => {
+    const b2 = document.querySelector('.thinking-box .th-text');
+    if (b2 && b2.firstChild && b2.firstChild.nodeType === 3 && b2.firstChild.nodeValue === text) {
+      b2.firstChild.nodeValue = '正在思考';
+    }
+  }, 3000);
+}
+
+// 加载每日一句（v0.17）
+async function loadDailyQuote() {
+  try {
+    const q = await api('/api/quote');
+    const t = document.getElementById('quote-text');
+    const a = document.getElementById('quote-author');
+    if (t) t.textContent = '「' + q.text + '」';
+    if (a) a.textContent = '—— ' + q.author + (q.source ? ' · ' + q.source : '');
+  } catch (e) { /* 服务离线时静默 */ }
+}
+
+// ─── 后端调用 ───
+async function api(path, options, method) {
+  const opts = options || {};
+  if (method) opts.method = method;
+  if (opts.body && typeof opts.body !== 'string') opts.body = JSON.stringify(opts.body);
+  const resp = await fetch(API_BASE + path, opts);
+  if (!resp.ok) {
+    // v0.26：优先解析 JSON error 字段（友好提示），否则才显示 HTTP 状态码
+    const errText = await resp.text();
+    let friendly = null;
+    try {
+      const parsed = JSON.parse(errText);
+      if (parsed && parsed.error) friendly = parsed.error;
+      else if (parsed && parsed.message) friendly = parsed.message;
+    } catch (e) { /* 非 JSON 错误体 */ }
+    const msg = friendly || `请求失败（HTTP ${resp.status}）`;
+    const err = new Error(msg);
+    err.status = resp.status;
+    err.friendly = friendly || '';
+    throw err;
+  }
+  return resp.json();
+}
+
+// 转义 HTML（防止会话标题中的特殊字符破坏 DOM）
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
+
+// v0.28：在气泡顶部插入"已完成检索"徽章。
+//   - 去重：同一气泡内仅首次插入有效（用 _retrievalBadgeShown 标志挂在气泡 DOM 上）
+//   - XSS：done 值经 escapeHtml 转义
+//   - 不依赖具体文案：data.done 取值（"知识库检索"/未来"网络检索" 等）原样渲染
+function insertRetrievalBadge(bubble, done) {
+  if (!bubble) return;
+  if (bubble._retrievalBadgeShown) return;  // 一次对话多次 retrieval → 只显示一次
+  bubble._retrievalBadgeShown = true;
+  const bubbleBody = bubble.querySelector('.msg-bubble');
+  if (!bubbleBody) return;
+  const badge = document.createElement('div');
+  badge.className = 'retrieval-badge';
+  badge.innerHTML = `<span class="check">✓</span>已完成<span class="label-name">${escapeHtml(done || '检索')}</span>`;
+  // 插到 .msg-bubble 内顶部（在 .md-content 等任何后续元素之前）
+  bubbleBody.insertBefore(badge, bubbleBody.firstChild);
+}
+
+async function checkHealth() {
+  try {
+    const h = await api('/api/health');
+    document.getElementById('conn-status').textContent = '服务在线';
+    document.getElementById('conn-status').className = 'conn-dot';
+    // v0.21.3：恢复持久化登录态（刷新后保持登录，历史会话可用）
+    restoreLoginState();
+    // 同步学习者画像
+    loadProfile();
+    // v0.27 ⭐ 元认知日志（画像）持久化：必须在 learnerId 恢复后加载，
+    // 否则刷新后 stat-reflect/学习记录丢失（此前 loadMetaLog 在 checkHealth 外先跑）
+    loadMetaLog();
+    return h;
+  } catch (e) {
+    document.getElementById('conn-status').textContent = '服务离线';
+    document.getElementById('conn-status').className = 'conn-dot offline';
+    return null;
+  }
+}
+
+// v0.21.3 + v0.26：从 localStorage 恢复登录态
+// v0.26 修复：①匿名用户持久化（刷新后 ID 不变，每用户唯一）②匿名账号不显示"已登录"UI
+function restoreLoginState() {
+  try {
+    const raw = localStorage.getItem('paeg-user');
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (!saved || !saved.learnerId) return;
+    // 恢复 learnerId（web_ 匿名 + u 注册都恢复，保证匿名用户唯一 ID）
+    STATE.learnerId = saved.learnerId;
+    STATE.nickname = saved.nickname || '学习者';
+    // 只有注册用户（u 前缀）才显示"已登录"状态（徽章+退出按钮）
+    const isRegistered = String(saved.learnerId).startsWith('u');
+    document.getElementById('learner-name').textContent = STATE.nickname;
+    // v0.27：恢复头像（localStorage 兜底，loadProfile 后会用服务器覆盖）
+    renderAvatar();
+    if (isRegistered) {
+      document.getElementById('user-badge').textContent = STATE.nickname;
+      document.getElementById('user-badge').style.display = '';
+      document.getElementById('user-btn').textContent = '退出';
+      document.getElementById('conv-clear').style.display = '';
+      // 历史会话列表（注册用户）
+      loadConversations();
+    } else {
+      // 匿名用户：不显示登录状态（保持"登录/注册"按钮 + 无徽章），只恢复唯一 ID
+      // v0.36.2 ⭐ 修复：匿名用户也加载历史（后端已支持 web_xxx 落盘），不再"数据存在但看不到"
+      // v0.36.2 ⭐ 修复：匿名用户也可清空全部会话（与注册用户一致）
+      document.getElementById('user-badge').style.display = 'none';
+      document.getElementById('user-btn').textContent = '登录/注册';
+      document.getElementById('conv-clear').style.display = '';
+      loadConversations();
+    }
+  } catch (e) {
+    console.error('[restoreLoginState]', e);
+  }
+}
+
+async function loadProfile() {
+  try {
+    const p = await api(`/api/profile/${STATE.learnerId}`);
+    renderMastery(p.subjects_mastery || {});
+    // 加载自我描述（v0.10）
+    if (p.self_description) {
+      document.getElementById('desc-textarea').value = p.self_description;
+    }
+    if (p.nickname) {
+      document.getElementById('learner-name').textContent = p.nickname;
+      // v0.41.1 ⭐ 修复：同步 STATE.nickname + localStorage——
+      // 此前只更新显示，聊天请求仍用 STATE.nickname（默认"学习者"）→ 智能体称呼错误
+      STATE.nickname = p.nickname;
+      try {
+        const _u = JSON.parse(localStorage.getItem('paeg-user') || '{}');
+        _u.nickname = p.nickname;
+        localStorage.setItem('paeg-user', JSON.stringify(_u));
+      } catch (e) { /* 忽略 */ }
+      const _badge = document.getElementById('user-badge');
+      if (_badge) _badge.textContent = p.nickname;
+    }
+    // v0.27：服务器返回的 avatar_url 优先（注册用户跨设备生效）
+    if (p.avatar_url) {
+      STATE.avatarUrl = p.avatar_url;
+      try { localStorage.setItem('paeg-avatar', p.avatar_url); } catch (e) {}
+      renderAvatar();
+    }
+  } catch (e) {
+    // 新学习者，暂无画像
+  }
+}
+
+// ─── v0.27：自定义头像 ───
+// 渲染头像：有 URL 则显示图片，否则显示昵称首字符
+function renderAvatar() {
+  const box = document.getElementById('learner-avatar');
+  if (!box) return;
+  // 优先 STATE.avatarUrl，其次 localStorage（匿名用户持久化）
+  let url = STATE.avatarUrl;
+  if (!url) {
+    try { url = localStorage.getItem('paeg-avatar') || ''; } catch (e) { url = ''; }
+  }
+  const initial = (STATE.nickname || '学习者').trim().charAt(0) || '学';
+  if (url) {
+    box.innerHTML = `<img src="${escapeHtml(url)}" alt="头像" onerror="this.parentNode.innerHTML='<span class=\\'avatar-text\\'>${escapeHtml(initial)}</span><span class=\\'avatar-hint\\'>点击更换头像</span>'"/><span class="avatar-hint">点击更换头像</span>`;
+  } else {
+    box.innerHTML = `<span class="avatar-text">${escapeHtml(initial)}</span><span class="avatar-hint">点击更换头像</span>`;
+  }
+}
+
+// 点击头像 → 触发文件选择 → 上传到 /api/avatar
+document.getElementById('learner-avatar').addEventListener('click', () => {
+  document.getElementById('avatar-input').click();
+});
+
+document.getElementById('avatar-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    alert('请选择图片文件');
+    e.target.value = '';
+    return;
+  }
+  // 客户端大小检查（>5MB 直接拒绝，避免大请求）
+  if (file.size > 5 * 1024 * 1024) {
+    alert('图片过大（>5MB），请压缩后再上传');
+    e.target.value = '';
+    return;
+  }
+  const fd = new FormData();
+  fd.append('avatar', file);
+  fd.append('learner_id', STATE.learnerId);
+  try {
+    const r = await fetch(API_BASE + '/api/avatar', { method: 'POST', body: fd });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) {
+      alert('头像上传失败: ' + (j.error || r.status));
+      return;
+    }
+    // 成功：保存到 STATE + localStorage + 重渲染
+    STATE.avatarUrl = j.url;
+    try { localStorage.setItem('paeg-avatar', j.url); } catch (e2) {}
+    renderAvatar();
+    // 轻提示
+    addMsg('paeg', '<span style="color:var(--success,#5cd6a4)">✓ 头像已更新</span>');
+  } catch (err) {
+    alert('头像上传失败: ' + err.message);
+  } finally {
+    e.target.value = '';  // 允许重选同一文件
+  }
+});
+
+// ─── 自我描述编辑（v0.10） ───
+document.getElementById('desc-toggle').addEventListener('click', () => {
+  document.getElementById('desc-editor').classList.toggle('open');
+});
+
+document.getElementById('desc-save').addEventListener('click', async () => {
+  const desc = document.getElementById('desc-textarea').value.trim();
+  const btn = document.getElementById('desc-save');
+  btn.disabled = true;
+  btn.textContent = '保存中…';
+  try {
+    await api(`/api/profile/${STATE.learnerId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ self_description: desc }),
+    });
+    btn.textContent = '已保存';
+    setTimeout(() => { btn.textContent = '保存（每次对话都会记住）'; btn.disabled = false; }, 1500);
+  } catch (e) {
+    btn.textContent = '保存失败';
+    btn.disabled = false;
+  }
+});
+
+async function loadMetaLog() {
+  try {
+    const m = await api(`/api/meta-log/${STATE.learnerId}`);
+    STATE.reflections = m.total || 0;
+    renderLogs(m.logs || []);
+    updateStats();
+  } catch (e) { /* ignore */ }
+}
+
+function renderMastery(masteries) {
+  const list = document.getElementById('mastery-list');
+  const entries = Object.entries(masteries).slice(0, 8);
+  if (!entries.length) {
+    // v0.36 ⭐ 未登录提示：换设备/浏览器后匿名数据不跨设备，登录账号可同步
+    const isAnon = !(window.STATE && STATE.learnerId && String(STATE.learnerId).startsWith('u'));
+    list.innerHTML = `<div style="font-size:12.5px;color:var(--text-dim)">
+      暂无学习记录${isAnon ? '，登录账号后可跨设备同步' : ''}。开始第一次对话吧</div>`;
+    return;
+  }
+  list.innerHTML = entries.map(([subj, v]) => {
+    // v0.36.3 ⭐ 修复：兼容两种掌握度结构（旧 mastery / 新 level——LLM 建模写入的 evidence 结构）
+    const m = typeof v === 'object' ? (v.mastery ?? v.level ?? 0) : v;
+    const pct = Math.round((m || 0) * 100);
+    const label = SUBJECT_LABELS[subj] || subj;
+    return `
+      <div class="mastery-item">
+        <div class="mastery-row"><span class="subj">${label}</span><span class="val">${pct}%</span></div>
+        <div class="mastery-bar"><i style="width:${pct}%"></i></div>
+      </div>`;
+  }).join('');
+}
+
+function renderLogs(logs) {
+  const list = document.getElementById('log-list');
+  if (!logs.length) {
+    // v0.36 ⭐ 未登录提示：匿名用户数据不跨设备，登录账号可同步
+    const isAnon = !(window.STATE && STATE.learnerId && String(STATE.learnerId).startsWith('u'));
+    list.innerHTML = `<div class="empty-state" role="status">
+        <img class="empty-icon" src="assets/icons/brain.svg" alt="" aria-hidden="true" />
+        <div class="empty-title">还没有反思记录</div>
+        <div class="empty-desc">${isAnon ? '登录账号后，老师会在这里整理你的学习轨迹（跨设备同步）。' : '开始几次对话后，老师会在这里整理你的学习轨迹与建议。'}</div>
+      </div>`;
+    return;
+  }
+  list.innerHTML = logs.slice(0, 8).map(l => {
+    // v0.32 ⭐ meta-log 接入 LLM 建模：识别 type=="user_modeling" 的记录，从顶层字段拼装展示
+    // —— v0.27 修复：reflection 可能是对象（反思 dict），需安全提取字符串
+    let txt = '';
+    if (l.reflection && typeof l.reflection === 'object' && l.reflection.type === 'user_modeling') {
+      const m = l.reflection;
+      const ks = (m.knowledge_strengths || []).slice(0, 2).join('、');
+      const kg = (m.knowledge_gaps || []).slice(0, 2).join('、');
+      // v0.41.4 ⭐ 修复：LLM 建模输出的是英文枚举（visual/neutral 等），此前原样显示
+      // → 用户看到"风 visual / 情 neutral"等奇怪词。加枚举→中文映射表统一展示。
+      const LS_CN = {visual:'视觉型', auditory:'听觉型', reading:'读写型', kinesthetic:'动觉型', mixed:'混合型'};
+      const EMO_CN = {anxious:'焦虑', engaged:'投入', neutral:'平静', withdrawn:'退缩', unknown:'未知', '':''};
+      const ls = m.learning_style || '';
+      const emo = m.emotional_tendency || '';
+      // 长句（LLM 越界输出）截断到 12 字，避免刷屏
+      const lsCn = LS_CN[ls] || (ls.length > 8 ? ls.slice(0, 8) + '…' : ls);
+      const emoCn = (emo !== '未知' && emo !== 'unknown') ? (EMO_CN[emo] || (emo.length > 8 ? emo.slice(0, 8) + '…' : emo)) : '';
+      const parts = [];
+      if (ks) parts.push(`擅长 ${ks}`);
+      if (kg) parts.push(`薄弱 ${kg}`);
+      if (lsCn) parts.push(`风格 ${lsCn}`);
+      if (emoCn) parts.push(`情绪 ${emoCn}`);
+      // v0.40.4 ⭐ 修复：emoji 🎯 → 无 emoji（用户要求）；SVG 图标在 log-item 模板中渲染
+      txt = parts.length ? `建模 · ${parts.join(' · ')}` : (m.reflection || '建模');
+    } else {
+      // v0.36.1 ⭐ 修复：非 user_modeling 记录（self_reflect/adaptation 等）不再显示用户原始提问（l.concept），
+      // 否则元认知日志看起来像"对话历史"。改为展示反思实际内容（notes/总结/决策）。
+      const rf = (typeof l.reflection === 'object') ? l.reflection : null;
+      if (rf && rf.type === 'self_reflect') {
+        txt = rf.notes || rf.summary || '教学自检';
+      } else if (rf && rf.type === 'adaptation') {
+        txt = (rf.details ? (typeof rf.details === 'string' ? rf.details : JSON.stringify(rf.details)) : '') || ('策略调整' + (rf.decision ? `：${rf.decision}` : ''));
+      } else {
+        const r = (typeof l.reflection === 'string') ? l.reflection
+                 : (rf) ? (rf.notes || rf.summary || '')
+                 : '';
+        txt = r || l.note || '教学记录';
+      }
+    }
+    // v0.40.4 ⭐ user_modeling 记录显示 SVG 图标（替代 emoji，符合无 emoji 规范）
+    const isModeling = !!(l.reflection && typeof l.reflection === 'object' && l.reflection.type === 'user_modeling');
+    // v0.40.5 ⭐ 修复：①渲染用户名（localStorage paeg-user 优先 → STATE.nickname → 日志字段 → learner_id）
+    // ②txt 用 escapeHtml（防特殊字符/换行错乱）
+    // 根因：此前 STATE.nickname 默认"学习者"，且未读 localStorage 真实昵称"团聚体"
+    let _savedNick = '';
+    try {
+      const _rawUser = localStorage.getItem('paeg-user');
+      const _savedUser = _rawUser ? JSON.parse(_rawUser) : null;
+      if (_savedUser && _savedUser.nickname) _savedNick = String(_savedUser.nickname).trim();
+    } catch (e) { /* 忽略 */ }
+    const _stateNick = (window.STATE && STATE.nickname) ? String(STATE.nickname).trim() : '';
+    const _logNick = l.nickname ? String(l.nickname).trim() : '';
+    const displayName = _savedNick || _stateNick || _logNick || l.learner_id || '匿名';
+    return `
+    <div class="log-item">
+      <div class="log-head">
+        <div class="time">${(l.timestamp || '').slice(5, 16)}</div>
+        <div class="name">${escapeHtml(String(displayName).slice(0, 12))}</div>
+      </div>
+      ${isModeling ? `<svg class="log-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>` : ''}
+      <div class="txt">${escapeHtml(String(txt).slice(0, 80))}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateStats() {
+  document.getElementById('stat-sessions').textContent = STATE.sessions;
+  document.getElementById('stat-reflect').textContent = STATE.reflections;
+  document.getElementById('stat-version').textContent = STATE.versions;
+  const vals = Object.values(STATE.masteries).map(v => typeof v === 'object' ? (v.mastery ?? v.level ?? 0) : v);
+  document.getElementById('stat-avg').textContent = vals.length
+    ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '-';
+}
+
+// ─── 教学主流程（v0.19：流式输出） ───
+async function teach(question, subject, subtopic) {
+  const thinking = addThinking('teach');
+  askBtn.disabled = true;
+  // v0.27 ⭐ 需求：生成中可打断——发送按钮变为"■ 停止"，点击停止
+  if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
+  const controller = new AbortController();
+  window._genAbort = controller;
+  window._showStopBtn = () => {
+    try {
+      const ab = document.getElementById('ask-btn');
+      ab.textContent = '■ 停止';
+      ab.dataset.generating = '1';
+    } catch(e){}
+  };
+  window._hideStopBtn = () => {
+    try {
+      const ab = document.getElementById('ask-btn');
+      ab.textContent = '发送';
+      delete ab.dataset.generating;
+    } catch(e){}
+  };
+  window._showStopBtn();
+  try {
+    const resp = await fetch(API_BASE + '/api/teach/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        learner_id: STATE.learnerId,
+        nickname: STATE.nickname,
+        grade_level: document.getElementById('grade-select').value,
+        // v0.41.6 ⭐ 确定性信号传递：前端已选模式随请求发送（后端据此
+        // 注入提示词并短路 LLM 意图判断——"用户已选闲聊，不必再判断意图"）
+        mode: currentMode,
+        subject: subject,
+        subtopic: subtopic || '',
+        concept: question,
+      }),
+      signal: controller.signal,
+    });
+    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    // v0.19.6：单个连续气泡（像 deepseek 网页端一样完整回答，不拆多个气泡）
+    let allText = '';
+    let mainBubble = null;
+    let lastSummary = '';
+    let lastPresStep = null;  // v0.40.2 分片支持：记录上一个 presentation step_id
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf('\n\n')) !== -1) {
+        const raw = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const evtLine = raw.split('\n')[0] || '';
+        const event = evtLine.startsWith('event:') ? evtLine.slice(6).trim() : 'message';
+        const dataLine = raw.split('\n').find(l => l.startsWith('data:')) || '';
+        const data = dataLine.slice(5).trim();
+        if (!data) continue;
+        let obj;
+        try { obj = JSON.parse(data); } catch (e) { continue; }
+
+        // v0.36 ⭐ 教学阶段事件：驱动思考框文字显示 6 步推理进度
+        // 教学流中 SSE 顺序：diagnosis → plan → step → presentation → evaluation → adjustment → reflection
+        if (event === 'diagnosis') {
+          updateTeachingStage('诊断学情');
+        } else if (event === 'plan') {
+          updateTeachingStage('规划教学路径');
+        } else if (event === 'step') {
+          const sid = obj.step_id || 1;
+          updateTeachingStage(`第 ${sid} 步讲解`);
+        } else if (event === 'presentation') {
+          // 追加到同一气泡（步骤间加空行分隔，不拆气泡）
+          const content = obj.content || obj.text || '';
+          // v0.40.2 ⭐ 分片支持：step_id 变化才插空行（后端现在 60 字分片 yield，
+          // 同一步骤的分片连续追加不插空行；不同步骤间保留分隔）
+          const curStep = obj.step_id || 0;
+          if (allText && lastPresStep && lastPresStep !== curStep && !allText.endsWith('\n\n')) allText += '\n\n';
+          lastPresStep = curStep;
+          allText += content;
+          // 创建或更新单个气泡
+          if (!mainBubble) {
+            mainBubble = document.createElement('div');
+            mainBubble.className = 'msg paeg';
+            mainBubble.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><div class="md-content"></div>
+              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div></div>`;
+            chatWin.appendChild(mainBubble);
+          }
+          // v0.36.1 ⭐ 修复：实时渲染累积内容——此前只追加字符串、最后一次性渲染
+          // （教学模式观感=非流式；chat 路径逐段 appendChild 正常，此处对齐）
+          // v0.40.2 ⭐ 分片流式：每次分片到达即实时渲染（marked 开销可接受，60 字/片）
+          const contentDiv = mainBubble.querySelector('.md-content');
+          const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(allText)));
+          contentDiv.innerHTML = typeof marked !== 'undefined'
+            ? marked.parse(fixedText) : escapeHtml(allText);
+          mainBubble._rawText = allText;
+          renderMath(contentDiv);
+          chatWin.scrollTop = chatWin.scrollHeight;
+        } else if (event === 'retrieval') {
+          // v0.28：检索状态徽章——后端在输出 presentation 前报告已完成何种检索
+          // retrieval 可能先于 presentation 到达 → 需 lazy 创建气泡，保证徽章显示在顶部
+          if (!mainBubble) {
+            mainBubble = document.createElement('div');
+            mainBubble.className = 'msg paeg';
+            mainBubble.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><div class="md-content"></div>
+              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div></div>`;
+            chatWin.appendChild(mainBubble);
+          }
+          insertRetrievalBadge(mainBubble, obj.done);
+          // 流式显示累积内容
+          const contentDiv = mainBubble.querySelector('.md-content');
+          const step = 12;
+          let shown = contentDiv.textContent.length;
+          while (shown < allText.length) {
+            shown = Math.min(shown + step, allText.length);
+            contentDiv.textContent = allText.slice(0, shown);
+            chatWin.scrollTop = chatWin.scrollHeight;
+            await new Promise(r => setTimeout(r, 10));
+          }
+          mainBubble._rawText = allText;
+        } else if (event === 'evaluation') {
+          updateTeachingStage('评估掌握度');
+        } else if (event === 'adjustment') {
+          updateTeachingStage('调整教学策略');
+        } else if (event === 'reflection') {
+          updateTeachingStage('教学反思');
+        } else if (event === 'summary') {
+          lastSummary = obj.avg_score || 0;
+        } else if (event === 'doc') {
+          // v0.19.6：关键词触发文档 → 显示下载链接
+          const typeCn = { 讲义: '讲义', 要点: '要点', 例题: '例题', 笔记: '笔记' }[obj.type] || '文档';
+          addMsg('paeg', `已生成${typeCn}：<b>${escapeHtml(obj.filename || '')}</b><br><br>` +
+            `<a class="download-link" href="${obj.md_url}" download><img class="link-icon" src="assets/icons/download.svg" alt="下载"/> 下载 ${typeCn}</a>` +
+            (obj.html_url ? ` <a class="download-link" href="${obj.html_url}" target="_blank" style="margin-left:10px">预览</a>` : ''));
+        } else if (event === 'done') {
+          // v0.27：消费 done 事件——自动维护学科/学段下拉
+          try {
+            // subject_steered=true 时同步一级学科到 subject_steered_to
+            if (obj.subject_steered && obj.subject_steered_to) {
+              if (SUBJECT_LABELS[obj.subject_steered_to] || (SUBJECT_TREE_API && SUBJECT_TREE_API.subjects && SUBJECT_TREE_API.subjects[obj.subject_steered_to])) {
+                if (subjectSelect.value !== obj.subject_steered_to) {
+                  subjectSelect.value = obj.subject_steered_to;
+                  refreshSubfields();  // 联动刷新二级学科（不主动清，仅当二级不再有效时 refreshSubfields 内部会清）
+                }
+              }
+            } else if (obj.subject_detected) {
+              // 备选：后端报告检测到的学科（仅在用户未选时给个提示，仍以 subject_steered 为准）
+              if (!subjectSelect.value && SUBJECT_LABELS[obj.subject_detected]) {
+                console.log('[PAEG] subject detected:', obj.subject_detected);
+              }
+            }
+            // v0.32 ⭐ grade_blocked 提示但不强制覆盖用户选择（Oracle 方案 A：LLM 是主体，规则只兜底）
+            // 此前强制 gradeSel.value = required_grade 会静默替用户切换学段，且后端缓存未同步导致死循环
+            if (obj.grade_blocked && obj.required_grade) {
+              const gradeLabel = { middle_school: '初中', high_school: '高中', undergraduate: '大学本科', graduate_exam: '考研' }[obj.required_grade] || obj.required_grade;
+              addMsg('paeg', `<small>提示：「${obj.subject_requested || '该学科'}」更适合<b>${gradeLabel}</b>学段。若想正式学习，可在左上角切换学段；当前对话仍会尽量按你的选择继续。</small>`);
+            }
+          } catch (e) {
+            console.warn('[PAEG] done 事件处理异常:', e);
+          }
+          break;
+        }
+      }
+    }
+
+    // 最终渲染（marked + 公式修复 + MathJax）
+    if (mainBubble && allText) {
+      const contentDiv = mainBubble.querySelector('.md-content');
+      const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(allText)));
+      contentDiv.innerHTML = typeof marked !== 'undefined'
+        ? marked.parse(fixedText) : escapeHtml(allText);
+      mainBubble._rawText = allText;
+      renderMath(contentDiv);
+    }
+    if (lastSummary) {
+      addMsg('paeg', `本次教学完成，平均掌握度 <b style="color:var(--accent)">${Number(lastSummary).toFixed(2)}</b>`);
+    }
+    removeThinking(thinking);
+    STATE.sessions++;
+    updateStats();
+    loadMetaLog();
+  } catch (e) {
+    removeThinking(thinking);
+    // v0.27 ⭐ 打断（AbortError）→ 友好提示，不显示"出错了"
+    if (e && (e.name === 'AbortError' || (e.message || '').includes('abort'))) {
+      addMsg('paeg', '<small>已停止生成。你可以继续提问，我会接着聊。</small>');
+      if (mainBubble && allText) {
+        const contentDiv = mainBubble.querySelector('.md-content');
+        if (contentDiv && !contentDiv.textContent.trim()) contentDiv.remove();
+      }
+    } else {
+      addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    }
+  } finally {
+    askBtn.disabled = false;
+    try { window._hideStopBtn && window._hideStopBtn(); } catch(e2){}
+    window._genAbort = null;
+    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+  }
+}
+
+// 创建步骤气泡（占位）
+function makeStepBubble(idx) {
+  const div = document.createElement('div');
+  div.className = 'msg paeg';
+  div.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><span class="step-tag">讲解</span><div class="md-content"></div>
+    <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div>
+  </div>`;
+  chatWin.appendChild(div);
+  chatWin.scrollTop = chatWin.scrollHeight;
+  return div;
+}
+
+// 流式逐字显示
+async function streamIntoBubble(bubble, fullText) {
+  const contentDiv = bubble.querySelector('.md-content');
+  const step = 12;  // 每步字符数
+  let shown = 0;
+  while (shown < fullText.length) {
+    shown = Math.min(shown + step, fullText.length);
+    contentDiv.textContent = fullText.slice(0, shown);
+    chatWin.scrollTop = chatWin.scrollHeight;
+    await new Promise(r => setTimeout(r, 16));
+  }
+}
+
+// 步骤完成：用 marked + 公式修复渲染最终内容（v0.19.4：加 sanitize + 复制/选择）
+function renderStepBubble(bubble, text, idx) {
+  if (!bubble) return;
+  const contentDiv = bubble.querySelector('.md-content');
+  const label = idx === 1 ? '先看一个问题' : (idx === 2 ? '讲给你听' : (idx >= 3 ? '深入一些' : ''));
+  const fixed = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(text)));
+  contentDiv.innerHTML = `<div class="md-content">${
+    typeof marked !== 'undefined' ? marked.parse(fixed) : escapeHtml(text)
+  }</div>`;
+  // 保存原始文本（复制用）
+  bubble._rawText = text;
+  renderMath(contentDiv);
+  chatWin.scrollTop = chatWin.scrollHeight;
+}
+
+// ─── 一般对话（闲聊~） ───
+// v0.19：P1-5/6 流式对话 + 工具调用可视化
+async function generalChat(text) {
+  const thinking = addThinking('chat');
+  askBtn.disabled = true;
+  // v0.27 ⭐ 需求：生成中可打断——发送按钮变为"■ 停止"
+  if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
+  const controller = new AbortController();
+  window._genAbort = controller;
+  try {
+    const ab = document.getElementById('ask-btn');
+    ab.textContent = '■ 停止';
+    ab.dataset.generating = '1';
+  } catch(e){}
+  // 流式消息气泡（累积显示）
+  const bubble = document.createElement('div');
+  bubble.className = 'msg paeg';
+  bubble.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble md-content"></div>`;
+  const bubbleBody = bubble.querySelector('.msg-bubble');
+  let accText = '';
+  let toolCards = [];
+
+  try {
+    const resp = await fetch(API_BASE + '/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        learner_id: STATE.learnerId,
+        nickname: STATE.nickname,
+        grade_level: document.getElementById('grade-select').value,
+        mode: currentMode,
+        text: text,
+      }),
+      signal: controller.signal,
+    });
+    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    // v0.19.14：SSE 读流超时保护——120s 无数据则停止（防止连接挂起导致"不回复"）
+    let lastData = Date.now();
+    const timeoutTimer = setInterval(() => {
+      if (Date.now() - lastData > 120000) {
+        try { reader.cancel(); } catch (e) {}
+      }
+    }, 5000);
+
+    // 读取 SSE 流
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value && value.length) lastData = Date.now();
+      buffer += decoder.decode(value, { stream: true });
+      // 解析 SSE 事件
+      let idx;
+      while ((idx = buffer.indexOf('\n\n')) !== -1) {
+        const raw = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const evtLine = raw.split('\n')[0] || '';
+        const event = evtLine.startsWith('event:') ? evtLine.slice(6).trim() : 'message';
+        const dataLine = raw.split('\n').find(l => l.startsWith('data:')) || '';
+        const data = dataLine.slice(5).trim();
+        if (!data) continue;
+        let obj;
+        try { obj = JSON.parse(data); } catch (e) { continue; }
+
+        if (event === 'tool') {
+          // 工具调用可视化卡片
+          const nameCn = { web_search: '搜索网络', verify_math: '数学验证', fetch_page: '抓取网页',
+                           daily_quote: '每日一句', get_time: '获取时间' }[obj.name] || obj.name;
+          const card = document.createElement('div');
+          card.className = 'tool-card';
+          card.innerHTML = `<img class="tool-icon-svg" src="assets/icons/settings.svg" alt=""/><span class="tool-name">${nameCn}</span><span class="tool-args">${escapeHtml(JSON.stringify(obj.arguments || {}).slice(0, 60))}</span>`;
+          toolCards.push(card);
+          if (!bubble.isConnected) chatWin.appendChild(bubble);
+          bubbleBody.appendChild(card);
+          chatWin.scrollTop = chatWin.scrollHeight;
+        } else if (event === 'retrieval') {
+          // v0.28：检索状态徽章——chat 气泡已在函数开头创建，直接插入徽章到顶部
+          if (!bubble.isConnected) chatWin.appendChild(bubble);
+          insertRetrievalBadge(bubble, obj.done);
+        } else if (event === 'seg') {
+          // 流式文本累积
+          if (!bubble.isConnected) chatWin.appendChild(bubble);
+          accText += obj.text || '';
+          bubbleBody.lastChild && bubbleBody.lastChild.classList && bubbleBody.lastChild.classList.contains('tool-card')
+            ? null : null;
+          // 只渲染文本部分（移除工具卡片后的纯文本）
+          const textDiv = document.createElement('span');
+          textDiv.textContent = obj.text || '';
+          bubbleBody.appendChild(textDiv);
+          chatWin.scrollTop = chatWin.scrollHeight;
+        } else if (event === 'doc') {
+          // v0.19.5：关键词触发文档生成 → 显示下载链接
+          const typeCn = { 讲义: '讲义', 要点: '要点', 例题: '例题', 笔记: '笔记' }[obj.type] || '文档';
+          addMsg('paeg', `已生成${typeCn}：<b>${escapeHtml(obj.filename || '')}</b><br><br>` +
+            `<a class="download-link" href="${obj.md_url}" download><img class="link-icon" src="assets/icons/download.svg" alt="下载"/> 下载 ${typeCn}</a>` +
+            (obj.html_url ? ` <a class="download-link" href="${obj.html_url}" target="_blank" style="margin-left:10px">预览</a>` : ''));
+        } else if (event === 'done') {
+          break;
+        }
+      }
+    }
+    clearInterval(timeoutTimer);
+    removeThinking(thinking);
+    // 用 marked 渲染最终累积文本（替换纯文本为 markdown）
+    const textParts = Array.from(bubbleBody.querySelectorAll('span')).map(s => s.textContent).join('');
+    if (textParts) {
+      try {
+        const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(textParts)));
+        bubbleBody.innerHTML = toolCards.map(c => c.outerHTML).join('') +
+          '<div class="md-content">' + (typeof marked !== 'undefined' ? marked.parse(fixedText) : escapeHtml(textParts)) + '</div>' +
+          '<div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div>';
+        // 保存原始文本（复制/文档用）
+        bubble._rawText = textParts;
+        renderMath(bubbleBody);
+        chatWin.scrollTop = chatWin.scrollHeight;
+      } catch (e) {
+        // v0.19.18：渲染失败不阻塞——至少显示纯文本
+        bubbleBody.innerHTML = '<div class="md-content">' + escapeHtml(textParts) + '</div>' +
+          '<div class="msg-actions"><input type="checkbox" class="msg-select" /><button class="msg-copy" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div>';
+        bubble._rawText = textParts;
+      }
+    } else {
+      // v0.19.18：空结果兜底——流正常结束但没内容时，显示占位而不是静默无回复
+      if (!bubble.isConnected) chatWin.appendChild(bubble);
+      bubbleBody.innerHTML = '<div class="md-content">（没有收到回复，可能是服务端暂时没生成内容。请再试一次。）</div>';
+    }
+    if (!bubble.isConnected) chatWin.appendChild(bubble);
+  } catch (e) {
+    clearInterval(timeoutTimer);
+    removeThinking(thinking);
+    // v0.27 ⭐ 打断（AbortError）→ 友好提示
+    if (e && (e.name === 'AbortError' || (e.message || '').includes('abort'))) {
+      addMsg('paeg', '<small>已停止生成。你可以继续输入，我会接着聊。</small>');
+    } else {
+      addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    }
+  } finally {
+    askBtn.disabled = false;
+    try {
+      const ab = document.getElementById('ask-btn');
+      ab.textContent = '发送';
+      delete ab.dataset.generating;
+    } catch(e2){}
+    window._genAbort = null;
+    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+  }
+}
+
+// v0.19.14：找答案模式——直接给完整答案（不受教学约束）
+async function answerChat(question, subject) {
+  const thinking = addThinking('chat');
+  askBtn.disabled = true;
+  try {
+    const result = await api('/api/answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: question,
+        subject: subject,
+        grade_level: document.getElementById('grade-select').value,
+        learner_id: STATE.learnerId,
+        nickname: STATE.nickname,
+        mode: currentMode,
+      }),
+    });
+    removeThinking(thinking);
+    if (result.answer) {
+      addMsg('paeg', result.answer);
+    } else if (result.error) {
+      addMsg('paeg', `出错了：${result.error}`);
+    } else {
+      addMsg('paeg', '（没有返回答案）');
+    }
+  } catch (e) {
+    removeThinking(thinking);
+    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+  } finally {
+    askBtn.disabled = false;
+    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+  }
+}
+
+// v0.19.25：学科学习方法模式——独立对话类型
+async function methodChat(question, subject) {
+  const thinking = addThinking('chat');
+  askBtn.disabled = true;
+  try {
+    const result = await api('/api/method', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        concept: question,
+        subject: subject,
+        grade_level: document.getElementById('grade-select').value,
+        learner_id: STATE.learnerId,
+        nickname: STATE.nickname,
+        mode: currentMode,
+        self_description: STATE.selfDescription || '',
+      }),
+    });
+    removeThinking(thinking);
+    const pres = (result.presentations && result.presentations[0]) || {};
+    const content = pres.content || '';
+    if (content) {
+      addMsg('paeg', `<div class="mode-tag">学习方法 · ${escapeHtml(result.learner && result.learner.nickname ? '' : '')}${escapeHtml(subjectLabel(subject))}</div>` + content);
+    } else if (result.error) {
+      addMsg('paeg', `出错了：${result.error}`);
+    } else {
+      addMsg('paeg', '（没有返回建议）');
+    }
+  } catch (e) {
+    removeThinking(thinking);
+    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+  } finally {
+    askBtn.disabled = false;
+    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+  }
+}
+
+// v0.19.25：知识库模式——独立对话类型（清点 Library）
+async function knowledgeChat(question) {
+  const thinking = addThinking('chat');
+  askBtn.disabled = true;
+  try {
+    const result = await api('/api/knowledge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        learner_id: STATE.learnerId,
+        nickname: STATE.nickname,
+        grade_level: document.getElementById('grade-select').value,
+        subject: subjectSelect.value,
+        mode: currentMode,
+      }),
+    });
+    removeThinking(thinking);
+    const pres = (result.presentations && result.presentations[0]) || {};
+    const content = pres.content || '';
+    if (content) {
+      addMsg('paeg', `<div class="mode-tag">知识库</div>` + content);
+    } else if (result.error) {
+      addMsg('paeg', `出错了：${result.error}`);
+    } else {
+      addMsg('paeg', '（知识库为空）');
+    }
+  } catch (e) {
+    removeThinking(thinking);
+    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+  } finally {
+    askBtn.disabled = false;
+    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+  }
+}
+
+// v0.19.29：倾诉模式——情绪与心理支持（不教不答，以注意力陪伴）
+async function affectionChat(text) {
+  const thinking = addThinking('chat');
+  askBtn.disabled = true;
+  try {
+    const result = await api('/api/affection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: text,
+        learner_id: STATE.learnerId,
+        nickname: STATE.nickname,
+        grade_level: document.getElementById('grade-select').value,
+        mode: currentMode,
+        self_description: STATE.selfDescription || '',
+      }),
+    });
+    removeThinking(thinking);
+    const pres = (result.presentations && result.presentations[0]) || {};
+    const content = pres.content || '';
+    if (content) {
+      addMsg('paeg', `<div class="mode-tag">倾诉 · 我在听</div>` + content);
+    } else if (result.error) {
+      addMsg('paeg', `出错了：${result.error}`);
+    } else {
+      addMsg('paeg', '（没有回应）');
+    }
+  } catch (e) {
+    removeThinking(thinking);
+    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+  } finally {
+    askBtn.disabled = false;
+    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+  }
+}
+
+// 辅助：学科 key → 中文 label（从 subject-select 读）
+function subjectLabel(key) {
+  const sel = document.getElementById('subject-select');
+  if (!sel) return key;
+  for (const opt of sel.options) {
+    if (opt.value === key) return opt.textContent;
+  }
+  return key;
+}
+
+// ─── 教学动作按钮（v0.9） ───
+const ACTIONS = {
+  'act-hint': '请只给我一个提示，不要直接告诉我答案，让我自己再想想。',
+  'act-reexplain': '我还是不太明白，请换一种解释方式，用不同的例子重新讲一遍。',
+  'act-test': '请考考我：给我出一道相关的题，让我试试能不能做出来。',
+  'act-example': '请给我一个类似的例子，让我通过例子来理解。',
+};
+
+document.querySelectorAll('.action-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const prompt = ACTIONS[btn.id];
+    if (!prompt) return;
+    // 教学模式下走教学对话（带学科），一般对话模式走 /api/chat
+    if (currentMode === 'teach') {
+      // 把动作作为一次追问发送给教学会话
+      addMsg('user', prompt);
+      teach(prompt, subjectSelect.value, subfieldSelect.value);
+    } else {
+      addMsg('user', prompt);
+      generalChat(prompt);
+    }
+  });
+});
+
+// ─── 文件生成与下载（v0.12） ───
+async function generateFile(type, topic) {
+  const resultEl = document.getElementById('gen-result');
+  const btn = type === 'quiz' ? document.getElementById('gen-quiz') : document.getElementById('gen-article');
+  btn.disabled = true;
+  resultEl.textContent = '生成中…';
+  try {
+    const resp = await api('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: type,
+        subject: subjectSelect.value,
+        topic: topic || questionInput.value.trim() || '学习内容',
+        n_questions: parseInt(document.getElementById('gen-num').value) || 5,
+        learner_id: STATE.learnerId,
+        grade_level: document.getElementById('grade-select').value,
+      }),
+    });
+    resultEl.innerHTML = `已生成：${resp.filename} <a class="download-link" href="${resp.download_url}" download><img class="link-icon" src="assets/icons/download.svg" alt="下载"/> 下载</a>`;
+  } catch (e) {
+    resultEl.textContent = '生成失败: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('gen-quiz').addEventListener('click', () => generateFile('quiz', ''));
+document.getElementById('gen-article').addEventListener('click', () => generateFile('article', ''));
+
+// ─── 用户注册/登录（v0.14） ───
+let authMode = 'login';  // login | register
+
+// 登录后固定 user_id，画像持久化（刷新不丢失）
+function applyLogin(result) {
+  STATE.learnerId = result.user_id;
+  STATE.nickname = result.nickname || '学生';
+  // v0.41.2 ⭐ 修复：登录后重置头像状态（此前残留匿名头像，登录用户头像不显示）
+  STATE.avatarUrl = '';
+  document.getElementById('user-badge').textContent = STATE.nickname;
+  document.getElementById('user-badge').style.display = '';
+  document.getElementById('user-btn').textContent = '退出';
+  document.getElementById('learner-name').textContent = STATE.nickname;
+  document.getElementById('conv-clear').style.display = '';
+  // v0.27：刷新头像（loadProfile 后会用服务器 avatar_url 覆盖）
+  renderAvatar();
+  // v0.21.3：持久化登录态（刷新后仍保持登录，历史会话可恢复）
+  try {
+    localStorage.setItem('paeg-user', JSON.stringify({ learnerId: STATE.learnerId, nickname: STATE.nickname }));
+  } catch (e) { /* 隐私模式等场景忽略 */ }
+  // 加载持久化的自我描述 + 历史会话（v0.18.1）
+  // v0.41.2 ⭐ 修复：补 loadMetaLog——此前登录后元认知日志不刷新（用户反馈"登录后仍无反思记录"）
+  loadProfile();
+  loadConversations();
+  loadMetaLog();
+}
+
+// v0.18.1：加载历史会话列表
+// v0.36.2 ⭐ 修复：匿名用户（web_xxx）也可加载历史——后端 v0.32 已放宽允许落盘，
+// 前端此前拦截（只认 u 前缀）导致"数据存在但看不到"的断链。
+async function loadConversations() {
+  const list = document.getElementById('conv-list');
+  const lid = String(STATE.learnerId || '');
+  const isRegistered = /^u\d+$/.test(lid);
+  const isAnon = /^web_[A-Za-z0-9_\-]+$/.test(lid);
+  if (!isRegistered && !isAnon) {
+    list.innerHTML = `<div class="empty-state" role="status">
+        <img class="empty-icon" src="assets/icons/message-circle.svg" alt="" aria-hidden="true" />
+        <div class="empty-title">登录后可恢复历史会话</div>
+        <div class="empty-desc">右上角"登录/注册"开启后，对话会自动归档到这里。</div>
+      </div>`;
+    document.getElementById('conv-clear').style.display = 'none';
+    return;
+  }
+  try {
+    const r = await api(`/api/conversations/${encodeURIComponent(lid)}`);
+    const convs = r.conversations || [];
+    if (!convs.length) {
+      list.innerHTML = `<div class="log-item"><div class="txt" style="color:var(--text-dim)">${isAnon ? '暂无历史对话（登录账号可跨设备同步）' : '暂无历史对话'}</div></div>`;
+      return;
+    }
+    const MODE_CN = { teach: '教学', chat: '闲聊', solve: '做题' };
+    list.innerHTML = convs.map(c => `
+      <div class="conv-item" data-cid="${c.id}">
+        <span class="conv-mode">${MODE_CN[c.mode] || c.mode}</span>
+        <span class="conv-title">${escapeHtml(c.title || '对话')}</span>
+        <span class="conv-del" data-cid="${c.id}" title="删除">✕</span>
+      </div>`).join('');
+    // 点击会话恢复
+    list.querySelectorAll('.conv-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.classList.contains('conv-del')) return;
+        restoreConversation(item.dataset.cid);
+      });
+    });
+    // 删除按钮
+    list.querySelectorAll('.conv-del').forEach(del => {
+      del.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const cid = del.dataset.cid;
+        if (!confirm('删除这个会话？')) return;
+        await api(`/api/conversations/${encodeURIComponent(STATE.learnerId)}/${cid}`, {}, 'DELETE');
+        loadConversations();
+      });
+    });
+  } catch (e) {
+    list.innerHTML = `<div class="log-item"><div class="txt" style="color:var(--text-dim)">加载失败</div></div>`;
+  }
+}
+
+// 恢复会话：把历史消息渲染到对话窗口
+async function restoreConversation(cid) {
+  try {
+    const conv = await api(`/api/conversations/${encodeURIComponent(STATE.learnerId)}/${cid}`);
+    const msgs = conv.messages || [];
+    if (!msgs.length) return;
+    // 清空当前窗口，重新渲染历史
+    chatWin.innerHTML = '';
+    msgs.forEach(m => {
+      addMsg(m.role === 'user' ? 'user' : 'paeg', m.content);
+    });
+    chatWin.scrollTop = chatWin.scrollHeight;
+  } catch (e) {
+    console.error('恢复会话失败', e);
+  }
+}
+
+// 清空全部会话
+document.getElementById('conv-clear').addEventListener('click', async () => {
+  if (!confirm('确定清空全部会话？此操作不可恢复。')) return;
+  try {
+    await api(`/api/conversations/${STATE.learnerId}`, {}, 'DELETE');
+    loadConversations();
+    chatWin.innerHTML = '';
+  } catch (e) {
+    console.error('清空失败', e);
+  }
+});
+
+document.getElementById('user-btn').addEventListener('click', () => {
+  if (document.getElementById('user-btn').textContent === '退出') {
+    // 退出登录（回到匿名模式）：生成新匿名 ID 并持久化（v0.26 匿名用户唯一）
+    STATE.learnerId = 'web_' + Math.random().toString(36).slice(2, 10);
+    STATE.nickname = '学习者';
+    // 持久化新匿名 ID（每用户唯一，刷新后保持）
+    try { localStorage.setItem('paeg-user', JSON.stringify({ learnerId: STATE.learnerId, nickname: '学习者' })); } catch (e) { /* 忽略 */ }
+    document.getElementById('user-badge').style.display = 'none';
+    document.getElementById('user-btn').textContent = '登录/注册';
+    document.getElementById('learner-name').textContent = '学习者';
+    document.getElementById('desc-textarea').value = '';
+    document.getElementById('conv-clear').style.display = 'none';
+    // v0.27：退出登录 — 清空服务器头像引用但保留 localStorage 的匿名头像
+    STATE.avatarUrl = '';
+    renderAvatar();
+    loadConversations();  // 恢复匿名提示
+    return;
+  }
+  document.getElementById('auth-modal').classList.add('open');
+});
+
+document.getElementById('auth-close').addEventListener('click', () => {
+  document.getElementById('auth-modal').classList.remove('open');
+});
+document.getElementById('auth-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('auth-modal')) {
+    document.getElementById('auth-modal').classList.remove('open');
+  }
+});
+// v0.31 (P0-3)：Esc 关闭登录弹窗（可访问性）
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.keyCode === 27) {
+    const modal = document.getElementById('auth-modal');
+    if (modal && modal.classList.contains('open')) {
+      modal.classList.remove('open');
+    }
+  }
+});
+
+document.getElementById('tab-login').addEventListener('click', () => {
+  authMode = 'login';
+  document.getElementById('tab-login').classList.add('active');
+  document.getElementById('tab-register').classList.remove('active');
+  document.getElementById('auth-nickname').style.display = 'none';
+  document.getElementById('auth-submit').textContent = '登录';
+});
+document.getElementById('tab-register').addEventListener('click', () => {
+  authMode = 'register';
+  document.getElementById('tab-register').classList.add('active');
+  document.getElementById('tab-login').classList.remove('active');
+  document.getElementById('auth-nickname').style.display = '';
+  document.getElementById('auth-submit').textContent = '注册';
+});
+
+document.getElementById('auth-submit').addEventListener('click', async () => {
+  const identifier = document.getElementById('auth-identifier').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const nickname = document.getElementById('auth-nickname').value.trim();
+  const msgEl = document.getElementById('auth-msg');
+  if (!identifier || !password) {
+    msgEl.textContent = '请输入账号和密码';
+    msgEl.className = 'auth-msg err';
+    return;
+  }
+  const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
+  try {
+    const result = await api(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, password, nickname }),
+    });
+    if (result.ok) {
+      msgEl.textContent = authMode === 'login' ? '登录成功' : '注册成功';
+      msgEl.className = 'auth-msg ok';
+      applyLogin(result);
+      setTimeout(() => document.getElementById('auth-modal').classList.remove('open'), 800);
+    } else {
+      msgEl.textContent = result.error || '操作失败';
+      msgEl.className = 'auth-msg err';
+    }
+  } catch (e) {
+    msgEl.textContent = e.message;
+    msgEl.className = 'auth-msg err';
+  }
+});
+
+// ─── 事件 ───
+let currentMode = 'teach';
+
+// v0.19 P2-10：图片/文件上传
+// v0.19.11：资料上传到个人资料库
+document.getElementById('lib-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('learner_id', STATE.learnerId);
+  fd.append('purpose', 'library');
+  fd.append('library_root', 'usr_knowledge');
+  try {
+    const r = await fetch(API_BASE + '/api/upload', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) { alert('资料上传失败: ' + (j.error || '')); return; }
+    addMsg('paeg', `已将资料 <b>${escapeHtml(file.name)}</b> 存入 usr_knowledge 资料库。<br><small>之后提问相关问题时，我会参考这份资料来回答。</small>`);
+  } catch (err) {
+    alert('资料上传失败: ' + err.message);
+  }
+  e.target.value = '';
+});
+
+document.getElementById('file-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('learner_id', STATE.learnerId);
+  try {
+    const r = await fetch(API_BASE + '/api/upload', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) { alert('上传失败: ' + (j.error || '')); return; }
+    // 显示图片预览消息
+    const isImg = /\.(png|jpg|jpeg|gif|webp)$/i.test(file.name);
+    const msgHtml = isImg
+      ? `<div class="upload-preview"><img src="${j.url}" alt="上传图片"/></div>`
+      : `<span class="file-chip"><img class="file-chip-icon" src="assets/icons/file-text.svg" alt=""/> ${escapeHtml(file.name)}</span>`;
+    addMsg('user', msgHtml);
+    // 发送附带文件说明的对话
+    const note = `（我上传了一个${isImg ? '图片' : '文件'}：${file.name}，URL: ${j.url}。请结合它回答）`;
+    const q = questionInput.value.trim() || `请看看我上传的${isImg ? '图片' : '文件'}`;
+    addMsg('user', q);
+    questionInput.value = '';
+    if (currentMode === 'chat') generalChat(note + ' ' + q);
+    else teach(note + ' ' + q, subjectSelect.value, subfieldSelect.value);
+  } catch (err) {
+    alert('上传失败: ' + err.message);
+  }
+  e.target.value = '';
+});
+
+askBtn.addEventListener('click', () => {
+  const q = questionInput.value.trim();
+  if (!q) return;
+  addMsg('user', q);
+  questionInput.value = '';
+  if (currentMode === 'chat') {
+    generalChat(q);
+  } else if (currentMode === 'answer') {
+    answerChat(q, subjectSelect.value);
+  } else if (currentMode === 'method') {
+    methodChat(q, subjectSelect.value);
+  } else if (currentMode === 'knowledge') {
+    knowledgeChat(q);
+  } else if (currentMode === 'affection') {
+    affectionChat(q);
+  } else {
+    teach(q, subjectSelect.value, subfieldSelect.value);
+  }
+});
+
+// ─── v0.36 ⭐ 语音模块：Web Speech API 录音转文本 → 复用现有发送管线 ───
+// v0.36.2 ⭐ 修复：提示精准化——区分"浏览器不支持"与"非安全环境"；诚实告知能力边界
+// v0.40 ⭐ 完整重构（Oracle 排查）：①secureCtx 严格判断（修复 Chrome 局域网 IP 静默失败）
+// ②录音立即视觉反馈+动画 ③start 3秒兜底提示 ④空结果/超时明确提示 ⑤长按输入框触发（豆包式）
+(function initVoice() {
+  const voiceBtn = document.getElementById('voice-btn');
+  if (!voiceBtn) return;
+  const voiceIcon = voiceBtn.querySelector('img');
+  const wavesEl = document.getElementById('voice-waves');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  // v0.40 P0-1 ⭐ secureCtx 判断：HTTPS（任何域名，含 Cloudflare 隧道）或 localhost → 放行
+  // v0.40.1 ⭐ 修复：上版 (isSecureContext||https) && isLocalhost 过度严格——把 HTTPS 公网隧道
+  // （如 trycloudflare.com）也拦截了。正确：isHttps || isLocalhost。
+  // 不用 window.isSecureContext：Chrome 桌面版对局域网 IP 常误判为 true，导致 start() 被静默拒绝。
+  const isLocalhost = /^(127\.0\.0\.1|localhost|\[::1\])$/i.test(location.hostname);
+  const isHttps = location.protocol === 'https:';
+  const secureCtx = isHttps || isLocalhost;
+  if (!SR) {
+    voiceBtn.title = '语音输入需 Chrome/Edge（微信内置浏览器不支持）';
+    voiceBtn.style.opacity = '.4';
+    voiceBtn.addEventListener('click', () => {
+      addMsg('paeg', `<small> 当前浏览器不支持语音输入（${/MicroMessenger/i.test(navigator.userAgent) ? '微信内置浏览器暂不支持，请用 Chrome 或 Edge 打开' : '推荐使用 Chrome 或 Edge'}）。可直接打字交流。</small>`);
+    });
+    return;
+  }
+  if (!secureCtx) {
+    voiceBtn.title = '语音输入需 HTTPS 或 localhost（Chrome 安全策略）';
+    voiceBtn.style.opacity = '.4';
+    voiceBtn.addEventListener('click', () => {
+      // v0.39 ⭐ 明确提示 Chrome 局域网 IP 场景（用户实测：Chrome 通过局域网 IP 访问时麦克风被禁）
+      addMsg('paeg', '<small> 当前为非安全环境（非 HTTPS + 非 localhost），Chrome 禁用了麦克风。\n' +
+        '解决办法：①本机用 http://127.0.0.1:5000 访问即可；②或 Chrome 地址栏输入 chrome://flags →\n' +
+        '搜索 "unsafely-treat-insecure-origin-as-secure" → 添加 ' + location.origin + ' → 重启 Chrome。</small>');
+    });
+    return;
+  }
+  let recognizing = false;
+  let recogTimer = null;
+  let startDeadline = null;
+  let _timeoutFired = false;
+  let _hadResult = false;   // v0.40.3 本次录音是否有识别结果（每次重置）
+  let _manualStop = false;  // v0.40.3 用户是否手动停止（手动停止不提示）
+  const recog = new SR();
+  recog.lang = 'zh-CN';
+  recog.continuous = false;
+  recog.interimResults = false;
+  // v0.36 ⭐ 录音态图标切换：麦克风 → 红色停止方块
+  // v0.36.3 ⭐ 修复：①图标 src 切换失败时用 CSS 背景兜底（微信 X5 对 SVG 缓存/渲染不稳）
+  // ②录音 10 秒无结果自动停止（X5 的 start() 后可能不触发 onend，导致 recognizing 卡死"按停止无反应"）
+  // ③停止改用 abort()（比 stop() 更可靠，确保触发 onend）④onend/onerror 强制重置状态
+  // v0.40 ⭐ 视觉反馈加强：录音立即显示波形动画 + 圆环脉冲（不依赖任何 API）
+  function _showRecordingUI() {
+    recognizing = true;
+    try { voiceBtn.classList.add('recording'); } catch (e) {}
+    try {
+      if (voiceIcon) voiceIcon.src = 'assets/icons/square.svg';
+      voiceBtn.style.background = 'rgba(239,68,68,.15)';
+      voiceBtn.style.color = '#ef4444';
+    } catch (e) {}
+    voiceBtn.title = '点击停止录音';
+    if (wavesEl) { try { wavesEl.classList.add('active'); } catch (e) {} }
+  }
+  function _resetRecording() {
+    recognizing = false;
+    if (recogTimer) { clearTimeout(recogTimer); recogTimer = null; }
+    if (startDeadline) { clearTimeout(startDeadline); startDeadline = null; }
+    try { voiceBtn.classList.remove('recording'); } catch (e) {}
+    try {
+      if (voiceIcon) voiceIcon.src = 'assets/icons/mic.svg';
+      voiceBtn.style.background = '';
+      voiceBtn.style.color = '';
+      voiceBtn.style.animation = '';
+    } catch (e) {}
+    voiceBtn.title = '语音输入（Chrome/Edge 推荐）';
+    if (wavesEl) { try { wavesEl.classList.remove('active'); } catch (e) {} }
+  }
+  function setRecording(on) {
+    if (on) { _showRecordingUI(); }
+    else { _resetRecording(); }
+  }
+  recog.onstart = () => {
+    _hadResult = false;
+    _manualStop = false;
+    _showRecordingUI();
+    if (startDeadline) { clearTimeout(startDeadline); startDeadline = null; }
+    addMsg('paeg', '<small> 正在聆听…（请说话，说完自动停止，或再按一次麦克风停止）</small>');
+    // 录音超时兜底：10 秒无结果自动停止
+    if (recogTimer) clearTimeout(recogTimer);
+    recogTimer = setTimeout(() => {
+      _timeoutFired = true;
+      try { recog.abort(); } catch (e) { try { recog.stop(); } catch (e2) {} }
+    }, 10000);
+  };
+  recog.onend = () => {
+    const timedOut = _timeoutFired;
+    _timeoutFired = false;
+    const wasManual = _manualStop;
+    _resetRecording();
+    // v0.40.4 ⭐ 修复：任何"录音结束但无识别结果"都必须提示（含手动停止——用户期望
+    // "我说完话手动停止但没识别到文字"也要告知；此前 _manualStop 时静默 = 用户看不到提示）
+    if (!_hadResult) {
+      if (timedOut) {
+        addMsg('paeg', '<small> 录音超时（10 秒未识别到语音）。请靠近麦克风再说一次，或直接打字。</small>');
+      } else if (wasManual) {
+        addMsg('paeg', '<small> 未识别到语音内容（可能网络识别服务不可达、太安静或未含中文）。请再试一次，或直接打字。</small>');
+      } else {
+        addMsg('paeg', '<small> 未识别到语音内容（可能太安静或未含中文）。请再试一次，或直接打字。</small>');
+      }
+    }
+    _hadResult = false;
+    _manualStop = false;
+  };
+  recog.onerror = (e) => {
+    const err = e && e.error;
+    const wasStart = recognizing;
+    _resetRecording();
+    if (err === 'aborted') {
+      // 主动停止或超时：正常路径（超时由 onend 提示）
+      return;
+    }
+    if (err === 'not-allowed' || err === 'service-not-allowed') {
+      addMsg('paeg', '<small> 麦克风权限被拒绝。请在浏览器地址栏左侧的🔒图标 → 网站设置中允许麦克风，然后重试。</small>');
+    } else if (err === 'network') {
+      addMsg('paeg', '<small> 语音识别网络错误（Chrome 语音服务需要联网）。</small>');
+    } else if (err === 'no-speech') {
+      addMsg('paeg', '<small> 没有听到声音，请靠近麦克风再说一次。</small>');
+    } else if (err === 'audio-capture') {
+      addMsg('paeg', '<small> 未检测到麦克风设备，请检查系统录音设置。</small>');
+    } else if (wasStart) {
+      // 启动失败（start() 被 Chrome 静默拒绝的 onerror 兜底）
+      addMsg('paeg', '<small> 语音识别启动失败（' + (err || '浏览器未授权') + '）。' +
+        '请检查麦克风权限；若用局域网 IP 访问请改用 http://127.0.0.1:5000。</small>');
+    } else {
+      addMsg('paeg', '<small> 语音识别未成功（' + (err || '未知错误') + '），可直接打字输入。</small>');
+    }
+  };
+  recog.onresult = (e) => {
+    _hadResult = true;
+    _resetRecording();
+    // v0.40 P1-4 ⭐ 空 transcript 明确提示（此前静默）
+    let text = '';
+    try {
+      text = (e.results && e.results[0] && e.results[0][0] ? e.results[0][0].transcript : '').trim();
+    } catch (err) {
+      text = '';
+    }
+    if (!text) {
+      addMsg('paeg', '<small> 没有识别到语音内容（可能太安静或未含中文）。请再试一次，或直接打字。</small>');
+      return;
+    }
+    const input = document.getElementById('question-input');
+    if (!input) {
+      addMsg('paeg', '<small> 已识别：「' + escapeHtml(text) + '」（但输入框未找到，请刷新页面）。</small>');
+      return;
+    }
+    // v0.41.5 ⭐ 统一走 _voiceSendOnce 去重锁（Web Speech 路径）
+    _voiceSendOnce(text);
+  };
+  // v0.41 ⭐ 后端 STT（MediaRecorder → /api/voice/stt，faster-whisper 本地识别）
+  // 解决：Web Speech API 转文字在 Google 云端（国内不可达）→"能启动能说话不能识别"
+  let mediaRecorder = null;
+  let mediaChunks = [];
+  // v0.41.5 ⭐ 语音双发送去重锁：后端 STT 与 Web Speech 双引擎并存时，
+  // 同一句识别文本可能被 onresult 与 _submitAudio 各发一次 → 用户看到两条消息。
+  // 相同文本 3 秒内只发送一次（以首次为准）。
+  let _lastVoiceSend = { text: '', ts: 0 };
+  function _voiceSendOnce(text) {
+    const now = Date.now();
+    const norm = (text || '').trim();
+    if (!norm) return false;
+    if (_lastVoiceSend.text === norm && (now - _lastVoiceSend.ts) < 3000) {
+      return false;  // 3 秒内同文 → 丢弃重复发送
+    }
+    _lastVoiceSend = { text: norm, ts: now };
+    const input = document.getElementById('question-input');
+    if (!input) return false;
+    addMsg('user', norm);
+    input.value = norm;
+    const askBtn = document.getElementById('ask-btn');
+    if (askBtn) askBtn.click();
+    return true;
+  }
+  function _startBackendSTT() {
+    return new Promise((resolve, reject) => {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+          reject(new Error('no_mediarecorder')); return;
+        }
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+          try {
+            const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+              ? 'audio/webm;codecs=opus' : 'audio/webm';
+            mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
+            mediaChunks = [];
+            mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) mediaChunks.push(e.data); };
+            mediaRecorder.onstop = () => {
+              stream.getTracks().forEach(t => t.stop());
+              const blob = new Blob(mediaChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+              _submitAudio(blob);
+            };
+            mediaRecorder.start();
+            _showRecordingUI();
+            addMsg('paeg', '<small> 正在录音（后端识别）…说完点停止，或长按松开发送。</small>');
+            // 15 秒自动停止
+            setTimeout(() => { if (mediaRecorder && mediaRecorder.state === 'recording') { try { mediaRecorder.stop(); } catch(e){} } }, 15000);
+            resolve();
+          } catch (e) { reject(e); }
+        }).catch(err => {
+          if (err && err.name === 'NotAllowedError') {
+            addMsg('paeg', '<small> 麦克风权限被拒绝。请点击地址栏🔒图标允许麦克风后重试。</small>');
+          } else {
+            addMsg('paeg', '<small> 无法获取麦克风：' + (err && err.message ? err.message : err) + '</small>');
+          }
+          reject(err);
+        });
+      } catch (e) { reject(e); }
+    });
+  }
+  function _stopBackendSTT() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      try { mediaRecorder.stop(); } catch (e) {}
+      return true;
+    }
+    return false;
+  }
+  function _submitAudio(blob) {
+    _resetRecording();
+    addMsg('paeg', '<small> 正在识别…</small>');
+    const fd = new FormData();
+    fd.append('audio', blob, 'voice.webm');
+    fetch(API_BASE + '/api/voice/stt', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => {
+        if (j && j.ok && j.text) {
+          // v0.41.5 ⭐ 统一走 _voiceSendOnce 去重锁（后端 STT 路径）
+          _voiceSendOnce(j.text);
+        } else {
+          addMsg('paeg', '<small> ' + ((j && j.error) || '未识别到语音内容') + '。可直接打字输入。</small>');
+        }
+      })
+      .catch(() => addMsg('paeg', '<small> 识别服务暂不可用，请直接打字输入。</small>'));
+  }
+  // v0.40 P0-2 ⭐ 点击立即视觉反馈（不依赖 start() 结果）
+  // v0.41 ⭐ 优先后端 STT（MediaRecorder），不支持才回退 Web Speech
+  voiceBtn.addEventListener('click', () => {
+    if (recognizing) {
+      // 停止：优先后端 recorder，回退 Web Speech abort
+      _manualStop = true;
+      _resetRecording();
+      if (!_stopBackendSTT()) {
+        try { recog.abort(); } catch (e) { try { recog.stop(); } catch (e2) {} }
+      }
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      addMsg('paeg', '<small> 当前环境不支持麦克风（需 HTTPS 或 localhost）。</small>');
+      return;
+    }
+    // 优先后端 STT（faster-whisper 本地，国内可用）；无 MediaRecorder 才走 Web Speech
+    if (window.MediaRecorder) {
+      _startBackendSTT().catch(() => {
+        // 回退 Web Speech
+        _resetRecording();
+        _fallbackWebSpeechStart();
+      });
+    } else {
+      _fallbackWebSpeechStart();
+    }
+  });
+  function _fallbackWebSpeechStart() {
+    // 立即视觉反馈
+    _showRecordingUI();
+    addMsg('paeg', '<small> 正在启动麦克风…</small>');
+    if (startDeadline) clearTimeout(startDeadline);
+    startDeadline = setTimeout(() => {
+      if (!recognizing) {
+        _resetRecording();
+        addMsg('paeg', '<small> 麦克风启动失败：浏览器未授权或安全策略限制。请：' +
+          '①检查地址栏🔒图标允许麦克风 ②改用 http://127.0.0.1:5000 访问。</small>');
+      }
+    }, 3000);
+    try { recog.start(); }
+    catch (err) {
+      _resetRecording();
+      if (startDeadline) { clearTimeout(startDeadline); startDeadline = null; }
+      addMsg('paeg', '<small> 无法启动语音识别：' + (err && err.message ? err.message : err) +
+        '（请检查麦克风权限或用 127.0.0.1 访问）。</small>');
+    }
+  }
+  // v0.40 P2-6 ⭐ 长按输入框触发录音（豆包式：长按 500ms 开始）
+  // v0.40.2 ⭐ 浮动气泡：长按时浮现微信式"按住说话"面板（更激进视觉反馈）
+  const inputEl = document.getElementById('question-input');
+  const popoverEl = document.getElementById('voice-popover');
+  const vpTextEl = document.getElementById('vp-text');
+  if (inputEl) {
+    let pressTimer = null;
+    let pressActive = false;
+    function _showPopover(pressing) {
+      if (!popoverEl) return;
+      try {
+        popoverEl.classList.add('active');
+        if (pressing) {
+          popoverEl.classList.remove('listening');
+          if (vpTextEl) vpTextEl.textContent = '松开发送 · 上滑取消';
+        } else {
+          popoverEl.classList.add('listening');
+          if (vpTextEl) vpTextEl.textContent = '正在聆听…';
+        }
+      } catch (e) {}
+    }
+    function _hidePopover() {
+      if (!popoverEl) return;
+      try { popoverEl.classList.remove('active', 'listening'); } catch (e) {}
+    }
+    function _showPressFeedback() {
+      pressActive = true;
+      try {
+        inputEl.classList.add('voice-press');
+        if (navigator.vibrate) { try { navigator.vibrate(30); } catch (e) {} }
+      } catch (e) {}
+    }
+    function _hidePressFeedback() {
+      pressActive = false;
+      try { inputEl.classList.remove('voice-press'); } catch (e) {}
+    }
+    function startPress() {
+      if (recognizing || !SR || !secureCtx) return;
+      _showPressFeedback();
+      _showPopover(true);  // 浮动气泡：按压准备态
+      pressTimer = setTimeout(() => {
+        _hidePressFeedback();
+        _showPopover(false);  // 气泡：正在聆听（录音已触发）
+        voiceBtn.click();  // 触发录音（MediaRecorder 开始）
+      }, 500);
+    }
+    function cancelPress() {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      // v0.41 ⭐ 长按松开时：若正在录音（后端 STT），停止并发送识别结果
+      if (recognizing) {
+        _manualStop = false;  // 松开=正常结束，触发识别
+        _hidePressFeedback();
+        _hidePopover();
+        if (!_stopBackendSTT()) {
+          try { recog.stop(); } catch (e) {}
+        }
+        return;
+      }
+      _hidePressFeedback();
+      _hidePopover();
+    }
+    inputEl.addEventListener('mousedown', startPress);
+    inputEl.addEventListener('mouseup', cancelPress);
+    inputEl.addEventListener('mouseleave', cancelPress);
+    inputEl.addEventListener('touchstart', startPress, { passive: true });
+    inputEl.addEventListener('touchend', cancelPress);
+    inputEl.addEventListener('touchcancel', cancelPress);
+    // 视觉提示：长按触发前显示"松开发送/长按说话"提示
+    inputEl.title = '点击输入，长按 0.5 秒可语音输入，松开停止并发送';
+  }
+  // 录音结束时隐藏气泡（onend/onerror/_resetRecording 联动）
+  const _origReset = _resetRecording;
+  _resetRecording = function() {
+    _hidePopoverSafe();
+    return _origReset.apply(this, arguments);
+  };
+  function _hidePopoverSafe() {
+    if (popoverEl) { try { popoverEl.classList.remove('active', 'listening'); } catch (e) {} }
+  }
+})();
+
+// v0.36 ⭐ TTS 播放：调后端 /api/voice/tts 生成音频并播放
+// v0.36.2 ⭐ 修复：autoplay 拦截精准提示（微信 X5 等浏览器需用户手势）；
+// 真实错误透传（不再笼统"语音暂不可用"误导）
+// v0.37.2 ⭐ Oracle P2 修复：AbortController 取消上一次 + 8s 超时（防连续点读重叠/卡死）
+let _ttsAbort = null;
+let _ttsAudio = null;
+async function playMsgTTS(btn) {
+  const bubble = btn.closest('.msg-bubble');
+  const text = (bubble ? bubble.textContent : '').replace(/[🔊复制\n]+/g, '').trim().slice(0, 2000);
+  if (!text) return;
+  // 取消上一次未完成的 TTS（防重叠播放）
+  if (_ttsAbort) { try { _ttsAbort.abort(); } catch (e) {} }
+  if (_ttsAudio) { try { _ttsAudio.pause(); _ttsAudio = null; } catch (e) {} }
+  const ac = new AbortController();
+  _ttsAbort = ac;
+  const timeoutId = setTimeout(() => { try { ac.abort(); } catch (e) {} }, 8000);
+  // 微信内置浏览器（X5）播放前先确保用户手势链（点击按钮即手势，此处主要捕获 rejection）
+  try {
+    const r = await fetch(API_BASE + '/api/voice/tts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, learner_id: STATE.learnerId }),
+      signal: ac.signal
+    });
+    const j = await r.json();
+    if (j.ok && j.url) {
+      const audio = new Audio(j.url);
+      _ttsAudio = audio;
+      console.log('[TTS] url=', j.url, 'ok=', j.ok);
+      const p = audio.play();
+      if (p && p.catch) {
+        p.catch((e) => {
+          if (e && e.name === 'AbortError') return; // 主动取消，不提示
+          console.error('[TTS] play rejected:', e);
+          addMsg('paeg', '<small>🔊 播放被浏览器拦截（自动播放限制）。请点击页面任意位置后，再点一次 🔊 重试。</small>');
+        });
+      }
+    } else {
+      addMsg('paeg', `<small>语音暂不可用：${(j.error || 'edge-tts 合成失败')}（可稍后重试，不影响打字交流）。</small>`);
+    }
+  } catch (err) {
+    if (err && err.name === 'AbortError') return; // 主动取消/超时，不提示
+    console.error('[TTS] fetch error', err);
+    addMsg('paeg', `<small>语音服务暂时不可用：${(err && err.message ? err.message : '网络错误')}。</small>`);
+  } finally {
+    clearTimeout(timeoutId);
+    if (_ttsAbort === ac) _ttsAbort = null;
+  }
+}
+
+questionInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') askBtn.click();
+});
+
+refreshSubjectOptions();
+loadSubjectTree();  // v0.27：异步加载学科树，命中后重建下拉（不影响用户已选项）
+
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    questionInput.value = chip.dataset.q;
+    askBtn.click();
+  });
+});
+
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    currentMode = btn.dataset.mode;
+    // v0.19.7：教学模式/找答案模式显示学科+学段选择；闲聊模式全部隐藏
+    // v0.19.14：新增 answer（找答案）模式
+    // v0.19.25：新增 method（学习方法）/ knowledge（知识库）模式
+    // v0.19.29：新增 affection（倾诉）模式
+    const isTeach = currentMode === 'teach';
+    const isAnswer = currentMode === 'answer';
+    const isMethod = currentMode === 'method';
+    const isKnowledge = currentMode === 'knowledge';
+    const isAffection = currentMode === 'affection';
+    const showSelects = isTeach || isAnswer || isMethod;
+    document.getElementById('subject-select').style.display = showSelects ? '' : 'none';
+    document.getElementById('grade-select').style.display = showSelects ? '' : 'none';
+    document.getElementById('subfield-select').style.display = showSelects ? '' : 'none';  // v0.27：三级学科
+    document.querySelector('.subject-chips').style.display = isTeach ? '' : 'none';
+    questionInput.placeholder = isTeach
+      ? '输入你想学习的内容…'
+      : (isAnswer ? '输入题目，直接给你完整答案（论述/计算/证明）…'
+         : (isMethod ? '问这门课该怎么学、怎么复习、怎么规划…'
+            : (isAffection ? '难过、焦虑、迷茫……想说什么都可以' : '输入任意内容，查看我的知识库…')));
+    questionInput.focus();
+  });
+});
+
+// ─── v0.19.3：深色/浅色主题切换 ───
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('paeg-theme', theme);
+  document.getElementById('theme-icon').src = theme === 'dark'
+    ? 'assets/icons/lightbulb.svg' : 'assets/icons/sparkles.svg';
+}
+/* v0.29 P2-1：用户从未手动选过时跟随系统（不写 data-theme，让 prefers-color-scheme 媒体查询生效）；
+   手动选过则照旧显式写 data-theme，固化偏好、不再跟随系统变化。 */
+(function initTheme() {
+  const saved = localStorage.getItem('paeg-theme');
+  if (saved === 'dark' || saved === 'light') {
+    applyTheme(saved);
+  } else {
+    // 仅根据当前系统偏好同步图标（lightbulb=暗色待切换；sparkles=浅色待切换）
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.getElementById('theme-icon').src = prefersDark
+      ? 'assets/icons/lightbulb.svg' : 'assets/icons/sparkles.svg';
+  }
+})();
+document.getElementById('theme-btn').addEventListener('click', () => {
+  const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+});
+// v0.40.4 ⭐ 修复：系统主题实时联动——用户未手动固定偏好时，系统切换深浅色网页实时跟随
+// （此前只有"用户从没点过按钮"才跟随系统；点过一次后 localStorage 固化，系统变化不再生效 = 用户感觉"功能没了"）
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+  try {
+    if (!localStorage.getItem('paeg-theme')) {
+      document.documentElement.removeAttribute('data-theme');  // 让 CSS 媒体查询重新生效
+      document.getElementById('theme-icon').src = e.matches
+        ? 'assets/icons/lightbulb.svg' : 'assets/icons/sparkles.svg';
+    }
+  } catch (err) { /* 忽略 */ }
+});
+
+// ─── v0.x：资料检索（需求C）───
+// 后端：POST /api/resources → {sources, scope, keywords, ppt_outline}
+// 前端：复用现有视觉语言渲染卡片，按钮触发后端检索，支持 PPT 引导。
+const RESOURCE_STAGES = [
+  '正在拆解问题…',
+  '正在检索知识库…',
+  '正在检索个人资料库…',
+  '正在检索互联网…',
+  '正在整理结果…',
+];
+const RESOURCE_TYPE_LABEL = {
+  kb: '知识库', md: '资料', pdf: '资料', docx: '资料',
+  doc: '资料', web: '网页', library: '资料',
+};
+const RESOURCE_TYPE_BADGE = {
+  kb: 'kb', md: 'lib', pdf: 'lib', docx: 'lib',
+  doc: 'lib', web: 'web', library: 'lib',
+};
+// URL 白名单：仅允许 http(s) / 同源 /api/
+function safeResourceUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const s = url.trim();
+  if (s.startsWith('/api/')) return s;             // 同源后端 API
+  if (/^https?:\/\//i.test(s)) return s;           // 外部链接
+  return '';                                        // 拒绝 javascript:/data:/file: 等
+}
+function resourceTypeBadgeClass(t) {
+  return RESOURCE_TYPE_BADGE[(t || '').toLowerCase()] || 'unknown';
+}
+function resourceTypeLabel(t) {
+  return RESOURCE_TYPE_LABEL[(t || '').toLowerCase()] || '来源';
+}
+
+// 从本地资源 url（如 /api/user-library?file=xxx.pdf）里抽出 file 参数
+// 安全转义后拼到 /api/library-file 上
+function extractFileParamFromLocalUrl(url) {
+  try {
+    const u = new URL(url, location.origin);
+    const f = u.searchParams.get('file');
+    return f ? f : null;
+  } catch (e) { return null; }
+}
+
+// 本地资料"下载"：GET /api/library-file → 文本弹窗（type=text/markdown/json）
+// 或触发浏览器下载（pdf/docx/图片等二进制）
+async function downloadLocalResource(source) {
+  if (!source || !source.url) return;
+  const filename = extractFileParamFromLocalUrl(source.url);
+  if (!filename) {
+    addMsg('paeg', `本地资料地址缺少 <code>file</code> 参数，无法下载。<br><small>${escapeHtml(source.url || '')}</small>`);
+    return;
+  }
+  const apiUrl = `/api/library-file?learner_id=${encodeURIComponent(STATE.learnerId || '')}&file=${encodeURIComponent(filename)}`;
+  addMsg('paeg', `正在获取本地资料 <b>${escapeHtml(filename)}</b> …`);
+  try {
+    const resp = await fetch(API_BASE + apiUrl);
+    if (!resp.ok) {
+      const errText = await resp.text();
+      let friendly = errText;
+      try { const j = JSON.parse(errText); friendly = j.error || j.message || errText; } catch (e) {}
+      throw new Error(friendly || `HTTP ${resp.status}`);
+    }
+    const ct = (resp.headers.get('content-type') || '').toLowerCase();
+    // 文本类（text/* / json / 缺失类型） → 弹窗显示
+    if (ct.startsWith('text/') || ct.includes('json') || ct === '' || ct.includes('xml')) {
+      const text = await resp.text();
+      showLocalTextInModal(filename, text, ct);
+      return;
+    }
+    // 二进制（pdf/docx/图片…） → blob 下载
+    const blob = await resp.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(objUrl), 4000);
+    addMsg('paeg', `已下载 <b>${escapeHtml(filename)}</b>（${escapeHtml(ct || blob.type || 'application/octet-stream')} · ${blob.size} 字节）。`);
+  } catch (e) {
+    addMsg('paeg', `获取本地资料失败：${escapeHtml(e.message || String(e))}`);
+  }
+}
+
+// 简单弹窗显示文本内容（不引入依赖，复用现有样式变量）
+function showLocalTextInModal(filename, text, contentType) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  const box = document.createElement('div');
+  box.style.cssText = 'max-width:780px;width:100%;max-height:80vh;display:flex;flex-direction:column;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.4);overflow:hidden';
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px';
+  head.innerHTML = `<b>${escapeHtml(filename)}</b><span style="color:var(--text-dim);font-size:11.5px">${escapeHtml(contentType || 'text')}</span>`;
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.textContent = '×';
+  closeBtn.style.cssText = 'background:transparent;border:0;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:0 6px';
+  closeBtn.setAttribute('aria-label', '关闭');
+  closeBtn.onclick = () => overlay.remove();
+  head.appendChild(closeBtn);
+  const pre = document.createElement('pre');
+  pre.style.cssText = 'margin:0;padding:16px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.55;flex:1';
+  pre.textContent = text;
+  box.appendChild(head);
+  box.appendChild(pre);
+  overlay.appendChild(box);
+  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+// PPT 一键生成：复用本次 /api/resources 的 sources（for_ppt=true 已被 fetchResources 设置过）
+// 后端响应若含 ppt:{ok,url}，按钮变"下载 PPT"
+async function generatePptFromResources(btnEl, sources, question) {
+  if (!sources || !sources.length) {
+    addMsg('paeg', '当前没有可用资料用于生成 PPT。');
+    return;
+  }
+  const q = (question || '').trim() || questionInput.value.trim() || '这份资料';
+  const originalHtml = btnEl.innerHTML;
+  btnEl.disabled = true;
+  btnEl.innerHTML = '<span class="rp-spinner" style="margin-right:6px;vertical-align:middle"></span>生成中…';
+  try {
+    const subjectEl = document.getElementById('subject-select');
+    const gradeEl = document.getElementById('grade-select');
+    const subfieldEl = document.getElementById('subfield-select');
+    const resp = await api('/api/resources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        learner_id: STATE.learnerId,
+        question: q,
+        subject: subjectEl ? subjectEl.value : 'physics',
+        grade_level: gradeEl ? gradeEl.value : 'high_school',
+        subfield: subfieldEl ? subfieldEl.value : '',
+        include_web: true,
+        for_ppt: true,
+      }),
+    });
+    const ppt = resp && resp.ppt;
+    if (ppt && ppt.ok && ppt.url) {
+      // 成功 — 把按钮变成下载链接
+      btnEl.disabled = false;
+      btnEl.innerHTML = '';
+      const a = document.createElement('a');
+      a.href = safeResourceUrl(ppt.url) || '#';
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.download = (ppt.path || '').split(/[\\/]/).pop() || 'presentation.pptx';
+      a.className = 'rc-link';
+      a.innerHTML = '<img class="link-icon" src="assets/icons/graduation-cap.svg" alt=""/>下载 PPT';
+      if (!a.href || a.href === '#') a.removeAttribute('href');
+      btnEl.replaceWith(a);
+      addMsg('paeg', `PPT 已生成（${escapeHtml(String(ppt.slides != null ? ppt.slides + ' 页' : ''))}）：<a href="${escapeHtml(safeResourceUrl(ppt.url) || '#')}" target="_blank" rel="noopener noreferrer">${escapeHtml(a.download)}</a>`);
+    } else {
+      const errMsg = (ppt && ppt.error) || (resp && resp.error) || '后端未返回 ppt.url';
+      btnEl.disabled = false;
+      btnEl.innerHTML = originalHtml;
+      addMsg('paeg', `PPT 生成失败：${escapeHtml(errMsg)}`);
+    }
+  } catch (e) {
+    btnEl.disabled = false;
+    btnEl.innerHTML = originalHtml;
+    addMsg('paeg', `PPT 生成失败：${escapeHtml(e.message || String(e))}`);
+  }
+}
+
+// 阶段式进度气泡（与 addThinking 视觉一致）
+function addResourceProgress(question) {
+  const div = document.createElement('div');
+  div.className = 'msg paeg';
+  div._isResourceProgress = true;
+  const inner = document.createElement('div');
+  inner.className = 'msg-bubble';
+  inner.innerHTML = `
+    <div class="resource-progress">
+      <div class="rp-row">
+        <span class="rp-spinner"></span>
+        <span class="rp-text">检索中</span>
+        <span class="rp-stage" data-stage>${RESOURCE_STAGES[0]}</span>
+      </div>
+      <div class="rp-bar"><i></i></div>
+      <div style="font-size:11.5px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        关键词：<span data-q>${escapeHtml(question || '')}</span>
+      </div>
+    </div>`;
+  div.appendChild(inner);
+  chatWin.appendChild(div);
+  chatWin.scrollTop = chatWin.scrollHeight;
+  let si = 0;
+  div._stageTimer = setInterval(() => {
+    si = Math.min(si + 1, RESOURCE_STAGES.length - 1);
+    const stageEl = div.querySelector('[data-stage]');
+    if (stageEl) stageEl.textContent = RESOURCE_STAGES[si];
+  }, 700);
+  return div;
+}
+function removeResourceProgress(div) {
+  if (div && div._stageTimer) { clearInterval(div._stageTimer); div._stageTimer = null; }
+  if (div) div.remove();
+  chatWin.scrollTop = chatWin.scrollHeight;
+}
+
+// 渲染资料卡片列表（新气泡），按钮 + 链接全部走 event delegation，不内联 onclick
+function renderResourceCards(payload, question) {
+  const sources = Array.isArray(payload && payload.sources) ? payload.sources : [];
+  const scope = (payload && payload.scope) || 'all';
+  const keywords = (payload && payload.keywords) || [];
+  const pptOutline = (payload && payload.ppt_outline) || null;
+
+  const div = document.createElement('div');
+  div.className = 'msg paeg resource-msg';
+  const inner = document.createElement('div');
+  inner.className = 'msg-bubble';
+
+  // 标题行：检索完成 + 来源说明
+  const scopeText = { kb: '知识库', library: '个人资料库', web: '互联网', all: '知识库 + 资料库 + 互联网' }[scope] || scope;
+  // v0.27 ⭐ 需求：联网检索徽章——sources 含 web 来源时显示"已完成网络检索"
+  const hasWeb = Array.isArray(sources) && sources.some(s => s.type === 'web');
+  const hasKb = Array.isArray(sources) && sources.some(s => s.type === 'kb' || s.type === 'md' || s.type === 'pdf' || s.type === 'docx');
+  const badgesHtml = [
+    (hasKb ? `<span class="retrieval-badge" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);background:var(--accent-soft);border-radius:6px;padding:2px 8px;margin-right:6px;margin-bottom:4px"><span style="color:var(--accent)">✓</span>已完成知识库检索</span>` : ''),
+    (hasWeb ? `<span class="retrieval-badge" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);background:var(--accent-soft);border-radius:6px;padding:2px 8px;margin-right:6px;margin-bottom:4px"><span style="color:var(--accent)">✓</span>已完成网络检索</span>` : ''),
+  ].join('');
+  const kwLine = keywords.length
+    ? `<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px">关键词：${escapeHtml(keywords.join('、'))}</div>`
+    : '';
+
+  // 卡片列表
+  const cardsHtml = sources.length
+    ? sources.map((s, idx) => {
+        const title = escapeHtml(s.title || '(无标题)');
+        const snippet = escapeHtml(s.snippet || '');
+        const rawUrl = safeResourceUrl(s.url);
+        const typeBadge = resourceTypeBadgeClass(s.type);
+        const typeLabel = resourceTypeLabel(s.type);
+        const isLocal = rawUrl && rawUrl.startsWith('/api/');
+        const linkHtml = rawUrl
+          ? (isLocal
+              // 本地资料（/api/user-library…）：渲染"下载"按钮 → 走 /api/library-file 真正下载/查看内容
+              ? `<button class="rc-link rc-link-btn" type="button" data-act="download-local" data-idx="${idx}">
+                   <img class="link-icon" src="assets/icons/download.svg" alt=""/>
+                   下载
+                 </button>`
+              // 外部链接：保持原行为（新窗口打开）
+              : `<a class="rc-link" href="${escapeHtml(rawUrl)}" target="_blank" rel="noopener noreferrer" data-idx="${idx}">
+                   <img class="link-icon" src="assets/icons/magnifying-glass.svg" alt=""/>
+                   打开链接
+                 </a>`)
+          : '<span class="rc-link" style="opacity:.5;cursor:default">无链接</span>';
+        return `
+        <div class="resource-card" data-idx="${idx}">
+          <div class="rc-title">
+            <span class="rc-badge ${typeBadge}">${escapeHtml(typeLabel)}</span>
+            <span class="rc-title-text">${title}</span>
+          </div>
+          ${snippet ? `<div class="rc-snippet">${snippet}</div>` : ''}
+          ${linkHtml}
+        </div>`;
+      }).join('')
+    : '<div style="font-size:12.5px;color:var(--text-dim);padding:8px 0">没有检索到相关资料。可以换个关键词，或在输入框追加"再试试互联网搜索"。</div>';
+
+  const pptBtnHtml = (sources.length || pptOutline)
+    ? `<button class="rc-ppt-btn" data-act="ppt">
+         <img class="link-icon" src="assets/icons/graduation-cap.svg" alt=""/>
+         用这些资料做 PPT
+       </button>`
+    : '';
+
+  inner.innerHTML = `
+    <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <span style="font-weight:600;color:var(--text)">检索完成</span>
+      <span style="font-size:12px;color:var(--text-dim)">来源：${escapeHtml(scopeText)} · 共 ${sources.length} 条</span>
+    </div>
+    <div style="margin-bottom:6px">${badgesHtml}</div>
+    ${kwLine}
+    <div class="resource-list">${cardsHtml}</div>
+    ${pptBtnHtml}`;
+  div.appendChild(inner);
+  chatWin.appendChild(div);
+
+  // 本地资料"下载"按钮（事件代理）
+  inner.addEventListener('click', (ev) => {
+    const t = ev.target.closest('[data-act="download-local"]');
+    if (!t) return;
+    ev.preventDefault();
+    const idx = parseInt(t.getAttribute('data-idx'), 10);
+    const src = sources[idx];
+    if (src) downloadLocalResource(src);
+  });
+
+  // PPT 一键生成按钮（事件代理）— 直接调 /api/resources(for_ppt=true)
+  const pptBtn = inner.querySelector('[data-act="ppt"]');
+  if (pptBtn) {
+    pptBtn.addEventListener('click', () => generatePptFromResources(pptBtn, sources, question));
+  }
+
+  chatWin.scrollTop = chatWin.scrollHeight;
+  return div;
+}
+
+// "查资料"按钮：调 /api/resources 并渲染结果
+async function fetchResources() {
+  const btn = document.getElementById('resource-btn');
+  const question = (questionInput.value || '').trim();
+  if (!question) {
+    addMsg('paeg', '请先在输入框写下你要查的主题，例如：<i>什么是贝叶斯定理？</i>');
+    questionInput.focus();
+    return;
+  }
+
+  // 学科 / 学段（从现有 select 读）
+  const gradeEl = document.getElementById('grade-select');
+  const subjectEl = document.getElementById('subject-select');
+  const subfieldEl = document.getElementById('subfield-select');
+
+  if (btn) btn.disabled = true;
+  // 用户问句（也作为新消息气泡，让对话流连贯）
+  addMsg('user', escapeHtml(question));
+  const progress = addResourceProgress(question);
+
+  try {
+    const resp = await api('/api/resources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        learner_id: STATE.learnerId,
+        question: question,
+        subject: subjectEl ? subjectEl.value : 'physics',
+        grade_level: gradeEl ? gradeEl.value : 'high_school',
+        subfield: subfieldEl ? subfieldEl.value : '',
+        include_web: true,
+        for_ppt: true,
+      }),
+    });
+    removeResourceProgress(progress);
+    renderResourceCards(resp || {}, question);
+  } catch (e) {
+    removeResourceProgress(progress);
+    addMsg('paeg', `资料检索失败：${escapeHtml(e.message || String(e))}<br><small>请确认后端已实现 POST /api/resources（ResourceLibrarian subagent）。</small>`);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+document.getElementById('resource-btn').addEventListener('click', fetchResources);
+
+// ─── 启动 ───
+checkHealth();
+loadDailyQuote();        // v0.17：每日一句
+setInterval(checkHealth, 30000);  // 30s 健康检查
+</script>
+</body>
+</html>

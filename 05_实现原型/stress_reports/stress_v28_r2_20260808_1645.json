@@ -1,0 +1,68 @@
+{
+  "round": 2,
+  "timestamp": "2026-08-08 16:45",
+  "passed": 15,
+  "total": 15,
+  "results": [
+    {
+      "name": "teach:什么是存在主义",
+      "pass": true
+    },
+    {
+      "name": "teach:讲解莎士比亚的悲剧特征",
+      "pass": true
+    },
+    {
+      "name": "teach:什么是文艺复兴",
+      "pass": true
+    },
+    {
+      "name": "teach:讲解现代主义诗歌",
+      "pass": true
+    },
+    {
+      "name": "teach:什么是儒家仁的思想",
+      "pass": true
+    },
+    {
+      "name": "answer:法语'谢谢'怎么说",
+      "pass": true
+    },
+    {
+      "name": "answer:日语'早上好'怎么说",
+      "pass": true
+    },
+    {
+      "name": "answer:德语'再见'怎么说",
+      "pass": true
+    },
+    {
+      "name": "aff:我和朋友吵架了很",
+      "pass": true
+    },
+    {
+      "name": "aff:对未来很迷茫",
+      "pass": true
+    },
+    {
+      "name": "通识:怎么提高记忆力",
+      "pass": true
+    },
+    {
+      "name": "通识:如何做一次好的演讲",
+      "pass": true
+    },
+    {
+      "name": "通识:什么是批判性思维",
+      "pass": true
+    },
+    {
+      "name": "mode:简单讲讲什么是意识",
+      "pass": true
+    },
+    {
+      "name": "mode:深入讲讲尼采哲学",
+      "pass": true
+    }
+  ]
+}

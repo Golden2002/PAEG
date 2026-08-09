@@ -1,0 +1,10 @@
+{
+ "users": {
+  "student@test.com": {
+   "user_id": "u1",
+   "identifier": "student@test.com",
+   "nickname": "小陈",
+   "password_hash": "6a7cacb853f92ecc85910f3b87cac7d15a054788f5e0afb4c44b06e3ec53e27b",
+   "salt": "7a74ca2dbd564c26",
+   "learner": {
+    "_individuality_trait_obj": 

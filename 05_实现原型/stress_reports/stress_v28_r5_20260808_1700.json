@@ -1,0 +1,40 @@
+{
+  "round": 5,
+  "timestamp": "2026-08-08 17:00",
+  "passed": 8,
+  "total": 8,
+  "results": [
+    {
+      "name": "大学:什么是语用学",
+      "pass": true
+    },
+    {
+      "name": "大学:讲解锋面气旋",
+      "pass": true
+    },
+    {
+      "name": "大学:什么是量子叠加态",
+      "pass": true
+    },
+    {
+      "name": "二级学科教学",
+      "pass": true
+    },
+    {
+      "name": "检索闭环",
+      "pass": true
+    },
+    {
+      "name": "长对话记忆",
+      "pass": true
+    },
+    {
+      "name": "长对话竞赛",
+      "pass": true
+    },
+    {
+      "name": "教学反思",
+      "pass": true
+    }
+  ]
+}

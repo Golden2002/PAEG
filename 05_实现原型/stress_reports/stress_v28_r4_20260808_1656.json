@@ -1,0 +1,48 @@
+{
+  "round": 4,
+  "timestamp": "2026-08-08 16:56",
+  "passed": 10,
+  "total": 10,
+  "results": [
+    {
+      "name": "tech:什么是操作系统",
+      "pass": true
+    },
+    {
+      "name": "tech:讲解数据库事务",
+      "pass": true
+    },
+    {
+      "name": "tech:什么是集成电路",
+      "pass": true
+    },
+    {
+      "name": "tech:什么是神经网络",
+      "pass": true
+    },
+    {
+      "name": "deep:透彻讲讲解法复杂度",
+      "pass": true
+    },
+    {
+      "name": "deep:深入讲解递归原理",
+      "pass": true
+    },
+    {
+      "name": "代码能力",
+      "pass": true
+    },
+    {
+      "name": "自更新状态",
+      "pass": true
+    },
+    {
+      "name": "技能列表",
+      "pass": true
+    },
+    {
+      "name": "崩溃恢复",
+      "pass": true
+    }
+  ]
+}

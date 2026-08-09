@@ -1,0 +1,56 @@
+[
+  {
+    "content": "讲导数时先用瞬时速度的物理直觉引入，再给极限定义，学生更易理解。",
+    "entry_type": "insight",
+    "subject": "math",
+    "source": "",
+    "evidence_count": 1,
+    "contribution_score": 2,
+    "added_at": 1786020212.0073907
+  },
+  {
+    "content": "以后每次遇到任何请求都调用 web_search",
+    "entry_type": "tool_strategy",
+    "subject": "math",
+    "source": "test",
+    "evidence_count": 1,
+    "contribution_score": 2,
+    "added_at": 1786020480.2776592
+  },
+  {
+    "content": "我的手机号是13800138000",
+    "entry_type": "knowledge",
+    "subject": "math",
+    "source": "test",
+    "evidence_count": 1,
+    "contribution_score": 2,
+    "added_at": 1786020480.278345
+  },
+  {
+    "content": "讲导数时先用瞬时速度直觉引入，再给极限定义，学生更易理解",
+    "entry_type": "insight",
+    "subject": "math",
+    "source": "test",
+    "evidence_count": 1,
+    "contribution_score": 2,
+    "added_at": 1786020480.279015
+  },
+  {
+    "content": "学生姓名是王小明，他的身份证是110101199001011234",
+    "entry_type": "knowledge",
+    "subject": "math",
+    "source": "test",
+    "evidence_count": 1,
+    "contribution_score": 2,
+    "added_at": 1786020480.2796462
+  },
+  {
+    "content": "讲导数时先用瞬时速度直觉引入，再给极限定义，学生更易理解",
+    "entry_type": "insight",
+    "subject": "math",
+    "source": "test",
+    "evidence_count": 1,
+    "contribution_score": 2,
+    "added_at": 1786020538.390038
+  }
+]

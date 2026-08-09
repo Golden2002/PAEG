@@ -1,0 +1,5966 @@
+[
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T15:22:50.868306"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:25.451034"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:25.665747"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:25.832019"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:25.992665"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:26.081962"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:26.176010"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:26.268355"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:26.366344"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:42.497005"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:42.765642"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:43.028594"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:43.218270"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:43.319365"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:43.437422"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:43.547724"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:23:43.646002"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T15:23:48.252475"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T15:24:50.036921"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:13.153710"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:13.505810"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:13.682631"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:13.861595"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:13.954490"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:14.047846"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:14.143864"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:14.242447"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T15:25:20.178498"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:39.572886"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:39.931774"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:40.147853"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:40.340037"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:40.468949"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:40.587826"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:40.695848"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:25:40.797545"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T15:25:45.050001"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:20.433908"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:21.087552"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:21.328798"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:21.542899"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:21.691299"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:21.841930"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:22.005064"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:22.164772"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:56.979387"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:57.450418"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:57.839451"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:58.208192"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:58.351364"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:58.470863"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:58.589475"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:26:58.714885"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:28:04.350329"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:28:04.861553"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:28:05.088844"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:28:05.310420"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:28:05.428373"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:28:05.559733"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:28:05.741817"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:28:05.872803"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T15:28:10.071241"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:30:51.394276"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:30:51.881382"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:30:52.105846"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:30:52.393690"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:30:52.519392"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:30:52.653716"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:30:52.821366"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:30:52.950272"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T15:30:57.349557"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:33:07.440654"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:33:07.954116"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:33:08.213991"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:33:08.450937"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:33:08.581459"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:33:08.734271"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:33:08.874124"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T15:33:09.005165"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T15:33:13.329800"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:00:20.462627"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:00:20.908489"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:00:21.265639"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:00:21.595475"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:00:21.721613"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:00:21.858481"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:00:21.994691"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:00:22.118030"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T18:00:29.991981"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:03:07.174690"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:03:07.792205"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:03:08.059007"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:03:08.279689"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:03:08.520903"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:03:08.789176"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:03:08.997152"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T18:03:09.154558"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T18:03:17.062102"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T20:59:34.669762"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T20:59:35.112414"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T20:59:35.331405"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T20:59:35.545598"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T20:59:35.674982"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T20:59:35.803958"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T20:59:35.934871"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T20:59:36.104875"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T20:59:45.600191"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:31:02.279149"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:31:02.770608"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:31:02.993210"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:31:03.258383"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:31:03.450752"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:31:03.624091"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:31:03.763842"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:31:03.892477"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T23:31:14.059308"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:50:27.554697"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:50:27.985313"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:50:28.199335"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:50:28.426566"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:50:28.552029"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:50:28.682782"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:50:28.819331"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-07T23:50:28.950961"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-07T23:50:40.022468"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:12:01.882548"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:12:02.287394"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:12:02.503567"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:12:02.714606"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:12:02.835130"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:12:02.953499"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:12:03.077200"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:12:03.199975"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T02:12:12.260332"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:17:23.347298"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:17:23.792687"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:17:23.999962"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:17:24.210319"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:17:24.364552"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:17:24.505724"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:17:24.639249"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:17:24.761705"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T02:17:34.388282"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:22:28.544141"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:22:28.951090"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:22:29.192694"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:22:29.403866"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:22:29.524810"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:22:29.648143"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:22:29.778212"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:22:29.911915"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T02:22:39.970238"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:45:31.049224"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:45:31.486299"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:45:31.712861"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:45:32.008952"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:45:32.151361"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:45:32.278978"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:45:32.411563"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T02:45:32.546711"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T02:45:41.990512"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:09:45.078557"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:09:45.486540"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:09:45.697974"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:09:45.920364"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:09:46.049749"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:09:46.176539"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:09:46.302172"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:09:46.430489"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T03:09:55.680339"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:21:53.437434"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:21:53.895960"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:21:54.127860"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:21:54.355860"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:21:54.551013"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:21:54.698383"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:21:54.842061"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:21:54.994365"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T03:22:04.644782"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:58:45.943484"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:58:46.624876"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:58:46.942740"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:58:47.203706"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:58:47.345677"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:58:47.492395"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:58:47.637980"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T03:58:47.784266"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T03:58:58.366202"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:01:34.524324"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:01:35.077969"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:01:35.326965"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:01:35.577286"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:01:35.721034"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:01:35.872874"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:01:36.026232"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:01:36.182699"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T04:01:46.944671"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:03:44.536567"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:03:45.051411"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:03:45.323808"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:03:45.584033"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:03:45.737034"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:03:45.894910"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:03:46.069803"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:03:46.234653"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T04:03:56.830515"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:06:08.980082"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:06:09.455820"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:06:09.779474"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:06:10.111520"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:06:10.284376"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:06:10.471373"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:06:10.657753"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:06:10.871802"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T04:06:22.833589"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:07:51.688309"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:07:52.768210"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:07:53.122414"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:07:53.457015"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:07:53.692895"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:07:53.902173"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:07:54.094915"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:07:54.263588"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T04:08:06.376159"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:09.996178"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:10.589734"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:10.845825"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:11.112277"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:11.275780"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:11.434875"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:11.589725"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:11.747456"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:57.882544"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:58.383796"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:58.653684"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:58.920546"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:59.085774"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:59.240464"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:59.403010"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:09:59.566434"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T04:10:09.353272"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:14:15.705501"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:14:16.240581"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:14:16.510976"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:14:16.782273"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:14:16.951898"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:14:17.124603"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:14:17.295222"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:14:17.461934"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T04:14:27.968970"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:24:06.101221"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:24:06.723960"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:24:07.006493"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:24:07.296334"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:24:07.469087"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:24:07.648157"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:24:07.876918"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:24:08.068300"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T04:24:20.508195"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:31:32.670526"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:31:33.206076"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:31:33.491224"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:31:33.779055"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:31:33.958528"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:31:34.140751"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:31:34.316201"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:31:34.493865"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T04:31:44.316148"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:44:28.301868"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:44:28.842710"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:44:29.135069"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:44:29.415763"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:44:29.588511"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:44:29.790148"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:44:30.008743"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:44:30.310235"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T04:44:40.711015"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:59:06.820503"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:59:07.356985"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:59:07.640589"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:59:07.925311"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:59:08.107273"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:59:08.281654"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:59:08.470005"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T04:59:08.652996"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T04:59:18.719182"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:08:48.118109"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:08:48.660445"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:08:48.949043"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:08:49.239307"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:08:49.421034"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:08:49.604809"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:08:49.792617"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:08:49.977291"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T05:08:59.856704"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:11:34.400823"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:11:35.296777"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:11:35.740925"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:11:36.159406"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:11:36.411970"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:11:36.671683"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:11:36.951259"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:11:37.217013"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T05:11:47.785001"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:15:58.585528"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:15:59.136058"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:15:59.425499"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:15:59.714864"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:15:59.897770"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:16:00.134477"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:16:00.361713"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:16:00.559220"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T05:16:10.641025"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:19:56.056501"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:19:56.615357"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:19:56.902206"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:19:57.196598"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:19:57.387155"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:19:57.611870"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:19:57.831993"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:19:58.021419"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T05:20:08.341121"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:37:45.645915"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:37:46.187143"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:37:46.476720"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:37:46.760228"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:37:46.999189"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:37:47.186714"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:37:47.374129"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:37:47.558029"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T05:37:57.359012"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:45:51.399503"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:45:51.947366"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:45:52.236458"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:45:52.529932"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:45:52.716358"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:45:52.901116"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:45:53.078441"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T05:45:53.269606"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T05:46:06.931784"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:02:56.823923"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:02:57.929559"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:02:58.656020"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:02:59.311697"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:02:59.698479"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:03:00.112541"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:03:00.554413"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:03:00.933526"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T06:03:28.294698"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:06:32.221472"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:06:32.910917"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:06:33.229150"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:06:33.707324"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:06:33.921340"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:06:34.090463"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:06:34.256455"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:06:34.433664"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T06:06:46.822995"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:09:21.018138"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:09:21.832473"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:09:22.123353"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:09:22.411641"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:09:22.675188"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:09:22.863043"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:09:23.070882"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:09:23.252473"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T06:09:34.308851"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:21:31.810080"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:21:32.523780"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:21:32.899595"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:21:33.227226"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:21:33.410735"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:21:33.612164"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:21:33.814112"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:21:34.024721"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T06:21:52.453907"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:29:52.773152"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:29:53.438190"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:29:53.760010"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:29:54.070722"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:29:54.322220"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:29:54.600907"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:29:54.790419"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:29:55.044887"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T06:30:06.338011"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:35:36.657245"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:35:37.443964"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:35:38.017097"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:35:38.459791"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:35:38.777353"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:35:38.956440"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:35:39.148778"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:35:39.330865"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T06:35:50.317614"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:45:45.281873"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:45:46.095314"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:45:46.393568"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:45:46.792914"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:45:46.962082"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:45:47.126537"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:45:47.299032"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:45:47.588821"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T06:45:58.583541"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:51:24.720081"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:51:25.301650"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:51:25.745899"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:51:26.319604"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:51:26.507537"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:51:26.688354"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:51:26.916277"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:51:27.178956"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T06:51:38.277022"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:59:25.797582"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:59:26.566413"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:59:27.115693"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:59:27.474853"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:59:27.754967"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:59:28.002041"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:59:28.277318"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T06:59:28.453613"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T06:59:39.352230"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:03:46.473609"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:03:47.262034"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:03:47.574977"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:03:48.049219"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:03:48.311405"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:03:48.513266"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:03:48.824678"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:03:49.146545"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T07:04:00.242259"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:07:16.219599"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:07:17.278071"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:07:17.751539"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:07:18.250630"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:07:18.439572"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:07:18.772317"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:07:18.990295"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:07:19.249030"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T07:07:30.071248"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:09:33.162684"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:09:34.225280"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:09:34.641205"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:09:35.092208"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:09:35.342498"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:09:35.535095"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:09:35.754942"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:09:35.934183"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T07:09:46.613606"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:11:51.508005"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:11:52.366868"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:11:52.959795"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:11:53.246318"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:11:53.422286"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:11:53.677831"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:11:53.864214"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:11:54.040651"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T07:12:04.862652"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:18:16.925522"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:18:17.813330"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:18:18.173124"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:18:18.549847"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:18:18.788460"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:18:19.072385"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:18:19.273648"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:18:19.516900"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T07:18:27.746162"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:21:56.618705"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:21:57.535369"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:21:57.977308"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:21:58.294461"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:21:58.508380"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:21:58.837482"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:21:59.027189"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T07:21:59.211891"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T07:22:06.961434"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:02:17.945480"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:02:19.086274"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:02:19.621017"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:02:20.303993"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:02:20.515703"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:02:20.762100"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:02:20.952313"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:02:21.186157"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T12:02:29.131319"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:15:44.388855"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:15:45.162946"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:15:45.666995"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:15:46.254935"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:15:46.600935"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:15:46.818797"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:15:47.026887"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:15:47.234345"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T12:15:55.222625"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:33:04.693633"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:33:05.452009"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:33:05.862888"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:33:06.279947"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:33:06.609408"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:33:06.800940"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:33:06.993315"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:33:07.193534"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T12:33:14.952435"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:42:34.806891"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:42:35.527910"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:42:35.896180"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:42:36.325071"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:42:36.558673"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:42:36.820336"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:42:37.109079"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:42:37.309972"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T12:42:45.024440"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:10.464814"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:11.467438"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:11.951881"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:12.455612"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:12.631164"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:12.825930"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:13.052771"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:13.229648"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T12:53:20.994533"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:56.135252"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:56.857664"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:57.238015"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:57.590546"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:57.784403"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:57.983400"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:58.161721"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:53:58.430504"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T12:54:06.205015"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:54:46.436356"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:54:47.384338"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:54:47.992737"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:54:48.431738"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:54:48.653146"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:54:48.846062"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:54:49.027834"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:54:49.238002"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:58:26.374375"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:58:27.067846"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:58:27.472344"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:58:27.826800"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:58:28.018816"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:58:28.274645"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:58:28.498765"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T12:58:28.742715"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T12:58:36.760931"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:00:00.870336"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:00:01.621287"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:00:02.050294"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:00:02.594422"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:00:02.802956"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:00:03.008555"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:00:03.202681"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:00:03.396201"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T13:00:14.926870"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:04:27.143968"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:04:27.974051"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:04:28.401217"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:04:28.920611"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:04:29.395154"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:04:29.863547"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:04:30.290369"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:04:30.945525"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T13:04:44.317710"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:05:56.316206"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:05:57.001540"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:05:57.341959"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:05:57.687293"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:05:57.906884"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:05:58.142164"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:05:58.369449"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:05:58.580933"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T13:06:08.141863"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:12:22.778541"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:12:23.408110"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:12:23.737778"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:12:24.083287"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:12:24.284662"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:12:24.480495"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:12:24.685866"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:12:24.902081"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T13:12:35.616259"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:19:46.155788"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:19:47.809833"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:19:48.530094"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:19:49.139250"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:19:49.513376"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:19:49.922202"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:19:50.390424"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:19:50.801073"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T13:21:10.814856"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:21:18.343144"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:21:20.613138"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:21:21.582933"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:21:22.501835"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:21:23.032743"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:21:23.573226"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:21:24.174885"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T13:21:24.721789"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T13:21:46.230538"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T14:42:28.210097"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T14:42:29.029227"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T14:42:29.718043"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T14:42:30.228147"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T14:42:30.441685"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T14:42:30.648111"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T14:42:30.852844"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T14:42:31.188288"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T14:42:39.160304"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:13:57.407541"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:13:58.134559"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:13:58.486853"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:13:58.867106"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:13:59.102295"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:13:59.314331"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:13:59.541283"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:13:59.758512"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T15:14:07.724652"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:18:30.657244"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:18:31.331122"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:18:31.707537"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:18:32.049233"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:18:32.284864"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:18:32.540999"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:18:32.845965"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:18:33.061357"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T15:18:40.901748"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:49:48.520928"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:49:49.339605"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:49:49.897164"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:49:50.266092"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:49:50.479549"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:49:50.698547"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:49:50.985764"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T15:49:51.213915"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T15:49:59.073943"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:01:26.935196"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:01:27.619971"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:01:28.017217"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:01:28.476469"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:01:28.781106"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:01:29.000844"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:01:29.259668"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:01:29.478043"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T16:01:37.453643"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:10:43.708309"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:10:44.395121"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:10:44.717139"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:10:45.068993"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:10:45.273019"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:10:45.497081"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:10:45.721249"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:10:45.951963"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T16:10:53.971932"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:15:47.557810"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:15:48.256014"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:15:48.738514"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:15:49.090341"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:15:49.320935"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:15:49.548980"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:15:49.833671"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:15:50.057507"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T16:15:57.870128"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:29:35.647982"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:29:36.325477"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:29:36.699862"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:29:37.012617"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:29:37.213624"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:29:37.411315"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:29:37.620387"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T16:29:37.822228"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T16:29:46.331032"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T18:14:24.060005"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T18:14:24.838486"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T18:14:25.357636"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T18:14:25.724566"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T18:14:25.935849"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T18:14:26.140515"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T18:14:26.352686"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T18:14:26.565986"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T18:14:34.483304"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T19:59:09.671457"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T19:59:10.194857"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T19:59:10.473890"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T19:59:10.757734"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T19:59:10.929207"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T19:59:11.097678"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T19:59:11.272967"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T19:59:11.442248"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T19:59:30.064273"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:00:14.000595"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:00:14.675200"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:00:15.019327"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:00:15.347437"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:00:15.549346"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:00:15.743274"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:00:15.958314"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:00:16.235984"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T20:00:24.011598"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:27:11.439735"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:27:12.288834"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:27:12.815430"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:27:13.159718"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:27:13.380727"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:27:13.633957"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:27:13.837288"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T20:27:14.051893"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T20:27:21.746494"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T21:10:13.269111"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T21:10:14.203386"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T21:10:14.569417"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T21:10:14.947962"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T21:10:15.308469"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T21:10:15.527143"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T21:10:15.821867"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T21:10:16.166869"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T21:10:23.947828"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:16:13.772591"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:16:14.639541"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:16:15.001057"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:16:15.453987"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:16:15.686239"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:16:15.895210"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:16:16.104703"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:16:16.306064"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T22:16:24.152166"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-08T22:27:59.512054"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:28:54.810158"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:28:55.548114"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:28:55.974067"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:28:56.506207"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:28:56.735677"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:28:56.985100"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:28:57.265957"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-08T22:28:57.528925"
+ },
+ {
+  "student_id": "001",
+  "subject": "phenomenology",
+  "ema_delta": -0.05779999999999985,
+  "reflection": "学法语常用的几款 APP，按水平给你分一下：\n\n1. **Duolingo**（零基础友好）—— 免费、游戏化、每日打卡，适合培养语感。\n2. **Babbel**（想练口语）—— 10-15 分钟一节，侧重日常对话，旅游/通勤很合适。\n3. **Rosetta Stone**（追求沉浸）—— 全法语教学，训练发音和语感。\n\n你是零基础还是想考级？我可以更精准地推。",
+  "timestamp": "2026-08-08T23:33:25.472325"
+ },
+ {
+  "student_id": "001",
+  "subject": "phenomenology",
+  "ema_delta": -0.05779999999999985,
+  "reflection": "学法语常用的几款 APP，按水平给你分一下：\n\n1. **Duolingo**（零基础友好）—— 免费、游戏化、每日打卡，适合培养语感。\n2. **Babbel**（想练口语）—— 10-15 分钟一节，侧重日常对话，旅游/通勤很合适。\n3. **Rosetta Stone**（追求沉浸）—— 全法语教学，训练发音和语感。\n\n你是零基础还是想考级？我可以更精准地推。",
+  "timestamp": "2026-08-08T23:33:26.644923"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "学法语常用的几款 APP，按水平给你分一下：\n\n1. **Duolingo**（零基础友好）—— 免费、游戏化、每日打卡，适合培养语感。\n2. **Babbel**（想练口语）—— 10-15 分钟一节，侧重日常对话，旅游/通勤很合适。\n3. **Rosetta Stone**（追求沉浸）—— 全法语教学，训练发音和语感。\n\n你是零基础还是想考级？我可以更精准地推。",
+  "timestamp": "2026-08-08T23:33:56.042479"
+ },
+ {
+  "student_id": "001",
+  "subject": "phenomenology",
+  "ema_delta": -0.05779999999999985,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-09T00:13:07.896955"
+ },
+ {
+  "student_id": "001",
+  "subject": "phenomenology",
+  "ema_delta": -0.05779999999999985,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-09T00:13:08.986197"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-09T00:13:26.657269"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T00:44:37.007209"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T08:42:42.244956"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T11:02:18.009110"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T11:16:07.574446"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T12:18:23.126031"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T12:20:01.808531"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T12:20:02.677809"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T18:06:51.837517"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T18:24:30.705799"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T18:26:53.950056"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T18:53:49.079836"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T18:55:35.950392"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.26699999999999996,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-09T19:09:22.634728"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.26699999999999996,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-09T19:09:23.272605"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.26699999999999996,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-09T19:09:23.567083"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.26699999999999996,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-09T19:09:23.826138"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.26699999999999996,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-09T19:09:23.906458"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.26699999999999996,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-09T19:09:23.990762"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.26699999999999996,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-09T19:09:24.065362"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.26699999999999996,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-09T19:09:24.159162"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-09T19:09:32.261438"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:37:33.327426"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:37:34.006362"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:37:34.272230"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:37:34.573254"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:37:34.655499"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:37:34.746630"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:37:34.833148"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:37:34.904839"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T19:37:43.055816"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:40:50.654050"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:40:51.305137"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:40:51.588915"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:40:51.858761"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:40:51.943408"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:40:52.027463"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:40:52.116794"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:40:52.190066"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T19:41:00.455635"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:46:50.055226"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:46:50.641269"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:46:50.895680"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:46:51.120397"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:46:51.208827"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:46:51.293682"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:46:51.374231"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:46:51.443153"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T19:47:11.732972"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:56:37.278552"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:56:38.020728"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:56:38.310188"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:56:38.661203"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:56:38.758144"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:56:38.861595"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:56:38.979147"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T19:56:39.059641"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T19:56:47.128983"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:02:40.059438"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:02:40.701101"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:02:40.967875"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:02:41.251291"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:02:41.343853"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:02:41.439613"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:02:41.568542"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:02:41.656015"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T20:02:50.185558"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:08:38.955998"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:08:40.080812"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:08:40.510164"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:08:40.976203"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:08:41.101423"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:08:41.220598"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:08:41.374187"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:08:41.483516"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T20:08:52.945256"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "学法语常用的几款 APP，按水平给你分一下：\n\n1. **Duolingo**（零基础友好）—— 免费、游戏化、每日打卡，适合培养语感。\n2. **Babbel**（想练口语）—— 10-15 分钟一节，侧重日常对话，旅游/通勤很合适。\n3. **Rosetta Stone**（追求沉浸）—— 全法语教学，训练发音和语感。\n\n你是零基础还是想考级？我可以更精准地推。",
+  "timestamp": "2026-08-09T20:18:38.055041"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:30:24.827001"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:30:25.497091"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:30:25.806574"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:30:26.147226"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:30:26.230337"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:30:26.377356"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:30:26.514564"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:30:26.636347"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T20:30:36.503183"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:47:09.862942"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:47:10.488411"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:47:10.754799"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:47:11.001449"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:47:11.081278"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:47:11.169335"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:47:11.284587"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:47:11.362641"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:51:46.064083"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:51:46.648315"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:51:47.001073"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:51:47.397776"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:51:47.533139"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:51:47.648737"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:51:47.797488"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T20:51:47.886424"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T20:51:57.576120"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T21:15:48.965069"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T21:15:49.605794"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T21:15:49.912592"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T21:15:50.159429"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T21:15:50.233546"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T21:15:50.317010"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T21:15:50.420937"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-09T21:15:50.498601"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-09T21:16:01.185104"
+ }
+]

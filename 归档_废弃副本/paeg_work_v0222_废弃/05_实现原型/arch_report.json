@@ -1,0 +1,128 @@
+{
+ "modules": [
+  {
+   "module": "tool_registry",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": true,
+   "connected": true
+  },
+  {
+   "module": "tool_recovery",
+   "exists": true,
+   "called_in_server": false,
+   "called_in_tool_registry": true,
+   "connected": true
+  },
+  {
+   "module": "tool_cache",
+   "exists": true,
+   "called_in_server": false,
+   "called_in_tool_registry": true,
+   "connected": true
+  },
+  {
+   "module": "context_manager",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": false,
+   "connected": true
+  },
+  {
+   "module": "memory_system",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": false,
+   "connected": true
+  },
+  {
+   "module": "expert_guard",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": false,
+   "connected": true
+  },
+  {
+   "module": "skill_registry",
+   "exists": true,
+   "called_in_server": false,
+   "called_in_tool_registry": true,
+   "connected": true
+  },
+  {
+   "module": "problem_solver",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": true,
+   "connected": true
+  },
+  {
+   "module": "web_search_tool",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": true,
+   "connected": true
+  },
+  {
+   "module": "meta_router",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": false,
+   "connected": true
+  },
+  {
+   "module": "self_improve",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": false,
+   "connected": true
+  },
+  {
+   "module": "teaching_memory",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": false,
+   "connected": true
+  },
+  {
+   "module": "mcp_gateway",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": false,
+   "connected": true
+  },
+  {
+   "module": "file_generator",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": true,
+   "connected": true
+  },
+  {
+   "module": "quotes",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": true,
+   "connected": true
+  },
+  {
+   "module": "agent_engine",
+   "exists": true,
+   "called_in_server": true,
+   "called_in_tool_registry": true,
+   "connected": true
+  }
+ ],
+ "connectivity_rate": 1.0,
+ "key_chains": {
+  "chat → run_agent_loop → tools": true,
+  "teach → paeg.teach → subagents": true,
+  "记忆压缩 (memory.compress)": true,
+  "教学记忆注入 (teaching_memory)": true,
+  "自我改进记录 (self_improve)": true,
+  "上下文管理 (context_manager)": true,
+  "深度守门 (expert_guard)": true,
+  "出题/方法/元问题路由 (meta_router)": true
+ },
+ "timestamp": "2026-08-07T02:46:22.327653"
+}

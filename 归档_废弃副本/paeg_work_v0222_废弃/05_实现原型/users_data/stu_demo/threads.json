@@ -1,0 +1,44 @@
+{
+ "threads": [
+  {
+   "id": "thr_af16101514ba",
+   "student_id": "stu_demo",
+   "subject": "math",
+   "title": "导数的几何意义",
+   "status": "active",
+   "parent_thread_id": null,
+   "created_at": 1786041809.2852032,
+   "updated_at": 1786041809.2852037,
+   "last_event_id": 1,
+   "turns": [
+    "trn_4251a535649f"
+   ],
+   "events": [
+    {
+     "event_id": 1,
+     "turn_id": "trn_4251a535649f",
+     "type": "turn_started",
+     "payload": {
+      "agent": "tutor"
+     },
+     "ts": 1786041809.3161242
+    }
+   ]
+  },
+  {
+   "id": "thr_f51aabab625e",
+   "student_id": "stu_demo",
+   "subject": "math",
+   "title": "导数的几何意义 (分支)",
+   "status": "active",
+   "parent_thread_id": "thr_af16101514ba",
+   "created_at": 1786041809.364527,
+   "updated_at": 1786041809.364528,
+   "last_event_id": 0,
+   "turns": [
+    "trn_4251a535649f"
+   ]
+  }
+ ],
+ "next_event_id": 2
+}

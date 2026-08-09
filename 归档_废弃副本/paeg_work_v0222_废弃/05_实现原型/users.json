@@ -1,0 +1,217 @@
+{
+ "users": {
+  "student@test.com": {
+   "user_id": "u1",
+   "identifier": "student@test.com",
+   "nickname": "小陈",
+   "password_hash": "6a7cacb853f92ecc85910f3b87cac7d15a054788f5e0afb4c44b06e3ec53e27b",
+   "salt": "7a74ca2dbd564c26",
+   "learner": {
+    "id": "u1",
+    "nickname": "小陈",
+    "grade_level": "high_school",
+    "age": 17,
+    "cognitive_style": "visual",
+    "subjects_mastery": {
+     "math": {
+      "mastery": 0.635,
+      "count": 1
+     }
+    },
+    "world_view_blend": {
+     "1": 0.2,
+     "2": 0.35,
+     "3": 0.35,
+     "4": 0.1
+    },
+    "privacy_parent_notify": false,
+    "target_exam": null,
+    "specialty_target": null,
+    "self_description": "我是小陈，高三，数学一般，想学好。"
+   },
+   "created_at": 1785992104.408508,
+   "last_login": 1785992121.6012938
+  },
+  "pubtest@test.com": {
+   "user_id": "u2",
+   "identifier": "pubtest@test.com",
+   "nickname": "????",
+   "password_hash": "c646911217cc4e26448666db38eef23bf03ccf29db086fbf46bfe4c934ba4833",
+   "salt": "23ea7d2e440df116",
+   "learner": null,
+   "created_at": 1785992296.0508263,
+   "last_login": 1785992296.0508275
+  },
+  "16688188656": {
+   "user_id": "u3",
+   "identifier": "16688188656",
+   "nickname": "团聚体",
+   "password_hash": "6ab1171a9914e239adb9d2d3fed63b052c3feedd057bcc21ec8f7edddcb28ae9",
+   "salt": "83b5812f608c2e3a",
+   "learner": {
+    "id": "u3",
+    "nickname": "团聚体",
+    "grade_level": "graduate_exam",
+    "age": 17,
+    "cognitive_style": "visual",
+    "subjects_mastery": {
+     "math": {
+      "mastery": 0.62,
+      "count": 1
+     }
+    },
+    "world_view_blend": {
+     "1": 0.2,
+     "2": 0.35,
+     "3": 0.35,
+     "4": 0.1
+    },
+    "privacy_parent_notify": false,
+    "target_exam": null,
+    "specialty_target": null,
+    "self_description": ""
+   },
+   "created_at": 1785992489.2489882,
+   "last_login": 1786044183.9372318
+  },
+  "test_1482@test.com": {
+   "user_id": "u4",
+   "identifier": "test_1482@test.com",
+   "nickname": "测试员",
+   "password_hash": "935430efa49524e4ffd344c04289eed00fa02af376a2d409cfe5bff0c4130115",
+   "salt": "4b2736ae8619f2e7",
+   "learner": {
+    "id": "u4",
+    "nickname": "测试员",
+    "grade_level": "high_school",
+    "age": 17,
+    "cognitive_style": "visual",
+    "subjects_mastery": {
+     "physics": {
+      "mastery": 0.62,
+      "count": 1
+     }
+    },
+    "world_view_blend": {
+     "1": 0.2,
+     "2": 0.35,
+     "3": 0.35,
+     "4": 0.1
+    },
+    "privacy_parent_notify": false,
+    "target_exam": null,
+    "specialty_target": null,
+    "self_description": ""
+   },
+   "created_at": 1786036595.5251517,
+   "last_login": 1786036595.525152
+  },
+  "hist_6975@t.com": {
+   "user_id": "u5",
+   "identifier": "hist_6975@t.com",
+   "nickname": "历史测试",
+   "password_hash": "f124dfac33d440a51a704ede81393f2f95b7a03ef18d1e86609bb3cc0d97ee5c",
+   "salt": "9adc18a4761c82b6",
+   "learner": {
+    "id": "u5",
+    "nickname": "历史测试",
+    "grade_level": "high_school",
+    "age": 17,
+    "cognitive_style": "visual",
+    "subjects_mastery": {
+     "physics": {
+      "mastery": 0.63,
+      "count": 1
+     }
+    },
+    "world_view_blend": {
+     "1": 0.2,
+     "2": 0.35,
+     "3": 0.35,
+     "4": 0.1
+    },
+    "privacy_parent_notify": false,
+    "target_exam": null,
+    "specialty_target": null,
+    "self_description": ""
+   },
+   "created_at": 1786036659.8990786,
+   "last_login": 1786036659.8990788
+  },
+  "hist_7973@t.com": {
+   "user_id": "u6",
+   "identifier": "hist_7973@t.com",
+   "nickname": "历史测试",
+   "password_hash": "6bfe0a5db084851dd4457d2d61eb11be51b07d8178c73fb73ddf492c89df7f2f",
+   "salt": "fed6ae4c185a4b9b",
+   "learner": {
+    "id": "u6",
+    "nickname": "历史测试",
+    "grade_level": "high_school",
+    "age": 17,
+    "cognitive_style": "visual",
+    "subjects_mastery": {
+     "physics": {
+      "mastery": 0.635,
+      "count": 1
+     }
+    },
+    "world_view_blend": {
+     "1": 0.2,
+     "2": 0.35,
+     "3": 0.35,
+     "4": 0.1
+    },
+    "privacy_parent_notify": false,
+    "target_exam": null,
+    "specialty_target": null,
+    "self_description": ""
+   },
+   "created_at": 1786036797.5430005,
+   "last_login": 1786036797.543001
+  },
+  "hist_6042@t.com": {
+   "user_id": "u7",
+   "identifier": "hist_6042@t.com",
+   "nickname": "历史测试",
+   "password_hash": "39ac66af7d6232a56eaf4e2c290c6413289e09e8355dd2cfb488fe80fad4633c",
+   "salt": "dcee5da5c1271d1b",
+   "learner": {
+    "id": "u7",
+    "nickname": "历史测试",
+    "grade_level": "high_school",
+    "age": 17,
+    "cognitive_style": "visual",
+    "subjects_mastery": {
+     "physics": {
+      "mastery": 0.635,
+      "count": 1
+     }
+    },
+    "world_view_blend": {
+     "1": 0.2,
+     "2": 0.35,
+     "3": 0.35,
+     "4": 0.1
+    },
+    "privacy_parent_notify": false,
+    "target_exam": null,
+    "specialty_target": null,
+    "self_description": ""
+   },
+   "created_at": 1786041677.884074,
+   "last_login": 1786041677.8840742
+  },
+  "hist_e2e_test@test.com": {
+   "user_id": "u8",
+   "identifier": "hist_e2e_test@test.com",
+   "nickname": "历史端到端",
+   "password_hash": "201386ac35f05c79566e10d6b7bff12a677def7db3c15751d8a4d2b39b2fcd77",
+   "salt": "de07439a2c4cdc08",
+   "learner": null,
+   "created_at": 1786043006.9050906,
+   "last_login": 1786043430.1305115
+  }
+ },
+ "next_id": 9
+}

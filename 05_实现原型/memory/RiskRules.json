@@ -1,0 +1,42 @@
+{
+  "_comment": "v0.37 ⭐ AffectionSupportor 风险分级规则（Oracle 方案 C）。LLM 优先分类 + 关键词兜底，取高者（保守原则）。level>=3 时 opt_out 不可压制。",
+  "levels": [
+    {"level": 0, "name": "none", "desc": "无情绪信号/中性", "behavior": "正常倾听", "opt_out_suppressible": true},
+    {"level": 1, "name": "distress", "desc": "难过/崩溃/撑不住/失眠/绝望（无致死意图）", "behavior": "确认+扎根+陪伴", "opt_out_suppressible": true},
+    {"level": 2, "name": "passive_ideation", "desc": "不想活/没意思/消失/不存在（无方法计划）", "behavior": "倾听+探索痛苦+扎根+温和现实连接；必须保留安全问句", "opt_out_suppressible": true},
+    {"level": 3, "name": "active_ideation", "desc": "想死/想结束/想去死/不想醒来", "behavior": "倾听+温和询问是否想到方法（不回避）+ 必须显示资源", "opt_out_suppressible": false},
+    {"level": 4, "name": "plan_or_means", "desc": "准备了工具/写了遗书/查了方法/选了地点时间", "behavior": "强制现实转介 + 明确告知会持续关心", "opt_out_suppressible": false},
+    {"level": 5, "name": "imminent", "desc": "今晚就/已经做了/正在做/马上", "behavior": "危机优先：急救转介 + 现实成人", "opt_out_suppressible": false}
+  ],
+  "patterns": {
+    "imminent": [
+      "已经(吃|割|跳|服)", "正在(做|准备|实施)", "现在就要", "就要去",
+      "马上.{0,3}(就)?(走|做|行动)", "倒计时", "此刻正在", "已经开始了"
+    ],
+    "plan_or_means": [
+      "(买了|准备了|查了|搜了).{0,4}(药|刀|绳|方法|工具)",
+      "写了.{0,4}(遗书|告别信)", "选了.{0,4}(地点|时间|方式)",
+      "想好.{0,4}(怎么|如何).{0,4}(死|结束)", "找到了.{0,4}(方法|方式)"
+    ],
+    "active_ideation": [
+      "想死", "想结束", "不想活", "不想醒", "想去死", "自杀", "自残",
+      "结束自己的生命", "不想再活"
+    ],
+    "passive_ideation": [
+      "没意思", "消失就好", "不存在", "希望没.{0,4}(我|出生)", "累觉不爱",
+      "活着没意义", "没有意义", "不想坚持"
+    ],
+    "distress": [
+      "崩溃", "撑不住", "绝望", "失眠", "喘不过气", "受不了",
+      "难过", "压抑", "焦虑", "委屈"
+    ]
+  },
+  "opt_out": {
+    "suppress_levels": [1, 2],
+    "force_levels_min": 3,
+    "reask_after_days": 7,
+    "hotline": "12356",
+    "emergency": "120",
+    "crisis_note": "level>=3 时旧 opt_out 不得压制资源提示；新出现 plan/means/imminent 信号自动覆盖旧拒绝"
+  }
+}

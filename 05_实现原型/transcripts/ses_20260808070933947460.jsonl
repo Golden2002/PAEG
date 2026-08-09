@@ -1,0 +1,13 @@
+{"ts": 1786144173.9475336, "session_id": "ses_20260808070933947460", "item_type": "user_input", "text": "什么是熵？", "subject": "physics"}
+{"ts": 1786144173.9515967, "session_id": "ses_20260808070933947460", "item_type": "diagnosis", "ready_to_teach": true}
+{"ts": 1786144173.9525728, "session_id": "ses_20260808070933947460", "item_type": "plan", "steps": 3, "subtopic": ""}
+{"ts": 1786144173.9589636, "session_id": "ses_20260808070933947460", "item_type": "presentation", "step_id": 1, "step_type": "present", "topic": "精讲：一个核心目标，讲透：什么是熵？（本步讲直觉和现象）", "content": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。", "llm_generated": true}
+{"ts": 1786144173.9604473, "session_id": "ses_20260808070933947460", "item_type": "evaluation", "step_id": 1, "score": 0.462, "ready_to_advance": false}
+{"ts": 1786144173.9667695, "session_id": "ses_20260808070933947460", "item_type": "retry", "step_id": 1, "decision": "switch_style", "score": 0.462, "ready": false}
+{"ts": 1786144173.97326, "session_id": "ses_20260808070933947460", "item_type": "presentation", "step_id": 2, "step_type": "practice", "topic": "小测：5-7 题形成性测验：什么是熵？（本步讲机制和定义，在上一步基础上深入）", "content": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。", "llm_generated": true}
+{"ts": 1786144173.9743652, "session_id": "ses_20260808070933947460", "item_type": "evaluation", "step_id": 2, "score": 0.462, "ready_to_advance": false}
+{"ts": 1786144173.9811356, "session_id": "ses_20260808070933947460", "item_type": "retry", "step_id": 2, "decision": "switch_style", "score": 0.462, "ready": false}
+{"ts": 1786144173.987528, "session_id": "ses_20260808070933947460", "item_type": "presentation", "step_id": 3, "step_type": "feedback", "topic": "矫正：针对错题再教一遍：什么是熵？（本步讲应用/辨析/练习，不重复前两步）", "content": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。", "llm_generated": true}
+{"ts": 1786144173.9887214, "session_id": "ses_20260808070933947460", "item_type": "evaluation", "step_id": 3, "score": 0.462, "ready_to_advance": false}
+{"ts": 1786144173.995158, "session_id": "ses_20260808070933947460", "item_type": "retry", "step_id": 3, "decision": "switch_style", "score": 0.462, "ready": false}
+{"ts": 1786144174.2348974, "session_id": "ses_20260808070933947460", "item_type": "summary", "avg_score": 0.462, "steps_completed": 6, "duration_min": 12}
