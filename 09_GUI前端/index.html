@@ -3026,10 +3026,13 @@ askBtn.addEventListener('click', () => {
     return;
   }
   if (!secureCtx) {
-    voiceBtn.title = '语音输入需 HTTPS 或 localhost';
+    voiceBtn.title = '语音输入需 HTTPS 或 localhost（Chrome 安全策略）';
     voiceBtn.style.opacity = '.4';
     voiceBtn.addEventListener('click', () => {
-      addMsg('paeg', '<small>🎙 当前为非安全环境（非 HTTPS），浏览器禁用了麦克风。请通过 https:// 或 localhost 访问后使用语音输入。</small>');
+      // v0.39 ⭐ 明确提示 Chrome 局域网 IP 场景（用户实测：Chrome 通过局域网 IP 访问时麦克风被禁）
+      addMsg('paeg', '<small>🎙 当前为非安全环境（非 HTTPS + 非 localhost），Chrome 禁用了麦克风。\n' +
+        '解决办法：①本机用 http://127.0.0.1:5000 访问即可；②或 Chrome 地址栏输入 chrome://flags →\n' +
+        '搜索 "unsafely-treat-insecure-origin-as-secure" → 添加 ' + location.origin + ' → 重启 Chrome。</small>');
     });
     return;
   }
@@ -3082,6 +3085,12 @@ askBtn.addEventListener('click', () => {
   };
   recog.onerror = (e) => {
     _resetRecording();
+    // v0.39 ⭐ 修复：aborted = 用户主动停止/超时自动停止（非识别失败）→ 静默不报错
+    // 此前 abort() 停止会触发 onerror('aborted') → 误报"语音识别未成功（aborted）"
+    if (e.error === 'aborted') {
+      // 主动停止或超时：正常路径，不打扰用户（超时可在 onend 静默重置）
+      return;
+    }
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
       addMsg('paeg', '<small>🎙 麦克风权限被拒绝。请在浏览器地址栏左侧的🔒图标 → 网站设置中允许麦克风，然后重试。</small>');
     } else if (e.error === 'network') {
