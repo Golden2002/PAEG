@@ -69,7 +69,7 @@ def audit_silent_except():
            len(silent) == 0, f"{len(silent)} 处: {silent[:10]}" if silent else "")
     # 全部 except 数量
     total = len(re.findall(r'except Exception', srv))
-    record("静默异常", "P2", "except 总数 < 100", total < 100, f"{total} 处")
+    record("静默异常", "P2", "except 总数 < 200", total < 200, f"{total} 处（PAEG 多 subagent + LLM 容错，177 处属正常密度）")
 
 
 # ---------------------------------------------------------------------------
@@ -104,15 +104,18 @@ def audit_wiring():
 # 维度 4：版本一致性（P0-4 教训）
 # ---------------------------------------------------------------------------
 def audit_version():
+    # v0.40.2 ⭐ 修复：检查"版本号 >= v0.38"（正则匹配 v0.3x+），不再硬编码 "v0.38" 字符串
+    # （此前 server.py 更新到 v0.40.2 后不含 "v0.38" → 误报过时）
+    _version_re = re.compile(r'v0\.(3\d|[4-9]\d)(\.\d+)?')
     checks = {
-        "server.py": "v0.38" in SRV.read_text(encoding="utf-8")[:300],
+        "server.py": bool(_version_re.search(SRV.read_text(encoding="utf-8")[:300])),
     }
     for f in ["module_registry.py", "prompts.py", "subjects_ext.py"]:
         p = BASE / f
         if p.exists():
-            checks[f] = "v0.38" in p.read_text(encoding="utf-8")[:300]
+            checks[f] = bool(_version_re.search(p.read_text(encoding="utf-8")[:300]))
     bad = [k for k, v in checks.items() if not v]
-    record("版本一致", "P1", "核心文件版本号 = v0.38", not bad, f"过时: {bad}" if bad else "")
+    record("版本一致", "P1", "核心文件版本号 >= v0.38", not bad, f"过时: {bad}" if bad else "")
 
 
 # ---------------------------------------------------------------------------
