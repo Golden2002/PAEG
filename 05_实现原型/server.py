@@ -41,6 +41,22 @@ from self_update import SelfUpdater
 # v0.27 ⭐ P0-1 模块化门控：让 paeg_modules.json 真正控制路由可达性
 from module_registry import is_enabled, require_module
 
+# v0.40 P1-1 ⭐ server.py Phase1 拆分: 从 config.py 读取常量与环境变量
+from config import (
+    SECRET_KEY, SECRET_KEY_IS_DEV_DEFAULT,
+    LLM_PROVIDER, LLM_MODEL,
+    GUI_DIR, FALLBACK_DOWNLOAD_DIR,
+    APP_HOST, APP_PORT, MCP_PORT,
+)
+
+# v0.40 P1-1 ⭐ server.py Phase1 拆分: 从 utils.py 导入无全局依赖的纯函数
+from utils import (
+    _safe_resolve_user_library_file,
+    _build_learner_ctx_str,
+    _anon_learner_id,
+    _hydrate_learner,
+)
+
 # ─────────────────────────────────────
 # Flask 应用初始化
 # ─────────────────────────────────────
@@ -48,9 +64,14 @@ from module_registry import is_enabled, require_module
 app = Flask(__name__, static_folder=None)
 CORS(app)  # 允许跨域（前端 GUI 在不同端口）
 
+# P0-2 安全基线: SECRET_KEY 已从 config.py 读取(SECRET_KEY_IS_DEV_DEFAULT 用于启动警告)
+# 注: SECRET_KEY / LLM_PROVIDER / LLM_MODEL 均由 config.py 统一管理, 这里仅做副作用输出与 Flask secret_key 赋值
+if SECRET_KEY_IS_DEV_DEFAULT:
+    print("[PAEG Server][SECURITY] PAEG_SECRET_KEY 未设置，使用开发默认值（生产环境必须设置！）")
+app.secret_key = SECRET_KEY
+
+
 # 初始化 PAEG（v0.5：默认 auto 自动发现真实 LLM 凭据）
-LLM_PROVIDER = os.environ.get("PAEG_LLM_PROVIDER", "auto")
-LLM_MODEL = os.environ.get("PAEG_LLM_MODEL")
 llm = create_llm(LLM_PROVIDER, model=LLM_MODEL)
 print(f"[PAEG Server] LLM: {LLM_PROVIDER}/{LLM_MODEL or 'default'} -> {llm.name}")
 
@@ -160,7 +181,7 @@ try:
     DOWNLOAD_DIR = fgen.download_dir
 except Exception as _e:
     fgen = None
-    DOWNLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads')
+    DOWNLOAD_DIR = FALLBACK_DOWNLOAD_DIR
     print(f"[PAEG Server] 文件生成器初始化失败: {_e}")
 
 # v0.14：用户注册与画像持久化
@@ -196,7 +217,7 @@ SESSIONS: Dict[str, Any] = {}
 # 静态文件（GUI 前端）
 # ─────────────────────────────────────
 
-GUI_DIR = Path(__file__).parent.parent / "09_GUI前端"
+# GUI_DIR 已从 config.py 导入
 
 
 @app.route("/")
@@ -329,18 +350,6 @@ def thread_action(student_id, tid):
 # v0.19.26：Agent Steering — 学科自动识别层
 # ─────────────────────────────────────
 
-def _build_learner_ctx_str(learner) -> str:
-    """构造学生画像上下文段（v0.20.3，供各端点 system 注入）。"""
-    try:
-        from context_bundle import build_learner_context, inject_user_model
-        # 懒推断 user_model（若已有则跳过）
-        if not getattr(learner, "_user_model", None):
-            inject_user_model(learner, [], getattr(learner, "self_description", ""))
-        return build_learner_context(learner)
-    except Exception:
-        return ""
-
-
 def _mode_auto_correct(text: str, requested_mode: str, learner, learner_id: str,
                        subject: str = "default") -> Optional[dict]:
     """模式自动纠正（v0.20.3 ⭐）：用户在独立端点（method/knowledge/affection/answer）
@@ -429,24 +438,6 @@ def _polish_text(text: str, context: str = "") -> str:
         pass
         pass
     return text
-
-def _hydrate_learner(learner, data):
-    """v0.32 ⭐ 每次请求把请求体的学段/画像字段同步到 SESSIONS 缓存。
-
-    历史 bug：teach_stream 等端点只在首次创建 LearnerProfile 时读 grade_level，
-    之后永远用缓存旧值，导致用户切换学段后后端仍按旧学段教学（linguistics 反复 grade_blocked）。
-    这里只更新运行时字段，不负责持久化（持久化由 profile_update 的 save_learner 负责）。
-    """
-    if learner is None or not isinstance(data, dict):
-        return learner
-    grade = data.get("grade_level")
-    if grade and getattr(learner, "grade_level", None) != grade:
-        try:
-            learner.grade_level = grade
-        except Exception as _e:
-            print(f"[Server] _hydrate_learner grade_level 同步失败: {_e}")
-    return learner
-
 
 def _steer_subject(concept: str, subject: str, learner, learner_id: str) -> dict:
     """根据问题内容自动判断学科，覆盖用户手动设定。
@@ -2385,44 +2376,6 @@ _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}
 _TEXT_EXTS = {".md", ".txt", ".csv", ".json"}
 
 
-def _safe_resolve_user_library_file(learner_id: str, filename: str) -> Optional[Path]:
-    """解析用户资料文件路径并做安全校验。
-
-    安全策略：
-      1. learner_id / filename 必须为非空字符串，且不含路径分隔符或 ".."
-      2. 解析后必须在 LIBRARY_DIR/usr_knowledge/<uid>/ 或 LIBRARY_DIR/user_<uid>/ 实际路径下
-      3. 必须为真实文件（非目录、非符号链接逃逸）
-      4. 拒绝非当前用户目录（防止 id 字段水平越权）
-    """
-    if not learner_id or not filename:
-        return None
-    # 防止 uid 本身含路径分隔符 / 相对路径元素
-    if "/" in learner_id or "\\" in learner_id or ".." in learner_id:
-        return None
-    # 防止 file 字段含路径分隔符 / 相对路径元素
-    if "/" in filename or "\\" in filename or ".." in filename:
-        return None
-
-    try:
-        from lib import library_store
-        # 候选根：规范路径 + 兼容旧路径
-        roots = [library_store.resolve_library_root(learner_id)] + library_store.legacy_paths(learner_id)
-        for root in roots:
-            try:
-                candidate = (root / filename).resolve()
-                real_root = root.resolve()
-                # 必须真实落在某个 user 目录前缀内
-                if not (str(candidate).startswith(str(real_root) + os.sep) or candidate == real_root):
-                    continue
-            except Exception:
-                continue
-            if candidate.is_file():
-                return candidate
-        return None
-    except Exception:
-        return None
-
-
 @app.route("/api/library-file", methods=["GET"])
 @require_module("knowledge")
 def library_file_download():
@@ -3649,30 +3602,6 @@ def solve_problem_api():
 # ─────────────────────────────────────
 
 
-def _anon_learner_id(request_data: dict, request_obj=None) -> str:
-    """v0.26：匿名用户"一个用户一个 ID"——优先请求里已有 ID；否则会话 cookie 绑定稳定 ID。
-
-    关键：同一用户的所有请求必须映射到同一个 ID，否则记忆（chat_hist）会混乱。
-    """
-    # 1. 请求显式带 learner_id → 信任（GUI 已保证 web_/u 前缀）
-    lid = request_data.get("learner_id")
-    if lid and str(lid).strip():
-        return str(lid).strip()
-    # 2. 从 cookie 取"会话级匿名 ID"（浏览器每个用户一个 cookie，跨请求稳定）
-    try:
-        if request_obj is not None:
-            from flask import request as _req
-            cid = _req.cookies.get("paeg_anon_id")
-            if cid:
-                return cid
-    except Exception as _e:
-        print(f"[PAEG][server.py] _anon_learner_id 异常忽略: {_e}")
-        pass
-        pass
-    # 3. 无 cookie 上下文 → 生成会话级 ID（本请求内稳定；有 cookie 时后续请求复用）
-    return "web_" + uuid.uuid4().hex[:10]
-
-
 def _is_registered(learner_id: str) -> bool:
     """v0.32 ⭐ 放宽：注册用户（u 前缀）与匿名用户（web_ 前缀）都允许对话落盘。
 
@@ -4494,14 +4423,14 @@ def self_update_from_feedback():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = APP_PORT
     print(f"\n[PAEG Server] 启动在 http://localhost:{port}")
     print(f"[PAEG Server] GUI 在 http://localhost:{port}/")
     print(f"[PAEG Server] 健康检查 http://localhost:{port}/api/health")
     # v0.19：P0-3 MCP 工具网关（后台线程）
     try:
         from mcp_gateway import start_mcp_server
-        start_mcp_server(port=int(os.environ.get("MCP_PORT", 8765)))
+        start_mcp_server(port=MCP_PORT)
     except Exception as _e:
         print(f"[PAEG Server] MCP 网关启动失败（不影响主服务）: {_e}")
     # v0.19.21：周期自我更新调度器（后台守护线程）
@@ -4509,4 +4438,4 @@ if __name__ == "__main__":
         PERIODIC_UPDATER.start()
     except Exception as _e:
         print(f"[PAEG Server] 周期自我更新调度器启动失败（不影响主服务）: {_e}")
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+    app.run(host=APP_HOST, port=port, debug=False, threaded=True)
