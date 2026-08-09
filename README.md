@@ -1,6 +1,6 @@
 # PAEG — Pedagogical Agent with Evolving Growth
 
-基于**西蒙娜·薇依（Simone Weil）**教育哲学、由 Agent 架构驱动的 AI 教育智能体（**v0.25 关键节点 · 35 学科 + 学段联动**）。
+基于**西蒙娜·薇依（Simone Weil）**教育哲学、由 Agent 架构驱动的 AI 教育智能体（**v0.38 关键节点 · 35 学科 + 学段联动 + SQLite 多用户扩展**）。
 
 > **定位**：PAEG = **新一代教育智能体解决方案**——为教育重新设计的 Agent 架构，让智能体指挥大模型完成教学全过程（诊断、计划、讲解、评估、调整、反思），使教育从"一次性问答"跃迁为"有教学法、有过程、有陪伴、能自我进化"的完整闭环。
 
@@ -57,7 +57,7 @@ Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（
 
 ### 11. 气象页面（v0.20.5）
 ### 12. 模块化架构（v0.21）
-12 个功能模块可独立启用/禁用（paeg_modules.json），上架下架不改代码。
+14 个功能模块可独立启用/禁用（paeg_modules.json），上架下架不改代码。
 
 ### 13. 元能力文档 + 可观测性（v0.21）
 ### 14. Thread/Turn/Item 会话模型（v0.21.1，借鉴 Codex）
@@ -126,7 +126,7 @@ PAEG/
 ├── 05_实现原型/        # 核心代码（40+ Python 模块）
 │   ├── server.py        # Flask 后端 + 全部端点
 │   ├── paeg.py          # 教学主循环
-│   ├── subagents.py     # 7 个子代理
+│   ├── subagents.py     # 9 个子代理
 │   ├── prompts.py       # 35 学科 × 4 学段提示词中心（学段-学科联动）
 │   ├── meta_router.py   # 意图检测（8 类）
 │   ├── context_bundle.py# 上下文打包器
