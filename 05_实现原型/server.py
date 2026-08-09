@@ -1344,6 +1344,7 @@ def teach_stream():
                     f"嗯，我听着。你想聊{subject}之外的什么，我都在。"
 
                 def gen_intent():
+                    _save_teach_turn("chat", g_reply)  # v0.36.2 早退分支补保存
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': g_reply, 'step_type': 'chat'}, ensure_ascii=False)}\n\n"
                     yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
                 return Response(gen_intent(), mimetype="text/event-stream",
