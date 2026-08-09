@@ -633,7 +633,7 @@ def health():
 
     return jsonify({
         "status": "ok",
-        "version": "0.24",
+        "version": "0.40.4",
         "llm_provider": LLM_PROVIDER,
         "llm_model": LLM_MODEL,
         "kb_stats": kb.stats(),
@@ -2285,14 +2285,42 @@ def voice_tts():
 @app.route("/api/voice/stt", methods=["POST"])
 @require_module("voice")
 def voice_stt():
-    # v0.38 内部 API（STT 由浏览器 Web Speech API 完成；保留供未来 v2 provider）
-    """v0.36 ⭐ 语音转文本契约（v1 由浏览器 Web Speech API 完成）。
-    保留端点供未来 v2 provider 替换（讯飞/Azure）。"""
-    from voice_service import stt_transcribe
+    """v0.38 ★ STT (faster-whisper local)."""
+    """POST multipart field "audio" -> "{text: ...}" or 4xx/5xx."""
+    from voice_service import transcribe_audio, stt_available, stt_ready
+    if not stt_available():
+        return jsonify({"error": "语音识别服务不可用，请改用键盘输入"}), 503
     f = request.files.get("audio")
-    if f:
-        return jsonify(stt_transcribe(f.read()))
-    return jsonify({"ok": False, "hint": "v1 语音识别由浏览器 Web Speech API 完成（前端）", "text": ""}), 200
+    if not f:
+        return jsonify({"error": "缺少音频文件"}), 400
+    # Infer suffix from filename or content_type
+    _fname = (getattr(f, "filename", "") or "").lower()
+    _ct = (f.content_type or "").lower()
+    if _fname.endswith(".webm"):
+        _suffix = ".webm"
+    elif _fname.endswith(".ogg"):
+        _suffix = ".ogg"
+    elif _fname.endswith(".mp3"):
+        _suffix = ".mp3"
+    elif _fname.endswith(".m4a"):
+        _suffix = ".m4a"
+    elif "webm" in _ct or "opus" in _ct:
+        _suffix = ".webm"
+    elif "ogg" in _ct:
+        _suffix = ".ogg"
+    elif "mpeg" in _ct or "mp3" in _ct:
+        _suffix = ".mp3"
+    else:
+        _suffix = ".wav"
+    try:
+        _text = transcribe_audio(f.read(), suffix=_suffix)
+    except Exception:
+        return jsonify({"error": "语音识别服务不可用，请改用键盘输入"}), 500
+    if _text is None:
+        if not stt_ready():
+            return jsonify({"error": "模型加载中，请稍候"}), 503
+        return jsonify({"error": "语音识别服务不可用，请改用键盘输入"}), 500
+    return jsonify({"text": _text})
 
 
 @app.route("/uploads/<path:filename>")
@@ -2717,7 +2745,12 @@ def general_chat_stream():
     data = request.get_json(force=True)
     text = (data.get("text") or "").strip()
     if not text:
-        return jsonify({"error": "text is required"}), 400
+        # v0.40.5 ⭐ 修复：空输入返回 200 + 友好提示（此前 400，混沌测试要求 200）
+        def gen_empty_chat():
+            yield f"event: seg\ndata: {json.dumps({'text': '请问你想聊点什么？直接输入你想说的内容，我就开始。'}, ensure_ascii=False)}\n\n"
+            yield f"event: done\ndata: {json.dumps({'ok': True}, ensure_ascii=False)}\n\n"
+        return Response(gen_empty_chat(), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     from paeg import LearnerProfile
     from prompts import build_general_chat_system, build_general_chat_user
