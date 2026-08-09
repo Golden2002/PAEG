@@ -2085,7 +2085,19 @@ async function loadProfile() {
     if (p.self_description) {
       document.getElementById('desc-textarea').value = p.self_description;
     }
-    if (p.nickname) document.getElementById('learner-name').textContent = p.nickname;
+    if (p.nickname) {
+      document.getElementById('learner-name').textContent = p.nickname;
+      // v0.41.1 ⭐ 修复：同步 STATE.nickname + localStorage——
+      // 此前只更新显示，聊天请求仍用 STATE.nickname（默认"学习者"）→ 智能体称呼错误
+      STATE.nickname = p.nickname;
+      try {
+        const _u = JSON.parse(localStorage.getItem('paeg-user') || '{}');
+        _u.nickname = p.nickname;
+        localStorage.setItem('paeg-user', JSON.stringify(_u));
+      } catch (e) { /* 忽略 */ }
+      const _badge = document.getElementById('user-badge');
+      if (_badge) _badge.textContent = p.nickname;
+    }
     // v0.27：服务器返回的 avatar_url 优先（注册用户跨设备生效）
     if (p.avatar_url) {
       STATE.avatarUrl = p.avatar_url;
