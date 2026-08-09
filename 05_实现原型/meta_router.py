@@ -289,25 +289,29 @@ VALID_INTENTS = {
     "chat",           # 闲聊（无规则函数，纯 LLM 判断）
 }
 
-INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。根据用户输入选择最匹配的一个意图。
+INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务：阅读用户输入，判断它属于下面 14 个意图中的哪一类，**只返回该意图的变量名**（如 "teach" / "interface"），不要做其他任何事。
 
-意图选项（互斥，必须选一个；选项名与本模块 is_xxx() 规则函数一一对应）：
-- teach: 开始/继续教学（如"教我法语""继续""下一题""讲解这个语法"）
-- knowledge: 清点/查询知识库已有内容（如"我学过什么""知识库有什么""总结我学过的"）
-- knowledge_map: 生成/查看知识地图/思维导图（如"画个思维导图""知识框架""结构图"）
-- recommend: 工具/软件/书/资源推荐（如"推荐app""学法语用什么软件""有什么好书"）
-- method: 学习方法论/认知策略（如"怎么记单词""如何高效学习""怎么复习"）
-- emotion: 情绪表达/倾诉（如"学不下去了""太难了想放弃""我很焦虑"）
-- problem: 出题/测验/练习（如"出10道题""考考我""来道练习"）
-- meta: 关于系统本身（如"你是谁""你能做什么""怎么用"）
-- greeting: 寒暄/打招呼（如"你好""在吗"）
-- material: 基于用户上传的文件操作（如"看我上传的文件""用我的资料回答""讲义在哪"）
-- interface: 关于界面操作（如"换主题""深色模式""按钮在哪""怎么切换语言"）
-- ppt: 生成演示文稿/PPT（如"做PPT""整理成演示文稿""生成课件""把这些资料做成PPT"）
-- chat: 闲聊/与教学无关（如"今天天气""随便聊聊"）
-- answer: 知识问答/直接回答（如"什么是X""为什么Y""法语难吗"）
+【意图类型定义（每个类型是什么、边界在哪）】
+- teach: 教学请求——用户要开始学习/继续学习/讲解某个学科概念（"教我法语""什么是导数""继续""下一题""讲解这个语法"）。注意：问"概念是什么"但目的是理解 → teach；只是要一句话结论 → answer。
+- answer: 知识问答——用户要直接答案/快速结论（"法语难吗""π等于多少""这道题答案是什么"）。与 teach 的区别：answer 要结论，teach 要过程讲解。
+- chat: 闲聊——与学习无关的日常对话、寒暄延伸、随便聊聊（"今天天气""你吃饭了吗""随便聊聊"）。注意：闲聊是**非学习**内容；学习相关一律不是 chat。
+- knowledge: 清点/查询知识库——用户问"我学过什么/知识库有什么/你收藏了什么资料"（清点已有内容，非新教学）。
+- knowledge_map: 生成/查看知识地图/思维导图（"画个思维导图""知识框架""结构图"）。
+- recommend: 工具/软件/书/资源推荐——用户要"推荐/用什么好"（"学法语用什么软件""推荐几本英语书"）。
+- method: 学习方法论/认知策略（"怎么记单词""如何高效学习""怎么复习"）。
+- emotion: 情绪表达/倾诉/心理支持（"学不下去了""太难了想放弃""我很焦虑"）。
+- problem: 出题/测验/练习（"出10道题""考考我""来道练习"）。
+- meta: 纯身份问题——关于"我是谁"（"你是谁""你叫什么""你是什么"）。注意：**"你能做什么/有什么功能/怎么用"不是 meta**，是 interface（问能力/功能/使用）。
+- interface: 界面/功能/使用问题——用户问系统有什么功能、怎么用、界面操作（"你有什么功能""你能做什么""这个网站怎么用""换深色模式""按钮在哪""怎么切换语言"）。注意：功能/能力/使用类问题**都属于 interface**，不是 meta。
+- material: 基于用户上传的文件操作（"看我上传的文件""用我的资料回答""讲义在哪"）。
+- ppt: 生成演示文稿/PPT（"做PPT""整理成演示文稿""生成课件""把这些资料做成PPT"）。
+- greeting: 寒暄/打招呼（"你好""在吗""嗨"）。
 
 【关键区分示例】
+- "你有什么功能" → interface（问能力清单），不是 meta
+- "你能做什么" → interface（问能力），不是 meta
+- "这个网站怎么用" → interface（问使用），不是 meta
+- "你是谁" → meta（纯身份），不是 interface
 - "学法语用什么软件" → recommend（推荐工具），不是 knowledge
 - "教我法语" → teach（要开始教学），不是 recommend
 - "法语难吗" → answer（知识问答），不是 method
@@ -317,27 +321,42 @@ INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。根据用户�
 - "把这些资料做成PPT" → ppt（生成演示文稿），不是 teach
 - "看下我上传的笔记" → material（用户文件），不是 knowledge
 - "换深色模式" → interface（界面操作），不是 teach
-- "推荐几本学英语的书" → recommend（推荐），不是 knowledge
+- "今天天气怎么样" → chat（闲聊），不是 teach
 
 【用户输入】
 {text}
 
-只输出严格 JSON（不要 markdown 代码块、不要其他文字）：{"intent": "...", "confidence": 0.0-1.0, "reason": "简短中文原因"}
+【输出要求】只输出严格 JSON（不要 markdown 代码块、不要任何其他文字）：
+{"intent": "上面 14 个变量名之一", "confidence": 0.0-1.0, "reason": "简短中文原因"}
 """
 
 _INTENT_CACHE_V2 = {}
 _INTENT_CACHE_TTL_V2 = 600
 
 
-def route_intent(text: str, llm=None, use_cache: bool = True) -> dict:
+def route_intent(text: str, llm=None, use_cache: bool = True, mode: str = None) -> dict:
     """v0.35 ⭐ LLM 主路由：判断用户意图（在选项中选一个）。
     返回 {"intent": str, "confidence": float, "reason": str}
     LLM 不可用/失败/超时 → 返回 {"intent": "chat", "confidence": 0.0, "reason": "llm_error"}
+
+    v0.41.6 ⭐ 模式短路（确定性信号优先于 LLM 判断）：
+    前端已显式选择模式（chat/teach/answer/method/knowledge/affection/ppt）时，
+    直接返回该模式对应意图——用户已点"闲聊"按钮，LLM 不必再判断"这是不是闲聊"。
+    这是"确定性信号 → LLM 判断 → 规则兜底"管线的第一层。
     """
     import time as _t
     t = (text or "").strip()
     if not t:
         return {"intent": "chat", "confidence": 0.0, "reason": "empty"}
+    # v0.41.6 ⭐ 模式短路：前端 mode 是用户显式选择，是最强确定性信号
+    _MODE_TO_INTENT = {
+        "teach": "teach", "chat": "chat", "answer": "answer",
+        "method": "method", "knowledge": "knowledge",
+        "affection": "emotion", "ppt": "ppt", "problem": "problem",
+    }
+    if mode and mode in _MODE_TO_INTENT:
+        return {"intent": _MODE_TO_INTENT[mode], "confidence": 0.95,
+                "reason": f"mode:{mode}"}
     now = _t.time()
     if use_cache and t in _INTENT_CACHE_V2 and now - _INTENT_CACHE_V2[t][1] < _INTENT_CACHE_TTL_V2:
         return _INTENT_CACHE_V2[t][0]
@@ -345,7 +364,7 @@ def route_intent(text: str, llm=None, use_cache: bool = True) -> dict:
         return {"intent": "chat", "confidence": 0.0, "reason": "no_llm"}
     try:
         from subagents import _safe_chat
-        # 用 replace 而非 format：模板里含 JSON 示例（{...}），不能被 format 当占位符
+        # 用 replace 而非 format：模板里有 JSON 示例（{...}），不能用 format 当占位符
         prompt = INTENT_PROMPT.replace("{text}", t[:120])
         raw = _safe_chat(llm, prompt, t[:120], max_tokens=120)
         if not raw:
@@ -385,6 +404,15 @@ def rule_fallback_intent(text: str) -> dict:
         pass
     if is_greeting(t):
         return {"intent": "greeting", "confidence": 0.85, "reason": "rule:greeting"}
+    # v0.41.5 ⭐ 顺序修正：interface（功能/使用/界面）优先于 meta（纯身份）
+    # —— "你有什么功能/怎么用"是 interface（确定性模板回答），"你是谁"才是 meta。
+    # 此前 meta 在 interface 之前 → LLM 不可用时"你有什么功能"走错 meta 分支（自由发挥）。
+    try:
+        from self_referential import is_interface_query
+        if is_interface_query(t):
+            return {"intent": "interface", "confidence": 0.8, "reason": "rule:interface"}
+    except Exception:
+        pass
     if is_meta_question(t):
         return {"intent": "meta", "confidence": 0.8, "reason": "rule:meta"}
     try:
@@ -413,13 +441,6 @@ def rule_fallback_intent(text: str) -> dict:
         t,
     ):
         return {"intent": "material", "confidence": 0.7, "reason": "rule:material_upload"}
-    # v0.35 ⭐ 界面操作（独立模块 server.py）
-    try:
-        from server import is_interface_query
-        if is_interface_query(t):
-            return {"intent": "interface", "confidence": 0.7, "reason": "rule:interface"}
-    except Exception:
-        pass
     # v0.35 ⭐ PPT / 演示文稿生成（本文件新增 is_ppt_request）
     try:
         if is_ppt_request(t):
