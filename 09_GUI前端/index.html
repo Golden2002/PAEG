@@ -2245,13 +2245,20 @@ function renderLogs(logs) {
       const m = l.reflection;
       const ks = (m.knowledge_strengths || []).slice(0, 2).join('、');
       const kg = (m.knowledge_gaps || []).slice(0, 2).join('、');
+      // v0.41.4 ⭐ 修复：LLM 建模输出的是英文枚举（visual/neutral 等），此前原样显示
+      // → 用户看到"风 visual / 情 neutral"等奇怪词。加枚举→中文映射表统一展示。
+      const LS_CN = {visual:'视觉型', auditory:'听觉型', reading:'读写型', kinesthetic:'动觉型', mixed:'混合型'};
+      const EMO_CN = {anxious:'焦虑', engaged:'投入', neutral:'平静', withdrawn:'退缩', unknown:'未知', '':''};
       const ls = m.learning_style || '';
       const emo = m.emotional_tendency || '';
+      // 长句（LLM 越界输出）截断到 12 字，避免刷屏
+      const lsCn = LS_CN[ls] || (ls.length > 8 ? ls.slice(0, 8) + '…' : ls);
+      const emoCn = (emo !== '未知' && emo !== 'unknown') ? (EMO_CN[emo] || (emo.length > 8 ? emo.slice(0, 8) + '…' : emo)) : '';
       const parts = [];
-      if (ks) parts.push(`擅 ${ks}`);
-      if (kg) parts.push(`薄 ${kg}`);
-      if (ls) parts.push(`风 ${ls}`);
-      if (emo && emo !== '未知') parts.push(`情 ${emo}`);
+      if (ks) parts.push(`擅长 ${ks}`);
+      if (kg) parts.push(`薄弱 ${kg}`);
+      if (lsCn) parts.push(`风格 ${lsCn}`);
+      if (emoCn) parts.push(`情绪 ${emoCn}`);
       // v0.40.4 ⭐ 修复：emoji 🎯 → 无 emoji（用户要求）；SVG 图标在 log-item 模板中渲染
       txt = parts.length ? `建模 · ${parts.join(' · ')}` : (m.reflection || '建模');
     } else {
@@ -2335,6 +2342,9 @@ async function teach(question, subject, subtopic) {
         learner_id: STATE.learnerId,
         nickname: STATE.nickname,
         grade_level: document.getElementById('grade-select').value,
+        // v0.41.6 ⭐ 确定性信号传递：前端已选模式随请求发送（后端据此
+        // 注入提示词并短路 LLM 意图判断——"用户已选闲聊，不必再判断意图"）
+        mode: currentMode,
         subject: subject,
         subtopic: subtopic || '',
         concept: question,
@@ -2576,6 +2586,7 @@ async function generalChat(text) {
         learner_id: STATE.learnerId,
         nickname: STATE.nickname,
         grade_level: document.getElementById('grade-select').value,
+        mode: currentMode,
         text: text,
       }),
       signal: controller.signal,
@@ -2709,6 +2720,7 @@ async function answerChat(question, subject) {
         grade_level: document.getElementById('grade-select').value,
         learner_id: STATE.learnerId,
         nickname: STATE.nickname,
+        mode: currentMode,
       }),
     });
     removeThinking(thinking);
@@ -2742,6 +2754,7 @@ async function methodChat(question, subject) {
         grade_level: document.getElementById('grade-select').value,
         learner_id: STATE.learnerId,
         nickname: STATE.nickname,
+        mode: currentMode,
         self_description: STATE.selfDescription || '',
       }),
     });
@@ -2777,6 +2790,7 @@ async function knowledgeChat(question) {
         nickname: STATE.nickname,
         grade_level: document.getElementById('grade-select').value,
         subject: subjectSelect.value,
+        mode: currentMode,
       }),
     });
     removeThinking(thinking);
@@ -2811,6 +2825,7 @@ async function affectionChat(text) {
         learner_id: STATE.learnerId,
         nickname: STATE.nickname,
         grade_level: document.getElementById('grade-select').value,
+        mode: currentMode,
         self_description: STATE.selfDescription || '',
       }),
     });
@@ -3320,16 +3335,33 @@ askBtn.addEventListener('click', () => {
       addMsg('paeg', '<small> 已识别：「' + escapeHtml(text) + '」（但输入框未找到，请刷新页面）。</small>');
       return;
     }
-    addMsg('user', text);              // v0.36 ⭐ 先显示语音转文字（用户可见）
-    input.value = text;
-    const askBtn = document.getElementById('ask-btn');
-    if (askBtn) { askBtn.click(); }
-    else { addMsg('paeg', '<small> 已输入，请点击发送。</small>'); }
+    // v0.41.5 ⭐ 统一走 _voiceSendOnce 去重锁（Web Speech 路径）
+    _voiceSendOnce(text);
   };
   // v0.41 ⭐ 后端 STT（MediaRecorder → /api/voice/stt，faster-whisper 本地识别）
   // 解决：Web Speech API 转文字在 Google 云端（国内不可达）→"能启动能说话不能识别"
   let mediaRecorder = null;
   let mediaChunks = [];
+  // v0.41.5 ⭐ 语音双发送去重锁：后端 STT 与 Web Speech 双引擎并存时，
+  // 同一句识别文本可能被 onresult 与 _submitAudio 各发一次 → 用户看到两条消息。
+  // 相同文本 3 秒内只发送一次（以首次为准）。
+  let _lastVoiceSend = { text: '', ts: 0 };
+  function _voiceSendOnce(text) {
+    const now = Date.now();
+    const norm = (text || '').trim();
+    if (!norm) return false;
+    if (_lastVoiceSend.text === norm && (now - _lastVoiceSend.ts) < 3000) {
+      return false;  // 3 秒内同文 → 丢弃重复发送
+    }
+    _lastVoiceSend = { text: norm, ts: now };
+    const input = document.getElementById('question-input');
+    if (!input) return false;
+    addMsg('user', norm);
+    input.value = norm;
+    const askBtn = document.getElementById('ask-btn');
+    if (askBtn) askBtn.click();
+    return true;
+  }
   function _startBackendSTT() {
     return new Promise((resolve, reject) => {
       try {
@@ -3382,13 +3414,8 @@ askBtn.addEventListener('click', () => {
       .then(r => r.json())
       .then(j => {
         if (j && j.ok && j.text) {
-          const input = document.getElementById('question-input');
-          if (input) {
-            addMsg('user', j.text);
-            input.value = j.text;
-            const askBtn = document.getElementById('ask-btn');
-            if (askBtn) askBtn.click();
-          }
+          // v0.41.5 ⭐ 统一走 _voiceSendOnce 去重锁（后端 STT 路径）
+          _voiceSendOnce(j.text);
         } else {
           addMsg('paeg', '<small> ' + ((j && j.error) || '未识别到语音内容') + '。可直接打字输入。</small>');
         }
