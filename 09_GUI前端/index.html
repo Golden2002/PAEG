@@ -643,6 +643,76 @@ body {
   0%, 100% { transform: scaleY(.3); }
   50% { transform: scaleY(1); }
 }
+/* v0.40.2 ⭐ 长按输入框反馈：按压高亮（豆包式长按准备态） */
+.question-input.voice-press {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239,68,68,.18);
+  background: rgba(239,68,68,.04);
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+/* v0.40.2 ⭐ 长按语音浮动气泡（微信"按住说话"式）——半透明浅绿 + SVG 图标 */
+.voice-popover {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%) scale(.85);
+  background: rgba(74, 222, 128, .14);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(74, 222, 128, .3);
+  color: #166534;
+  border-radius: 18px;
+  padding: 12px 20px;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0,0,0,.12);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity .18s ease, transform .18s ease;
+  pointer-events: none;
+}
+.voice-popover.active {
+  display: block;
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+.voice-popover .vp-mic {
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 8px;
+  display: block;
+  color: #16a34a;
+}
+.voice-popover .vp-text {
+  font-size: 13px;
+  color: rgba(22, 101, 52, .9);
+  white-space: nowrap;
+  font-weight: 500;
+}
+.voice-popover .vp-waves {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  height: 18px;
+  margin-top: 8px;
+  align-items: center;
+}
+.voice-popover .vp-waves span {
+  width: 3px;
+  height: 100%;
+  background: #16a34a;
+  border-radius: 2px;
+  animation: wave-bar 0.9s ease-in-out infinite;
+}
+.voice-popover .vp-waves span:nth-child(2) { animation-delay: .15s; }
+.voice-popover .vp-waves span:nth-child(3) { animation-delay: .3s; }
+.voice-popover .vp-waves span:nth-child(4) { animation-delay: .45s; }
+.voice-popover .vp-waves span:nth-child(5) { animation-delay: .6s; }
+/* 录音中气泡状态（已触发）——浅绿加深 */
+.voice-popover.listening {
+  background: rgba(22, 163, 74, .22);
+  border-color: rgba(22, 163, 74, .45);
+}
+.voice-popover.listening .vp-text { color: #14532d; font-weight: 600; }
 .upload-msg { font-size: 12px; color: var(--text-dim); margin-left: 8px; }
 .upload-preview img { max-height: 120px; border-radius: 8px; border: 1px solid var(--border); }
 
@@ -652,6 +722,7 @@ body {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 14px; padding: 8px 8px 8px 14px;
   box-shadow: var(--shadow); align-items: center;
+  position: relative; /* v0.40.2 语音浮动气泡定位基准 */
 }
 /* v0.28：学段 / 学科 / 二级学科 — 三件一组统一控件 */
 .subject-select {
@@ -1229,6 +1300,12 @@ body {
     </div>
 
     <div class="input-bar">
+      <!-- v0.40.2 ⭐ 长按语音浮动气泡（微信"按住说话"式）：长按输入框时浮现，半透明浅绿 -->
+      <div class="voice-popover" id="voice-popover" role="status" aria-live="polite">
+        <svg class="vp-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        <div class="vp-text" id="vp-text">松开发送 · 上滑取消</div>
+        <div class="vp-waves"><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
       <select class="subject-select" id="grade-select" aria-label="学段">
         <option value="">不限</option>
         <option value="middle_school">初中</option>
@@ -2229,6 +2306,7 @@ async function teach(question, subject, subtopic) {
     let allText = '';
     let mainBubble = null;
     let lastSummary = '';
+    let lastPresStep = null;  // v0.40.2 分片支持：记录上一个 presentation step_id
 
     while (true) {
       const { done, value } = await reader.read();
@@ -2258,7 +2336,11 @@ async function teach(question, subject, subtopic) {
         } else if (event === 'presentation') {
           // 追加到同一气泡（步骤间加空行分隔，不拆气泡）
           const content = obj.content || obj.text || '';
-          if (allText && !allText.endsWith('\n\n')) allText += '\n\n';
+          // v0.40.2 ⭐ 分片支持：step_id 变化才插空行（后端现在 60 字分片 yield，
+          // 同一步骤的分片连续追加不插空行；不同步骤间保留分隔）
+          const curStep = obj.step_id || 0;
+          if (allText && lastPresStep && lastPresStep !== curStep && !allText.endsWith('\n\n')) allText += '\n\n';
+          lastPresStep = curStep;
           allText += content;
           // 创建或更新单个气泡
           if (!mainBubble) {
@@ -2270,6 +2352,7 @@ async function teach(question, subject, subtopic) {
           }
           // v0.36.1 ⭐ 修复：实时渲染累积内容——此前只追加字符串、最后一次性渲染
           // （教学模式观感=非流式；chat 路径逐段 appendChild 正常，此处对齐）
+          // v0.40.2 ⭐ 分片流式：每次分片到达即实时渲染（marked 开销可接受，60 字/片）
           const contentDiv = mainBubble.querySelector('.md-content');
           const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(allText)));
           contentDiv.innerHTML = typeof marked !== 'undefined'
@@ -3045,10 +3128,13 @@ askBtn.addEventListener('click', () => {
   const voiceIcon = voiceBtn.querySelector('img');
   const wavesEl = document.getElementById('voice-waves');
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  // v0.40 P0-1 ⭐ secureCtx 严格判断：只有 localhost/127.0.0.1 才放行
-  // （Chrome 桌面版访问局域网 IP 时 isSecureContext 常为 true → 绕过拦截 → start() 被静默拒绝）
+  // v0.40 P0-1 ⭐ secureCtx 判断：HTTPS（任何域名，含 Cloudflare 隧道）或 localhost → 放行
+  // v0.40.1 ⭐ 修复：上版 (isSecureContext||https) && isLocalhost 过度严格——把 HTTPS 公网隧道
+  // （如 trycloudflare.com）也拦截了。正确：isHttps || isLocalhost。
+  // 不用 window.isSecureContext：Chrome 桌面版对局域网 IP 常误判为 true，导致 start() 被静默拒绝。
   const isLocalhost = /^(127\.0\.0\.1|localhost|\[::1\])$/i.test(location.hostname);
-  const secureCtx = (window.isSecureContext || location.protocol === 'https:') && isLocalhost;
+  const isHttps = location.protocol === 'https:';
+  const secureCtx = isHttps || isLocalhost;
   if (!SR) {
     voiceBtn.title = '语音输入需 Chrome/Edge（微信内置浏览器不支持）';
     voiceBtn.style.opacity = '.4';
@@ -3213,19 +3299,73 @@ askBtn.addEventListener('click', () => {
     }
   });
   // v0.40 P2-6 ⭐ 长按输入框触发录音（豆包式：长按 500ms 开始）
+  // v0.40.2 ⭐ 浮动气泡：长按时浮现微信式"按住说话"面板（更激进视觉反馈）
   const inputEl = document.getElementById('question-input');
+  const popoverEl = document.getElementById('voice-popover');
+  const vpTextEl = document.getElementById('vp-text');
   if (inputEl) {
     let pressTimer = null;
+    let pressActive = false;
+    function _showPopover(pressing) {
+      if (!popoverEl) return;
+      try {
+        popoverEl.classList.add('active');
+        if (pressing) {
+          popoverEl.classList.remove('listening');
+          if (vpTextEl) vpTextEl.textContent = '松开发送 · 上滑取消';
+        } else {
+          popoverEl.classList.add('listening');
+          if (vpTextEl) vpTextEl.textContent = '正在聆听…';
+        }
+      } catch (e) {}
+    }
+    function _hidePopover() {
+      if (!popoverEl) return;
+      try { popoverEl.classList.remove('active', 'listening'); } catch (e) {}
+    }
+    function _showPressFeedback() {
+      pressActive = true;
+      try {
+        inputEl.classList.add('voice-press');
+        if (navigator.vibrate) { try { navigator.vibrate(30); } catch (e) {} }
+      } catch (e) {}
+    }
+    function _hidePressFeedback() {
+      pressActive = false;
+      try { inputEl.classList.remove('voice-press'); } catch (e) {}
+    }
     function startPress() {
       if (recognizing || !SR || !secureCtx) return;
-      pressTimer = setTimeout(() => { voiceBtn.click(); }, 500);
+      _showPressFeedback();
+      _showPopover(true);  // 浮动气泡：按压准备态
+      pressTimer = setTimeout(() => {
+        _hidePressFeedback();
+        _showPopover(false);  // 气泡：正在聆听（录音已触发）
+        voiceBtn.click();  // 触发录音
+      }, 500);
     }
-    function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
+    function cancelPress() {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      _hidePressFeedback();
+      _hidePopover();
+    }
     inputEl.addEventListener('mousedown', startPress);
     inputEl.addEventListener('mouseup', cancelPress);
     inputEl.addEventListener('mouseleave', cancelPress);
     inputEl.addEventListener('touchstart', startPress, { passive: true });
     inputEl.addEventListener('touchend', cancelPress);
+    inputEl.addEventListener('touchcancel', cancelPress);
+    // 视觉提示：长按触发前显示"松开发送/长按说话"提示
+    inputEl.title = '点击输入，长按 0.5 秒可语音输入';
+  }
+  // 录音结束时隐藏气泡（onend/onerror/_resetRecording 联动）
+  const _origReset = _resetRecording;
+  _resetRecording = function() {
+    _hidePopoverSafe();
+    return _origReset.apply(this, arguments);
+  };
+  function _hidePopoverSafe() {
+    if (popoverEl) { try { popoverEl.classList.remove('active', 'listening'); } catch (e) {} }
   }
 })();
 
