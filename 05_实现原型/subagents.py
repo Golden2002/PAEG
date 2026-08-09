@@ -163,6 +163,8 @@ def _llm_choose_retrieval_scope(question: str, llm, subject: str = None,
                     return {"scope": _valid[0], "scopes": _valid,
                             "keywords": _kw, "source": "llm"}
     except Exception:
+        print(f"[PAEG][subagents.py] _llm_choose_retrieval_scope 异常忽略: {_e}")
+        pass
         pass
     return _fallback
 
@@ -251,6 +253,8 @@ def _pre_retrieve(question: str, subject: str = None, learner=None, llm=None,
                         for _u in os.listdir(_uk):
                             _dirs.append(os.path.join(_uk, _u))
                 except Exception:
+                    print(f"[PAEG][subagents.py] _pre_retrieve 异常忽略: {_e}")
+                    pass
                     pass
             # 关键词：LLM 规划的优先，否则用问句分词
             _match_toks = _kw_plan or _tokens[:3]
@@ -278,6 +282,8 @@ def _pre_retrieve(question: str, subject: str = None, learner=None, llm=None,
                 parts.append("\n## Library 学科资料（v0.26 自动注入：学科子文件夹 + common + 用户文件夹）")
                 parts.extend(_lib_parts[:5])
         except Exception:
+            print(f"[PAEG][subagents.py] _pre_retrieve 异常忽略: {_e}")
+            pass
             pass
         if len(parts) == 1:
             return ""
@@ -314,6 +320,8 @@ def _detect_teaching_mode(text: str, llm=None, fallback: str = "normal") -> str:
             if _mode in ("easy", "normal", "deep"):
                 return _mode
     except Exception:
+        print(f"[PAEG][subagents.py] _detect_teaching_mode 异常忽略: {_e}")
+        pass
         pass
     return _detect_teaching_mode_regex(text) or fallback
 
@@ -425,6 +433,8 @@ class Diagnostor:
                         if not isinstance(gaps, list):
                             gaps = [str(gaps)]
                 except Exception:
+                    print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                    pass
                     pass
 
         return {
@@ -576,6 +586,8 @@ class Presenter:
                         "学生未指定深度——正常深入讲解，四层走完，但开头可以稍微快一点进入正题。"
                     )
             except Exception:
+                print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                pass
                 pass
             # v0.26 ⭐ 用户资料注入（P0 断链修复：教学能看到用户上传资料）
             try:
@@ -586,6 +598,8 @@ class Presenter:
                         + str(_uc)[:600]
                     )
             except Exception:
+                print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                pass
                 pass
             # v0.36.1 ⭐ 网络检索补充材料（teach_stream 知识库无匹配时自动联网，注入让 LLM 参考）
             try:
@@ -596,6 +610,8 @@ class Presenter:
                         + str(_web_ctx)[:600]
                     )
             except Exception:
+                print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                pass
                 pass
             # v0.24 ⭐ 把上游注入的真接到 system（让 LLM 真正按上游决策改写）
             if ind_profile:
@@ -746,6 +762,8 @@ class ResourceLibrarian:
                         "type": "kb",
                     })
         except Exception:
+            print(f"[PAEG][subagents.py] _search_kb 异常忽略: {_e}")
+            pass
             pass
         return out
 
@@ -791,6 +809,8 @@ class ResourceLibrarian:
                         "type": "pdf" if _f.endswith('.pdf') else ("docx" if _f.endswith('.docx') else "md"),
                     })
         except Exception:
+            print(f"[PAEG][subagents.py] _search_library 异常忽略: {_e}")
+            pass
             pass
         return out
 
@@ -846,6 +866,8 @@ class ResourceLibrarian:
                         "type": "web",
                     })
             except Exception:
+                print(f"[PAEG][subagents.py] _search_web 异常忽略: {_e}")
+                pass
                 pass
         return out
 
@@ -858,6 +880,8 @@ class ResourceLibrarian:
             try:
                 learner._current_subject = subject  # type: ignore[attr-defined]
             except Exception:
+                print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                pass
                 pass
         # LLM 检索规划（需求B）：选库+关键词
         _plan = retrieval_plan
@@ -949,6 +973,8 @@ class Evaluator:
             if isinstance(v, str) and v.strip():
                 return v
         except Exception:
+            print(f"[PAEG][subagents.py] _extract_student_text 异常忽略: {_e}")
+            pass
             pass
         return ""
 
@@ -1293,6 +1319,8 @@ class AnswerSolver:
                         history or [], desc)
                 learner_ctx = build_learner_context(learner)
             except Exception:
+                print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                pass
                 pass
         if learner_ctx:
             desc_line = f"学生自述：{desc}\n【对象意识】{learner_ctx}\n" if desc else f"【对象意识】{learner_ctx}\n"
@@ -1388,16 +1416,22 @@ class AffectionSupportor:
                                     try:
                                         learner._crisis_opt_out = True
                                     except Exception:
+                                        print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                                        pass
                                         pass
                                     break
                         _opt_out = _rejected
                 except Exception:
+                    print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                    pass
                     pass
                 if _opt_out:
                     _crisis_context = "opt_out"
                 else:
                     _crisis_context = "active"
         except Exception:
+            print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+            pass
             pass
         # 加载情绪支持原则
         core = self._load_principles()
@@ -1417,6 +1451,8 @@ class AffectionSupportor:
                     learner._user_model = build_user_model_bundle([{"content": text}], desc)
                 learner_ctx = build_learner_context(learner)
             except Exception:
+                print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                pass
                 pass
 
         system = (
@@ -1544,6 +1580,8 @@ class AffectionSupportor:
             elif getattr(learner, "_crisis_opt_out", False):
                 _opt_out_state = {"active": True, "rejected_at": None, "rejected_resources": []}
         except Exception:
+            print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+            pass
             pass
         # 旧 opt_out(bool) 迁移到新结构
         try:
@@ -1556,6 +1594,8 @@ class AffectionSupportor:
                         "risk_history": [], "real_world_anchors": {},
                     }
         except Exception:
+            print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+            pass
             pass
         # 分级行为注入
         if _risk_level >= 3:
@@ -1596,6 +1636,8 @@ class AffectionSupportor:
             try:
                 _suppress = bool(_rc.opt_out_suppressible(_risk_level)) if _rc else True
             except Exception:
+                print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                pass
                 pass
             if _suppress:
                 system = system + (
@@ -1877,6 +1919,8 @@ class SelfUpdateAgent:
                         from context_bundle import build_learner_context
                         learner_ctx = build_learner_context(learner)
                     except Exception:
+                        print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                        pass
                         pass
                 except Exception:
                     pass  # learner 读取失败不致命
@@ -2225,8 +2269,12 @@ class Individuality:
                                         try:
                                             learner.__dict__["_individuality_trait"] = merged
                                         except Exception:
+                                            print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                                            pass
                                             pass
             except Exception:
+                print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                pass
                 pass
         # 规则聚合（原有逻辑）
         trait = {}
@@ -2250,6 +2298,8 @@ class Individuality:
                     if facts:
                         t.update_from_facts(facts)
                 except Exception:
+                    print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                    pass
                     pass
                 native_language = getattr(t, "native_language", None) or "zh"
                 # v0.22.3：直接从 learner 兜底读母语（即使 StudentTrait 未设）
@@ -2266,12 +2316,16 @@ class Individuality:
                     try:
                         learner.__dict__["_individuality_trait_obj"] = t
                     except Exception:
+                        print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                        pass
                         pass
             # 2. 上游：对话历史 → 个人事实
             try:
                 from context_bundle import extract_user_facts
                 facts = extract_user_facts(history or [])
             except Exception:
+                print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+                pass
                 pass
             if facts:
                 facts_str = "\n".join(f"- {f}" for f in facts[:8])
@@ -2291,6 +2345,8 @@ class Individuality:
                 if _add:
                     profile_prompt = profile_prompt + "\n" + "\n".join(_add)
         except Exception:
+            print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+            pass
             pass
 
         # v0.35 ⭐ 兜底：LLM 信息不足时用画像填充空字段（Oracle 方案 C——不覆盖 LLM 有效判断）
@@ -2333,6 +2389,8 @@ class Individuality:
                     if _cs and _cs != "unknown":
                         trait["learning_style"] = _cs
         except Exception:
+            print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
+            pass
             pass
 
         # 4. 下游：对 LLM 的控制指令
@@ -2433,8 +2491,12 @@ class Individuality:
                         except Exception:
                             learner.__dict__["interests"] = cur
                     except Exception:
+                        print(f"[PAEG][subagents.py] apply_modeled_to_learner 异常忽略: {_e}")
+                        pass
                         pass
             except Exception:
+                print(f"[PAEG][subagents.py] apply_modeled_to_learner 异常忽略: {_e}")
+                pass
                 pass
             return True
         except Exception:
@@ -2503,6 +2565,8 @@ class Individuality:
                             "w", encoding="utf-8") as f:
                         _json.dump(ld, f, ensure_ascii=False, indent=1)
             except Exception:
+                print(f"[PAEG][subagents.py] persist 异常忽略: {_e}")
+                pass
                 pass
             return True
         except Exception:
