@@ -1944,6 +1944,14 @@ def profile_update(learner_id):
 def meta_log(learner_id):
     """获取元认知日志。"""
     limit = int(request.args.get("limit", 10))
+    # v0.38 ⭐ SQLite 优先：带索引查询替代全量内存过滤（多用户时快得多）
+    try:
+        _rs = getattr(paeg.self_updater, "_ref_store", None)
+        if _rs is not None:
+            logs = _rs.query(learner_id, limit=limit)
+            return jsonify({"logs": logs, "total": _rs.count(learner_id)})
+    except Exception:
+        pass
     learner_logs = [h for h in paeg.self_updater.history if h.get("learner_id") == learner_id]
     return jsonify({
         "logs": learner_logs[-limit:],
