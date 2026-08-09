@@ -1036,6 +1036,23 @@ def teach_stream():
     # v0.26 ⭐ 二级学科/子主题（前端 SUBFIELD_TREE 三级选择；可空=未选）
     subtopic = (data.get("subtopic") or "").strip()
 
+    # v0.36.2 ⭐ 统一历史保存（修复：9 个早退分支跳过 CONV_STORE → "对话有时不在历史里"）
+    # 此前只有主教学循环（L1686 附近）保存；gen_aff/gen_grade_blocked/gen_unknown/gen_ui/
+    # gen_rec/gen_kb/gen_map/gen_composite/gen_ppt 全部跳过 → 用户在这些场景对话"看似成功但历史无记录"。
+    # 统一出口：所有分支在 done 前调用 _save_teach_turn(mode, reply_text)。
+    def _save_teach_turn(mode: str, reply_text: str):
+        try:
+            if CONV_STORE is not None and _is_registered(learner_id):
+                _cid = SESSIONS.get(f"conv_{learner_id}")
+                _cid = CONV_STORE.add_message(
+                    learner_id, mode, str(concept)[:60], "user", concept, conv_id=_cid)
+                _full = str(reply_text or "").strip()[:2000] or f"（{mode}：已回复 {concept}）"
+                _cid = CONV_STORE.add_message(
+                    learner_id, mode, _full[:30], "assistant", _full, conv_id=_cid)
+                SESSIONS[f"conv_{learner_id}"] = _cid
+        except Exception as _e:
+            print(f"[PAEG] teach_stream 早退分支保存会话失败({mode}): {_e}")
+
     # v0.26 ⭐ P0 安全修复（Oracle 审查发现）：teach_stream 此前绕过 _affection_gate_check，
     # 危机输入（"我想死"等）直接进 Diagnostor 当学科问题诊断，跳过 SafetyChecker 热线注入。
     # 与 paeg.teach 行为对齐：危机/纯情绪在入口短路到 AffectionSupportor。
@@ -1049,6 +1066,7 @@ def teach_stream():
             )
 
             def gen_aff():
+                _save_teach_turn("affection", _aff_reply.get("content", ""))  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _aff_reply.get('content', ''), 'step_type': 'affection'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'affection'}, ensure_ascii=False)}\n\n"
             return Response(gen_aff(), mimetype="text/event-stream",
@@ -1071,6 +1089,7 @@ def teach_stream():
                     pass
 
                 def gen_grade_blocked():
+                    _save_teach_turn("teach", _gb_content)  # v0.36.2 早退分支补保存
                     for i in range(0, len(_gb_content), 60):
                         yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _gb_content[i:i+60], 'step_type': 'grade_blocked_subject'}, ensure_ascii=False)}\n\n"
                     yield f"event: done\ndata: {json.dumps({'status': 'completed', 'grade_blocked': True, 'required_grade': (_steer.get('response').get_json().get('required_grade', '') if _steer.get('response') is not None else '')}, ensure_ascii=False)}\n\n"
@@ -1083,6 +1102,7 @@ def teach_stream():
             _unk_content = _unk.get("presentations", [{}])[0].get("content", "")
 
             def gen_unknown():
+                _save_teach_turn("teach", _unk_content)  # v0.36.2 早退分支补保存
                 for i in range(0, len(_unk_content), 60):
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _unk_content[i:i+60], 'step_type': 'unregistered_subject'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed', 'unregistered_subject': True}, ensure_ascii=False)}\n\n"
@@ -1124,6 +1144,7 @@ def teach_stream():
             _ui_reply = handle_interface_query(concept, learner)
 
             def gen_ui():
+                _save_teach_turn("chat", _ui_reply)  # v0.36.2 早退分支补保存
                 for i in range(0, len(_ui_reply), 60):
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _ui_reply[i:i+60], 'step_type': 'interface'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
@@ -1145,6 +1166,7 @@ def teach_stream():
             def gen_rec():
                 # v0.35 ⭐ 先发 retrieval 事件（前端显示"已联网检索"badge）：
                 # 与 _handle_recommend_query 中是否真做了 web_search 对应。
+                _save_teach_turn("chat", _rec_content)  # v0.36.2 早退分支补保存
                 _badge = "网络检索" if _rec_web else "检索"
                 yield f"event: retrieval\ndata: {json.dumps({'done': _badge}, ensure_ascii=False)}\n\n"
                 for i in range(0, len(_rec_content), 60):
@@ -1164,6 +1186,7 @@ def teach_stream():
             _kb_content = _kb.get("presentations", [{}])[0].get("content", "")
 
             def gen_kb():
+                _save_teach_turn("knowledge", _kb_content)  # v0.36.2 早退分支补保存
                 for i in range(0, len(_kb_content), 60):
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _kb_content[i:i+60], 'step_type': 'knowledge'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
@@ -1181,6 +1204,7 @@ def teach_stream():
             _map_content = _map_result.get("content", "")
 
             def gen_map():
+                _save_teach_turn("knowledge_map", _map_content)  # v0.36.2 早退分支补保存
                 for i in range(0, len(_map_content), 60):
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _map_content[i:i+60], 'step_type': 'knowledge_map'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
@@ -1213,6 +1237,7 @@ def teach_stream():
                 f"你说的是：{_instr[:60]}……我先把你的资料整理一下再回应你。"
 
             def gen_composite():
+                _save_teach_turn("chat", _grep)  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _grep, 'step_type': 'chat'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_composite(), mimetype="text/event-stream",
@@ -1239,6 +1264,7 @@ def teach_stream():
                 "做演示文稿我建议用课程备课流程——把你的素材和大纲给我，我帮你组织成 PPT。"
 
             def gen_ppt():
+                _save_teach_turn("ppt", _ppt_reply)  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _ppt_reply, 'step_type': 'ppt'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'ppt'}, ensure_ascii=False)}\n\n"
             return Response(gen_ppt(), mimetype="text/event-stream",
@@ -1288,6 +1314,7 @@ def teach_stream():
                 f"嗯，我听着。你想聊{subject}之外的什么，我都在。"
 
             def gen_intent():
+                _save_teach_turn("chat", g_reply)  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': g_reply, 'step_type': 'chat'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_intent(), mimetype="text/event-stream",
@@ -1332,6 +1359,7 @@ def teach_stream():
             _ma_content = _ma.get_json().get("presentations", [{}])[0].get("content", "")
 
             def gen_ma():
+                _save_teach_turn("method", _ma_content)  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _ma_content, 'step_type': 'method'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_ma(), mimetype="text/event-stream",
@@ -1347,6 +1375,7 @@ def teach_stream():
             _pr_content = _pr.get_json().get("presentations", [{}])[0].get("content", "")
 
             def gen_pr():
+                _save_teach_turn("solve", _pr_content)  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _pr_content, 'step_type': 'problem'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_pr(), mimetype="text/event-stream",
@@ -1365,6 +1394,7 @@ def teach_stream():
             _emo_content = _polish_text(_emo_result.get("content", ""), context=f"affection:{concept[:30]}")
 
             def gen_emo():
+                _save_teach_turn("affection", _emo_content)  # v0.36.2 早退分支补保存
                 for i in range(0, len(_emo_content), 60):
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _emo_content[i:i+60], 'step_type': 'affection'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'affection'}, ensure_ascii=False)}\n\n"
@@ -1386,6 +1416,7 @@ def teach_stream():
                 "我是 Émile Novis，你的老师。关于我、我的能力或知识库，你可以具体问我。"
 
             def gen_meta():
+                _save_teach_turn("chat", m_reply)  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': m_reply, 'step_type': 'meta'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             return Response(gen_meta(), mimetype="text/event-stream",
@@ -2693,6 +2724,18 @@ def general_chat_stream():
                 _reply = _handler.handle(learner_id, text, _hit_chunks, llm)
 
                 def gen_file_op():
+                    # v0.36.2 ⭐ 早退分支补保存（chat_stream 文件操作提前 return，主流程保存不执行）
+                    try:
+                        if CONV_STORE is not None and _is_registered(learner_id):
+                            _fcid = SESSIONS.get(f"conv_{learner_id}")
+                            _fcid = CONV_STORE.add_message(
+                                learner_id, "chat", str(text)[:60], "user", text, conv_id=_fcid)
+                            _frep = str(_reply or "").strip()[:2000] or f"（文件操作：{_intent.value}）"
+                            _fcid = CONV_STORE.add_message(
+                                learner_id, "chat", _frep[:30], "assistant", _frep, conv_id=_fcid)
+                            SESSIONS[f"conv_{learner_id}"] = _fcid
+                    except Exception as _fe2:
+                        print(f"[PAEG] chat_stream 文件操作保存会话失败: {_fe2}")
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _reply, 'step_type': 'file_' + _intent.value}, ensure_ascii=False)}\n\n"
                     yield f"event: done\ndata: {json.dumps({'status': 'completed', 'file_op': _intent.value, 'retriever': _mode}, ensure_ascii=False)}\n\n"
                 return Response(gen_file_op(), mimetype="text/event-stream",
