@@ -1110,8 +1110,9 @@ def teach_stream():
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
         if _steer.get("switched"):
             subject = _steer["subject"]
-    except Exception:
-        pass
+    except Exception as _steer_e:
+        # v0.37.1 ⭐ Oracle P1-3 修复：不再静默吞——用户改学科"没生效"正是这类失败导致
+        print(f"[PAEG] teach_stream steering 失败（学科未切换）: {_steer_e}")
 
     # v0.35 ⭐ LLM 优先意图路由（用户原则：LLM 是被充分调用的主体，规则只兜底）
     # 大模型先判断用户意图（在 14 项里选一个）；置信度 ≥0.6 时作为分支选择的第一依据
@@ -1628,7 +1629,19 @@ def teach_stream():
         # 反思 + 自我更新
         from dataclasses import asdict
         from datetime import datetime
-        reflection = paeg._reflect(_FakeSession(learner, concept, subject, plan, []))
+        # v0.37.1 ⭐ Oracle P1-2 修复：共享一个 _FakeSession（此前构造 3 次，
+        # summary 基于空 evaluations → avg_score 恒 0 → 触发噪声"提示词自进化"）
+        _fs_shared = _FakeSession(learner, concept, subject, plan, [])
+        # 用真实教学步数估算掌握度（无 Evaluator 时的合理兜底，避免恒 0）
+        try:
+            if _assistant_parts:
+                _fs_shared.evaluations.append({
+                    "score": min(0.95, 0.6 + 0.08 * len(_assistant_parts)),
+                    "step": "summary_estimate",
+                })
+        except Exception:
+            pass
+        reflection = paeg._reflect(_fs_shared)
 
         yield f"event: reflection\ndata: {json.dumps(reflection, ensure_ascii=False)}\n\n"
 
@@ -1636,14 +1649,13 @@ def teach_stream():
         if paeg.self_updater:
             # v0.32 ⭐ meta-log 接入 LLM 建模：把 teach_stream 顶部构造的 _modeling_reflections
             # 追加到 fake session.reflections，让 incremental_update 把它写入 history
-            _fs_for_meta = _FakeSession(learner, concept, subject, plan, [])
             if _modeling_reflections:
-                _fs_for_meta.reflections.extend(_modeling_reflections)
-            paeg.self_updater.incremental_update(_fs_for_meta)
+                _fs_shared.reflections.extend(_modeling_reflections)
+            paeg.self_updater.incremental_update(_fs_shared)
             yield f"event: self_update\ndata: {json.dumps({'history_size': len(paeg.self_updater.history)}, ensure_ascii=False)}\n\n"
 
         # 总结
-        summary = paeg._summarize(_FakeSession(learner, concept, subject, plan, []))
+        summary = paeg._summarize(_fs_shared)
         yield f"event: summary\ndata: {json.dumps(summary, ensure_ascii=False)}\n\n"
 
         # v0.24 修复 5：teach_stream 补 SelfEvolution.evolve_prompt + SelfEvolver.on_session_end
@@ -2971,19 +2983,16 @@ def general_chat_stream():
             # v0.36.1 ⭐ 修复：chat 路径也写 user_modeling 到元认知日志
             # （此前只有 teach_stream 写 → u 账号 meta-log 只有 self_reflect/adaptation，
             #   前端 fallback 显示用户提问 → 元认知日志看起来像"对话历史"）
+            # v0.37.1 ⭐ Oracle P0-1 修复：改用 append_reflection（append + _save 落盘），
+            # 此前直接 history.append 不落盘 → 元认知日志重启即丢
             try:
-                from datetime import datetime as _dt_chat
                 _trait_chat = (_ind_result or {}).get("trait") or {}
                 _facts_chat = (_ind_result or {}).get("facts") or []
                 if paeg.self_updater is not None:
-                    paeg.self_updater.history.append({
-                        "timestamp": _dt_chat.now().isoformat(),
-                        "learner_id": learner_id,
-                        "concept": text[:60],
-                        "subject": data.get("subject", "general"),
-                        "reflection": {
+                    paeg.self_updater.append_reflection(
+                        learner_id,
+                        {
                             "type": "user_modeling",
-                            "timestamp": _dt_chat.now().isoformat(),
                             "learner_id": learner_id,
                             "concept": text[:60],
                             "subject": data.get("subject", "general"),
@@ -3001,7 +3010,8 @@ def general_chat_stream():
                                 f"薄弱 {_trait_chat.get('knowledge_gaps') or '[]'}"
                             ),
                         },
-                    })
+                        concept=text[:60], subject=data.get("subject", "general"),
+                    )
             except Exception as _mce:
                 print(f"[PAEG] chat meta-log 建模记录跳过: {_mce}")
         # v0.19.7：自我改进——记录对话案例（轻量，不阻塞）
@@ -4172,6 +4182,9 @@ def self_update_from_feedback():
     learner_id = data.get("learner_id") or "anonymous"
     if not text:
         return jsonify({"ok": False, "error": "缺少 text 字段"}), 400
+    # v0.37.1 ⭐ Oracle P1-4 修复：任意 learner_id 可触发反馈提取 → 校验注册/匿名合法性
+    if not _is_registered(learner_id):
+        return jsonify({"ok": False, "error": "非法用户标识"}), 401
 
     try:
         from subagents import SelfUpdateAgent
