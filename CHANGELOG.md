@@ -1,3 +1,20 @@
+### v0.37.1 Oracle 全面审查修复（杜绝"修复有时未生效"复发，2026-08-09）
+
+**Oracle 审查发现并修复（全部基于实际代码验证）**
+- 🐛 **P0-1 元认知日志不落盘**（重启即丢）：chat 路径直接 `history.append` 但绕过 `_save()` → 新增 `SelfUpdateUpdater.append_reflection()` public API（append+原子落盘+版本快照），server.py chat 路径改用。实测：chat 触发 → reflections.json 落盘 ✅
+- 🐛 **P0-3 RiskClassifier fallback 静默降级 0**（高危漏判风险）：分类器异常时保守回退 3 级（宁可误报不漏报）+ 打印日志
+- 🐛 **P1-2 _FakeSession 重复构造 3 次** → summary 恒 0 → 噪声触发"提示词自进化"：共享单实例 + 用真实教学步数估算掌握度（summary_estimate）
+- 🐛 **P1-3 12+ 处 except Exception: pass 静默吞异常**：teach_stream steering 失败（用户改学科"没生效"根因）等改为打印日志
+- 🐛 **P1-4 /api/self-update/from-feedback 未授权**：任意 learner_id 可触发 → 加 _is_registered 校验 401
+- 🔧 **P2-4 学科 label 补全**：SUBJECT_GRADES 32 学科前端全覆盖（补 writing: 写作）
+
+**Oracle 误判澄清（无需修复）**
+- P1-1 PPT 断链：实际通过 `/api/resources?for_ppt=true` 真生成（实测 slides:2 成功）
+- P2-4 "仅6学科"：实际 SUBJECT_LABELS 34 键，仅 writing 缺口已补
+
+**防复发测试（新增 6 用例，test_v037_regressions.py 22/22 通过）**
+- meta-log 落盘（append_reflection 必须 _save）/ Risk fallback 保守 / _FakeSession 共享 / summary 估算 / 学科 label 全覆盖 / 早退分支保存
+
 ### v0.37 情绪支持哲学重构（薇依四闸门+约纳斯责任伦理）+ 风险分级 + 全项目自检（2026-08-09）
 
 **任务1：AffectionSupportor 基于薇依/约纳斯原著优化（Oracle 方案 C）**
