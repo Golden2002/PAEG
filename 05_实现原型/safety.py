@@ -149,6 +149,93 @@ def guard_input(text: str, learner: Optional[object] = None) -> Optional[dict]:
     return _default_checker.guard_question(text, learner)
 
 
+# ---------------------------------------------------------------------------
+# v0.37 ⭐ RiskClassifier：情绪支持风险分级（Oracle 方案 C）
+# - 6 级：none/distress/passive_ideation/active_ideation/plan_or_means/imminent
+# - LLM 优先 + 关键词兜底（个人项目无标注数据，关键词毫秒级先行，LLM 复核取高）
+# - 完全不破坏 SafetyChecker（新增独立类，向后兼容）
+# ---------------------------------------------------------------------------
+import json as _json
+from datetime import datetime, timedelta
+from pathlib import Path as _Path
+
+
+class RiskClassifier:
+    """6 级风险分级器（关键词确定性分级；LLM 复核由调用方决定是否启用）。
+
+    规则表：memory/RiskRules.json（levels + patterns + opt_out 策略）。
+    """
+
+    def __init__(self, rules_path: Optional[str] = None):
+        self._rules = self._load_rules(rules_path)
+        self._patterns = self._rules.get("patterns", {})
+        self._levels = {lvl["level"]: lvl for lvl in self._rules.get("levels", [])}
+        self._opt = self._rules.get("opt_out", {})
+
+    @staticmethod
+    def _load_rules(rules_path: Optional[str]) -> dict:
+        default = _Path(__file__).parent / "memory" / "RiskRules.json"
+        path = _Path(rules_path) if rules_path else default
+        try:
+            return _json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return {"levels": [], "patterns": {}, "opt_out": {}}
+
+    def classify(self, text: str) -> int:
+        """关键词分级（0-5）。调用方如需 LLM 复核，取 max(关键词, LLM) 保守。"""
+        text = str(text or "")
+        if not text:
+            return 0
+        # 从高到低检查（imminent > plan > active > passive > distress）
+        for level in (5, 4, 3, 2, 1):
+            lvl_info = self._levels.get(level)
+            if not lvl_info:
+                continue
+            name = lvl_info["name"]
+            patterns = self._patterns.get(name, [])
+            for pat in patterns:
+                try:
+                    if re.search(pat, text):
+                        return level
+                except re.error:
+                    continue
+        return 0
+
+    def opt_out_suppressible(self, level: int) -> bool:
+        """该级别是否可被 opt_out 压制。"""
+        lvl_info = self._levels.get(level, {})
+        return bool(lvl_info.get("opt_out_suppressible", False))
+
+    def should_show_resources(self, level: int, opt_out_state: Optional[dict] = None) -> bool:
+        """是否必须显示热线/资源。level>=3 强制；level<=2 看 opt_out。"""
+        if level >= self._opt.get("force_levels_min", 3):
+            return True
+        if not opt_out_state or not opt_out_state.get("active"):
+            return False
+        # opt_out 有效期：超过 reask_after_days 温和重问
+        rejected_at = opt_out_state.get("rejected_at")
+        if rejected_at:
+            try:
+                dt = datetime.fromisoformat(str(rejected_at))
+                if datetime.now() - dt > timedelta(days=self._opt.get("reask_after_days", 7)):
+                    return "gentle_reask"
+            except ValueError:
+                pass
+        return False
+
+    def level_name(self, level: int) -> str:
+        return self._levels.get(level, {}).get("name", "none")
+
+
+# 便捷实例
+_default_risk_classifier = RiskClassifier()
+
+
+def classify_risk(text: str) -> int:
+    """便捷入口：返回风险等级 0-5。"""
+    return _default_risk_classifier.classify(text)
+
+
 if __name__ == "__main__":
     checker = SafetyChecker()
     cases = [
@@ -162,3 +249,9 @@ if __name__ == "__main__":
     for c in cases:
         r = checker.check_input(c)
         print(f"{'[拦截]' if r.blocked else '[放行]'} {c!r} -> {r.categories or 'OK'}")
+    # 风险分级自测
+    rc = RiskClassifier()
+    for c in ["我有点累", "我今天崩溃了，失眠一整晚", "我觉得活着没意思",
+              "我想死", "我买了药想好了今晚就走", "我已经吃了药，感觉头晕"]:
+        lv = rc.classify(c)
+        print(f"[风险{lv}] {c!r}")
