@@ -4220,3 +4220,21 @@ python arch_check.py          # 输出连通性报告 + arch_report.json
 
 #### 新铁律
 > **自检必须覆盖"用户旅程"**：登录→看界面→发请求→看响应 全链路，不止"端点存活"。
+
+
+### 10.2.24 ⭐ 三次反思：为什么自检反复漏"登录后状态刷新"（v0.41.2）
+
+> **案例**：昵称（loadProfile 未更新 STATE）、元认知日志（applyLogin 缺 loadMetaLog）、头像（applyLogin 未重置 STATE.avatarUrl）——三个都是"登录成功处理器（applyLogin）不完整"导致。
+
+#### 根因（自检缺"事件处理器完整性"层）
+1. 自检模拟了**数据流**，但没模拟**用户交互事件**（点击登录 → applyLogin → 一系列 load）
+2. user_journey_test 验证"状态传播"，但**没验证"登录动作触发了哪些加载"**——applyLogin 缺 loadMetaLog 测不出
+3. **这类问题的本质**：事件处理器（成功回调）必须调用所有必要的加载函数——是"处理器完整性"问题
+
+#### 提升（事件驱动测试）
+1. user_journey_test 加"登录事件"场景：模拟 applyLogin → 断言调用 loadProfile/loadMetaLog/loadConversations
+2. audit_check 加"处理器完整性"检查：每个成功处理器必须调用一组必备加载函数
+3. 交互模拟：用代码静态分析断言"applyLogin 包含 loadX"模式
+
+#### 新铁律
+> **自检必须覆盖"交互事件驱动的流程"**：不只是数据流，还有"用户动作 → 处理器 → 加载链"的完整性。
