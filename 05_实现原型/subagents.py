@@ -587,6 +587,16 @@ class Presenter:
                     )
             except Exception:
                 pass
+            # v0.36.1 ⭐ 网络检索补充材料（teach_stream 知识库无匹配时自动联网，注入让 LLM 参考）
+            try:
+                _web_ctx = getattr(learner, "_teach_web_ctx", "") or ""
+                if _web_ctx:
+                    system = system + (
+                        "\n\n## 网络检索补充材料（v0.36.1 自动检索，回答时参考外部信息）\n"
+                        + str(_web_ctx)[:600]
+                    )
+            except Exception:
+                pass
             # v0.24 ⭐ 把上游注入的真接到 system（让 LLM 真正按上游决策改写）
             if ind_profile:
                 system = system + "\n\n## 个体化学生画像（v0.24）\n" + ind_profile
