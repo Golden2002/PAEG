@@ -184,6 +184,8 @@ class PAEG:
         try:
             if _tr: _tr("diagnosis", ready_to_teach=session.diagnosis.get("ready_to_teach", True))
         except Exception:
+            print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
+            pass
             pass
 
         # 2. 计划
@@ -203,6 +205,8 @@ class PAEG:
             if _tr: _tr("plan", steps=len(session.plan.get("steps") or []),
                         subtopic=subtopic or "")
         except Exception:
+            print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
+            pass
             pass
 
         # 世界观语气（贯穿全程）
@@ -334,6 +338,8 @@ class PAEG:
                             content=(presentation.get("content") or "")[:300],
                             llm_generated=presentation.get("llm_generated", False))
             except Exception:
+                print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
+                pass
                 pass
 
             # 4. 评估（每个呈现步骤后）—— v0.24 真正评估学生
@@ -353,6 +359,8 @@ class PAEG:
                             score=evaluation.get("score", 0),
                             ready_to_advance=evaluation.get("ready_to_advance", True))
             except Exception:
+                print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
+                pass
                 pass
 
             # 5. 调整（必要时）—— v0.24 真正执行
@@ -438,6 +446,8 @@ class PAEG:
                                     _retry_presentation["content"] = _refined
                                     _retry_presentation["refined"] = True
                             except Exception:
+                                print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
+                                pass
                                 pass
                     session.history.append(_retry_presentation)
                     # v0.24 一致性：重讲同样带 _injections 字段（测试/审计断言依赖）
@@ -459,6 +469,8 @@ class PAEG:
                                         score=_retry_eval.get("score", 0),
                                         ready=_retry_eval.get("ready_to_advance", True))
                         except Exception:
+                            print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
+                            pass
                             pass
                     except Exception as _re:
                         self._log(f"   (重讲评估跳过: {_re})")
@@ -538,6 +550,8 @@ class PAEG:
                     steps_completed=_summary.get("steps_completed", 0),
                     duration_min=_summary.get("duration_min", 0))
         except Exception:
+            print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
+            pass
             pass
 
         return {
@@ -565,6 +579,8 @@ class PAEG:
                     getattr(_sr, "categories", None) or []):
                 crisis = True
         except Exception:
+            print(f"[PAEG][paeg.py] _affection_gate_check 异常忽略: {_e}")
+            pass
             pass
         # 2. 纯情绪表达：无学科关键词 + 强情绪词命中
         if not crisis:
@@ -589,6 +605,8 @@ class PAEG:
                     if (not has_subject) and emo_hit >= 1 and len(q) <= 60:
                         emotion_only = True
             except Exception:
+                print(f"[PAEG][paeg.py] _affection_gate_check 异常忽略: {_e}")
+                pass
                 pass
         # 3. learner 上的危机标志
         if not crisis:
@@ -596,6 +614,8 @@ class PAEG:
                 if getattr(learner, "_crisis_flag", False):
                     crisis = True
             except Exception:
+                print(f"[PAEG][paeg.py] _affection_gate_check 异常忽略: {_e}")
+                pass
                 pass
         return (crisis, emotion_only)
 
@@ -643,6 +663,8 @@ class PAEG:
                         check["improvements"].append("下次生成后应加强薇依式改写")
                         break
         except Exception:
+            print(f"[PAEG][paeg.py] _self_reflect 异常忽略: {_e}")
+            pass
             pass
 
         # 薇依价值对齐（规则检查：是否有廉价鼓励/评判性语言）
