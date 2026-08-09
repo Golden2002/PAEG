@@ -619,6 +619,30 @@ body {
 .upload-btn:hover { background: var(--border); color: var(--accent); }
 /* v0.36 ⭐ 语音按钮：录音态红色提示 */
 #voice-btn.recording { color: #ef4444; background: rgba(239,68,68,.1); }
+/* v0.40 ⭐ 录音动画：圆环脉冲 + 波形条（豆包式视觉反馈） */
+@keyframes voice-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(239,68,68,.45); }
+  70% { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+}
+#voice-btn.recording { animation: voice-pulse 1.2s ease-out infinite; }
+#voice-btn.recording .upload-btn-icon { animation: voice-wave 0.8s ease-in-out infinite alternate; }
+@keyframes voice-wave {
+  from { transform: scale(1); }
+  to { transform: scale(1.25); }
+}
+/* 录音波形指示器（输入框上方） */
+.voice-waves { display: none; align-items: center; gap: 3px; height: 20px; padding: 2px 8px; background: rgba(239,68,68,.08); border-radius: 10px; margin-right: 8px; }
+.voice-waves.active { display: inline-flex; }
+.voice-waves span { width: 3px; height: 100%; background: #ef4444; border-radius: 2px; animation: wave-bar 0.9s ease-in-out infinite; }
+.voice-waves span:nth-child(2) { animation-delay: .15s; }
+.voice-waves span:nth-child(3) { animation-delay: .3s; }
+.voice-waves span:nth-child(4) { animation-delay: .45s; }
+.voice-waves span:nth-child(5) { animation-delay: .6s; }
+@keyframes wave-bar {
+  0%, 100% { transform: scaleY(.3); }
+  50% { transform: scaleY(1); }
+}
 .upload-msg { font-size: 12px; color: var(--text-dim); margin-left: 8px; }
 .upload-preview img { max-height: 120px; border-radius: 8px; border: 1px solid var(--border); }
 
@@ -1220,6 +1244,8 @@ body {
         <option value="">不限</option>
       </select>
       <input class="question-input" id="question-input" type="text" placeholder="输入你想学习的内容…" autocomplete="off" aria-label="输入你想学习的内容" />
+      <!-- v0.40 ⭐ 录音波形指示器（豆包式：录音时显示音波动画） -->
+      <div class="voice-waves" id="voice-waves" role="status" aria-label="正在录音"><span></span><span></span><span></span><span></span><span></span></div>
       <!-- v0.19 P2-10：图片/文件上传 -->
       <label class="upload-btn" id="upload-btn" title="上传图片/文件" aria-label="上传图片或文件">
         <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.md,.txt" style="display:none" />
@@ -3011,12 +3037,18 @@ askBtn.addEventListener('click', () => {
 
 // ─── v0.36 ⭐ 语音模块：Web Speech API 录音转文本 → 复用现有发送管线 ───
 // v0.36.2 ⭐ 修复：提示精准化——区分"浏览器不支持"与"非安全环境"；诚实告知能力边界
+// v0.40 ⭐ 完整重构（Oracle 排查）：①secureCtx 严格判断（修复 Chrome 局域网 IP 静默失败）
+// ②录音立即视觉反馈+动画 ③start 3秒兜底提示 ④空结果/超时明确提示 ⑤长按输入框触发（豆包式）
 (function initVoice() {
   const voiceBtn = document.getElementById('voice-btn');
   if (!voiceBtn) return;
   const voiceIcon = voiceBtn.querySelector('img');
+  const wavesEl = document.getElementById('voice-waves');
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const secureCtx = window.isSecureContext || location.protocol === 'https:' || ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
+  // v0.40 P0-1 ⭐ secureCtx 严格判断：只有 localhost/127.0.0.1 才放行
+  // （Chrome 桌面版访问局域网 IP 时 isSecureContext 常为 true → 绕过拦截 → start() 被静默拒绝）
+  const isLocalhost = /^(127\.0\.0\.1|localhost|\[::1\])$/i.test(location.hostname);
+  const secureCtx = (window.isSecureContext || location.protocol === 'https:') && isLocalhost;
   if (!SR) {
     voiceBtn.title = '语音输入需 Chrome/Edge（微信内置浏览器不支持）';
     voiceBtn.style.opacity = '.4';
@@ -3038,6 +3070,8 @@ askBtn.addEventListener('click', () => {
   }
   let recognizing = false;
   let recogTimer = null;
+  let startDeadline = null;
+  let _timeoutFired = false;
   const recog = new SR();
   recog.lang = 'zh-CN';
   recog.continuous = false;
@@ -3046,87 +3080,153 @@ askBtn.addEventListener('click', () => {
   // v0.36.3 ⭐ 修复：①图标 src 切换失败时用 CSS 背景兜底（微信 X5 对 SVG 缓存/渲染不稳）
   // ②录音 10 秒无结果自动停止（X5 的 start() 后可能不触发 onend，导致 recognizing 卡死"按停止无反应"）
   // ③停止改用 abort()（比 stop() 更可靠，确保触发 onend）④onend/onerror 强制重置状态
+  // v0.40 ⭐ 视觉反馈加强：录音立即显示波形动画 + 圆环脉冲（不依赖任何 API）
+  function _showRecordingUI() {
+    recognizing = true;
+    try { voiceBtn.classList.add('recording'); } catch (e) {}
+    try {
+      if (voiceIcon) voiceIcon.src = 'assets/icons/square.svg';
+      voiceBtn.style.background = 'rgba(239,68,68,.15)';
+      voiceBtn.style.color = '#ef4444';
+    } catch (e) {}
+    voiceBtn.title = '点击停止录音';
+    if (wavesEl) { try { wavesEl.classList.add('active'); } catch (e) {} }
+  }
   function _resetRecording() {
     recognizing = false;
     if (recogTimer) { clearTimeout(recogTimer); recogTimer = null; }
+    if (startDeadline) { clearTimeout(startDeadline); startDeadline = null; }
     try { voiceBtn.classList.remove('recording'); } catch (e) {}
     try {
       if (voiceIcon) voiceIcon.src = 'assets/icons/mic.svg';
       voiceBtn.style.background = '';
       voiceBtn.style.color = '';
+      voiceBtn.style.animation = '';
     } catch (e) {}
     voiceBtn.title = '语音输入（Chrome/Edge 推荐）';
+    if (wavesEl) { try { wavesEl.classList.remove('active'); } catch (e) {} }
   }
   function setRecording(on) {
-    recognizing = on;
-    if (on) {
-      voiceBtn.classList.add('recording');
-      if (voiceIcon) voiceIcon.src = 'assets/icons/square.svg';
-      // CSS 兜底：即使 SVG 加载失败，按钮也明显变红
-      voiceBtn.style.background = 'rgba(239,68,68,.15)';
-      voiceBtn.style.color = '#ef4444';
-      voiceBtn.title = '点击停止录音';
-      // 超时兜底：10 秒无结果自动停止（防 X5 卡死）
-      if (recogTimer) clearTimeout(recogTimer);
-      recogTimer = setTimeout(() => {
-        try { recog.abort(); } catch (e) {}
-        _resetRecording();
-      }, 10000);
-    } else {
-      _resetRecording();
-    }
+    if (on) { _showRecordingUI(); }
+    else { _resetRecording(); }
   }
   recog.onstart = () => {
-    setRecording(true);
-    addMsg('paeg', '<small>🎙 正在聆听…（麦克风已变红，再按一次停止）</small>');
+    _showRecordingUI();
+    if (startDeadline) { clearTimeout(startDeadline); startDeadline = null; }
+    addMsg('paeg', '<small>🎙 正在聆听…（请说话，说完自动停止，或再按一次麦克风停止）</small>');
+    // 录音超时兜底：10 秒无结果自动停止
+    if (recogTimer) clearTimeout(recogTimer);
+    recogTimer = setTimeout(() => {
+      _timeoutFired = true;
+      try { recog.abort(); } catch (e) { try { recog.stop(); } catch (e2) {} }
+    }, 10000);
   };
   recog.onend = () => {
+    const timedOut = _timeoutFired;
+    _timeoutFired = false;
     _resetRecording();
+    // v0.40 P1-5 ⭐ 超时明确提示（此前静默）
+    if (timedOut && !window._voiceResultHandled) {
+      addMsg('paeg', '<small>🎙 录音超时（10 秒未识别到语音）。请靠近麦克风再说一次，或直接打字。</small>');
+    }
   };
   recog.onerror = (e) => {
+    const err = e && e.error;
+    const wasStart = recognizing;
     _resetRecording();
-    // v0.39 ⭐ 修复：aborted = 用户主动停止/超时自动停止（非识别失败）→ 静默不报错
-    // 此前 abort() 停止会触发 onerror('aborted') → 误报"语音识别未成功（aborted）"
-    if (e.error === 'aborted') {
-      // 主动停止或超时：正常路径，不打扰用户（超时可在 onend 静默重置）
+    if (err === 'aborted') {
+      // 主动停止或超时：正常路径（超时由 onend 提示）
       return;
     }
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+    if (err === 'not-allowed' || err === 'service-not-allowed') {
       addMsg('paeg', '<small>🎙 麦克风权限被拒绝。请在浏览器地址栏左侧的🔒图标 → 网站设置中允许麦克风，然后重试。</small>');
-    } else if (e.error === 'network') {
+    } else if (err === 'network') {
       addMsg('paeg', '<small>🎙 语音识别网络错误（Chrome 语音服务需要联网）。</small>');
-    } else if (e.error === 'no-speech') {
+    } else if (err === 'no-speech') {
       addMsg('paeg', '<small>🎙 没有听到声音，请靠近麦克风再说一次。</small>');
-    } else if (e.error === 'audio-capture') {
+    } else if (err === 'audio-capture') {
       addMsg('paeg', '<small>🎙 未检测到麦克风设备，请检查系统录音设置。</small>');
+    } else if (wasStart) {
+      // 启动失败（start() 被 Chrome 静默拒绝的 onerror 兜底）
+      addMsg('paeg', '<small>🎙 语音识别启动失败（' + (err || '浏览器未授权') + '）。' +
+        '请检查麦克风权限；若用局域网 IP 访问请改用 http://127.0.0.1:5000。</small>');
     } else {
-      addMsg('paeg', '<small>🎙 语音识别未成功（' + (e.error || '未知错误') + '），可直接打字输入。</small>');
+      addMsg('paeg', '<small>🎙 语音识别未成功（' + (err || '未知错误') + '），可直接打字输入。</small>');
     }
   };
   recog.onresult = (e) => {
+    window._voiceResultHandled = true;
     _resetRecording();
-    const text = e.results[0][0].transcript;
-    const input = document.getElementById('question-input');
-    if (input && text) {
-      addMsg('user', text);              // v0.36 ⭐ 先显示语音转文字（用户可见）
-      input.value = text;
-      document.getElementById('ask-btn').click();
+    // v0.40 P1-4 ⭐ 空 transcript 明确提示（此前静默）
+    let text = '';
+    try {
+      text = (e.results && e.results[0] && e.results[0][0] ? e.results[0][0].transcript : '').trim();
+    } catch (err) {
+      text = '';
     }
+    if (!text) {
+      addMsg('paeg', '<small>🎙 没有识别到语音内容（可能太安静或未含中文）。请再试一次，或直接打字。</small>');
+      return;
+    }
+    const input = document.getElementById('question-input');
+    if (!input) {
+      addMsg('paeg', '<small>🎙 已识别：「' + escapeHtml(text) + '」（但输入框未找到，请刷新页面）。</small>');
+      return;
+    }
+    addMsg('user', text);              // v0.36 ⭐ 先显示语音转文字（用户可见）
+    input.value = text;
+    const askBtn = document.getElementById('ask-btn');
+    if (askBtn) { askBtn.click(); }
+    else { addMsg('paeg', '<small>🎙 已输入，请点击发送。</small>'); }
   };
+  // v0.40 P0-2 ⭐ 点击立即视觉反馈（不依赖 start() 结果）
   voiceBtn.addEventListener('click', () => {
     if (recognizing) {
       // 停止：abort 确保触发 onend → 状态重置（比 stop() 更可靠）
-      try { recog.abort(); } catch (e) { try { recog.stop(); } catch (e2) {} }
       _resetRecording();
+      try { recog.abort(); } catch (e) { try { recog.stop(); } catch (e2) {} }
       return;
     }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       addMsg('paeg', '<small>🎙 当前环境不支持麦克风（需 HTTPS 或 localhost）。</small>');
       return;
     }
+    // 立即视觉反馈（豆包式：点了马上有反应）
+    _showRecordingUI();
+    addMsg('paeg', '<small>🎙 正在启动麦克风…</small>');
+    // v0.40 P0-3 ⭐ start() 3 秒未触发 onstart 的兜底提示（修复 Chrome 静默拒绝）
+    if (startDeadline) clearTimeout(startDeadline);
+    startDeadline = setTimeout(() => {
+      if (!recognizing) {
+        // onstart 未触发 → 启动失败
+        _resetRecording();
+        addMsg('paeg', '<small>🎙 麦克风启动失败：浏览器未授权或安全策略限制。请：' +
+          '①检查地址栏🔒图标允许麦克风 ②改用 http://127.0.0.1:5000 访问。</small>');
+      }
+    }, 3000);
     try { recog.start(); }
-    catch (err) { addMsg('paeg', '<small>🎙 无法启动语音识别：' + (err && err.message ? err.message : err) + '</small>'); }
+    catch (err) {
+      _resetRecording();
+      if (startDeadline) { clearTimeout(startDeadline); startDeadline = null; }
+      addMsg('paeg', '<small>🎙 无法启动语音识别：' + (err && err.message ? err.message : err) +
+        '（请检查麦克风权限或用 127.0.0.1 访问）。</small>');
+    }
   });
+  // v0.40 P2-6 ⭐ 长按输入框触发录音（豆包式：长按 500ms 开始）
+  const inputEl = document.getElementById('question-input');
+  if (inputEl) {
+    let pressTimer = null;
+    function startPress() {
+      if (recognizing || !SR || !secureCtx) return;
+      pressTimer = setTimeout(() => { voiceBtn.click(); }, 500);
+    }
+    function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
+    inputEl.addEventListener('mousedown', startPress);
+    inputEl.addEventListener('mouseup', cancelPress);
+    inputEl.addEventListener('mouseleave', cancelPress);
+    inputEl.addEventListener('touchstart', startPress, { passive: true });
+    inputEl.addEventListener('touchend', cancelPress);
+  }
 })();
 
 // v0.36 ⭐ TTS 播放：调后端 /api/voice/tts 生成音频并播放
