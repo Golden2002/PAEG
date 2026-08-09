@@ -55,6 +55,10 @@ from utils import (
 # v0.42 ⭐ 重构：把 13 处 LearnerProfile 获取/创建内联实现统一到 services 包。
 # 见 services/_learner_session.py docstring 中列出的 13 处原位置。
 from services._learner_session import ensure_learner_session
+# v0.43 ⭐ Wave 3 拆分：业务处理函数迁出 server.py。
+# polish/steering/routing 各自负责一段领域逻辑，所有依赖在函数体内懒加载。
+from services.polish import _polish_text
+from services.steering import _steer_subject, _steer_unknown_response
 from infra.runtime import (
     get_agent_engine,
     get_conv_store,
@@ -326,184 +330,6 @@ def _mode_auto_correct(text: str, requested_mode: str, learner, learner_id: str,
         pass
     return None
 
-def _polish_text(text: str, context: str = "") -> str:
-    """全局语言质量修正（v0.20）：所有输出端点统一过 LanguageRefiner。
-
-    修正：无主语短语（不催你/先不急）、动宾搭配不当（带着重量）、
-    AI 腔、省略句——保持风格的最小改动。
-    纯规则生成/预存文本跳过 LLM 改写（成本考虑）。
-    """
-    if not text or not text.strip():
-        return text
-    try:
-        if paeg is not None and paeg.refiner is not None:
-            # 仅对可能有问题的文本触发（AI 味 or 省略句 or 动宾搭配）
-            from ai_taste_detector import detect_ai_taste
-            try:
-                sig = detect_ai_taste(text)
-                ai_prob = sig.ai_likelihood
-            except Exception:
-                ai_prob = 0.2
-            has_issues = False
-            try:
-                has_issues = len(paeg.refiner._check_ellipsis(text)) > 0
-            except Exception as _e:
-                print(f"[PAEG][server.py] _polish_text 异常忽略: {_e}")
-                pass
-                pass
-            if ai_prob >= 0.4 or has_issues:
-                refined = paeg.refiner.refine(text, context=context)
-                if refined:
-                    return refined
-    except Exception as _e:
-        print(f"[PAEG][server.py] _polish_text 异常忽略: {_e}")
-        pass
-        pass
-    return text
-
-def _steer_subject(concept: str, subject: str, learner, learner_id: str) -> dict:
-    """根据问题内容自动判断学科，覆盖用户手动设定。
-
-    返回 {"subject": 最终学科, "unknown": bool, "unknown_name": str|None,
-          "switched": bool, "response": 可选（unknown 时返回响应对象）}
-    """
-    try:
-        from subject_detector import detect_subject
-        from prompts import normalize_subject
-        norm_subject = normalize_subject(subject)
-        _grade = ""
-        try:
-            _grade = getattr(learner, "grade_level", "") or ""
-        except Exception:
-            _grade = ""
-        det = detect_subject(concept, llm, user_subject=norm_subject, grade=_grade)
-
-        # 未收录学科：记录需求 + 反馈用户
-        if det.get("unknown"):
-            uname = det.get("unknown_name") or "该学科"
-            # v0.25 学段-学科联动：区分"学科需更高学段"与"真未收录"
-            if det.get("grade_blocked"):
-                need_grade = det.get("grade_name") or "大学本科"
-                reply = (
-                    f"我注意到你问的是「{uname}」领域的问题。\n\n"
-                    f"「{uname}」通常需要<b>{need_grade}</b>及以上学段才适合系统学习，"
-                    f"当前你的学段设置还未覆盖它。\n\n"
-                    f"你可以：\n"
-                    f"· 在左上角把<b>学段切换为「{need_grade}」</b>，就能正式学习这门学科\n"
-                    f"· 或者先问我当前学段的<b>其他学科</b>（如物理、数学、语文……）\n"
-                    f"· 或者把资料上传给我（点右下角输入栏旁的书本图标），我就能基于你给的资料回答\n\n"
-                    f"教学讲究循序渐进，先把基础打牢，更高的学科随时欢迎你。"
-                )
-                return {"subject": subject, "unknown": True, "unknown_name": uname,
-                        "grade_blocked": True,
-                        "switched": False, "response": jsonify({
-                            "session_id": f"grade_blocked_{learner_id}",
-                            "summary": {"avg_score": 0},
-                            "worldview_used": "weil",
-                            "tone_ratio": 0,
-                            "presentations": [
-                                {"step_id": 1, "content": reply,
-                                 "step_type": "grade_blocked_subject"}
-                            ],
-                            "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
-                            "reflections": [],
-                            "learner": {
-                                "id": learner.id, "nickname": learner.nickname,
-                                "grade_level": learner.grade_level,
-                                "subjects_mastery": learner.subjects_mastery,
-                            },
-                            "grade_blocked": True,
-                            "subject_requested": uname,
-                            "required_grade": det.get("grade_name", ""),
-                        })}
-            if EVOLVER is not None:
-                try:
-                    EVOLVER.record_subject_request(uname, concept, learner_id)
-                except Exception as _e:
-                    print(f"[PAEG][server.py] _steer_subject 异常忽略: {_e}")
-                    pass
-                    pass
-            reply = (
-                f"我注意到你问的是「{uname}」领域的问题。\n\n"
-                f"目前我还没有把「{uname}」正式列入我的学科清单，"
-                f"但**我已经把这条需求记下来**，后续会优先优化升级来覆盖它。\n\n"
-                f"在此之前，你可以：\n"
-                f"· 问我相关的**其他学科**（如物理、数学、哲学……）\n"
-                f"· 或者把资料上传给我（点右下角输入栏旁的书本图标），我就能基于你给的资料回答\n\n"
-                f"感谢你的反馈，这会让 PAEG 变得更好。"
-            )
-            return {"subject": subject, "unknown": True, "unknown_name": uname,
-                    "switched": False, "response": jsonify({
-                        "session_id": f"unknown_{learner_id}",
-                        "summary": {"avg_score": 0},
-                        "worldview_used": "weil",
-                        "tone_ratio": 0,
-                        "presentations": [
-                            {"step_id": 1, "content": reply, "step_type": "unregistered_subject"}
-                        ],
-                        "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
-                        "reflections": [],
-                        "learner": {
-                            "id": learner.id, "nickname": learner.nickname,
-                            "grade_level": learner.grade_level,
-                            "subjects_mastery": learner.subjects_mastery,
-                        },
-                        "unregistered_subject": True,
-                        "subject_requested": uname,
-                    })}
-
-        # 识别到学科且 ≠ 用户设定 → steering 切换
-        if det.get("switched"):
-            new_subject = det["subject"]
-            try:
-                from prompts import get_style
-                old_label = get_style(subject)["label"]
-                new_label = get_style(new_subject)["label"]
-                print(f"[PAEG][steering] {old_label} → {new_label}（问题: {concept[:30]}）")
-            except Exception as _e:
-                print(f"[PAEG][server.py] _steer_subject 异常忽略: {_e}")
-                pass
-                pass
-            return {"subject": new_subject, "unknown": False, "unknown_name": None,
-                    "switched": True, "response": None}
-    except Exception as _e:
-        print(f"[PAEG][server.py] _steer_subject 异常忽略: {_e}")
-        pass
-        pass
-    return {"subject": subject, "unknown": False, "unknown_name": None,
-            "switched": False, "response": None}
-
-def _steer_unknown_response(concept: str, learner, learner_id: str,
-                           unknown_name: str) -> dict:
-    """构造未收录学科的 SSE 流式响应（teach_stream/chat_stream 用）。"""
-    reply = (
-        f"我注意到你问的是「{unknown_name}」领域的问题。\n\n"
-        f"目前我还没有把「{unknown_name}」正式列入我的学科清单，"
-        f"但**我已经把这条需求记下来**，后续会优先优化升级来覆盖它。\n\n"
-        f"在此之前，你可以：\n"
-        f"· 问我相关的**其他学科**（如物理、数学、哲学……）\n"
-        f"· 或者把资料上传给我（点右下角输入栏旁的书本图标），我就能基于你给的资料回答\n\n"
-        f"感谢你的反馈，这会让 PAEG 变得更好。"
-    )
-    return {
-        "session_id": f"unknown_{learner_id}",
-        "summary": {"avg_score": 0},
-        "worldview_used": "weil",
-        "tone_ratio": 0,
-        "presentations": [
-            {"step_id": 1, "content": reply, "step_type": "unregistered_subject"}
-        ],
-        "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
-        "reflections": [],
-        "learner": {
-            "id": learner.id, "nickname": learner.nickname,
-            "grade_level": learner.grade_level,
-            "subjects_mastery": learner.subjects_mastery,
-        },
-        "unregistered_subject": True,
-        "subject_requested": unknown_name,
-    }
-
 @app.route("/api/health", methods=["GET"])
 def health():
     """健康检查（v0.24 修复 3 ⭐）：增加 mcp_connected / skill_count / agent_engine 字段。"""
@@ -638,7 +464,7 @@ def teach():
 
     # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（在拦截器之前）
     try:
-        _steer = _steer_subject(concept, subject, learner, learner_id)
+        _steer = _steer_subject(concept, subject, learner, learner_id, llm=llm, evolver=EVOLVER)
         if _steer.get("response") is not None:
             return _steer["response"]  # 未收录学科反馈
         if _steer.get("switched"):
@@ -1009,7 +835,7 @@ def teach_stream():
 
     # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（流式版本）
     try:
-        _steer = _steer_subject(concept, subject, learner, learner_id)
+        _steer = _steer_subject(concept, subject, learner, learner_id, llm=llm, evolver=EVOLVER)
         # v0.25 学段-学科联动：跨学段学科 → SSE 推"需切换学段"反馈
         if _steer.get("grade_blocked"):
             _gb = _steer.get("response")
