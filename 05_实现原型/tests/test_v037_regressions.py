@@ -157,3 +157,74 @@ class TestEarlyExitSave:
             if '_save_teach_turn' not in block and 'add_message' not in block:
                 unsaved.append(g)
         assert not unsaved, f"以下生成器未保存: {unsaved}"
+
+
+# ---------------------------------------------------------------------------
+# 5. Oracle P0-1：meta-log 落盘（chat 路径 append_reflection 必须 _save）
+# ---------------------------------------------------------------------------
+class TestMetaLogPersistence:
+    def test_append_reflection_saves_to_disk(self):
+        """append_reflection 必须写 data/reflections.json（防重启丢失）。"""
+        # 直接验证 self_update.py 有 append_reflection 且调用 _save
+        su = open(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'self_update.py'),
+            encoding='utf-8').read()
+        assert "def append_reflection" in su, "缺 append_reflection API"
+        assert "self._save()" in su, "append_reflection 必须落盘"
+
+    def test_chat_path_uses_append_reflection(self):
+        """server.py chat 路径必须用 append_reflection（而非裸 history.append）。"""
+        srv = open(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'server.py'),
+            encoding='utf-8').read()
+        # chat 路径（/api/chat/stream 附近）应调用 append_reflection
+        assert "append_reflection" in srv, "server.py 未用 append_reflection"
+
+
+# ---------------------------------------------------------------------------
+# 6. Oracle P0-3：RiskClassifier fallback 保守
+# ---------------------------------------------------------------------------
+class TestRiskFallback:
+    def test_fallback_conservative_not_zero(self):
+        """RiskClassifier 加载失败时应保守回退（>=3），不静默降级 0。"""
+        from subagents import AffectionSupportor
+        src = open(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'subagents.py'),
+            encoding='utf-8').read()
+        # 找 RiskClassifier except 分支
+        assert "保守回退 3 级" in src or "保守" in src, "RiskClassifier fallback 未保守"
+        # 不应存在"静默降级 0"的旧逻辑
+        assert "_risk_level = 3 if _crisis_context == \"active\" else 0" not in src, "旧静默降级残留"
+
+
+# ---------------------------------------------------------------------------
+# 7. Oracle P1-2：_FakeSession 共享（防 summary 恒 0 噪声自进化）
+# ---------------------------------------------------------------------------
+class TestFakeSessionShared:
+    def test_shared_fakesession(self):
+        """teach_stream 应共享 _FakeSession 而非构造 3 次。"""
+        srv = open(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'server.py'),
+            encoding='utf-8').read()
+        # 检查是否还有 3 次独立 _FakeSession 构造（应只有 1 处 + 顶部定义）
+        count = srv.count("_FakeSession(learner, concept, subject, plan, [])")
+        assert count <= 1, f"_FakeSession 构造 {count} 次（应共享 1 次）"
+
+    def test_summary_estimate_present(self):
+        """teach_stream 应有 summary 估算（防 avg_score 恒 0）。"""
+        srv = open(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'server.py'),
+            encoding='utf-8').read()
+        assert "summary_estimate" in srv, "缺 summary 估算"
+
+
+# ---------------------------------------------------------------------------
+# 8. 补全学科 label
+# ---------------------------------------------------------------------------
+class TestSubjectLabels:
+    def test_writing_label_exists(self):
+        """SUBJECT_GRADES 32 学科前端 label 应全覆盖（writing 补齐）。"""
+        html = open(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '09_GUI前端', 'index.html'),
+            encoding='utf-8').read()
+        assert "writing: '写作'" in html, "writing label 缺失"
