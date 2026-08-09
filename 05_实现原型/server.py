@@ -2918,6 +2918,12 @@ def general_chat_stream():
         if not reply or reply.startswith("（模型调用失败"):
             reply = _safe_chat(llm, system, user, max_tokens=1500) or \
                 f"我听到你说：{text}。想多说说吗？我会认真听。"
+            # v0.37.2 ⭐ Oracle P2 修复：兜底分支也发 retrieval 徽章（此前缺失，
+            # 前端看不到"已完成知识库检索"——看似没检索）
+            try:
+                yield f"event: retrieval\ndata: {json.dumps({'done': '知识库检索'}, ensure_ascii=False)}\n\n"
+            except Exception:
+                pass
 
         # 2) 深度守门
         try:
