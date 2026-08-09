@@ -1945,12 +1945,14 @@ function restoreLoginState() {
       document.getElementById('user-badge').style.display = '';
       document.getElementById('user-btn').textContent = '退出';
       document.getElementById('conv-clear').style.display = '';
-      // 历史会话列表（仅注册用户）
+      // 历史会话列表（注册用户）
       loadConversations();
     } else {
       // 匿名用户：不显示登录状态（保持"登录/注册"按钮 + 无徽章），只恢复唯一 ID
+      // v0.36.2 ⭐ 修复：匿名用户也加载历史（后端已支持 web_xxx 落盘），不再"数据存在但看不到"
       document.getElementById('user-badge').style.display = 'none';
       document.getElementById('user-btn').textContent = '登录/注册';
+      loadConversations();
     }
   } catch (e) {
     console.error('[restoreLoginState]', e);
@@ -2121,10 +2123,19 @@ function renderLogs(logs) {
       if (emo && emo !== '未知') parts.push(`情 ${emo}`);
       txt = parts.length ? `🎯 建模 · ${parts.join(' · ')}` : (m.reflection || '建模');
     } else {
-      const r = (typeof l.reflection === 'string') ? l.reflection
-               : (l.reflection && typeof l.reflection === 'object') ? (l.reflection.concept || l.reflection.summary || '')
-               : '';
-      txt = r || l.concept || l.note || '';
+      // v0.36.1 ⭐ 修复：非 user_modeling 记录（self_reflect/adaptation 等）不再显示用户原始提问（l.concept），
+      // 否则元认知日志看起来像"对话历史"。改为展示反思实际内容（notes/总结/决策）。
+      const rf = (typeof l.reflection === 'object') ? l.reflection : null;
+      if (rf && rf.type === 'self_reflect') {
+        txt = rf.notes || rf.summary || '教学自检';
+      } else if (rf && rf.type === 'adaptation') {
+        txt = (rf.details ? (typeof rf.details === 'string' ? rf.details : JSON.stringify(rf.details)) : '') || ('策略调整' + (rf.decision ? `：${rf.decision}` : ''));
+      } else {
+        const r = (typeof l.reflection === 'string') ? l.reflection
+                 : (rf) ? (rf.notes || rf.summary || '')
+                 : '';
+        txt = r || l.note || '教学记录';
+      }
     }
     return `
     <div class="log-item">
@@ -2227,6 +2238,15 @@ async function teach(question, subject, subtopic) {
               <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div></div>`;
             chatWin.appendChild(mainBubble);
           }
+          // v0.36.1 ⭐ 修复：实时渲染累积内容——此前只追加字符串、最后一次性渲染
+          // （教学模式观感=非流式；chat 路径逐段 appendChild 正常，此处对齐）
+          const contentDiv = mainBubble.querySelector('.md-content');
+          const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(allText)));
+          contentDiv.innerHTML = typeof marked !== 'undefined'
+            ? marked.parse(fixedText) : escapeHtml(allText);
+          mainBubble._rawText = allText;
+          renderMath(contentDiv);
+          chatWin.scrollTop = chatWin.scrollHeight;
         } else if (event === 'retrieval') {
           // v0.28：检索状态徽章——后端在输出 presentation 前报告已完成何种检索
           // retrieval 可能先于 presentation 到达 → 需 lazy 创建气泡，保证徽章显示在顶部
@@ -2745,9 +2765,14 @@ function applyLogin(result) {
 }
 
 // v0.18.1：加载历史会话列表
+// v0.36.2 ⭐ 修复：匿名用户（web_xxx）也可加载历史——后端 v0.32 已放宽允许落盘，
+// 前端此前拦截（只认 u 前缀）导致"数据存在但看不到"的断链。
 async function loadConversations() {
   const list = document.getElementById('conv-list');
-  if (!STATE.learnerId.startsWith('u')) {
+  const lid = String(STATE.learnerId || '');
+  const isRegistered = /^u\d+$/.test(lid);
+  const isAnon = /^web_[A-Za-z0-9_\-]+$/.test(lid);
+  if (!isRegistered && !isAnon) {
     list.innerHTML = `<div class="empty-state" role="status">
         <img class="empty-icon" src="assets/icons/message-circle.svg" alt="" aria-hidden="true" />
         <div class="empty-title">登录后可恢复历史会话</div>
@@ -2757,10 +2782,10 @@ async function loadConversations() {
     return;
   }
   try {
-    const r = await api(`/api/conversations/${STATE.learnerId}`);
+    const r = await api(`/api/conversations/${encodeURIComponent(lid)}`);
     const convs = r.conversations || [];
     if (!convs.length) {
-      list.innerHTML = `<div class="log-item"><div class="txt" style="color:var(--text-dim)">暂无历史对话</div></div>`;
+      list.innerHTML = `<div class="log-item"><div class="txt" style="color:var(--text-dim)">${isAnon ? '暂无历史对话（登录账号可跨设备同步）' : '暂无历史对话'}</div></div>`;
       return;
     }
     const MODE_CN = { teach: '教学', chat: '闲聊', solve: '做题' };
@@ -2783,7 +2808,7 @@ async function loadConversations() {
         e.stopPropagation();
         const cid = del.dataset.cid;
         if (!confirm('删除这个会话？')) return;
-        await api(`/api/conversations/${STATE.learnerId}/${cid}`, {}, 'DELETE');
+        await api(`/api/conversations/${encodeURIComponent(STATE.learnerId)}/${cid}`, {}, 'DELETE');
         loadConversations();
       });
     });
@@ -2795,7 +2820,7 @@ async function loadConversations() {
 // 恢复会话：把历史消息渲染到对话窗口
 async function restoreConversation(cid) {
   try {
-    const conv = await api(`/api/conversations/${STATE.learnerId}/${cid}`);
+    const conv = await api(`/api/conversations/${encodeURIComponent(STATE.learnerId)}/${cid}`);
     const msgs = conv.messages || [];
     if (!msgs.length) return;
     // 清空当前窗口，重新渲染历史
@@ -2981,15 +3006,26 @@ askBtn.addEventListener('click', () => {
 });
 
 // ─── v0.36 ⭐ 语音模块：Web Speech API 录音转文本 → 复用现有发送管线 ───
+// v0.36.2 ⭐ 修复：提示精准化——区分"浏览器不支持"与"非安全环境"；诚实告知能力边界
 (function initVoice() {
   const voiceBtn = document.getElementById('voice-btn');
   if (!voiceBtn) return;
+  const voiceIcon = voiceBtn.querySelector('img');
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const secureCtx = window.isSecureContext || location.protocol === 'https:' || ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
   if (!SR) {
-    voiceBtn.title = '语音输入需 Chrome/Edge/Safari';
+    voiceBtn.title = '语音输入需 Chrome/Edge（微信内置浏览器不支持）';
     voiceBtn.style.opacity = '.4';
     voiceBtn.addEventListener('click', () => {
-      addMsg('paeg', '<small>当前浏览器不支持语音输入，推荐使用 Chrome 或 Edge。</small>');
+      addMsg('paeg', `<small>🎙 当前浏览器不支持语音输入（${/MicroMessenger/i.test(navigator.userAgent) ? '微信内置浏览器暂不支持，请用 Chrome 或 Edge 打开' : '推荐使用 Chrome 或 Edge'}）。可直接打字交流。</small>`);
+    });
+    return;
+  }
+  if (!secureCtx) {
+    voiceBtn.title = '语音输入需 HTTPS 或 localhost';
+    voiceBtn.style.opacity = '.4';
+    voiceBtn.addEventListener('click', () => {
+      addMsg('paeg', '<small>🎙 当前为非安全环境（非 HTTPS），浏览器禁用了麦克风。请通过 https:// 或 localhost 访问后使用语音输入。</small>');
     });
     return;
   }
@@ -2998,10 +3034,28 @@ askBtn.addEventListener('click', () => {
   recog.lang = 'zh-CN';
   recog.continuous = false;
   recog.interimResults = false;
-  recog.onstart = () => { recognizing = true; voiceBtn.classList.add('recording'); addMsg('paeg', '<small>🎙 正在聆听…请说话（说完自动识别）。</small>'); };
-  recog.onend = () => { recognizing = false; voiceBtn.classList.remove('recording'); };
+  // v0.36 ⭐ 录音态图标切换：麦克风 → 红色停止方块
+  function setRecording(on) {
+    recognizing = on;
+    if (on) {
+      voiceBtn.classList.add('recording');
+      if (voiceIcon) voiceIcon.src = 'assets/icons/square.svg';
+      voiceBtn.title = '点击停止录音';
+    } else {
+      voiceBtn.classList.remove('recording');
+      if (voiceIcon) voiceIcon.src = 'assets/icons/mic.svg';
+      voiceBtn.title = '语音输入（Chrome/Edge 推荐）';
+    }
+  }
+  recog.onstart = () => {
+    setRecording(true);
+    addMsg('paeg', '<small>🎙 正在聆听…（麦克风已变红，再按一次停止）</small>');
+  };
+  recog.onend = () => {
+    setRecording(false);
+  };
   recog.onerror = (e) => {
-    recognizing = false; voiceBtn.classList.remove('recording');
+    setRecording(false);
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
       addMsg('paeg', '<small>🎙 麦克风权限被拒绝。请在浏览器地址栏左侧的🔒图标 → 网站设置中允许麦克风，然后重试。</small>');
     } else if (e.error === 'network') {
@@ -3015,14 +3069,18 @@ askBtn.addEventListener('click', () => {
     }
   };
   recog.onresult = (e) => {
+    setRecording(false);
     const text = e.results[0][0].transcript;
     const input = document.getElementById('question-input');
-    if (input && text) { input.value = text; document.getElementById('ask-btn').click(); }
+    if (input && text) {
+      addMsg('user', text);              // v0.36 ⭐ 先显示语音转文字（用户可见）
+      input.value = text;
+      document.getElementById('ask-btn').click();
+    }
   };
   voiceBtn.addEventListener('click', () => {
     if (recognizing) { recog.stop(); }
     else {
-      // 先检查权限状态，给出即时反馈
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         addMsg('paeg', '<small>🎙 当前环境不支持麦克风（需 HTTPS 或 localhost）。</small>');
         return;
@@ -3034,10 +3092,13 @@ askBtn.addEventListener('click', () => {
 })();
 
 // v0.36 ⭐ TTS 播放：调后端 /api/voice/tts 生成音频并播放
+// v0.36.2 ⭐ 修复：autoplay 拦截精准提示（微信 X5 等浏览器需用户手势）；
+// 真实错误透传（不再笼统"语音暂不可用"误导）
 async function playMsgTTS(btn) {
   const bubble = btn.closest('.msg-bubble');
   const text = (bubble ? bubble.textContent : '').replace(/[🔊复制\n]+/g, '').trim().slice(0, 2000);
   if (!text) return;
+  // 微信内置浏览器（X5）播放前先确保用户手势链（点击按钮即手势，此处主要捕获 rejection）
   try {
     const r = await fetch(API_BASE + '/api/voice/tts', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -3046,12 +3107,20 @@ async function playMsgTTS(btn) {
     const j = await r.json();
     if (j.ok && j.url) {
       const audio = new Audio(j.url);
-      audio.play();
+      console.log('[TTS] url=', j.url, 'ok=', j.ok);
+      const p = audio.play();
+      if (p && p.catch) {
+        p.catch((e) => {
+          console.error('[TTS] play rejected:', e);
+          addMsg('paeg', '<small>🔊 播放被浏览器拦截（自动播放限制）。请点击页面任意位置后，再点一次 🔊 重试。</small>');
+        });
+      }
     } else {
-      addMsg('paeg', '<small>语音暂不可用（edge-tts 未安装或合成失败）。</small>');
+      addMsg('paeg', `<small>语音暂不可用：${(j.error || 'edge-tts 合成失败')}（可稍后重试，不影响打字交流）。</small>`);
     }
   } catch (err) {
-    addMsg('paeg', '<small>语音服务暂时不可用。</small>');
+    console.error('[TTS] fetch error', err);
+    addMsg('paeg', `<small>语音服务暂时不可用：${(err && err.message ? err.message : '网络错误')}。</small>`);
   }
 }
 
