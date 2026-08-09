@@ -155,7 +155,9 @@ class TestEarlyExitSave:
             idx = srv.find(f'def gen_{g}():')
             block = srv[idx:idx + 400]
             if '_save_teach_turn' not in block and 'add_message' not in block:
-                unsaved.append(g)
+                # v0.40.5: gen_empty_chat 是空输入引导语（无实际对话内容），无需保存历史
+                if g != 'empty_chat':
+                    unsaved.append(g)
         assert not unsaved, f"以下生成器未保存: {unsaved}"
 
 
