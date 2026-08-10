@@ -2507,6 +2507,18 @@ def general_chat_stream():
                 system = system + "\n\n## 用户上传的资料（供回答参考）\n" + _uc_chat
     except Exception as _uce:
         print(f"[PAEG] chat_stream 用户资料注入跳过: {_uce}")
+    # v0.41.9 ⭐ 修复：chat_stream 注入 KB 检索结果（此前通用话题不查知识库——
+    # 只有 teach 用 kb.resolve_node、answer 用 _pre_retrieve；chat 全靠 LLM 自身，
+    # 接线缺口。用 _pre_retrieve（KB+Library 三线）增强闲聊的知识支撑）
+    try:
+        if text and len(text) <= 100:
+            from subagents import _pre_retrieve
+            _retr_chat = _pre_retrieve(
+                text, data.get("subject", ""), learner=learner, llm=llm)
+            if _retr_chat:
+                system = system + "\n\n" + _retr_chat
+    except Exception as _rce:
+        print(f"[PAEG] chat_stream KB 检索注入跳过: {_rce}")
     system = _inject_skill_catalog(system)
 
     # v0.22.0：基于用户上传文件的 4 能力（找答案/讲解/输出原文/重组结构）
