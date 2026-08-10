@@ -47,6 +47,51 @@ PAEG 的设计目标分层：
 
 **核心判断**：任何功能/提示词都服从一个标准——"这个回答，对眼前这个学生有用吗？他听完会更好吗？"规范是为学生服务的，不是学生为规范服务。
 
+## 1.1.2 v0.43 功能 / 模块 / 管线 / 接线汇总（2026-08-10 ⭐）
+
+### 功能清单（6 对话模式 × 共享能力）
+
+| 模式 | 端点 | 语言规范 | 记忆写回 | 停止按钮 | 检索 | 问卷注入 | 意图聚焦 |
+|---|---|---|---|---|---|---|---|
+| **teach 教学** | `/api/teach/stream` | ✅ L1+L2+L3 | ✅ chat_hist | ✅ | ✅ KB+facts+web | ✅ | ✅ |
+| **chat 闲聊** | `/api/chat/stream` + `/api/chat` | ✅ | ✅ | ✅ | ✅ 三线 | ✅ | ✅ |
+| **answer 找答案** | `/api/answer` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **method 方法** | `/api/method` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **knowledge 知识库** | `/api/knowledge` | ✅ | ✅ | ✅ | ✅（自身即检索） | ✅ | ✅ |
+| **affection 倾诉** | `/api/affection` | ✅ | ✅ | ✅ | N/A（不检索） | ✅ | ✅ |
+
+### 核心模块清单（v0.43）
+
+| 模块 | 职责 | 关键文件 | 状态 |
+|---|---|---|---|
+| **Agent 编排** | 6 阶段教学闭环 + 9 子代理调度 | `paeg.py` | ✅ |
+| **9 子代理** | Diagnostor/Planner/Presenter/Evaluator/Adapter/AnswerSolver/AffectionSupportor/SelfUpdateAgent/Individuality | `subagents.py` | ✅ |
+| **提示词模板** | 固定模板+动态槽（12 槽）+ 3 位掩码约束分层 | `prompt_template.py` + `prompts.py` | ✅ v0.43 |
+| **约束分层** | L0 保底 11 条 + A(8)/B(9)/C(6) 位掩码 | `prompts.py` `_build_constraint_layers` | ✅ v0.43 |
+| **约束信号** | DIRECT/EMOTION/PREF → 位掩码检测 | `utils/constraint_signals.py` | ✅ v0.43 |
+| **问卷画像** | 注册问卷→固定提示词注入所有模式→建模 | `prompts.py` `_build_questionnaire_block` + `server.py` `/api/profile/<id>/questionnaire` | ✅ v0.43 |
+| **意图聚焦** | 提示词开头 LLM 判断用户关键需求 | `prompts.py` build_*_system 开头 | ✅ v0.43 |
+| **语言质量层** | L1 提示词/L2 规则/L3 LLM 修正 | `language_refiner.py` + `services/polish.py` | ✅ |
+| **安全伦理** | 危机协议/未成年人/内容过滤 | `safety.py` + `quality_gate.py` | ✅ |
+| **记忆系统** | 三层记忆 + 用户事实 + 画像持久化 | `memory_system.py` + `user_store.py` | ✅ |
+| **检索三线** | KB + Library + Web | `subagents.py` `_pre_retrieve` | ✅ |
+| **前端** | 单文件 GUI（6 模式+问卷弹窗+停止按钮） | `index.html` | ✅ |
+
+### 关键管线（数据流）
+
+```
+用户输入 → 意图路由(meta_router) → 关键需求判断(意图聚焦) → 约束掩码(detect_constraint_flags)
+  → 模式分发(6 模式) → system 构建(build_*_system: 角色+语言规范+检索+问卷+约束分层)
+  → LLM 生成 → 语言规范收口(polish/refiner) → 记忆写回(chat_hist) → 画像持久化
+```
+
+### 新增能力亮点（v0.43）
+
+1. **注册问卷**：10 题选择题 → 用户专属固定提示词（所有模式每次注入）→ 进入 Individuality 建模
+2. **意图聚焦**：模板化提示词开头加 LLM 关键需求判断——"类型化模板是工具不是枷锁，过强约束让能力失效"
+3. **3 位掩码约束架构**：3 变量=3 位（100 组A直接性/010 组B情绪/001 组C深度）精确取消对应组，**L0 保底（语言规范/格式/反AI腔/安全）永不跳过**——"语言规范层永远不会被跳过，它不在这三个层中的任何一个"
+
+
 ## 1.2 一句话架构
 
 ```mermaid
