@@ -787,6 +787,9 @@ def teach_stream():
         print(f"[PAEG] teach_stream 情绪支持钩子跳过: {_e}")
 
     # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（流式版本）
+    # v0.41.8 ⭐ 修复：_steer 在 try 内定义但被 generate() 闭包引用——
+    # 若 _steer_subject 抛异常 → NameError（pyright reportPossiblyUnbound 核查发现）
+    _steer = {}
     try:
         _steer = _steer_subject(concept, subject, learner, learner_id, llm=llm, evolver=EVOLVER)
         # v0.25 学段-学科联动：跨学段学科 → SSE 推"需切换学段"反馈
@@ -2035,17 +2038,9 @@ def uploaded_file(filename):
     return send_from_directory(base, filename)
 
 def get_user_library(learner_id: str) -> str:
-    """v0.21.4：读取用户专属资料库内容（供 Agent 注入回答上下文）。
-
-    路径：Library/usr_knowledge/<learner_id>/（规范）
-         同时向兼容扫 Library/user_<learner_id>/ 及嵌套子目录
-    返回：可注入 system 的资料摘要文本；无资料返回 ""。
-    """
-    try:
-        from lib import library_store
-        return library_store.read_user_corpus(learner_id, max_files=5, per_file=500)
-    except Exception:
-        return ""
+    """v0.21.4：读取用户专属资料库内容（v0.41.8 迁至 services/library.py）。"""
+    from services.library import get_user_library as _gul
+    return _gul(learner_id)
 
 @app.route("/api/user-library/<learner_id>", methods=["GET"])
 @require_module("knowledge")
@@ -2448,6 +2443,10 @@ def general_chat_stream():
     # v0.22.3：个体化注入（Individuality subagent——16 维画像 + LLM 建模 + 母语控制）
     _ind = None  # v0.23.0：闭包传给 generate() 用于 persist()
     _ind_run_ok = False
+    # v0.41.8 ⭐ 修复：_ind_result 在 try 内定义但被 generate() 闭包引用——
+    # 若 _ind.run 抛异常 → 闭包内 `_ind_result or {}` 前先求值 → NameError
+    # （pyright reportPossiblyUnbound 核查发现）
+    _ind_result = {}
     try:
         from subagents import Individuality
         _ind = Individuality()
@@ -3299,238 +3298,29 @@ def list_conversations(learner_id):
         return jsonify({"conversations": [], "error": str(e)}), 500
 
 def _handle_recommend_query(learner, question, subject, llm_arg):
-    """v0.35 ⭐ 推荐类问题：联网检索真实推荐 + 组织回答。
+    """v0.35：推荐类问题（v0.41.8 迁至 services/handlers/recommend.py）。
 
-    用户问"有什么推荐/推荐几本/哪个软件好"——必须基于外部真实信息（web_search
-    检索结果），不能凭 LLM 训练知识编造。返回**纯 dict**（不 jsonify），
-    调用方自行决定序列化方式——生成器（SSE 流）里没有 Flask app context，
-    不能调 jsonify（与 _handle_knowledge_query 同约定）。
+    联网检索真实推荐 + 组织回答。返回纯 dict（不 jsonify），调用方自行序列化。
     """
-    # 1) 联网检索：拿真实推荐信息
-    results_text = ""
-    web_ok = False
-    try:
-        from web_search_tool import web_search
-        search_q = f"{question} 推荐 排名 对比"
-        raw = web_search(search_q, max_results=5)
-        web_ok = bool(raw) and ("搜索未返回" not in raw)
-        results_text = raw or ""
-    except Exception:
-        results_text, web_ok = "", False
-
-    # 2) LLM 基于检索结果组织回答
-    answer = ""
-    try:
-        from subagents import _safe_chat
-        sys_prompt = (
-            "你是一位熟悉多语言学习产品的老师。学生问推荐类问题，请结合检索到的真实信息回答。\n"
-            "要求：\n"
-            "1. 先给出 2-4 个具体推荐（名称+一句话理由），优先用检索到的真实产品\n"
-            "2. 每个推荐说明适合什么水平/目标（如零基础/进阶/备考）\n"
-            "3. 若无检索结果，诚实说明'我查到的信息有限'，给通用建议但标注不确定性\n"
-            "4. 用中文回答，语气亲切实用\n\n"
-            f"检索到的资料：\n{results_text[:3000] if results_text else '（无检索结果）'}"
-        )
-        user_msg = f"学生问：{question}"
-        answer = _safe_chat(llm_arg, sys_prompt, user_msg, max_tokens=900) or ""
-    except Exception:
-        answer = ""
-    if not answer:
-        answer = (
-            "关于推荐，我帮你查了一些资料，但信息有限。"
-            "你可以告诉我你的具体水平和目标，我帮你更精准地推荐。"
-        )
-
-    return {
-        "session_id": f"rec_{learner.id}",
-        "summary": {"avg_score": 0},
-        "worldview_used": "weil",
-        "tone_ratio": 0,
-        "presentations": [
-            {"step_id": 1, "content": answer, "step_type": "recommend"}
-        ],
-        "evaluations": [],
-        "diagnosis": {},
-        "plan": {"steps": [{"type": "recommend"}]},
-        "reflections": [],
-        "learner": {
-            "id": learner.id,
-            "nickname": learner.nickname,
-            "grade_level": learner.grade_level,
-            "subjects_mastery": learner.subjects_mastery,
-        },
-        "web_searched": web_ok,  # v0.35 ⭐ 告知调用方：是否真做了网络检索（前端 badge 用）
-    }
+    from services.handlers.recommend import _handle_recommend_query as _hrq
+    return _hrq(learner, question, subject, llm_arg)
 
 def _handle_knowledge_query(learner, subject):
-    """v0.19.15：知识库查询——汇报 Library 已收录的知识 + 提示上传。
+    """v0.19.15：知识库查询（v0.41.8 迁至 services/handlers/knowledge.py）。
 
-    用户问"你学过什么/你的知识库/你懂哪些"时，扫描 Library 文件夹，
-    按领域列出已收录内容，并提示用户可以上传资料让 Agent 更精通。
-    返回**纯 dict**（不 jsonify），调用方自行决定序列化方式——
-    生成器（SSE 流）里没有 Flask app context，不能调 jsonify。
+    汇总 Library 已收录的知识 + 提示上传。返回纯 dict（不 jsonify）。
     """
-    import os as _os
-    proj_root = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..')
-    lib_root = _os.path.join(proj_root, 'Library')
-
-    # 收集 Library 各领域的文件
-    areas = []
-    if _os.path.isdir(lib_root):
-        for name in sorted(_os.listdir(lib_root)):
-            d = _os.path.join(lib_root, name)
-            if _os.path.isdir(d) and not name.startswith('.'):
-                files = [f for f in _os.listdir(d)
-                         if not f.startswith('.') and _os.path.isfile(_os.path.join(d, f))]
-                if files:
-                    areas.append((name, files))
-
-    # 用户上传的资料（单独列出）
-    learner_id = getattr(learner, 'id', '')
-    user_lib = get_user_library(learner_id) if learner_id else ""
-
-    # 构造"已收录内容清单"（读取所有文件的真实内容，让 LLM 真正基于内容总结）
-    inventory = []
-    if areas:
-        inventory.append("【Library 资料库收录（以下是每个文件的真实内容摘要，务必基于这些总结）】")
-        for name, files in areas:
-            inventory.append(f"## 领域：{name}（{len(files)} 份）")
-            for f in files:
-                fpath = os.path.join(lib_root, name, f)
-                content_snippet = ""
-                if f.endswith(('.md', '.txt', '.json')):
-                    try:
-                        with open(fpath, encoding='utf-8', errors='replace') as _f:
-                            content_snippet = _f.read(800).strip()
-                    except Exception:
-                        content_snippet = ""
-                elif f.endswith('.pdf'):
-                    # 尝试提取 PDF 文本（用 pypdf 若可用）
-                    try:
-                        from pypdf import PdfReader
-                        reader = PdfReader(fpath)
-                        content_snippet = ""
-                        for page in reader.pages[:3]:
-                            content_snippet += (page.extract_text() or "") + " "
-                        content_snippet = content_snippet.strip()[:800]
-                    except Exception:
-                        content_snippet = "（PDF，未能提取文本，仅知道文件名）"
-                if content_snippet:
-                    inventory.append(f"### 文件：{f}\n{content_snippet}")
-                else:
-                    inventory.append(f"### 文件：{f}\n（内容不可读，仅文件名）")
-    if user_lib:
-        inventory.append("【用户上传的专属资料】")
-        inventory.append(user_lib)
-
-    inventory_text = "\n".join(inventory) if inventory else "（Library 目前没有收录资料）"
-
-    # v0.19.19：用 LLM 严格基于知识库实际内容总结（不得凭训练知识自由发挥）
-    from subagents import _safe_chat
-    system = (
-        "你是 Émile Novis。学生问你'你的知识库/你学过什么'。\n\n"
-        f"{('【学生画像】' + _build_learner_ctx_str(learner) + '\n\n') if learner else ''}"
-        "**最重要：你只能基于下面【Library 资料库收录】里的实际文件内容来回答**——"
-        "这些是你真正'拥有'的资料。逐份介绍它们具体讲了什么（从内容摘要里提炼）。\n\n"
-        "规则：\n"
-        "1. 严格基于给出的文件内容总结，不要说你知识库里没有的东西\n"
-        "2. 每份资料提到时，说它实际讲什么（如'《数理统计讲义》从概率基础讲到假设检验、回归分析'）\n"
-        "3. 按领域分组介绍，像一位老师清点自己的藏书\n"
-        "4. 如果有用户上传的资料，特别提到'我还保存着你上传的XXX'\n"
-        "5. 结尾自然引导：**明确告诉学生以后只要说'知识库'或'你学过什么'，我就会为你打开这份资料清单**；"
-        "同时邀请 ta 问我这些领域的任何问题；想让更精通某领域就上传资料（点书本图标）\n"
-        "6. 语言像认真备课的老师，主谓宾完整\n"
-        "7. 如果某文件内容不可读，如实说'这份是 PDF，我存着但还没细读内容'\n"
-        "8. 如果清单是空的，就说'目前我的资料库还比较空，你可以先问我任何问题，或者上传资料让我更擅长'"
-    )
-    user = f"【Library 资料库实际内容】\n{inventory_text}\n\n请逐份基于这些内容，用老师式的语言总结你掌握的知识。"
-    llm_answer = _safe_chat(llm, system, user, max_tokens=900)
-    answer = llm_answer or ("我目前的知识库里收录了这些领域的资料，你可以问我相关问题，也可以上传资料让我更擅长。")
-
-    return {
-        "session_id": f"kb_{learner.id}",
-        "summary": {"avg_score": 0},
-        "worldview_used": "weil",
-        "tone_ratio": 0,
-        "presentations": [
-            {"step_id": 1, "content": answer, "step_type": "knowledge"}
-        ],
-        "evaluations": [],
-        "diagnosis": {},
-        "plan": {"steps": []},
-        "reflections": [],
-        "learner": {
-            "id": learner.id,
-            "nickname": learner.nickname,
-            "grade_level": learner.grade_level,
-            "subjects_mastery": learner.subjects_mastery,
-        },
-    }
+    from services.handlers.knowledge import _handle_knowledge_query as _hkq
+    return _hkq(learner, subject)
 
 def _handle_method_advice(learner, concept, subject):
-    """v0.19.7：学习方法咨询——"如何学习X/怎么复习"走学习指导而非教学/出题。
+    """v0.19.7：学习方法咨询（v0.41.8 迁至 services/handlers/method.py）。
 
-    结合学段/学科/用户画像，给出针对性的学习方法建议（像一位有经验的老师
-    在谈怎么学这门课），而不是把"如何学习线性代数"当成概念去教学或出题。
+    "如何学习X/怎么复习"走学习指导而非教学/出题——结合学段/学科/用户画像，
+    给出针对性的学习方法建议（像一位有经验的老师在谈怎么学这门课）。
     """
-    from prompts import build_general_chat_system, build_general_chat_user
-    from subagents import _safe_chat
-
-    grade = getattr(learner, "grade_level", "high_school")
-    grade_cn = {"middle_school": "初中", "high_school": "高中/高考",
-                "undergraduate": "大学本科", "graduate_exam": "考研"}.get(grade, grade)
-    from prompts import get_style
-    try:
-        subject_cn = get_style(subject)["label"]
-    except Exception:
-        subject_cn = subject
-    desc = getattr(learner, "self_description", "") or ""
-    desc_line = f"学生的自述：{desc.strip()}\n" if desc.strip() else ""
-    # v0.36 ⭐ P0-08 ContextBundle 接线：补 BDI/user_model/完整画像段注入
-    # （之前 method 端点只有 self_description，缺对象意识与掌握度——LLM 给学习方法时不知学生水平）
-    # 复用现有 helper _build_learner_ctx_str（与 _handle_knowledge_query L3564 同源）
-    # 异常时 helper 返回 ""，不破坏原逻辑
-    _learner_ctx = _build_learner_ctx_str(learner)
-
-    system = (
-        "你是 Émile Novis，一位既懂学科又懂学习的老师。学生问的是'如何学习{subject}'这类方法问题。\n"
-        "请给出一份**具体、可执行的学习方法建议**，而不是讲学科概念，更不是出题考他。\n"
-        "要点：\n"
-        "1. 先理解 ta 的处境（{grade}学生）和基础\n"
-        "2. 给出学习路径：入门→进阶→强化，每阶段该做什么\n"
-        "3. 推荐具体方法（如：先建立直觉再用工具、做例题找规律、错题复盘）\n"
-        "4. 结合这门学科的特点（{subject}该怎么学才有感觉）\n"
-        "5. 语气像一位耐心的老师，不列'步骤1/2/3'，用自然的讲义式叙述\n"
-        "不需要出题，不需要讲具体知识点，就谈'怎么学'。"
-    ).format(subject=subject_cn, grade=grade_cn)
-    if _learner_ctx:
-        system = f"【学生画像与对象意识】\n{_learner_ctx}\n\n" + system
-
-    user = f"学生问：{concept}\n{desc_line}请给出{subject_cn}的学习方法建议。"
-    answer = _safe_chat(llm, system, user, max_tokens=1400)
-    if not answer:
-        answer = (f"关于怎么学{subject_cn}，我的建议是：先从最基础的概念建立直觉，"
-                  f"再通过做典型例题巩固，最后用错题复盘查漏补缺。具体方法我可以展开讲。")
-
-    return jsonify({
-        "session_id": f"method_{learner.id}",
-        "summary": {"avg_score": 0},
-        "worldview_used": "weil",
-        "tone_ratio": 0,
-        "presentations": [
-            {"step_id": 1, "content": answer, "step_type": "method"}
-        ],
-        "evaluations": [],
-        "diagnosis": {},
-        "plan": {"steps": [{"type": "method"}]},
-        "reflections": [],
-        "learner": {
-            "id": learner.id,
-            "nickname": learner.nickname,
-            "grade_level": learner.grade_level,
-            "subjects_mastery": learner.subjects_mastery,
-        },
-    })
+    from services.handlers.method import _handle_method_advice as _hma
+    return _hma(learner, concept, subject)
 
 # ─────────────────────────────────────
 # v0.19.25：独立对话类型端点——学习方法 / 知识库
@@ -3682,74 +3472,12 @@ def affection_support():
     })
 
 def _handle_problem_request(learner, concept, subject):
-    """v0.19：出题请求处理——结合学段/学科/画像生成经典题目。
+    """v0.19：出题请求处理（v0.41.8 迁至 services/handlers/problem.py）。
 
-    用户说"给我一道经典题目/出题/练习题"时调用，避免被当概念教学。
+    结合学段/学科/画像生成经典题目。
     """
-    from prompts import build_general_chat_user
-    from subagents import _safe_chat
-
-    # 学段中文
-    grade = getattr(learner, "grade_level", "high_school")
-    grade_cn = {"middle_school": "初中", "high_school": "高中/高考",
-                "undergraduate": "大学本科", "graduate_exam": "考研"}.get(grade, grade)
-    # 学科中文
-    from prompts import get_style
-    try:
-        subject_cn = get_style(subject)["label"]
-    except Exception:
-        subject_cn = subject
-    # 画像（薄弱点/目标）
-    desc = getattr(learner, "self_description", "") or ""
-    desc_line = f"学生自述：{desc.strip()}\n" if desc.strip() else ""
-    # v0.36 ⭐ P0-08 ContextBundle 接线：补 BDI/user_model/完整画像段注入
-    # （之前 problem 端点只有 self_description，缺对象意识与掌握度——LLM 出题时不知学生薄弱点）
-    # 复用现有 helper _build_learner_ctx_str（与 _handle_knowledge_query L3564 同源）
-    _learner_ctx = _build_learner_ctx_str(learner)
-
-    system = (
-        "你是一位有多年命题经验、深知考试评分标准的{grade}{subject}老师（Émile Novis）。\n"
-        "学生要求你给出一道经典题目。请：\n"
-        "1. 出 1 道**经典、有代表性**的{subject}题（难度贴合{grade}考试要求）\n"
-        "2. 题目要规范：条件清楚、目标明确、是真题或经典题的变式\n"
-        "3. 给出完整解答（作为可对照的标准答案，分步、严谨、用 LaTeX 公式）\n"
-        "4. 最后点出这道题考查的知识点和易错点\n"
-        "5. 如果学生自述了薄弱点，优先出一道针对薄弱点的题\n"
-        "语言朴素准确，不列'步骤1/2/3'，用自然段落。公式用 $...$ 或 $$...$$。"
-    ).format(grade=grade_cn, subject=subject_cn)
-    if _learner_ctx:
-        system = f"【学生画像与对象意识】\n{_learner_ctx}\n\n" + system
-
-    user = (
-        f"请给我一道{grade_cn}{subject_cn}经典题目。\n"
-        + desc_line
-        + f"（用户原话：{concept}）"
-    )
-    answer = _safe_chat(llm, system, user, max_tokens=1500)
-    if not answer:
-        answer = (f"好，这是一道{grade_cn}{subject_cn}经典题：\n"
-                  f"【题目】请证明/求解以下问题（{concept}）……\n"
-                  f"（生成失败，请重试）")
-
-    return jsonify({
-        "session_id": f"prob_{learner.id}",
-        "summary": {"avg_score": 0},
-        "worldview_used": "weil",
-        "tone_ratio": 0,
-        "presentations": [
-            {"step_id": 1, "content": answer, "step_type": "practice"}
-        ],
-        "evaluations": [],
-        "diagnosis": {},
-        "plan": {"steps": [{"type": "practice"}]},
-        "reflections": [],
-        "learner": {
-            "id": learner.id,
-            "nickname": learner.nickname,
-            "grade_level": learner.grade_level,
-            "subjects_mastery": learner.subjects_mastery,
-        },
-    })
+    from services.handlers.problem import _handle_problem_request as _hpr
+    return _hpr(learner, concept, subject)
 
 def _handle_keyword_doc(user_text, reply, learner, data):
     """v0.19.5：关键词触发文档生成（v0.42 迁至 services/handlers/keyword_doc.py）。
