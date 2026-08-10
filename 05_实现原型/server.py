@@ -3472,74 +3472,12 @@ def affection_support():
     })
 
 def _handle_problem_request(learner, concept, subject):
-    """v0.19：出题请求处理——结合学段/学科/画像生成经典题目。
+    """v0.19：出题请求处理（v0.41.8 迁至 services/handlers/problem.py）。
 
-    用户说"给我一道经典题目/出题/练习题"时调用，避免被当概念教学。
+    结合学段/学科/画像生成经典题目。
     """
-    from prompts import build_general_chat_user
-    from subagents import _safe_chat
-
-    # 学段中文
-    grade = getattr(learner, "grade_level", "high_school")
-    grade_cn = {"middle_school": "初中", "high_school": "高中/高考",
-                "undergraduate": "大学本科", "graduate_exam": "考研"}.get(grade, grade)
-    # 学科中文
-    from prompts import get_style
-    try:
-        subject_cn = get_style(subject)["label"]
-    except Exception:
-        subject_cn = subject
-    # 画像（薄弱点/目标）
-    desc = getattr(learner, "self_description", "") or ""
-    desc_line = f"学生自述：{desc.strip()}\n" if desc.strip() else ""
-    # v0.36 ⭐ P0-08 ContextBundle 接线：补 BDI/user_model/完整画像段注入
-    # （之前 problem 端点只有 self_description，缺对象意识与掌握度——LLM 出题时不知学生薄弱点）
-    # 复用现有 helper _build_learner_ctx_str（与 _handle_knowledge_query L3564 同源）
-    _learner_ctx = _build_learner_ctx_str(learner)
-
-    system = (
-        "你是一位有多年命题经验、深知考试评分标准的{grade}{subject}老师（Émile Novis）。\n"
-        "学生要求你给出一道经典题目。请：\n"
-        "1. 出 1 道**经典、有代表性**的{subject}题（难度贴合{grade}考试要求）\n"
-        "2. 题目要规范：条件清楚、目标明确、是真题或经典题的变式\n"
-        "3. 给出完整解答（作为可对照的标准答案，分步、严谨、用 LaTeX 公式）\n"
-        "4. 最后点出这道题考查的知识点和易错点\n"
-        "5. 如果学生自述了薄弱点，优先出一道针对薄弱点的题\n"
-        "语言朴素准确，不列'步骤1/2/3'，用自然段落。公式用 $...$ 或 $$...$$。"
-    ).format(grade=grade_cn, subject=subject_cn)
-    if _learner_ctx:
-        system = f"【学生画像与对象意识】\n{_learner_ctx}\n\n" + system
-
-    user = (
-        f"请给我一道{grade_cn}{subject_cn}经典题目。\n"
-        + desc_line
-        + f"（用户原话：{concept}）"
-    )
-    answer = _safe_chat(llm, system, user, max_tokens=1500)
-    if not answer:
-        answer = (f"好，这是一道{grade_cn}{subject_cn}经典题：\n"
-                  f"【题目】请证明/求解以下问题（{concept}）……\n"
-                  f"（生成失败，请重试）")
-
-    return jsonify({
-        "session_id": f"prob_{learner.id}",
-        "summary": {"avg_score": 0},
-        "worldview_used": "weil",
-        "tone_ratio": 0,
-        "presentations": [
-            {"step_id": 1, "content": answer, "step_type": "practice"}
-        ],
-        "evaluations": [],
-        "diagnosis": {},
-        "plan": {"steps": [{"type": "practice"}]},
-        "reflections": [],
-        "learner": {
-            "id": learner.id,
-            "nickname": learner.nickname,
-            "grade_level": learner.grade_level,
-            "subjects_mastery": learner.subjects_mastery,
-        },
-    })
+    from services.handlers.problem import _handle_problem_request as _hpr
+    return _hpr(learner, concept, subject)
 
 def _handle_keyword_doc(user_text, reply, learner, data):
     """v0.19.5：关键词触发文档生成（v0.42 迁至 services/handlers/keyword_doc.py）。
