@@ -15,9 +15,7 @@
 
 **验证**：audit 27/28（P0 全过，1 处 P1 核查）+ 属性测试 3/3 + 服务 200
 
-### v0.41.9 前端 bug 修复 + 审计增强 + 接线巡检（2026-08-10）
-
-**前端 bug（用户实测反馈）**
+### v0.41.9 前端 bug 修复 + 审计增强 + 接线巡检（2026-08-10）**前端 bug（用户实测反馈）**
 - 🐛 停止键无反应：ask-btn click handler 缺 data-generating 分支 + **disabled 按钮不派发 click** → 生成中不 disabled + 加停止分支
 - 🐛 语音双发送：直调模式函数（不 askBtn.click 双 addMsg）+ STT 提交锁 + 长按直调
 - 🐛 语音输入框残留：发送后清空 input.value
@@ -41,6 +39,18 @@
 
 **工具清单（用户要求记录）**
 - pyright（npm，静态分析）/ pytest-cov（覆盖率）/ jsonschema（契约）/ hypothesis（属性）/ mutmut（**Windows 不适用**）——记录到维护手册 §六
+
+**学段学科 bug（用户实测反馈：考研+法语被误判需初中）**
+- 🐛 Bug B：SUBJECT_GRADES 语言类缺 graduate_exam → 考研生学法语被拦 → 补 5 语言考研档
+- 🐛 Bug A：grade_blocked 时清 subject + unknown 阻断 switched → 保留 subject + 加 required_grade
+- 🐛 Bug C：提示"左上角"实际在底部输入栏 → 改文案
+- 🐛 chat_stream 通用话题不查 KB → 注入 _pre_retrieve
+
+**十一次反思（用户核心洞察：测试缺组合矩阵）**
+- 验证：测试样本偏"高中+数物"（high_school 60 次/graduate_exam 仅 1 次/french 仅 2 次），**无 graduate_exam×french 组合** → 用户一提问就暴露
+- 根因：测试是"手工挑样本"不是"参数化全组合"——角落组合必然漏网
+- 提升：tests/test_grade_matrix.py（4 学段×14 学科=56 组合+5 语言回归，61/61 秒级）——修复前必失败
+- 文档：技术 §10.2.32 / 元能力 §6.26 / 维护手册 checklist
 
 ### v0.41.8 问题层级下沉 + 需求表 6 项落地（2026-08-10）
 
