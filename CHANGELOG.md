@@ -15,6 +15,24 @@
 
 **验证**：audit 27/28（P0 全过，1 处 P1 核查）+ 属性测试 3/3 + 服务 200
 
+### v0.41.9 前端 bug 修复 + 审计增强 + 测试质量评估（2026-08-10）
+
+**Bug 修复（用户实测反馈）**
+- 🐛 **停止键无反应**：ask-btn click handler 缺 data-generating 分支，被 if(!q) 拦截静默返回 → 加生成中分支（abort + 恢复按钮）
+- 🐛 **语音双发送复发**：三层根因——①_voiceSendOnce 内 addMsg+askBtn.click 双 addMsg ②voiceBtn 异步启动重复点创建双 MediaRecorder ③长按合成 click 与真实 click 碰撞 → ①直调模式函数 ②STT 提交锁 ③长按直调 _startBackendSTT
+
+**审计增强（Oracle 策略）**
+- ⭐ **pyright P1 归零**：修 _summary_avg（try 内定义跨 try 引用）+ _tb（try 内 import 被 except 引用）——0 可能未绑定 + 0 真未定义
+- ⭐ **audit 维度 14 模块化健康**：services/handlers 5 件套 + server.py <4000 行 + handler 迁出 + 无循环依赖——**发现并修复 routing.py 循环依赖**（from server import → services.handlers 直导）
+- ✅ **audit 32/32 全绿**
+
+**测试质量评估**
+- 📋 mutmut 不适用（Windows 无 WSL，官方 issue #397）→ pytest-cov 覆盖率基线（services/ 55%）
+- 📋 并发写锁审查：reflection_store（_DB_LOCK+WAL）/self_update/user_store 均安全
+
+**文档沉淀**
+- 技术 §10.2.29（成功维护可复制方法）/ 元能力 §6.23（智能体使用方法论）/ 启动指南.md
+
 ### v0.41.8 问题层级下沉 + 需求表 6 项落地（2026-08-10）
 
 **用户判断（确认正确）**："这一次不是架构/连接问题，是更基础的代码层问题"——记录为元能力 §6.22 问题层级下沉元技术 + 技术文档 §10.2.28。
