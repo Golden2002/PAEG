@@ -850,9 +850,48 @@ def teach_stream():
     # 新概念处理 → 误判/误触发检索 → 答非所问。
     _prev_intent = SESSIONS.get(f"current_intent_{learner_id}")
     _prev_concept = SESSIONS.get(f"current_concept_{learner_id}")
+    _prev_subject = SESSIONS.get(f"current_subject_{learner_id}")
     _is_short_in = (len(str(concept).strip()) < 6)
-    if _is_short_in and _prev_intent:
-        # 短输入 + 有上轮意图 → 复用（不重跑 LLM 路由）
+    # v0.41.9 ⭐ 意图延续安全边界（Oracle 副作用评估 + explore 冲突扫描）：
+    # 1. mode 字段优先级最高——前端切了模式，短输入不得延续（否则模式形同虚设）
+    # 2. 情绪/危机词必须先于延续（"好累/救救我"绝不能延续到教学）
+    # 3. 学科变化不延续（上轮数学的"那这个"不能被物理语境延续）
+    # 4. 退出/确认词不延续（"懂了/好的"不无意义续教学）
+    _MODE_FOR_CONT = {"teach": "teach", "chat": "chat", "answer": "answer",
+                      "method": "method", "knowledge": "knowledge",
+                      "affection": "emotion", "ppt": "ppt", "problem": "problem"}
+    _EXIT_ACK_WORDS = ("嗯", "哦", "好的", "懂了", "知道了", "ok", "OK", "👍",
+                       "再见", "结束", "不学了", "不用了", "谢谢", "感谢", "没事")
+    _can_continue = True
+    # 边界1：mode 明确且 ≠ 上轮意图 → 不延续（用户主动切模式）
+    _mode_now = data.get("mode")
+    if _mode_now and _mode_now in _MODE_FOR_CONT and \
+            _prev_intent and _MODE_FOR_CONT[_mode_now] != _prev_intent:
+        _can_continue = False
+    # 边界2：情绪/危机词 → 强制不延续（走 emotion 安全分支）
+    try:
+        from meta_router import is_affection_expression
+        if is_affection_expression(str(concept)):
+            _can_continue = False
+    except Exception as _afe:
+        print(f"[PAEG] 意图延续情绪检查跳过: {_afe}")
+    try:
+        from safety import guard_input
+        _g = guard_input(str(concept))
+        if _g and _g.get("blocked"):
+            _can_continue = False
+    except Exception as _gfe:
+        print(f"[PAEG] 意图延续安全检查跳过: {_gfe}")
+    # 边界3：学科变化 → 不延续
+    if _prev_subject and data.get("subject") and \
+            str(_prev_subject).strip() != str(data.get("subject")).strip():
+        _can_continue = False
+    # 边界4：退出/确认词 → 不延续（让规则链处理为 chat/greeting）
+    if str(concept).strip() in _EXIT_ACK_WORDS or \
+            any(str(concept).startswith(w) for w in ("好的", "懂了", "知道了", "不学了")):
+        _can_continue = False
+    if _is_short_in and _prev_intent and _can_continue:
+        # 短输入 + 有上轮意图 + 通过安全边界 → 复用（不重跑 LLM 路由）
         _llm_intent = _prev_intent
         _llm_conf = 0.95
         print(f"[PAEG][v0.41.9-INTENT-CONT] 短输入复用上轮意图 {_prev_intent!r} (concept={concept!r})",
@@ -902,6 +941,8 @@ def teach_stream():
     if not _is_short_in and _llm_intent is not None:
         SESSIONS[f"current_intent_{learner_id}"] = _llm_intent
         SESSIONS[f"current_concept_{learner_id}"] = concept
+        # v0.41.9 ⭐ 补存 subject——供下一轮"学科变化不延续"边界判断
+        SESSIONS[f"current_subject_{learner_id}"] = data.get("subject", "")
 
     # v0.19.27：界面自指涉拦截（流式版本）——v0.35 ⭐ LLM 优先（LLM 判 interface → 跳过规则）
     try:
