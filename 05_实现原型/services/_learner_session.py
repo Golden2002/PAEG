@@ -104,6 +104,8 @@ def ensure_learner_session(
             cognitive_style=src.get("cognitive_style", "visual"),
             self_description=src.get("self_description", ""),
         )
+        # v0.43 ⭐ 恢复注册问卷答案（持久化画像 / 请求体都可能携带）
+        kwargs["questionnaire_answers"] = src.get("questionnaire_answers") or {}
         if with_target_exam:
             # L738 / PUT 路径用：data 提供时再传。
             kwargs["target_exam"] = src.get("target_exam")

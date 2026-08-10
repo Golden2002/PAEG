@@ -54,6 +54,14 @@ def _handle_method_advice(learner, concept, subject):
         system = f"{LANGUAGE_STYLE}\n\n" + system
     except Exception:
         pass
+    # v0.43 ⭐ 注册问卷固定提示词（用户专属教学指令，所有模式共用）
+    try:
+        from prompts import _build_questionnaire_block
+        _qq = _build_questionnaire_block(learner)
+        if _qq:
+            system = f"{_qq}\n\n" + system
+    except Exception:
+        pass
     # v0.42.3 ⭐ P1 修复：method 注入对话历史 + 用户事实（共享记忆能力）——
     # 此前 handler 完全不看历史，连问两次"怎么学数学"第二次无上文。
     try:

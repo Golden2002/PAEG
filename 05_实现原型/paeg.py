@@ -33,6 +33,10 @@ class LearnerProfile:
     specialty_target: Optional[str] = None
     # v0.10：用户自我描述（"我是怎样的人/目标/擅长与不擅长"），每次对话自动注入
     self_description: str = ""
+    # v0.43 ⭐ 注册问卷答案（用户初始画像，固定注入所有对话模式）
+    # 结构：{学段, 学习风格, 学习动机, 学习节奏, 学习时段, 希望老师性格,
+    #        薄弱学科[], 擅长学科[], 学习目标} —— 每次 LLM 调用都作为固定提示词注入
+    questionnaire_answers: dict = field(default_factory=dict)
     # v0.37 ⭐ 危机状态机（Oracle 方案 C）：opt_out 结构化 + 风险历史 + 现实锚点
     # 兼容旧 _crisis_opt_out(bool)：读取时优先 _crisis_state，缺失则迁移旧值
     _crisis_state: Optional[dict] = field(default=None)

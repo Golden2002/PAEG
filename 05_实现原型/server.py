@@ -1848,7 +1848,38 @@ def profile(learner_id):
         "subjects_mastery": learner.subjects_mastery,
         "world_view_blend": learner.world_view_blend,
         "self_description": learner.self_description,
+        # v0.43 ⭐ 注册问卷答案（前端判断是否已填 / 展示已填内容）
+        "questionnaire_answers": getattr(learner, "questionnaire_answers", None) or {},
     })
+
+@app.route("/api/profile/<learner_id>/questionnaire", methods=["POST", "PUT"])
+def profile_questionnaire(learner_id):
+    """v0.43 ⭐ 保存注册问卷答案（注册后弹出问卷 + 事后可修改）。
+
+    入参：{answers: {field: value}} —— 问卷答案映射到 questionnaire_answers 字典，
+    作为用户专属固定提示词注入所有对话模式 + 进入 Individuality 建模。
+    """
+    if USER_STORE is None:
+        return jsonify({"ok": False, "error": "用户系统不可用"}), 500
+    data = request.get_json(force=True) or {}
+    answers = data.get("answers") or {}
+    if not isinstance(answers, dict):
+        return jsonify({"ok": False, "error": "answers 必须为对象"}), 400
+    # 只接受问卷已知字段，防止任意字段污染
+    _allowed = {"grade_level", "cognitive_style", "motivation", "depth_pref",
+                "learning_rhythm", "time_preference", "personality_pref",
+                "weak_subjects", "strong_subjects", "study_goal", "extra_pref"}
+    _clean = {k: v for k, v in answers.items() if k in _allowed}
+    try:
+        learner = ensure_learner_session(
+            learner_id, {}, SESSIONS, default_nickname="学习者")
+        learner.questionnaire_answers = _clean  # type: ignore[attr-defined]
+        if str(learner_id).startswith('u') and USER_STORE is not None:
+            USER_STORE.save_learner(learner_id, learner)
+        return jsonify({"ok": True, "saved": list(_clean.keys())})
+    except Exception as e:
+        print(f"[PAEG][server.py] profile_questionnaire 异常: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/profile/<learner_id>", methods=["PUT"])
 def profile_update(learner_id):

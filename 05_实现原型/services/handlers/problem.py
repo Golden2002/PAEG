@@ -45,6 +45,14 @@ def _handle_problem_request(learner, concept, subject):
     ).format(grade=grade_cn, subject=subject_cn)
     if _learner_ctx:
         system = f"【学生画像与对象意识】\n{_learner_ctx}\n\n" + system
+    # v0.43 ⭐ 注册问卷固定提示词（用户专属教学指令，所有模式共用）
+    try:
+        from prompts import _build_questionnaire_block
+        _qq = _build_questionnaire_block(learner)
+        if _qq:
+            system = f"{_qq}\n\n" + system
+    except Exception:
+        pass
 
     user = (
         f"请给我一道{grade_cn}{subject_cn}经典题目。\n"

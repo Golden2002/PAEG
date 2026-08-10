@@ -904,6 +904,91 @@ body {
   float: right; border: none; background: none; font-size: 18px;
   cursor: pointer; color: var(--text-dim); line-height: 1;
 }
+
+/* ─── 注册问卷弹窗（v0.42：复用 auth-modal 遮罩/居中风格） ─── */
+.questionnaire-modal {
+  display: none; position: fixed; inset: 0; z-index: 110;
+  background: rgba(15, 23, 42, 0.5); align-items: center; justify-content: center;
+  padding: 24px 0;
+}
+.questionnaire-modal.open { display: flex; }
+.questionnaire-card {
+  background: var(--surface); border-radius: 16px; padding: 26px 28px;
+  width: 640px; max-width: 94vw; max-height: 86vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+.questionnaire-card h2 {
+  font-family: var(--font-display);
+  font-size: 20px; margin-bottom: 4px; color: var(--text);
+  font-weight: 600;
+}
+.questionnaire-sub {
+  font-size: var(--fs-sm); color: var(--text-dim);
+  margin-bottom: 18px;
+}
+.questionnaire-progress {
+  font-size: var(--fs-xs); color: var(--accent);
+  background: var(--accent-soft); padding: 3px 10px;
+  border-radius: 10px; display: inline-block; margin-bottom: 16px;
+}
+.questionnaire-list { display: flex; flex-direction: column; gap: 14px; }
+.q-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px; padding: 12px 14px;
+  background: var(--surface-2);
+  transition: border-color .15s var(--ease-out);
+}
+.q-item:focus-within { border-color: var(--accent); }
+.q-item .q-label {
+  display: block; font-size: 13px; font-weight: 600;
+  color: var(--text); margin-bottom: 8px;
+}
+.q-item .q-num {
+  color: var(--accent); font-weight: 700; margin-right: 4px;
+}
+.q-options { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+.q-options.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.q-option {
+  position: relative; display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border: 1px solid var(--border);
+  border-radius: 999px; font-size: 13px; color: var(--text-dim);
+  background: var(--surface); cursor: pointer; user-select: none;
+  transition: all .15s var(--ease-out);
+}
+.q-option input { position: absolute; opacity: 0; pointer-events: none; }
+.q-option:hover { border-color: var(--accent); color: var(--text); }
+.q-option:has(input:checked) {
+  background: var(--accent-soft); border-color: var(--accent);
+  color: var(--accent); font-weight: 600;
+}
+.q-options.grid .q-option { justify-content: center; }
+.q-actions {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; margin-top: 18px; padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+.q-actions .q-hint { font-size: var(--fs-xs); color: var(--text-dim); flex: 1; }
+.q-btn {
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-dim); padding: 9px 18px; border-radius: 10px;
+  font-size: 13px; cursor: pointer; transition: all .15s;
+}
+.q-btn:hover { border-color: var(--accent); color: var(--accent); }
+.q-btn.primary {
+  border: none; color: #fff; font-weight: 600;
+  background: linear-gradient(135deg, var(--grad-from), var(--accent-2));
+  padding: 10px 22px;
+}
+.q-btn.primary:hover { opacity: .92; }
+.q-btn.primary:disabled { opacity: .6; cursor: not-allowed; }
+.questionnaire-msg { font-size: var(--fs-sm); margin-top: 8px; min-height: 16px; }
+.questionnaire-msg.ok { color: var(--success); }
+.questionnaire-msg.err { color: var(--danger); }
+@media (max-width: 560px) {
+  .questionnaire-card { padding: 20px 18px; }
+  .q-options.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .user-badge {
   font-size: var(--fs-sm); color: var(--accent); font-weight: 600;
   padding: 4px 10px; background: var(--accent-soft); border-radius: 14px;
@@ -1218,6 +1303,138 @@ body {
     <input class="auth-input" id="auth-nickname" type="text" placeholder="昵称（注册时填写，可选）" aria-label="昵称（可选）" style="display:none" />
     <button class="auth-submit" id="auth-submit">登录</button>
     <div class="auth-msg" id="auth-msg"></div>
+  </div>
+</div>
+
+<!-- v0.42：注册问卷（注册成功后弹出，收集 10 维画像写入后端提示词） -->
+<div class="questionnaire-modal" id="questionnaire-modal" role="dialog" aria-modal="true" aria-label="注册问卷">
+  <div class="questionnaire-card">
+    <h2>认识一下你<span style="font-size:13px;font-weight:400;color:var(--text-dim);margin-left:6px">（帮助老师更好地教你）</span></h2>
+    <div class="questionnaire-sub">10 个小问题 · 任意题可跳过 · 写完后老师每次都会按你给的画像来教</div>
+    <div class="questionnaire-progress" id="questionnaire-progress">0 / 10 已作答</div>
+
+    <form class="questionnaire-list" id="questionnaire-form" onsubmit="return false;">
+      <!-- 1. 学段 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">1.</span>你目前的学段</label>
+        <div class="q-options" role="radiogroup" aria-label="学段">
+          <label class="q-option"><input type="radio" name="grade_level" value="初中">初中</label>
+          <label class="q-option"><input type="radio" name="grade_level" value="高中">高中</label>
+          <label class="q-option"><input type="radio" name="grade_level" value="大学本科">大学本科</label>
+          <label class="q-option"><input type="radio" name="grade_level" value="考研">考研</label>
+          <label class="q-option"><input type="radio" name="grade_level" value="通识素养">通识素养</label>
+        </div>
+      </div>
+      <!-- 2. 学习风格 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">2.</span>你更习惯哪种学习方式</label>
+        <div class="q-options" role="radiogroup" aria-label="学习风格">
+          <label class="q-option"><input type="radio" name="cognitive_style" value="视觉型">看图示图表</label>
+          <label class="q-option"><input type="radio" name="cognitive_style" value="听觉型">听讲解音频</label>
+          <label class="q-option"><input type="radio" name="cognitive_style" value="阅读型">阅读文字</label>
+          <label class="q-option"><input type="radio" name="cognitive_style" value="动觉型">动手练习</label>
+          <label class="q-option"><input type="radio" name="cognitive_style" value="混合型">多种混合</label>
+        </div>
+      </div>
+      <!-- 3. 学习动机 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">3.</span>你学习最主要的动力是</label>
+        <div class="q-options" role="radiogroup" aria-label="学习动机">
+          <label class="q-option"><input type="radio" name="motivation" value="真正理解">真正理解</label>
+          <label class="q-option"><input type="radio" name="motivation" value="考高分">考高分</label>
+          <label class="q-option"><input type="radio" name="motivation" value="不落后于人">不落后于人</label>
+          <label class="q-option"><input type="radio" name="motivation" value="出于兴趣">出于兴趣</label>
+          <label class="q-option"><input type="radio" name="motivation" value="将来帮助他人">将来帮助他人</label>
+        </div>
+      </div>
+      <!-- 4. 教学深度 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">4.</span>你希望老师讲多深</label>
+        <div class="q-options" role="radiogroup" aria-label="教学深度">
+          <label class="q-option"><input type="radio" name="depth_pref" value="基础入门">基础入门（听懂会用）</label>
+          <label class="q-option"><input type="radio" name="depth_pref" value="中等深入">中等深入（理解原理）</label>
+          <label class="q-option"><input type="radio" name="depth_pref" value="深入钻研">深入钻研（定理推导）</label>
+        </div>
+      </div>
+      <!-- 5. 学习节奏 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">5.</span>你一次能专注多久</label>
+        <div class="q-options" role="radiogroup" aria-label="学习节奏">
+          <label class="q-option"><input type="radio" name="learning_rhythm" value="短">短（&lt;30 分钟）</label>
+          <label class="q-option"><input type="radio" name="learning_rhythm" value="中">中（30-90 分钟）</label>
+          <label class="q-option"><input type="radio" name="learning_rhythm" value="长">长（90 分钟+）</label>
+        </div>
+      </div>
+      <!-- 6. 学习时段 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">6.</span>你通常什么时段学习</label>
+        <div class="q-options" role="radiogroup" aria-label="学习时段">
+          <label class="q-option"><input type="radio" name="time_preference" value="早晨">早晨</label>
+          <label class="q-option"><input type="radio" name="time_preference" value="下午">下午</label>
+          <label class="q-option"><input type="radio" name="time_preference" value="晚上">晚上</label>
+          <label class="q-option"><input type="radio" name="time_preference" value="深夜">深夜</label>
+          <label class="q-option"><input type="radio" name="time_preference" value="灵活">灵活</label>
+        </div>
+      </div>
+      <!-- 7. 希望老师性格 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">7.</span>你希望老师是什么风格</label>
+        <div class="q-options" role="radiogroup" aria-label="希望老师性格">
+          <label class="q-option"><input type="radio" name="personality_pref" value="温和鼓励">温和鼓励</label>
+          <label class="q-option"><input type="radio" name="personality_pref" value="直接挑战">直接挑战</label>
+          <label class="q-option"><input type="radio" name="personality_pref" value="严肃中立">严肃中立</label>
+          <label class="q-option"><input type="radio" name="personality_pref" value="幽默轻松">幽默轻松</label>
+        </div>
+      </div>
+      <!-- 8. 薄弱科目（多选） -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">8.</span>你目前比较薄弱的科目（可多选）</label>
+        <div class="q-options grid" role="group" aria-label="薄弱科目">
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="数学">数学</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="物理">物理</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="化学">化学</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="语文">语文</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="英语">英语</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="历史">历史</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="政治">政治</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="地理">地理</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="生物">生物</label>
+        </div>
+      </div>
+      <!-- 9. 擅长科目（多选） -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">9.</span>你比较擅长的科目（可多选）</label>
+        <div class="q-options grid" role="group" aria-label="擅长科目">
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="数学">数学</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="物理">物理</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="化学">化学</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="语文">语文</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="英语">英语</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="历史">历史</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="政治">政治</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="地理">地理</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="生物">生物</label>
+        </div>
+      </div>
+      <!-- 10. 学习目标 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">10.</span>你现阶段最想达到的目标</label>
+        <div class="q-options" role="radiogroup" aria-label="学习目标">
+          <label class="q-option"><input type="radio" name="study_goal" value="中考高考">中考高考</label>
+          <label class="q-option"><input type="radio" name="study_goal" value="考研">考研</label>
+          <label class="q-option"><input type="radio" name="study_goal" value="出国留学">出国留学</label>
+          <label class="q-option"><input type="radio" name="study_goal" value="职业发展">职业发展</label>
+          <label class="q-option"><input type="radio" name="study_goal" value="自我提升">自我提升</label>
+        </div>
+      </div>
+    </form>
+
+    <div class="questionnaire-msg" id="questionnaire-msg"></div>
+    <div class="q-actions">
+      <span class="q-hint">填写后老师更懂你 · 也可稍后在左侧"告诉老师你是谁"补充</span>
+      <button class="q-btn" id="questionnaire-skip" type="button">跳过</button>
+      <button class="q-btn primary" id="questionnaire-save" type="button">保存并开始</button>
+    </div>
   </div>
 </div>
 
@@ -3199,7 +3416,15 @@ document.getElementById('auth-submit').addEventListener('click', async () => {
       msgEl.textContent = authMode === 'login' ? '登录成功' : '注册成功';
       msgEl.className = 'auth-msg ok';
       applyLogin(result);
-      setTimeout(() => document.getElementById('auth-modal').classList.remove('open'), 800);
+      // v0.42：仅注册成功才弹问卷；登录成功不弹
+      if (authMode === 'register') {
+        setTimeout(() => {
+          document.getElementById('auth-modal').classList.remove('open');
+          openQuestionnaire(result.user_id);
+        }, 800);
+      } else {
+        setTimeout(() => document.getElementById('auth-modal').classList.remove('open'), 800);
+      }
     } else {
       msgEl.textContent = result.error || '操作失败';
       msgEl.className = 'auth-msg err';
@@ -3207,6 +3432,123 @@ document.getElementById('auth-submit').addEventListener('click', async () => {
   } catch (e) {
     msgEl.textContent = e.message;
     msgEl.className = 'auth-msg err';
+  }
+});
+
+// ─── v0.42：注册问卷（10 道选择题）───
+// 后端白名单字段：grade_level, cognitive_style, motivation, depth_pref, learning_rhythm,
+// time_preference, personality_pref, weak_subjects, strong_subjects, study_goal, extra_pref
+const Q_FIELDS = [
+  'grade_level', 'cognitive_style', 'motivation', 'depth_pref',
+  'learning_rhythm', 'time_preference', 'personality_pref',
+  'weak_subjects', 'strong_subjects', 'study_goal'
+];
+const Q_MULTI = new Set(['weak_subjects', 'strong_subjects']);  // 多选字段
+
+function updateQuestionnaireProgress() {
+  const form = document.getElementById('questionnaire-form');
+  if (!form) return;
+  let answered = 0;
+  Q_FIELDS.forEach(name => {
+    if (Q_MULTI.has(name)) {
+      if (form.querySelectorAll(`input[name="${name}"]:checked`).length > 0) answered++;
+    } else {
+      if (form.querySelector(`input[name="${name}"]:checked`)) answered++;
+    }
+  });
+  document.getElementById('questionnaire-progress').textContent = `${answered} / 10 已作答`;
+}
+
+function collectQuestionnaireAnswers() {
+  const form = document.getElementById('questionnaire-form');
+  const answers = {};
+  Q_FIELDS.forEach(name => {
+    if (Q_MULTI.has(name)) {
+      const vals = Array.from(form.querySelectorAll(`input[name="${name}"]:checked`)).map(i => i.value);
+      if (vals.length) answers[name] = vals;
+    } else {
+      const checked = form.querySelector(`input[name="${name}"]:checked`);
+      if (checked) answers[name] = checked.value;
+    }
+  });
+  return answers;
+}
+
+function openQuestionnaire(learnerId) {
+  const modal = document.getElementById('questionnaire-modal');
+  const msgEl = document.getElementById('questionnaire-msg');
+  if (!modal) return;
+  msgEl.textContent = '';
+  msgEl.className = 'questionnaire-msg';
+  updateQuestionnaireProgress();
+  modal.classList.add('open');
+  modal.dataset.learnerId = learnerId || STATE.learnerId || '';
+}
+
+function closeQuestionnaire() {
+  const modal = document.getElementById('questionnaire-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+async function submitQuestionnaire() {
+  const modal = document.getElementById('questionnaire-modal');
+  const msgEl = document.getElementById('questionnaire-msg');
+  const saveBtn = document.getElementById('questionnaire-save');
+  const skipBtn = document.getElementById('questionnaire-skip');
+  const learnerId = modal.dataset.learnerId || STATE.learnerId;
+  if (!learnerId) {
+    msgEl.textContent = '未识别到用户，无法保存';
+    msgEl.className = 'questionnaire-msg err';
+    return;
+  }
+  const answers = collectQuestionnaireAnswers();
+  if (Object.keys(answers).length === 0) {
+    msgEl.textContent = '请至少回答一题，或直接跳过';
+    msgEl.className = 'questionnaire-msg err';
+    return;
+  }
+  saveBtn.disabled = true; skipBtn.disabled = true;
+  msgEl.textContent = '保存中…';
+  msgEl.className = 'questionnaire-msg';
+  try {
+    const result = await api(`/api/profile/${encodeURIComponent(learnerId)}/questionnaire`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers })
+    });
+    if (result && result.ok) {
+      msgEl.textContent = '已保存 · 老师会更懂你';
+      msgEl.className = 'questionnaire-msg ok';
+      // 关闭弹窗 + 在聊天区友好提示
+      setTimeout(() => {
+        closeQuestionnaire();
+        try { addMsg('assistant', '谢谢！我已经更了解你了。', 'warm'); } catch (e) { /* addMsg 可选 */ }
+      }, 600);
+    } else {
+      msgEl.textContent = (result && result.error) || '保存失败，请稍后重试';
+      msgEl.className = 'questionnaire-msg err';
+      saveBtn.disabled = false; skipBtn.disabled = false;
+    }
+  } catch (e) {
+    msgEl.textContent = e && e.message ? e.message : '保存失败，请稍后重试';
+    msgEl.className = 'questionnaire-msg err';
+    saveBtn.disabled = false; skipBtn.disabled = false;
+  }
+}
+
+// 事件绑定：保存 / 跳过 / 进度更新 / Esc 关闭
+document.getElementById('questionnaire-save').addEventListener('click', submitQuestionnaire);
+document.getElementById('questionnaire-skip').addEventListener('click', () => {
+  closeQuestionnaire();
+});
+document.getElementById('questionnaire-form').addEventListener('change', updateQuestionnaireProgress);
+document.getElementById('questionnaire-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('questionnaire-modal')) closeQuestionnaire();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.keyCode === 27) {
+    const modal = document.getElementById('questionnaire-modal');
+    if (modal && modal.classList.contains('open')) closeQuestionnaire();
   }
 });
 

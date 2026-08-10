@@ -851,6 +851,111 @@ def get_style(subject: str) -> dict:
     return SUBJECT_STYLES.get(normalize_subject(subject), SUBJECT_STYLES["default"])
 
 
+# v0.43 ⭐ 问卷答案 → 固定提示词段（用户专属，每次 LLM 调用都注入）
+_QUESTIONNAIRE_LABELS = {
+    "grade_level": "学段",
+    "cognitive_style": "学习风格",
+    "motivation": "学习动机",
+    "depth_pref": "期望教学深度",
+    "learning_rhythm": "学习节奏",
+    "time_preference": "学习时段",
+    "personality_pref": "希望老师性格",
+    "weak_subjects": "薄弱科目",
+    "strong_subjects": "擅长科目",
+    "study_goal": "学习目标",
+    "extra_pref": "其他偏好",
+}
+
+
+# v0.43 ⭐ 问卷答案 → LLM 指令（每个字段都转化为"指导如何对待该用户"的指令句）
+# 问卷选项值 → 行为指令，全部打包进 system prompt，指导 LLM 的回复方式
+_QUESTIONNAIRE_CMDS = {
+    # 学习风格：指导讲解方式
+    "cognitive_style": {
+        "visual": "这位学生偏好**视觉学习**——讲解时多用图示、图表、可视化比喻。",
+        "auditory": "这位学生偏好**听觉学习**——讲解时多用口头讲解、声音类比、朗读。",
+        "reading": "这位学生偏好**阅读学习**——讲解时多给文字、笔记、书面材料。",
+        "kinesthetic": "这位学生偏好**动觉学习**——讲解时多用动手练习、例题、实际操作。",
+        "mixed": "这位学生偏好**混合学习**——讲解时可灵活切换多种方式。",
+    },
+    # 学习动机：指导激励方式
+    "motivation": {
+        "understand": "这位学生的学习动机是**真正理解**——多讲原理与为什么，少机械灌输。",
+        "score": "这位学生的学习动机是**取得好成绩**——讲解时要点明考点与得分点。",
+        "avoid_shame": "这位学生希望**不落后于人**——讲解时要多鼓励、肯定进步，避免让其感到挫败。",
+        "interest": "这位学生出于**兴趣**学习——讲解时多联系趣味性、背景故事与前沿。",
+        "help": "这位学生希望**将来帮助他人**——讲解时可联系知识的应用与价值。",
+    },
+    # 学习节奏：指导步长
+    "learning_rhythm": {
+        "short": "这位学生偏好**短时学习**（<30分钟）——讲解要节奏紧凑、一次一个要点。",
+        "medium": "这位学生偏好**中等时长**（30-90分钟）——可按常规节奏推进。",
+        "long": "这位学生偏好**长时间学习**（90分钟+）——可以深入展开，不必担心信息量大。",
+    },
+    # 学习时段：指导安排
+    "time_preference": {
+        "morning": "这位学生偏好**早晨**学习。",
+        "afternoon": "这位学生偏好**下午**学习。",
+        "evening": "这位学生偏好**晚上**学习。",
+        "night": "这位学生偏好**深夜**学习。",
+        "flexible": "这位学生学习时段**灵活**。",
+    },
+    # 希望老师性格：指导语气
+    "personality_pref": {
+        "gentle": "这位学生希望老师**温和鼓励**——语气温柔、多肯定、少施压。",
+        "challenging": "这位学生希望老师**直接挑战**——讲解可以直接犀利、高标准要求。",
+        "neutral": "这位学生希望老师**严肃中立**——语气沉稳专业、就事论事。",
+        "humorous": "这位学生希望老师**幽默轻松**——讲解可以活泼幽默、善用轻松例子。",
+    },
+    # 学习深度：指导讲解深度（单独特殊处理，见 _DEPTH_PREF_CMDS）
+    "depth_pref": {
+        "basic": "讲解保持**基础入门**深度：听懂概念、会用即可，不深入公式推导与理论细节。",
+        "intermediate": "讲解达到**中等深入**：理解概念背后的原理，能解释『为什么』，适度涉及公式与推导。",
+        "advanced": "讲解**深入钻研**：包含定理推导、数学证明与综合应用，挑战学生的深度理解。",
+    },
+}
+
+
+def _build_questionnaire_block(learner) -> str:
+    """构造"用户注册问卷答案"固定提示词段（v0.43 ⭐）。
+
+    用途：用户注册时填写的初始问卷作为该用户的**固定画像指令包**，每次 LLM 调用
+    都注入——每个答案都转化为"指导如何对待该用户"的指令句，让 agent 始终以用户
+    自述的目标/偏好/薄弱点为锚点，而非仅依赖动态推断。
+
+    设计：纯函数，零副作用；无问卷数据/异常 → 返回空串（不产生空标题段）。
+    """
+    if learner is None:
+        return ""
+    try:
+        answers = getattr(learner, "questionnaire_answers", None) or {}
+        if not answers:
+            return ""
+        lines = [
+            "## 用户专属教学指令（来自注册问卷，v0.43 ⭐ 每次回答都必须遵守）",
+            "以下是这位用户在注册时填写的初始问卷——这些是**对 TA 的教学指令**，"
+            "请始终按此调整讲解方式、深度、语气与节奏：",
+            "",
+        ]
+        for k, v in answers.items():
+            if v in (None, "", [], {}):
+                continue
+            label = _QUESTIONNAIRE_LABELS.get(k, k)
+            # ⭐ 每个字段优先用指令化映射（若有），否则回退到中性列举
+            _cmds = _QUESTIONNAIRE_CMDS.get(k, {})
+            if isinstance(v, str) and v in _cmds:
+                lines.append(f"- {_cmds[v]}")
+            elif isinstance(v, list):
+                lines.append(f"- **{label}**：{'、'.join(str(x) for x in v)}")
+            else:
+                lines.append(f"- **{label}**：{v}")
+        if len(lines) <= 3:  # 无有效内容
+            return ""
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
 def build_presenter_system(subject: str, tone: str,
                            learner=None, kb_node: Optional[dict] = None,
                            strategy_line: str = "",
@@ -974,6 +1079,15 @@ def build_presenter_system(subject: str, tone: str,
         "本学科（" + style['label'] + "）的 subfield_guide、concept_analysis 等专属扩展是对规范的**补充**，不能凌驾于规范之上。"
     )
 
+    # v0.43 ⭐ 注册问卷固定提示词（用户专属画像，永远生效）
+    questionnaire_line = ""
+    try:
+        _q = _build_questionnaire_block(learner)
+        if _q:
+            questionnaire_line = "\n\n" + _q
+    except Exception:
+        questionnaire_line = ""
+
     return f"""{WEIL_CORE}
 ## 当前场景：学科教学（用户已选择「学科教学」模式，这是你的首要任务约束）
 用户明确选择了**学科教学模式**——他要的是系统性的教学：诊断基础、分步讲解、引导思考、
@@ -998,6 +1112,7 @@ def build_presenter_system(subject: str, tone: str,
 
 {learner_line}
 {grade_line}
+{questionnaire_line}
 {user_desc_line}
 {user_model_line}
 {tone_line}
@@ -1340,6 +1455,14 @@ def build_general_chat_system(learner=None, mode: str = None) -> str:
         pass
     _um_line = um_line
     _mast_line = mastery_line
+    # v0.43 ⭐ 注册问卷固定提示词（用户专属画像，永远生效）
+    questionnaire_line = ""
+    try:
+        _q = _build_questionnaire_block(learner)
+        if _q:
+            questionnaire_line = "\n" + _q
+    except Exception:
+        questionnaire_line = ""
     return f"""{WEIL_CORE}
 
 {scene_line}
@@ -1354,6 +1477,7 @@ def build_general_chat_system(learner=None, mode: str = None) -> str:
 {desc_line}
 {um_line}
 {mastery_line}
+{questionnaire_line}
 
 ## 回应方式（v0.17 重要更新）
 

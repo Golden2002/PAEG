@@ -20,6 +20,7 @@ import os  # v0.42 ⭐ P0 修复：_pre_retrieve 的 Library 分支使用 os.pat
 from typing import Optional
 
 from prompts import build_presenter_system, build_presenter_user, normalize_subject
+from prompts import _build_questionnaire_block  # v0.43 ⭐ 注册问卷固定提示词（answer/affection 共用）
 
 
 # ---------------------------------------------------------------------------
@@ -1327,9 +1328,13 @@ class AnswerSolver:
         if learner_ctx:
             desc_line = f"学生自述：{desc}\n【对象意识】{learner_ctx}\n" if desc else f"【对象意识】{learner_ctx}\n"
 
+        # v0.43 ⭐ 注册问卷固定提示词（answer 模式接入，用户专属教学指令）
+        _qq_block = _build_questionnaire_block(learner)
+        _qq_prefix = (f"{_qq_block}\n\n" if _qq_block else "")
+
         # 找答案模式的 system：明确"直接给完整答案"，不受教学范式约束
         system = (
-            f"你是 Émile Novis，一位功底扎实的{grade_cn}学科老师。学生要的是**一份可以直接使用的完整答案**。\n\n"
+            f"{_qq_prefix}你是 Émile Novis，一位功底扎实的{grade_cn}学科老师。学生要的是**一份可以直接使用的完整答案**。\n\n"
             "## 模式：直接给出答案（不是教学引导）\n"
             "学生明确要答案，所以：\n"
             "1. **直接输出完整答案**：论述题给完整范文、计算题给完整规范解法、证明题给标准证明。\n"
@@ -1451,8 +1456,12 @@ class AffectionSupportor:
                 pass
                 pass
 
+        # v0.43 ⭐ 注册问卷固定提示词（affection 模式接入，用户专属教学指令）
+        _qq_block = _build_questionnaire_block(learner)
+        _qq_prefix = (f"{_qq_block}\n\n" if _qq_block else "")
+
         system = (
-            "你是 Émile Novis，一位以注意力陪伴学生的老师。学生带着情绪/心理/人生困惑来找你。\n\n"
+            f"{_qq_prefix}你是 Émile Novis，一位以注意力陪伴学生的老师。学生带着情绪/心理/人生困惑来找你。\n\n"
             f"学生情况：{('学段：' + grade_cn) if grade_cn else ''}{desc_line or ''}\n"
             f"{('【对象意识】' + learner_ctx) if learner_ctx else ''}\n\n"
             "## 你的底层世界观（v0.22.2 ⭐ 从薇依原著提炼，一切情绪支持策略之基）\n"
@@ -2191,6 +2200,22 @@ class Individuality:
                             )
                     except Exception:
                         _profile_ctx = ""
+                    # v0.43 ⭐ 问卷是建模的权威信息来源：把注册问卷答案喂给 LLM 建模，
+                    # 让它基于用户自述的薄弱/擅长/动机/目标做提取，而非仅靠对话推断。
+                    try:
+                        if learner is not None:
+                            _qa = getattr(learner, "questionnaire_answers", None) or {}
+                            if _qa:
+                                _qa_lines = [f"- {k}：{v}" for k, v in _qa.items()
+                                             if v not in (None, "", [], {})]
+                                if _qa_lines:
+                                    _profile_ctx += (
+                                        "\n【用户注册问卷】（用户自述的权威初始画像，"
+                                        "建模时必须优先采用，勿与对话推断冲突）：\n"
+                                        + "\n".join(_qa_lines) + "\n"
+                                    )
+                    except Exception:
+                        pass
                     _sys = (
                         "你是个体化建模助手。从学生的对话历史、自我陈述与【学生画像】中，"
                         "提取 6 类结构化信息："

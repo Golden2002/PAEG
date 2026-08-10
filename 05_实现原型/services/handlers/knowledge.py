@@ -99,6 +99,14 @@ def _handle_knowledge_query(learner, subject):
         system = f"{LANGUAGE_STYLE}\n\n" + system
     except Exception:
         pass
+    # v0.43 ⭐ 注册问卷固定提示词（用户专属教学指令，所有模式共用）
+    try:
+        from prompts import _build_questionnaire_block
+        _qq = _build_questionnaire_block(learner)
+        if _qq:
+            system = f"{_qq}\n\n" + system
+    except Exception:
+        pass
     # v0.42.3 ⭐ P1 修复：knowledge 注入对话历史 + 用户事实（共享记忆能力）
     try:
         from infra.sessions import SESSIONS
