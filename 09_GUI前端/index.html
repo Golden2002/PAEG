@@ -768,6 +768,8 @@ body {
 .question-input {
   flex: 1; border: none; outline: none; font-size: var(--fs-base); color: var(--text);
   background: transparent; padding: 8px 4px;
+  /* v0.41.9 ⭐ textarea 换行支持：禁止手动拉伸、超高滚动、行高约束 */
+  resize: none; overflow-y: auto; line-height: 1.5; min-height: 36px; max-height: 120px;
 }
 .question-input::placeholder { color: var(--text-dim); opacity: .85; }   /* v0.31 P0-4：原 #9ca3af 过浅无法辨识，绑定 token */
 .ask-btn {
@@ -1333,7 +1335,9 @@ body {
       <select class="subject-select" id="subfield-select" disabled title="三级学科：按学段与一级学科过滤" aria-label="二级学科">
         <option value="">不限</option>
       </select>
-      <input class="question-input" id="question-input" type="text" placeholder="输入你想学习的内容…" autocomplete="off" aria-label="输入你想学习的内容" />
+      <!-- v0.41.9 ⭐ 修复：input→textarea（input 无法换行，长文字只能横向滚动；
+           现支持自动换行 + 自适应高度，用户输入长问题也能看到全部内容） -->
+      <textarea class="question-input" id="question-input" rows="1" placeholder="输入你想学习的内容…" autocomplete="off" aria-label="输入你想学习的内容"></textarea>
       <!-- v0.40 ⭐ 录音波形指示器（豆包式：录音时显示音波动画） -->
       <div class="voice-waves" id="voice-waves" role="status" aria-label="正在录音"><span></span><span></span><span></span><span></span><span></span></div>
       <!-- v0.19 P2-10：图片/文件上传 -->
@@ -1437,6 +1441,35 @@ const TONE_LABELS = {
 const chatWin = document.getElementById('chat-window');
 const questionInput = document.getElementById('question-input');
 const askBtn = document.getElementById('ask-btn');
+
+// v0.41.9 ⭐ 输入框自适应高度：长文字自动换行 + 高度随内容增长（最多 ~4 行）
+// 用户输入长问题时能看到全部内容，不用横向滚动。
+(function autoResizeQuestionInput() {
+  const qi = document.getElementById('question-input');
+  if (!qi) return;
+  const MAX_H = 120;  // 与 CSS max-height 一致（约 4 行）
+  const resize = () => {
+    qi.style.height = 'auto';               // 先重置，才能量出实际高度
+    const h = Math.min(qi.scrollHeight, MAX_H);
+    qi.style.height = h + 'px';
+  };
+  // 全局暴露：任何清空输入框的地方（发送/上传/语音）都可调用重置高度
+  window._resetInputHeight = () => {
+    qi.style.height = '36px';               // 重置到单行高度
+  };
+  qi.addEventListener('input', resize);
+  qi.addEventListener('keydown', (e) => {
+    // Enter 发送（Shift+Enter 换行）——textarea 默认 Enter 换行，需拦截
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const btn = document.getElementById('ask-btn');
+      if (btn) btn.click();
+    }
+  });
+  // 发送后清空并重置高度
+  const askBtnEl = document.getElementById('ask-btn');
+  if (askBtnEl) askBtnEl.addEventListener('click', () => setTimeout(() => { qi.value = ''; window._resetInputHeight(); }, 100));
+})();
 
 // ─── v0.25 学段-学科联动 + v0.27 三级级联（学段→一级学科→二级学科）───
 const SUBJECT_MIN_GRADE = {
@@ -3409,6 +3442,8 @@ askBtn.addEventListener('click', () => {
     // v0.41.9 ⭐ 修复：发送后清空输入框（此前 input.value = norm 残留 →
     // 用户看到"已发送一条 + 输入框还留同一条"）
     input.value = '';
+    // v0.41.9 ⭐ textarea 清空后重置高度（否则长文本高度残留）
+    try { if (window._resetInputHeight) window._resetInputHeight(); else input.style.height = '36px'; } catch (e) {}
     return true;
   }
   function _startBackendSTT() {
@@ -3660,9 +3695,8 @@ async function playMsgTTS(btn) {
   }
 }
 
-questionInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') askBtn.click();
-});
+// v0.41.9 ⭐ 移除：原 Enter 发送监听已被 autoResizeQuestionInput 的 keydown
+// 取代（textarea 需拦截 Enter 发送 + Shift+Enter 换行；旧监听会双重发送）
 
 refreshSubjectOptions();
 loadSubjectTree();  // v0.27：异步加载学科树，命中后重建下拉（不影响用户已选项）
