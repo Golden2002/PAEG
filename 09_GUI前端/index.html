@@ -1290,7 +1290,7 @@ body {
   <!-- 右栏：对话 -->
   <section class="chat-area">
     <div class="chat-header">
-      <span class="title">与 PAEG 对话</span>
+      <span class="title">与 PAEG 对话 <span class="mode-tag" id="current-mode-tag" style="margin-left:8px;margin-bottom:0;vertical-align:middle;">当前：学科教学</span></span>
       <span class="meta">基于 DeepSeek 大模型 · 本地中转 · 数据不落第三方</span>
     </div>
 
@@ -1462,13 +1462,20 @@ const askBtn = document.getElementById('ask-btn');
     // Enter 发送（Shift+Enter 换行）——textarea 默认 Enter 换行，需拦截
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      // v0.x ⭐ 修复：生成中按 Enter 不再静默吞掉——明确提示先停止再发
       const btn = document.getElementById('ask-btn');
+      if (btn && btn.dataset && btn.dataset.generating === '1') {
+        addMsg('paeg', '<small>正在生成上一条回复，请先点击「■ 停止」再发送新内容。</small>');
+        return;
+      }
       if (btn) btn.click();
     }
   });
-  // 发送后清空并重置高度
-  const askBtnEl = document.getElementById('ask-btn');
-  if (askBtnEl) askBtnEl.addEventListener('click', () => setTimeout(() => { qi.value = ''; window._resetInputHeight(); }, 100));
+  // v0.42 ⭐ P0 修复：删除此处独立清空监听器——子代理 v0.42 #5 修复误在此加了
+  // askBtn click 清空监听器，但该监听器注册早于 L3219 主发送 handler，触发顺序
+  // 是先清空再读取 → 主 handler 读到空值 if(!q) return → 发送被吞（E2E 实测抓到）。
+  // 主 handler（L3219）已含同步清空逻辑（addMsg 后 questionInput.value=''），
+  // 无需此处再清。此块整体移除，恢复发送功能。
 })();
 
 // ─── v0.25 学段-学科联动 + v0.27 三级级联（学段→一级学科→二级学科）───
@@ -2368,6 +2375,14 @@ async function teach(question, subject, subtopic) {
       delete ab.dataset.generating;
     } catch(e){}
   };
+  // v0.x ⭐ 修复：统一所有模式 finally 收尾——以前只有 teach/generalChat 调 _hideStopBtn，
+  // answer/method/knowledge/affection 4 个模式中途异常时按钮卡在"■ 停止"红样式。
+  window._finalizeGeneration = () => {
+    try { askBtn.disabled = false; } catch (e) {}
+    try { window._hideStopBtn && window._hideStopBtn(); } catch (e) {}
+    window._genAbort = null;
+    try { loadConversations(); } catch (e) {}
+  };
   window._showStopBtn();
   try {
     const resp = await fetch(API_BASE + '/api/teach/stream', {
@@ -2544,10 +2559,8 @@ async function teach(question, subject, subtopic) {
       addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
     }
   } finally {
-    askBtn.disabled = false;
-    try { window._hideStopBtn && window._hideStopBtn(); } catch(e2){}
-    window._genAbort = null;
-    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+    // v0.x ⭐ 统一收尾（替代原 4 行手写）
+    window._finalizeGeneration();
   }
 }
 
@@ -2731,14 +2744,8 @@ async function generalChat(text) {
       addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
     }
   } finally {
-    askBtn.disabled = false;
-    try {
-      const ab = document.getElementById('ask-btn');
-      ab.textContent = '发送';
-      delete ab.dataset.generating;
-    } catch(e2){}
-    window._genAbort = null;
-    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+    // v0.x ⭐ 统一收尾（替代原 6 行手写）
+    window._finalizeGeneration();
   }
 }
 
@@ -2772,8 +2779,8 @@ async function answerChat(question, subject) {
     removeThinking(thinking);
     addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
   } finally {
-    askBtn.disabled = false;
-    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+    // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
+    window._finalizeGeneration();
   }
 }
 
@@ -2810,8 +2817,8 @@ async function methodChat(question, subject) {
     removeThinking(thinking);
     addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
   } finally {
-    askBtn.disabled = false;
-    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+    // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
+    window._finalizeGeneration();
   }
 }
 
@@ -2846,8 +2853,8 @@ async function knowledgeChat(question) {
     removeThinking(thinking);
     addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
   } finally {
-    askBtn.disabled = false;
-    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+    // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
+    window._finalizeGeneration();
   }
 }
 
@@ -2883,8 +2890,8 @@ async function affectionChat(text) {
     removeThinking(thinking);
     addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
   } finally {
-    askBtn.disabled = false;
-    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+    // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
+    window._finalizeGeneration();
   }
 }
 
@@ -3713,12 +3720,33 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     document.querySelectorAll('.mode-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
     btn.classList.add('active');
     btn.setAttribute('aria-selected', 'true');
+    // v0.x ⭐ 修复：切走前先保存当前学段/学科/二级学科到全局 stash
+    // （此前用 btn.dataset 写在被切走的按钮上，切回 teach 时取不到——改存到 window）
+    const _gradeEl = document.getElementById('grade-select');
+    const _subjectEl = document.getElementById('subject-select');
+    const _subfieldEl = document.getElementById('subfield-select');
+    if (!window._paegModeStash) window._paegModeStash = { grade: '', subject: '', subfield: '' };
+    if (_gradeEl && _gradeEl.value) window._paegModeStash.grade = _gradeEl.value;
+    if (_subjectEl && _subjectEl.value) window._paegModeStash.subject = _subjectEl.value;
+    if (_subfieldEl && _subfieldEl.value) window._paegModeStash.subfield = _subfieldEl.value;
     currentMode = btn.dataset.mode;
+    // v0.x ⭐ 切回 teach 时从 stash 恢复（学段/学科/二级学科联动会自然触发 subfield 重填）
+    const isTeach = currentMode === 'teach';
+    if (isTeach) {
+      if (_gradeEl && window._paegModeStash.grade) _gradeEl.value = window._paegModeStash.grade;
+      if (_subjectEl && window._paegModeStash.subject) _subjectEl.value = window._paegModeStash.subject;
+      // 切回 teach 后派发 change 事件，触发既有 onGradeChange / onSubjectChange 重建 subfield
+      try { _gradeEl.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+      try { _subjectEl.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+      if (_subfieldEl && window._paegModeStash.subfield) {
+        // 等 subfield 重建后再设（默认异步一帧）
+        setTimeout(() => { try { _subfieldEl.value = window._paegModeStash.subfield; } catch (e) {} }, 0);
+      }
+    }
     // v0.19.7：教学模式/找答案模式显示学科+学段选择；闲聊模式全部隐藏
     // v0.19.14：新增 answer（找答案）模式
     // v0.19.25：新增 method（学习方法）/ knowledge（知识库）模式
     // v0.19.29：新增 affection（倾诉）模式
-    const isTeach = currentMode === 'teach';
     const isAnswer = currentMode === 'answer';
     const isMethod = currentMode === 'method';
     const isKnowledge = currentMode === 'knowledge';
@@ -3733,6 +3761,15 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
       : (isAnswer ? '输入题目，直接给你完整答案（论述/计算/证明）…'
          : (isMethod ? '问这门课该怎么学、怎么复习、怎么规划…'
             : (isAffection ? '难过、焦虑、迷茫……想说什么都可以' : '输入任意内容，查看我的知识库…')));
+    // v0.x ⭐ 修复：聊天头部动态模式 tag——切换时更新（用户能直观看到当前模式）
+    const _modeTag = document.getElementById('current-mode-tag');
+    if (_modeTag) {
+      const _labels = {
+        teach: '学科教学', chat: '闲聊', answer: '找答案',
+        method: '学习方法', knowledge: '知识库', affection: '倾诉',
+      };
+      _modeTag.textContent = '当前：' + (_labels[currentMode] || currentMode);
+    }
     questionInput.focus();
   });
 });

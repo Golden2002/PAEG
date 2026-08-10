@@ -77,7 +77,12 @@ class PAEG:
         # 7. 情绪支持（危机信号时走这条而非教学）
         self.affection_supportor = AffectionSupportor()
         # 8. 自我更新（基于反馈生成结构化建议）
-        self.self_update_agent = SelfUpdateAgent()
+        # v0.42 ⭐ P1 修复：改为懒初始化——此前这里直接构造 SelfUpdateAgent()，
+        # 但全项目只有 /api/self-update/from-feedback 端点调用 .run()，教学/闲聊路径
+        # 从不触发（僵尸实例，误导读者以为自我更新在教学时被驱动）。现改为 None +
+        # _get_self_update_agent() 懒创建，语义清晰且节省构造开销。
+        self.self_update_agent = None
+        self._self_update_agent_loaded = False
         # 9. 个体化（聚合 16 维画像 + 控制 LLM 教学）
         self.individuality = Individuality()
         self.self_updater = SelfUpdater(knowledge_base) if enable_self_update else None
@@ -101,6 +106,22 @@ class PAEG:
     def _log(self, msg: str):
         if self.verbose:
             print(msg)
+
+    def _get_self_update_agent(self):
+        """v0.42 ⭐ P1 修复：懒创建 SelfUpdateAgent（替代僵尸实例）。
+
+        首次调用时构造，幂等（_self_update_agent_loaded 守卫）。
+        由 /api/self-update/from-feedback 端点驱动（server.py）。
+        """
+        if not self._self_update_agent_loaded:
+            try:
+                from subagents import SelfUpdateAgent
+                self.self_update_agent = SelfUpdateAgent()
+            except Exception as _e:
+                print(f"[PAEG][paeg.py] SelfUpdateAgent 懒创建失败: {_e}")
+                self.self_update_agent = None
+            self._self_update_agent_loaded = True
+        return self.self_update_agent
 
     def teach(self, learner: LearnerProfile, question: str, subject: str,
               subtopic: str = "") -> dict:
@@ -552,6 +573,17 @@ class PAEG:
         except Exception as _e:
             print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
             pass
+            pass
+
+        # v0.42 ⭐ P0 修复：教学路径持久化个体化画像——此前 /api/teach（sync）只跑
+        # Individuality.run()（写内存 _individuality_trait），从未调 persist()，
+        # 注册用户的 profile.json 不会写入本轮 LLM 建模结果，前端 /api/profile 看不到。
+        # 对齐 /api/chat 行为（u<digits> 才落盘，匿名自动跳过）。
+        try:
+            if getattr(self, "individuality", None) is not None:
+                self.individuality.persist(learner, getattr(learner, "id", "") or "")
+        except Exception as _pe:
+            print(f"[PAEG][paeg.py] teach 个体化持久化异常忽略: {_pe}")
             pass
 
         return {

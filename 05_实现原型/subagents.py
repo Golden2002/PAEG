@@ -15,6 +15,8 @@ v0.5：接入真实 LLM（ModelAPI.chat）：
 
 from __future__ import annotations  # 延迟求值注解，避免与 paeg.py 的循环导入
 
+import os  # v0.42 ⭐ P0 修复：_pre_retrieve 的 Library 分支使用 os.path，此前顶层缺 import 导致每次调用抛 NameError，三线检索只剩 KB 一线
+
 from typing import Optional
 
 from prompts import build_presenter_system, build_presenter_user, normalize_subject
@@ -2581,8 +2583,13 @@ class Individuality:
         _depth = ctl.get("depth")
         if _depth:
             system = system + f"\n- 讲解深度：{_depth}"
+        # v0.42 ⭐ P1 修复：补 rhythm 注入——_derive_rhythm 定义了节奏字段但
+        # inject_control 从未拼出（孤儿字段），因材施教的"节奏"维度实际未生效。
+        _rhythm = ctl.get("rhythm")
+        if _rhythm:
+            system = system + f"\n- 学习节奏：{_rhythm}"
         if ctl.get("emotion_sensitive") == "是":
-            system = system + "\n- 情绪敏感：学生当前情绪较脆弱，教学时更温和、多确认、避免施压。"
+            system = system + "\n- 情绪敏感：学生当前情绪波动较大，教学时更温和、先确认、不施加压力。"
         return system
 
     @staticmethod

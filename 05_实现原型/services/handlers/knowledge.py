@@ -14,7 +14,9 @@ import os
 
 def _handle_knowledge_query(learner, subject):
     """v0.19.15：知识库查询——汇总 Library 已收录的知识 + 提示上传。"""
-    proj_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
+    # v0.42 ⭐ P0 修复：__file__ 在 05_实现原型/services/handlers/ 下，两级 '..' 只到
+    # 05_实现原型/，得到的 Library 是空目录（领域数恒 0）；真实 Library 在项目根，需三级。
+    proj_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..')
     lib_root = os.path.join(proj_root, 'Library')
 
     # 收集 Library 各领域的文件

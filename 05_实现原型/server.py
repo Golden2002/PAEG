@@ -127,6 +127,11 @@ def _norm_trait_scalar(value, mapping):
         return ""
     if v in mapping:
         return mapping[v]
+    # v0.42.1 ⭐ P1 修复：LLM 可能输出组合值（如 "neutral_curiosity"）——
+    # 精确映射失败时做子串匹配（含 "neutral" → "平静"），杜绝英文枚举残留进 meta-log。
+    for k, cn in mapping.items():
+        if k in v:
+            return cn
     return v[:16] + ("…" if len(v) > 16 else "")
 
 def _inject_skill_catalog(system: str) -> str:
@@ -723,6 +728,11 @@ def teach():
                 EVOLVER.distill_knowledge(result.get("session"))
             except Exception as _e:
                 print(f"[Server] 知识蒸馏失败: {_e}")
+        # v0.42 ⭐ P1 修复：同步教学也标记调度器活跃（此前仅 chat_stream 标记）
+        try:
+            PERIODIC_UPDATER.mark_activity()
+        except Exception as _mae:
+            print(f"[PAEG] teach mark_activity 失败: {_mae}")
         return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1316,21 +1326,27 @@ def teach_stream():
                     # 短输入（如"我猜是en"）会检索出"en 嗯 同音"等无关内容污染回答。
                     # 与 chat_stream（L3069 should_search 前置）对齐。
                     from web_search_tool import should_search, web_search
-                    _is_short = (len(str(concept).strip()) < 6) or \
-                                not any('\u4e00' <= c <= '\u9fff' for c in str(concept))
-                    if _is_short or not should_search(str(concept)):
+                    # v0.42 ⭐ P1 修复：短输入短路误伤中文短概念——
+                    # 此前 len<6 对中文按字符数判定，"熵""导数""光合作用"等 2-4 字标准概念
+                    # 全被短路 → KB miss 时纯靠 LLM 训练知识裸答。
+                    # 修正：仅"纯英文/无中文且长度<6"才短路（防"我猜是en"这类污染），
+                    # 中文概念词（含 ≥1 个汉字）一律允许走 should_search 判定。
+                    _text = str(concept).strip()
+                    _has_cjk = any('\u4e00' <= c <= '\u9fff' for c in _text)
+                    _is_short = (len(_text) < 6) and (not _has_cjk)
+                    if _is_short or not should_search(_text):
                         _web_raw = None  # 短输入/非检索意图 → 不联网，不污染
                     else:
                         _web_raw = web_search(f"{subject} {concept}", max_results=3)
-                if _web_raw and "搜索未返回" not in str(_web_raw):
-                    _teach_badge = "网络检索"
-                    _teach_web_ctx = str(_web_raw)[:600]
-                    try:
-                        learner._teach_web_ctx = _teach_web_ctx  # type: ignore[attr-defined]  # 供 Presenter 消费
-                    except Exception as _e:
-                        print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-                        pass
-                        pass
+                    if _web_raw and "搜索未返回" not in str(_web_raw):
+                        _teach_badge = "网络检索"
+                        _teach_web_ctx = str(_web_raw)[:600]
+                        try:
+                            learner._teach_web_ctx = _teach_web_ctx  # type: ignore[attr-defined]  # 供 Presenter 消费
+                        except Exception as _e:
+                            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+                            pass
+                            pass
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
@@ -1380,6 +1396,13 @@ def teach_stream():
                     individuality_control=_ind_control,
                     individuality_profile_prompt=_ind_profile,
                 )
+            # v0.42 ⭐ P0 修复：teach_stream 持久化个体化画像——此前 SSE 教学流只
+            # run() + set_pending_overrides（内存注入），从未 persist()，
+            # 注册用户教学后 profile.json 缺本轮 LLM 建模结果（与 /api/chat 行为对齐）。
+            try:
+                _ind_stream.persist(learner, learner_id)
+            except Exception as _pe:
+                print(f"[PAEG] teach_stream 个体化持久化异常忽略: {_pe}")
             # v0.32 ⭐ meta-log 接入 LLM 建模：把 Individuality 的 trait（学习风格/擅长/薄弱等）写入元认知日志
             # —— meta-log 之前只记录"教学打分/自检"（agent 视角），缺 LLM 对用户建模后的判断（用户视角）
             # —— 注：即使 trait 为空也记录一条（llm_modeled=False 标记未建模），保证 meta-log 有建模轨迹
@@ -1677,6 +1700,14 @@ def teach_stream():
                 SESSIONS[f"chat_hist_{learner_id}"] = _hist[-20:]
         except Exception as _eh:
             print(f"[PAEG] teach_stream 写回 chat_hist 失败: {_eh}")
+
+        # v0.42 ⭐ P1 修复：teach_stream 标记调度器活跃——此前只有 chat_stream 调
+        # mark_activity()，教学流（含同步/SSE）不标记，周期调度器误判"7 天无活跃"
+        # 而跳过周度自我更新任务。
+        try:
+            PERIODIC_UPDATER.mark_activity()
+        except Exception as _mae:
+            print(f"[PAEG] teach_stream mark_activity 失败: {_mae}")
 
         # v0.19.6：关键词触发文档（教学对话中"讲义/要点/例题/笔记"）
         try:
@@ -2566,17 +2597,10 @@ def general_chat_stream():
     # v0.24 修复 1：技能 L1 目录注入 system prompt（chat_stream）
     # —— 之前 SkillRegistry 扫描了 10 个 SKILL.md 但从未被注入，技能功能上等价于不存在；
     # —— 现在把技能目录（name + description）一次性注入，LLM 知道何时用 load_skill__<name>。
-    # v0.41.9 ⭐ 修复：chat_stream 注入用户资料库（此前只 teach_stream 有——
-    # 学生聊天时问"我笔记里讲的X"LLM 拿不到用户上传的资料，接线缺口）
-    try:
-        _uid_chat = getattr(learner, "id", "") or ""
-        if _uid_chat:
-            from lib.library_store import read_user_corpus
-            _uc_chat = read_user_corpus(str(_uid_chat), max_files=3, per_file=300)
-            if _uc_chat:
-                _dyn_ctx["user_corpus"] = _uc_chat
-    except Exception as _uce:
-        print(f"[PAEG] chat_stream 用户资料注入跳过: {_uce}")
+    # v0.42 ⭐ P2 修复：移除 user_corpus 重复注入——get_user_library（L2546，5×500）
+    # 与 read_user_corpus（此处，3×300）同源（都读 Library/usr_knowledge/），
+    # 此前同一份资料在 system prompt 里出现两遍，浪费 context 且干扰注意力。
+    # 保留更完整的 user_library 槽即可，teach_stream 路径不受影响。
     # v0.41.9 ⭐ 修复：chat_stream 注入 KB 检索结果（此前通用话题不查知识库——
     # 只有 teach 用 kb.resolve_node、answer 用 _pre_retrieve；chat 全靠 LLM 自身，
     # 接线缺口。用 _pre_retrieve（KB+Library 三线）增强闲聊的知识支撑）
@@ -3269,11 +3293,17 @@ def general_chat():
         pass
         pass
 
+    # v0.42 ⭐ P1 修复：同步闲聊也标记调度器活跃（此前仅 chat_stream 标记）
+    try:
+        PERIODIC_UPDATER.mark_activity()
+    except Exception as _mae:
+        print(f"[PAEG] general_chat mark_activity 失败: {_mae}")
+
     return jsonify({
         "reply": reply,            # 兼容旧前端
-        "segments": segments,       # v0.17：多段输出
-        "doc": doc_urls,            # v0.18：若生成了文档则返回下载链接
-        "tools": tool_log,          # v0.19：工具调用记录（前端可视化）
+        "segments": segments,      # v0.17：多段输出
+        "doc": doc_urls,           # v0.18：若生成了文档则返回下载链接
+        "tools": tool_log,         # v0.19：工具调用记录（前端可视化）
         "agent_trace": _agent_trace,  # v0.24：AgentEngine trace（仅 mode=agent 填充）
         "learner": {
             "id": learner.id,
@@ -3694,6 +3724,19 @@ def cleanup_conversations():
 # ─────────────────────────────────────
 PERIODIC_UPDATER = get_periodic_updater()
 
+def init_periodic_updater() -> None:
+    """v0.42 ⭐ P0 修复：显式启动周期自我更新调度器。
+
+    - 此前 .start() 只在 __main__ 块执行，gunicorn/WSGI 导入模式下调度器永不启动。
+    - 修复：抽成可调用函数，__main__ 启动时调用；gunicorn 部署可在 app 工厂/入口
+      显式调用本函数（import server 时不启动，避免 import 期线程副作用）。
+    """
+    try:
+        PERIODIC_UPDATER.start()
+        print("[PAEG] 周期自我更新调度器已启动")
+    except Exception as _pe:
+        print(f"[PAEG] 周期自我更新调度器启动失败（不影响主服务）: {_pe}")
+
 @app.route("/api/self-update/run", methods=["POST"])
 @require_module("self_update")
 def run_self_update():
@@ -3852,8 +3895,6 @@ if __name__ == "__main__":
     except Exception as _e:
         print(f"[PAEG Server] MCP 网关启动失败（不影响主服务）: {_e}")
     # v0.19.21：周期自我更新调度器（后台守护线程）
-    try:
-        PERIODIC_UPDATER.start()
-    except Exception as _e:
-        print(f"[PAEG Server] 周期自我更新调度器启动失败（不影响主服务）: {_e}")
+    # v0.42 ⭐ P0 修复：改调 init_periodic_updater()（统一入口，含幂等守卫）
+    init_periodic_updater()
     app.run(host=APP_HOST, port=port, debug=False, threaded=True)
