@@ -72,13 +72,41 @@ def main():
     s, head = post_quick("/api/voice/tts", {"text": "冒烟", "learner_id": "smoke"})
     check("TTS 可达", s == 200, f"got {s}")
 
-    # 4. 教学流式（只验首事件——SSE 首字节诊断；LLM 首字节可能慢，用 STREAM_TIMEOUT）
+    # 4. 教学流式（v0.41.7 ⭐ 完整流验证——此前只读首 256B，诊断后的
+    #    NameError（如 subtopic 未定义）导致 SSE 中途中断测不出）
     s, head = post_quick("/api/teach/stream",
                          {"learner_id": "smoke", "concept": "什么是熵",
                           "subject": "physics", "grade_level": "high_school"},
                          timeout=STREAM_TIMEOUT)
     raw = head.decode("utf-8", errors="replace") if isinstance(head, bytes) else ""
     check("teach_stream 首事件", s == 200 and "event:" in raw, f"got {s} 首事件={raw[:40]!r}")
+
+    # 4b. v0.41.7 ⭐ 教学流完整输出验证（修复"教学模式不输出内容"漏检）
+    #     —— 完整读流（最长 75s），断言：presentation 事件非空 + done 事件存在。
+    #     此前只读 256B 首事件，诊断后的 NameError（subtopic 等）导致 SSE 中途
+    #     中断，但首事件正常 → 漏检。这是"重构后未跑真实教学验证"的流程教训。
+    def post_full(path, body, timeout=75):
+        data = json.dumps(body).encode("utf-8")
+        req = urllib.request.Request(BASE + path, data=data,
+                                     headers={"Content-Type": "application/json"},
+                                     method="POST")
+        try:
+            resp = urllib.request.urlopen(req, timeout=timeout)
+            return resp.status, resp.read()
+        except urllib.error.HTTPError as e:
+            return e.code, e.read()
+        except Exception as e:
+            return -1, str(e).encode()
+    _s, _body = post_full("/api/teach/stream",
+                          {"learner_id": "smoke", "concept": "什么是素数",
+                           "subject": "math", "grade_level": "high_school",
+                           "mode": "teach"})
+    _txt = _body.decode("utf-8", errors="replace") if isinstance(_body, bytes) else ""
+    _has_pres = "event: presentation" in _txt
+    _has_done = "event: done" in _txt
+    check("teach_stream 完整流（presentation+done）",
+          _s == 200 and _has_pres and _has_done,
+          f"pres={_has_pres} done={_has_done} 事件数={_txt.count('event:')}")
 
     # 5. 历史会话
     s, _ = get_quick("/api/conversations/u3")
