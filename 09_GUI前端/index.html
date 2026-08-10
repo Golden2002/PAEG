@@ -3161,6 +3161,13 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
 });
 
 askBtn.addEventListener('click', () => {
+  // v0.41.9 ⭐ 修复：生成中"■ 停止"按钮无反应——此前无 data-generating 分支，
+  // 点击被 if(!q) return 拦截，从不调 _genAbort.abort()。现：生成中点击 = 停止。
+  if (askBtn.dataset.generating === '1') {
+    if (window._genAbort) { try { window._genAbort.abort(); } catch (e) {} }
+    try { if (window._hideStopBtn) window._hideStopBtn(); } catch (e) {}
+    return;
+  }
   const q = questionInput.value.trim();
   if (!q) return;
   addMsg('user', q);
@@ -3365,8 +3372,23 @@ askBtn.addEventListener('click', () => {
     if (!input) return false;
     addMsg('user', norm);
     input.value = norm;
-    const askBtn = document.getElementById('ask-btn');
-    if (askBtn) askBtn.click();
+    // v0.41.9 ⭐ 修复：改为直接调模式函数（此前 askBtn.click() 会让 askBtn handler
+    // 再 addMsg 一次 → 同文本双气泡；且生成中点击会被 data-generating 分支拦成"停止"）。
+    // 直接按 currentMode 分发，与 askBtn handler 行为一致但不重复 addMsg。
+    if (currentMode === 'chat') {
+      generalChat(norm);
+    } else if (currentMode === 'answer') {
+      answerChat(norm, document.getElementById('subject-select') ? subjectSelect.value : '');
+    } else if (currentMode === 'method') {
+      methodChat(norm, document.getElementById('subject-select') ? subjectSelect.value : '');
+    } else if (currentMode === 'knowledge') {
+      knowledgeChat(norm);
+    } else if (currentMode === 'affection') {
+      affectionChat(norm);
+    } else {
+      teach(norm, document.getElementById('subject-select') ? subjectSelect.value : '',
+            document.getElementById('subfield-select') ? subfieldSelect.value : '');
+    }
     return true;
   }
   function _startBackendSTT() {
@@ -3412,7 +3434,12 @@ askBtn.addEventListener('click', () => {
     }
     return false;
   }
+  // v0.41.9 ⭐ STT 提交锁：防 voiceBtn 异步启动时重复点击创建双 MediaRecorder
+  // → 两条 _submitAudio → 两条 _voiceSendOnce（语音双发送复发根因之一）
+  let _sttSubmitting = false;
   function _submitAudio(blob) {
+    if (_sttSubmitting) return;  // 已有一次识别提交中，丢弃重复
+    _sttSubmitting = true;
     _resetRecording();
     addMsg('paeg', '<small> 正在识别…</small>');
     const fd = new FormData();
@@ -3420,6 +3447,7 @@ askBtn.addEventListener('click', () => {
     fetch(API_BASE + '/api/voice/stt', { method: 'POST', body: fd })
       .then(r => r.json())
       .then(j => {
+        _sttSubmitting = false;
         if (j && j.ok && j.text) {
           // v0.41.5 ⭐ 统一走 _voiceSendOnce 去重锁（后端 STT 路径）
           _voiceSendOnce(j.text);
@@ -3427,7 +3455,7 @@ askBtn.addEventListener('click', () => {
           addMsg('paeg', '<small> ' + ((j && j.error) || '未识别到语音内容') + '。可直接打字输入。</small>');
         }
       })
-      .catch(() => addMsg('paeg', '<small> 识别服务暂不可用，请直接打字输入。</small>'));
+      .catch(() => { _sttSubmitting = false; addMsg('paeg', '<small> 识别服务暂不可用，请直接打字输入。</small>'); });
   }
   // v0.40 P0-2 ⭐ 点击立即视觉反馈（不依赖 start() 结果）
   // v0.41 ⭐ 优先后端 STT（MediaRecorder），不支持才回退 Web Speech
@@ -3519,7 +3547,13 @@ askBtn.addEventListener('click', () => {
       pressTimer = setTimeout(() => {
         _hidePressFeedback();
         _showPopover(false);  // 气泡：正在聆听（录音已触发）
-        voiceBtn.click();  // 触发录音（MediaRecorder 开始）
+        // v0.41.9 ⭐ 修复：直接调 _startBackendSTT()，不走 voiceBtn.click()——
+        // 合成 click 与用户真实点击可能碰撞 → 双 MediaRecorder → 双发送
+        if (window.MediaRecorder) {
+          _startBackendSTT().catch(() => { _resetRecording(); _fallbackWebSpeechStart(); });
+        } else {
+          _fallbackWebSpeechStart();
+        }
       }, 500);
     }
     function cancelPress() {
