@@ -683,12 +683,12 @@ SUBJECT_GRADES = {
     # 单学段学科（仅最低学段）：
     "law": ["middle_school", "high_school", "undergraduate"],
     "aesthetics": ["high_school", "undergraduate"],
-    "french": ["middle_school", "high_school", "undergraduate"],
-    "german": ["middle_school", "high_school", "undergraduate"],
-    "japanese": ["middle_school", "high_school", "undergraduate"],
+    "french": ["middle_school", "high_school", "undergraduate", "graduate_exam"],
+    "german": ["middle_school", "high_school", "undergraduate", "graduate_exam"],
+    "japanese": ["middle_school", "high_school", "undergraduate", "graduate_exam"],
     "phenomenology": ["undergraduate"],
-    "linguistics": ["middle_school", "high_school", "undergraduate"],  # v0.32 ⭐ 与知识库分层对齐（subjects_ext 含中学/高中节点）
-    "atmospheric_science": ["middle_school", "high_school", "undergraduate"],  # v0.32 ⭐ 与知识库分层对齐（subjects_ext 含中学/高中节点）
+    "linguistics": ["middle_school", "high_school", "undergraduate", "graduate_exam"],  # v0.41.9 ⭐ 补考研档（考研生学语言合理）
+    "atmospheric_science": ["middle_school", "high_school", "undergraduate", "graduate_exam"],  # v0.41.9 ⭐ 补考研档
     "electronics": ["undergraduate"],
     "computer_science": ["undergraduate"],
     "artificial_intelligence": ["undergraduate"],
