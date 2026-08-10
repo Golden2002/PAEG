@@ -762,6 +762,14 @@ def teach_stream():
                 _cid = CONV_STORE.add_message(
                     learner_id, mode, _full[:30], "assistant", _full, conv_id=_cid)
                 SESSIONS[f"conv_{learner_id}"] = _cid
+            # v0.41.9 ⭐ 修复：教学后掌握度落盘（此前 subjects_mastery 只在内存，
+            # 用户主动 PUT /api/profile 才持久化 → 刷新后掌握度丢失，接线缺口）
+            try:
+                if str(learner_id)[:1] == "u" and str(learner_id)[1:].isdigit():
+                    if USER_STORE is not None:
+                        USER_STORE.save_learner(learner_id, learner)
+            except Exception as _se:
+                print(f"[PAEG] teach_stream 画像落盘失败: {_se}")
         except Exception as _e:
             print(f"[PAEG] teach_stream 早退分支保存会话失败({mode}): {_e}")
 
@@ -1225,9 +1233,27 @@ def teach_stream():
             except Exception:
                 _kb_hit = None
             if not _kb_hit:
-                # 知识库未收录该概念（如"矩阵的质"这类自创/偏门概念）→ 联网补充，badge 显示"网络检索"
-                from web_search_tool import web_search
-                _web_raw = web_search(f"{subject} {concept}", max_results=3)
+                # v0.41.9 ⭐ 修复：先查本地事实资料库（Library/KnowledgeBase/facts/*.md）——
+                # 此前 facts 加载了但从未接入检索主链路（search_facts 无人调用），
+                # 接线缺口；本地事实优先于联网。
+                _facts_ctx = ""
+                try:
+                    from library_loader import KnowledgeLibrary
+                    _kl = KnowledgeLibrary()
+                    _facts_hits = _kl.search_facts(concept, top_k=2)
+                    if _facts_hits:
+                        _facts_ctx = "\n\n".join(
+                            f"[{h['source']}] {h['snippet']}" for h in _facts_hits)
+                        _teach_badge = "知识库检索"
+                except Exception:
+                    _facts_ctx = ""
+                if _facts_ctx:
+                    _teach_web_ctx = _facts_ctx
+                    learner._teach_web_ctx = _facts_ctx
+                else:
+                    # 知识库未收录该概念（如"矩阵的质"这类自创/偏门概念）→ 联网补充，badge 显示"网络检索"
+                    from web_search_tool import web_search
+                    _web_raw = web_search(f"{subject} {concept}", max_results=3)
                 if _web_raw and "搜索未返回" not in str(_web_raw):
                     _teach_badge = "网络检索"
                     _teach_web_ctx = str(_web_raw)[:600]
@@ -2470,6 +2496,17 @@ def general_chat_stream():
     # v0.24 修复 1：技能 L1 目录注入 system prompt（chat_stream）
     # —— 之前 SkillRegistry 扫描了 10 个 SKILL.md 但从未被注入，技能功能上等价于不存在；
     # —— 现在把技能目录（name + description）一次性注入，LLM 知道何时用 load_skill__<name>。
+    # v0.41.9 ⭐ 修复：chat_stream 注入用户资料库（此前只 teach_stream 有——
+    # 学生聊天时问"我笔记里讲的X"LLM 拿不到用户上传的资料，接线缺口）
+    try:
+        _uid_chat = getattr(learner, "id", "") or ""
+        if _uid_chat:
+            from lib.library_store import read_user_corpus
+            _uc_chat = read_user_corpus(str(_uid_chat), max_files=3, per_file=300)
+            if _uc_chat:
+                system = system + "\n\n## 用户上传的资料（供回答参考）\n" + _uc_chat
+    except Exception as _uce:
+        print(f"[PAEG] chat_stream 用户资料注入跳过: {_uce}")
     system = _inject_skill_catalog(system)
 
     # v0.22.0：基于用户上传文件的 4 能力（找答案/讲解/输出原文/重组结构）
@@ -3186,7 +3223,9 @@ def answer_api():
     响应：{"answer": "完整答案", "mode": "answer"}
     """
     data = request.get_json(force=True)
-    question = (data.get("question") or "").strip()
+    # v0.41.9 ⭐ 修复：字段兼容 question/text/concept（此前仅 question——
+    # 外部 Agent 用 text 调会 400；前端用 question 正常）
+    question = (data.get("question") or data.get("text") or data.get("concept") or "").strip()
     if not question:
         return jsonify({"error": "question is required"}), 400
     subject = data.get("subject", "math")
