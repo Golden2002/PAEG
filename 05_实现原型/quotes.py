@@ -70,10 +70,26 @@ DAILY_QUOTES: List[Dict[str, str]] = [
 
 
 def quote_of_the_day(date: datetime.date | None = None) -> Dict[str, str]:
-    """返回某一天的每日一句。默认今天。按天数取模轮换。"""
+    """返回某一天的每日一句。默认今天。按天数取模轮换。
+
+    v0.41.9 ⭐ 动态扩充：除内置种子外，自动合并 data/quotes_user.json
+    （若存在）——追加一条 {"text","author","source"} 即扩充语料，无需改代码。
+    """
     d = date or datetime.date.today()
+    _all = list(DAILY_QUOTES)
+    try:
+        import json, os
+        _p = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'quotes_user.json')
+        if os.path.exists(_p):
+            _extra = json.load(open(_p, encoding='utf-8'))
+            if isinstance(_extra, list):
+                for _q in _extra:
+                    if isinstance(_q, dict) and _q.get("text"):
+                        _all.append(_q)
+    except Exception:
+        pass
     day_index = d.toordinal()
-    q = DAILY_QUOTES[day_index % len(DAILY_QUOTES)]
+    q = _all[day_index % len(_all)]
     return {
         "text": q["text"],
         "author": q["author"],
