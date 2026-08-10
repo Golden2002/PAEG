@@ -566,6 +566,33 @@ def audit_dataflow_integrity():
              "重试" in (BASE / "voice_service.py").read_text(encoding="utf-8")
     record("数据流", "P1", "TTS 首请求重试（防偶发 500）",
            ok_tts, "" if ok_tts else "TTS 无重试，首请求可能 500")
+    # 7) 学段集合完整性（v0.41.9 十次反思：考研+法语误判——
+    #    SUBJECT_GRADES 语言类缺 graduate_exam，配置语义盲区）
+    try:
+        import sys as _sys2
+        _sys2.path.insert(0, str(BASE))
+        _sys2.path.insert(0, str(BASE.parent))
+        import os as _os2
+        _cwd = _os2.getcwd()
+        _os2.chdir(BASE)
+        from prompts import SUBJECT_GRADES
+        _os2.chdir(_cwd)
+        _langs = ["french", "german", "japanese", "english", "linguistics",
+                  "atmospheric_science"]
+        _missing = [l for l in _langs
+                    if l in SUBJECT_GRADES and "graduate_exam" not in SUBJECT_GRADES[l]]
+        record("数据流", "P1", "语言类学科含考研档（考研生可学外语）",
+               not _missing, f"缺考研档: {_missing}" if _missing else "")
+    except Exception as _ge:
+        record("数据流", "P1", "语言类学科含考研档", False, f"检查失败: {_ge}")
+    # 8) 文案-UI 一致性（v0.41.9：提示"左上角"实际在底部输入栏）
+    try:
+        _steer = (BASE / "services" / "steering.py").read_text(encoding="utf-8")
+        _bad_text = "左上角" in _steer
+        record("数据流", "P1", "学段提示文案与实际 UI 一致（无'左上角'误导）",
+               not _bad_text, "提示仍写'左上角'（实际在底部输入栏）" if _bad_text else "")
+    except Exception:
+        pass
 
 
 def main():
