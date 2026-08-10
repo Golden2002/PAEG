@@ -743,6 +743,9 @@ def teach_stream():
 
     concept = data["concept"]
     subject = data["subject"]
+    # v0.41.7 ⭐ 修复：重构时 subtopic 定义被误删（同步 teach 端点 L413 有，stream 版丢失）
+    # → NameError: subtopic 未定义 → SSE 中途中断 → 教学模式不输出内容
+    subtopic = (data.get("subtopic") or "").strip()
 
     # v0.36.2 ⭐ 统一历史保存（修复：15 个早退分支跳过 CONV_STORE → "对话有时不在历史里"）
     # 此前只有主教学循环（L1686 附近）保存；v0.36.2 首批补 9 个：gen_aff/gen_grade_blocked/

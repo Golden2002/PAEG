@@ -414,6 +414,36 @@ def audit_nickname_consistency():
         record("昵称双源", "P0", "三方昵称一致", False, str(e))
 
 
+# ---------------------------------------------------------------------------
+# 维度 13：重构完整性（v0.41.7 教训——模块化误删 subtopic 定义 → 教学不输出）
+# ---------------------------------------------------------------------------
+def audit_refactor_integrity():
+    """检查关键函数内的关键变量是否已定义（防重构误删变量）。
+
+    v0.41.7 教训：模块化提取 ensure_learner_session 时误删了 teach_stream 的
+    `subtopic = (data.get("subtopic") or "").strip()` → NameError → SSE 中途
+    中断 → "教学模式不输出内容"。audit_check 静态检查 24/24 全过（检查的是
+    文件/结构/常量），从不执行代码 → 运行时 NameError 测不出。
+    此维度用"函数内变量定义存在性"静态扫，作为第一道防线。
+    """
+    srv = SRV.read_text(encoding="utf-8")
+    # teach_stream 函数体内必须定义 subtopic（L1376 附近引用）
+    m = re.search(r'def teach_stream\(\):(.*?)(?=\n@|\ndef )', srv, re.S)
+    ok_subtopic = True
+    if m:
+        body = m.group(1)
+        # 找到 subtopic 引用点，检查其前方是否有定义
+        ref_pos = body.find('if subtopic:')
+        def_pos = body.find('subtopic = ')
+        ok_subtopic = def_pos != -1 and (ref_pos == -1 or def_pos < ref_pos)
+    record("重构完整", "P0", "teach_stream 定义 subtopic（防重构误删）",
+           ok_subtopic, "" if ok_subtopic else "teach_stream 缺 subtopic 定义！")
+    # 所有 gen_ 早退分支函数体内引用的变量检查（快速扫：ensure_learner_session 调用前后）
+    record("重构完整", "P1", "server.py 无重复 LearnerProfile 内联创建",
+           srv.count("learner = LearnerProfile(") <= 1,
+           f"{srv.count('learner = LearnerProfile(')} 处（应 ≤1，其余走 ensure_learner_session）")
+
+
 def main():
     audit_early_exit()
     audit_silent_except()
@@ -427,6 +457,7 @@ def main():
     audit_reflection_consistency()
     audit_display_quality()
     audit_nickname_consistency()
+    audit_refactor_integrity()
 
     p0 = [r for r in REPORT if r["level"] == "P0" and not r["ok"]]
     p1 = [r for r in REPORT if r["level"] == "P1" and not r["ok"]]

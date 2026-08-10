@@ -80,12 +80,25 @@ def ensure_learner_session(
     cache_key = f"learner_{learner_id}"
     learner = SESSIONS.get(cache_key)
     if not learner:
+        # v0.41.7 ⭐ 稳定性根治：请求未带 nickname 时，注册用户（u+数字）
+        # 从 USER_STORE 根昵称兜底，而不是落到默认"学生"——防止 SESSIONS
+        # 重建时用默认值覆盖用户真实昵称（曾导致 u106 画像回退"学生"）。
+        _nickname = src.get("nickname") or ""
+        if not _nickname and str(learner_id)[:1] == "u" and str(learner_id)[1:].isdigit():
+            try:
+                from infra.runtime import get_user_store
+                _us = get_user_store()
+                _u = _us.get_user(learner_id) if _us is not None else None
+                if _u:
+                    _nickname = (_u.get("nickname") or "").strip()
+            except Exception:
+                _nickname = ""
         # === 13 处共有字段 ===
         # cognitive_style 显式传 "visual" 默认（= LearnerProfile 内部默认）
         # 与 L2711 原代码省略 kwarg 行为完全等价（默认值一样）。
         kwargs = dict(
             id=src.get("id", learner_id),
-            nickname=src.get("nickname", default_nickname),
+            nickname=_nickname or src.get("nickname", default_nickname),
             grade_level=src.get("grade_level", "high_school"),
             age=src.get("age", 17),
             cognitive_style=src.get("cognitive_style", "visual"),
