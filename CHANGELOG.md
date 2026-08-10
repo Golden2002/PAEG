@@ -1,3 +1,20 @@
+### v0.41.8 Subagent 治理 + 自检增强（2026-08-10）
+
+**Subagent 卡死反思（用户关切："经常崩溃，要监控进度"）**
+- 根因（Oracle）：执行完成但没 ack——模型长任务自检循环不输出完成信号 + 后台转换吞回调 + 任务粒度过大
+- 方案（维护手册 §4.9）：从"等回调"改为"轮询产物 + 服务健康 + 告警"三段式；**超时 ≠ 失败，先看产物再看信号**
+- 已落地：任务原子化 / finish_signal / 5 分钟心跳 / 30 分钟强杀三态盘点 / 已完成利用
+
+**自检增强（Librarian 业界调研）**
+- ⭐ **pyright 集成（audit_check 维度 13 v2）**：`reportUnboundVariable`（P0 真未定义）+ `reportPossiblyUnbound`（P1 核查）——重构误删变量在 commit 阶段阻断
+- ⭐ **属性测试（tests/test_properties.py）**：3 性质（教学流完整/无错误/subtopic 传递）3/3 通过——v0.41.7 事故场景自动防线
+- 调研沉淀：突变测试（mutmut）/ 契约测试（schemathesis）/ SSE 增强 / 测试金字塔评估 → 需求表 v0.41.8
+
+**修复**
+- server.py:3053 fgen 全局+局部赋值混合 → 改用 infra get_file_generator()（消除 pyright 真未定义）
+
+**验证**：audit 27/28（P0 全过，1 处 P1 核查）+ 属性测试 3/3 + 服务 200
+
 ### v0.41.7 三 bug 修复 + 质检方法论反思（2026-08-10）
 
 **Bug 1：语音转文字发送两条消息（用户反馈仍存在）**

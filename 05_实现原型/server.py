@@ -3050,8 +3050,10 @@ def general_chat():
         if _re2.search(r'生成.{0,4}(文档|文件|笔记)|保存.{0,4}(这个|回答|文档)|下载|导出|做成.{0,2}(文档|文件)',
                        text):
             from file_generator import FileGenerator
-            if fgen is None:
-                fgen = FileGenerator(llm)
+            # v0.41.8 ⭐ 改用 infra 单例（消除 pyright reportUnboundVariable：
+            # fgen 模块级全局 + 函数内赋值 → pyright 认为可能未绑定）
+            from infra.runtime import get_file_generator
+            fgen = get_file_generator() or FileGenerator(llm)
             title = f"{data.get('subject','PAEG')} · {text[:20]}"
             _md, _html = fgen.save_answer(reply, title, data.get("subject", "通用"))
             from urllib.parse import quote as _quote
