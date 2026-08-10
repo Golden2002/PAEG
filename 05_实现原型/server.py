@@ -2502,12 +2502,16 @@ def general_chat_stream():
         pass
         pass
 
+    # v0.42 ⭐ 提示词模板化：散落注入段统一收集到 _dyn_ctx，末尾用
+    # render_dynamic_slots 按重要性降序组织（替代 system = system + X 散落拼接）。
+    _dyn_ctx = {}
+
     # v0.19.7：注入可编辑教学记忆（teaching_memory，CLAUDE.md 风格）
     try:
         from teaching_memory import load_teaching_memory
         _tm = load_teaching_memory()
         if _tm:
-            system = system + "\n\n" + _tm
+            _dyn_ctx["teaching_memory"] = _tm
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
         pass
@@ -2517,7 +2521,7 @@ def general_chat_stream():
     try:
         _ulib = get_user_library(learner_id)
         if _ulib:
-            system = system + "\n\n" + _ulib
+            _dyn_ctx["user_library"] = _ulib
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
         pass
@@ -2529,9 +2533,7 @@ def general_chat_stream():
         _facts = extract_user_facts(SESSIONS.get(f"chat_hist_{learner_id}", []))
         if _facts:
             _facts_str = "\n".join(f"- {f}" for f in _facts)
-            system = system + (
-                "\n\n## 用户说过的事实（v0.21.8 记忆锚点，回答相关问题时必须引用）\n"
-                + _facts_str)
+            _dyn_ctx["user_facts"] = _facts_str
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
         pass
@@ -2555,7 +2557,7 @@ def general_chat_stream():
             history=_ind_history,
             subject=data.get("subject", "general"))
         if _ind_result.get("profile_prompt"):
-            system = system + "\n\n" + _ind_result["profile_prompt"]
+            _dyn_ctx["individuality"] = _ind_result["profile_prompt"]
         system = _ind.inject_control(system, _ind_result.get("control"))
         _ind_run_ok = True
     except Exception as _ie:
@@ -2572,7 +2574,7 @@ def general_chat_stream():
             from lib.library_store import read_user_corpus
             _uc_chat = read_user_corpus(str(_uid_chat), max_files=3, per_file=300)
             if _uc_chat:
-                system = system + "\n\n## 用户上传的资料（供回答参考）\n" + _uc_chat
+                _dyn_ctx["user_corpus"] = _uc_chat
     except Exception as _uce:
         print(f"[PAEG] chat_stream 用户资料注入跳过: {_uce}")
     # v0.41.9 ⭐ 修复：chat_stream 注入 KB 检索结果（此前通用话题不查知识库——
@@ -2584,9 +2586,19 @@ def general_chat_stream():
             _retr_chat = _pre_retrieve(
                 text, data.get("subject", ""), learner=learner, llm=llm)
             if _retr_chat:
-                system = system + "\n\n" + _retr_chat
+                _dyn_ctx["web_retrieval"] = _retr_chat
     except Exception as _rce:
         print(f"[PAEG] chat_stream KB 检索注入跳过: {_rce}")
+
+    # v0.42 ⭐ 提示词模板化：把收集到的动态槽按重要性降序组织注入 system
+    try:
+        from prompt_template import render_dynamic_slots
+        _dyn_str = render_dynamic_slots(_dyn_ctx)
+        if _dyn_str:
+            system = system + "\n\n\n" + _dyn_str
+    except Exception as _de:
+        print(f"[PAEG] chat_stream 动态槽组装跳过: {_de}")
+
     system = _inject_skill_catalog(system)
 
     # v0.22.0：基于用户上传文件的 4 能力（找答案/讲解/输出原文/重组结构）
@@ -3011,6 +3023,10 @@ def general_chat():
 
     system = build_general_chat_system(learner, mode=data.get("mode"))
 
+    # v0.42 ⭐ 提示词模板化：散落注入段统一收集到 _dyn_ctx，末尾用
+    # render_dynamic_slots 按重要性降序组织（替代 system = system + X 散落拼接）。
+    _dyn_ctx = {}
+
     # v0.16：注入用户画像 + BDI（让"随便说说"也有个体性）
     try:
         from agent_core import infer_user_model, infer_bdi
@@ -3028,7 +3044,7 @@ def general_chat():
     try:
         _ulib_chat = get_user_library(learner_id)
         if _ulib_chat:
-            system = system + "\n\n" + _ulib_chat
+            _dyn_ctx["user_library"] = _ulib_chat
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
         pass
@@ -3049,11 +3065,20 @@ def general_chat():
             history=_ind_history,
             subject=data.get("subject", "general"))
         if _ind_result.get("profile_prompt"):
-            system = system + "\n\n" + _ind_result["profile_prompt"]
+            _dyn_ctx["individuality"] = _ind_result["profile_prompt"]
         system = _ind.inject_control(system, _ind_result.get("control"))
         _ind_run_ok = True
     except Exception as _ie:
         print(f"[PAEG] general_chat 个体化注入跳过: {_ie}")
+
+    # v0.42 ⭐ 提示词模板化：把收集到的动态槽按重要性降序组织注入 system
+    try:
+        from prompt_template import render_dynamic_slots
+        _dyn_str = render_dynamic_slots(_dyn_ctx)
+        if _dyn_str:
+            system = system + "\n\n\n" + _dyn_str
+    except Exception as _de:
+        print(f"[PAEG] general_chat 动态槽组装跳过: {_de}")
 
     # v0.24 修复 1：技能 L1 目录注入 system prompt（general_chat 同 chat_stream）
     system = _inject_skill_catalog(system)
