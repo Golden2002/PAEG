@@ -476,6 +476,53 @@ def audit_refactor_integrity():
            f"{srv.count('learner = LearnerProfile(')} 处（应 ≤1，其余走 ensure_learner_session）")
 
 
+# ---------------------------------------------------------------------------
+# 维度 14：模块化健康（v0.41.9——固化 v0.41.7/8 反思为常驻检查）
+# ---------------------------------------------------------------------------
+def audit_modular_health():
+    """模块化架构健康度：services/handlers 完整性 + server.py 行数 + 依赖方向。
+
+    v0.41.9 ⭐ 把 v0.41.7（重构误删变量）与 v0.41.8（handler 迁移）的教训
+    固化为常驻检查——防止重构倒退（搬函数搬丢、依赖混乱、server.py 膨胀）。
+    """
+    srv = SRV.read_text(encoding="utf-8")
+    # 1) services/handlers 完整性：5 个业务 handler 应存在且被 server.py 引用
+    handlers_dir = BASE / "services" / "handlers"
+    expected = ["keyword_doc", "method", "knowledge", "recommend", "problem"]
+    missing = [h for h in expected if not (handlers_dir / f"{h}.py").exists()]
+    record("模块健康", "P1", "services/handlers 5 个业务 handler 齐全",
+           not missing, f"缺: {missing}" if missing else "")
+    # 2) server.py 行数上限（模块化目标 < 4000 行；当前 3713）
+    lines = len(srv.splitlines())
+    record("模块健康", "P1", f"server.py 行数 < 4000（模块化目标）",
+           lines < 4000, f"{lines} 行")
+    # 3) 业务 handler 不应内联在 server.py（应走 services.handlers import）
+    inline_handlers = [h for h in expected
+                       if f"def _handle_{h}_" in srv and f"from services.handlers.{h}" not in srv]
+    record("模块健康", "P1", "handler 定义已迁出 server.py（走 services.handlers）",
+           not inline_handlers, f"仍内联: {inline_handlers}" if inline_handlers else "")
+    # 4) 依赖方向：services/ 不应 import server.py（单向依赖：server → services）
+    dep_violations = []
+    for mod in ["services", "infra"]:
+        mdir = BASE / mod
+        if mdir.is_dir():
+            for f in mdir.rglob("*.py"):
+                try:
+                    txt = f.read_text(encoding="utf-8")
+                except Exception:
+                    continue
+                if "from server import" in txt or "import server" in txt:
+                    # 排除注释行（v0.41.9：注释里提到 "from server import" 会误报）
+                    _code_lines = [l for l in txt.splitlines()
+                                   if l.strip() and not l.strip().startswith("#")
+                                   and not l.strip().startswith('"""')]
+                    if any("from server import" in l or "import server" in l
+                           for l in _code_lines):
+                        dep_violations.append(f"{mod}/{f.name}")
+    record("模块健康", "P1", "services/infra 不反向依赖 server.py",
+           not dep_violations, f"反向依赖: {dep_violations}" if dep_violations else "")
+
+
 def main():
     audit_early_exit()
     audit_silent_except()
@@ -490,6 +537,7 @@ def main():
     audit_display_quality()
     audit_nickname_consistency()
     audit_refactor_integrity()
+    audit_modular_health()
 
     p0 = [r for r in REPORT if r["level"] == "P0" and not r["ok"]]
     p1 = [r for r in REPORT if r["level"] == "P1" and not r["ok"]]
