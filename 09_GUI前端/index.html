@@ -3344,14 +3344,21 @@ askBtn.addEventListener('click', () => {
   let mediaChunks = [];
   // v0.41.5 ⭐ 语音双发送去重锁：后端 STT 与 Web Speech 双引擎并存时，
   // 同一句识别文本可能被 onresult 与 _submitAudio 各发一次 → 用户看到两条消息。
-  // 相同文本 3 秒内只发送一次（以首次为准）。
+  // v0.41.7 ⭐ 加强：3 秒内"相同或近似文本"（去标点后一致）都去重——
+  // 此前仅精确匹配，若两次识别文本差一个标点（"你是谁" vs "你是谁。"）锁不触发。
   let _lastVoiceSend = { text: '', ts: 0 };
+  function _normVoiceText(t) {
+    return (t || '').replace(/[，。！？、,.!?\s]/g, '').trim();
+  }
   function _voiceSendOnce(text) {
     const now = Date.now();
     const norm = (text || '').trim();
     if (!norm) return false;
-    if (_lastVoiceSend.text === norm && (now - _lastVoiceSend.ts) < 3000) {
-      return false;  // 3 秒内同文 → 丢弃重复发送
+    const normKey = _normVoiceText(norm);
+    if (_lastVoiceSend.text && normKey &&
+        _normVoiceText(_lastVoiceSend.text) === normKey &&
+        (now - _lastVoiceSend.ts) < 4000) {
+      return false;  // 4 秒内同文（含标点差异）→ 丢弃重复发送
     }
     _lastVoiceSend = { text: norm, ts: now };
     const input = document.getElementById('question-input');
@@ -3382,7 +3389,7 @@ askBtn.addEventListener('click', () => {
             };
             mediaRecorder.start();
             _showRecordingUI();
-            addMsg('paeg', '<small> 正在录音（后端识别）…说完点停止，或长按松开发送。</small>');
+            addMsg('paeg', '<small> 同学请讲，说完点击停止键，或长按松开发送。</small>');
             // 15 秒自动停止
             setTimeout(() => { if (mediaRecorder && mediaRecorder.state === 'recording') { try { mediaRecorder.stop(); } catch(e){} } }, 15000);
             resolve();
