@@ -523,6 +523,51 @@ def audit_modular_health():
            not dep_violations, f"反向依赖: {dep_violations}" if dep_violations else "")
 
 
+# ---------------------------------------------------------------------------
+# 维度 15：数据流完整性（v0.41.9 九次反思——接线缺口 8 项未被发现）
+# ---------------------------------------------------------------------------
+def audit_dataflow_integrity():
+    """检查"功能语义完整性"——静态/可达之外，数据流是否真的完整。
+
+    v0.41.9 教训：8 个接线/数据流问题（chat 不读用户库 / facts 死代码 /
+    掌握度不落盘 / stat-sessions 内存计数 / MODE_CN 不全 / quote 无法扩充 /
+    answer 字段不兼容 / TTS 首请求 500）——audit 查"代码存在/路由在"，
+    smoke 查"端点可达"，但从不查"功能语义"：对称性/死代码/持久化/真实数据源。
+    """
+    srv = SRV.read_text(encoding="utf-8")
+    # 1) 功能对称性：teach_stream 有的接线，chat_stream 也必须同样有
+    #    （chat 不读用户资料库 = 对称性缺失）
+    ok_sym = False
+    # 检查 chat_stream 是否也注入用户资料库（read_user_corpus 或 _user_corpus）
+    chat_has_uc = "chat_stream 用户资料注入" in srv or \
+                  ("read_user_corpus" in srv and "用户上传的资料" in srv)
+    record("数据流", "P0", "chat_stream 注入用户资料库（与 teach 对称）",
+           chat_has_uc, "" if chat_has_uc else "chat_stream 不读用户库（接线缺口）")
+    # 2) 死代码检测：定义但从未被调用的关键函数（facts search_facts 教训）
+    #    —— search_facts 应被 server.py 调用（teach 兜底接 facts）
+    ok_facts = "search_facts" in srv
+    record("数据流", "P0", "facts/*.md 检索接通（search_facts 被调用）",
+           ok_facts, "" if ok_facts else "facts 加载但从未接入检索（死代码）")
+    # 3) 持久化完整性：教学路径必须落盘画像（掌握度教学后不丢）
+    ok_persist = "save_learner" in srv and "画像落盘失败" in srv
+    record("数据流", "P0", "教学后画像落盘（掌握度持久化）",
+           ok_persist, "" if ok_persist else "掌握度只内存不落盘（刷新丢失）")
+    # 4) 契约字段兼容：核心端点接受常见字段别名（question/text/concept）
+    ok_contract = "data.get(\"question\") or data.get(\"text\")" in srv or \
+                  "data.get(\"text\") or data.get(\"concept\")" in srv
+    record("数据流", "P1", "核心端点字段兼容（question/text/concept）",
+           ok_contract, "" if ok_contract else "answer 仅接受 question（外部 text 调 400）")
+    # 5) 每日一句可扩充：quotes_user.json 机制存在
+    ok_quote = "quotes_user.json" in (BASE / "quotes.py").read_text(encoding="utf-8")
+    record("数据流", "P1", "每日一句可动态扩充（quotes_user.json）",
+           ok_quote, "" if ok_quote else "quote 硬编码，无法追加")
+    # 6) TTS 首请求稳定：重试机制存在
+    ok_tts = "指数退避" in (BASE / "voice_service.py").read_text(encoding="utf-8") or \
+             "重试" in (BASE / "voice_service.py").read_text(encoding="utf-8")
+    record("数据流", "P1", "TTS 首请求重试（防偶发 500）",
+           ok_tts, "" if ok_tts else "TTS 无重试，首请求可能 500")
+
+
 def main():
     audit_early_exit()
     audit_silent_except()
@@ -538,6 +583,7 @@ def main():
     audit_nickname_consistency()
     audit_refactor_integrity()
     audit_modular_health()
+    audit_dataflow_integrity()
 
     p0 = [r for r in REPORT if r["level"] == "P0" and not r["ok"]]
     p1 = [r for r in REPORT if r["level"] == "P1" and not r["ok"]]

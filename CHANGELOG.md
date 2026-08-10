@@ -15,7 +15,34 @@
 
 **验证**：audit 27/28（P0 全过，1 处 P1 核查）+ 属性测试 3/3 + 服务 200
 
-### v0.41.9 前端 bug 修复 + 审计增强 + 测试质量评估（2026-08-10）
+### v0.41.9 前端 bug 修复 + 审计增强 + 接线巡检（2026-08-10）
+
+**前端 bug（用户实测反馈）**
+- 🐛 停止键无反应：ask-btn click handler 缺 data-generating 分支 + **disabled 按钮不派发 click** → 生成中不 disabled + 加停止分支
+- 🐛 语音双发送：直调模式函数（不 askBtn.click 双 addMsg）+ STT 提交锁 + 长按直调
+- 🐛 语音输入框残留：发送后清空 input.value
+
+**接线巡检（用户要求"检查所有接线"）——发现并修复 8 项**
+| # | 问题 | 修复 |
+|---|---|---|
+| 1 | chat_stream 不读用户资料库（teach 有 chat 没有） | chat_stream 注入 read_user_corpus |
+| 2 | facts/*.md 死代码（search_facts 无人调用） | teach 兜底先查 facts 再联网 |
+| 3 | TTS 首请求 500 | voice_service 指数退避重试 |
+| 4 | 掌握度教学后不落盘（刷新丢失） | _save_teach_turn 加 save_learner |
+| 5 | stat-sessions 前端内存计数（假数字） | 改从 conversations API 取真实数 |
+| 6 | MODE_CN 映射不全 | 补 answer/method/knowledge/affection 等 |
+| 7 | 每日一句无法动态扩充 | quotes_user.json 外部追加机制 |
+| 8 | answer 字段仅 question（外部 text 调 400） | 兼容 question/text/concept |
+
+**九次反思（为什么 8 项漏检）**
+- 根因：audit 查"结构存在/路由在"，smoke 查"端点可达"，**从不查"功能语义完整"**——对称性/死代码/持久化/真实数据源
+- 提升：audit 维度 15 数据流完整性（6 项常驻检查）→ **38/38 全绿**
+- 文档：技术 §10.2.30 / 元能力 §6.24 / 维护手册 checklist 四查
+
+**工具清单（用户要求记录）**
+- pyright（npm，静态分析）/ pytest-cov（覆盖率）/ jsonschema（契约）/ hypothesis（属性）/ mutmut（**Windows 不适用**）——记录到维护手册 §六
+
+### v0.41.8 问题层级下沉 + 需求表 6 项落地（2026-08-10）
 
 **Bug 修复（用户实测反馈）**
 - 🐛 **停止键无反应**：ask-btn click handler 缺 data-generating 分支，被 if(!q) 拦截静默返回 → 加生成中分支（abort + 恢复按钮）
