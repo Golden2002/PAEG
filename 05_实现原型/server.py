@@ -845,22 +845,36 @@ def teach_stream():
     # 设计：_llm_intent is None = 完全走规则链；_llm_intent == "teach"/"answer" = 教学请求必走完整管线（核心修复）
     # v0.41.6 ⭐ 模式短路：前端已选模式（mode 字段）是最强确定性信号——
     # 用户点了"闲聊"就不必让 LLM 再判断意图，直接走 chat 分支。
-    _llm_intent = None
-    _llm_conf = 0.0
-    try:
-        from meta_router import route_intent as _route_intent_v035
-        # 传入前端 mode：命中则短路返回（LLM 不重复判断）；未命中（teach 默认/无 mode）走 LLM
-        _intent_res = _route_intent_v035(concept, llm=llm, mode=data.get("mode"))
-        _llm_conf = float(_intent_res.get("confidence", 0.0) or 0.0)
-        if _llm_conf >= 0.6 and _intent_res.get("intent") in {
-            "teach", "knowledge", "knowledge_map", "recommend", "method",
-            "emotion", "problem", "meta", "greeting", "material",
-            "interface", "ppt", "answer", "chat",
-        }:
-            _llm_intent = _intent_res.get("intent")
-    except Exception as _re:
+    # v0.41.9 ⭐ 会话意图延续（用户洞察）：短输入（<6 字，如"我猜是en"）是
+    # 对上一轮问题的承接，应复用上轮意图而非重新路由——否则短输入被当独立
+    # 新概念处理 → 误判/误触发检索 → 答非所问。
+    _prev_intent = SESSIONS.get(f"current_intent_{learner_id}")
+    _prev_concept = SESSIONS.get(f"current_concept_{learner_id}")
+    _is_short_in = (len(str(concept).strip()) < 6)
+    if _is_short_in and _prev_intent:
+        # 短输入 + 有上轮意图 → 复用（不重跑 LLM 路由）
+        _llm_intent = _prev_intent
+        _llm_conf = 0.95
+        print(f"[PAEG][v0.41.9-INTENT-CONT] 短输入复用上轮意图 {_prev_intent!r} (concept={concept!r})",
+              file=__import__("sys").stderr, flush=True)
+    else:
         _llm_intent = None
         _llm_conf = 0.0
+    if _llm_intent is None:
+        try:
+            from meta_router import route_intent as _route_intent_v035
+            # 传入前端 mode：命中则短路返回（LLM 不重复判断）；未命中（teach 默认/无 mode）走 LLM
+            _intent_res = _route_intent_v035(concept, llm=llm, mode=data.get("mode"))
+            _llm_conf = float(_intent_res.get("confidence", 0.0) or 0.0)
+            if _llm_conf >= 0.6 and _intent_res.get("intent") in {
+                "teach", "knowledge", "knowledge_map", "recommend", "method",
+                "emotion", "problem", "meta", "greeting", "material",
+                "interface", "ppt", "answer", "chat",
+            }:
+                _llm_intent = _intent_res.get("intent")
+        except Exception as _re:
+            _llm_intent = None
+            _llm_conf = 0.0
     # v0.41.6 ⭐ 规则兜底接入（消除 rule_fallback_intent 死代码）：
     # LLM 未判断出（低置信/异常/无 LLM）时，用统一规则链兜底——
     # 此前散落在各分支的 is_xxx() 规则，现由 rule_fallback_intent 一次性接管。
@@ -883,6 +897,11 @@ def teach_stream():
     if _llm_intent is not None:
         print(f"[PAEG][v0.35-LLM-ROUTE] intent={_llm_intent!r} conf={_llm_conf:.2f} text={concept[:40]!r} mode={data.get('mode')!r}",
               file=__import__("sys").stderr, flush=True)
+    # v0.41.9 ⭐ 写回会话意图（供下一轮短输入复用）——非短输入才更新意图，
+    # 短输入（承接）保持上轮意图不变。
+    if not _is_short_in and _llm_intent is not None:
+        SESSIONS[f"current_intent_{learner_id}"] = _llm_intent
+        SESSIONS[f"current_concept_{learner_id}"] = concept
 
     # v0.19.27：界面自指涉拦截（流式版本）——v0.35 ⭐ LLM 优先（LLM 判 interface → 跳过规则）
     try:
@@ -1251,9 +1270,17 @@ def teach_stream():
                     _teach_web_ctx = _facts_ctx
                     learner._teach_web_ctx = _facts_ctx
                 else:
-                    # 知识库未收录该概念（如"矩阵的质"这类自创/偏门概念）→ 联网补充，badge 显示"网络检索"
-                    from web_search_tool import web_search
-                    _web_raw = web_search(f"{subject} {concept}", max_results=3)
+                    # v0.41.9 ⭐ 修复：联网前加 should_search 前置 + 短输入短路——
+                    # 此前 KB miss 就无条件 web_search(f"{subject} {concept}")，
+                    # 短输入（如"我猜是en"）会检索出"en 嗯 同音"等无关内容污染回答。
+                    # 与 chat_stream（L3069 should_search 前置）对齐。
+                    from web_search_tool import should_search, web_search
+                    _is_short = (len(str(concept).strip()) < 6) or \
+                                not any('\u4e00' <= c <= '\u9fff' for c in str(concept))
+                    if _is_short or not should_search(str(concept)):
+                        _web_raw = None  # 短输入/非检索意图 → 不联网，不污染
+                    else:
+                        _web_raw = web_search(f"{subject} {concept}", max_results=3)
                 if _web_raw and "搜索未返回" not in str(_web_raw):
                     _teach_badge = "网络检索"
                     _teach_web_ctx = str(_web_raw)[:600]
