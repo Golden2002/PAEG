@@ -566,6 +566,7 @@ class Presenter:
                 strategy_line=teaching_line,
                 user_model=getattr(learner, "_user_model", None),
                 subtopic=step.get("subtopic", "") or "",
+                constraint_flags=getattr(learner, "_constraint_flags", ()) or (),  # v0.43 ⭐ 3参数分层放开
             )
             # v0.26 ⭐ 教学模式识别（agent 引导 LLM 判断 easy/normal/deep，不靠关键词）
             try:
