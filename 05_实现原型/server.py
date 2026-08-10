@@ -1493,6 +1493,9 @@ def teach_stream():
         # —— 但 teach_stream 走手写循环完全跳过这些钩子；这里直接复用 paeg 实例的同款组件，
         # —— 与 sync 路径的 paeg.teach 行为对齐，确保 stream 路径也触发自我进化。
         _ev_stream_events = []
+        # v0.41.9 ⭐ 修复：_summary_avg 在 try 内定义但被下方另一 try 引用——
+        # 若本 try 抛异常 → NameError（pyright reportPossiblyUnbound 核查发现）
+        _summary_avg = 0.5
         try:
             # (a) SelfEvolution.evolve_prompt（提示词自进化）
             _summary_avg = (summary or {}).get("avg_score", 0.5)
@@ -2623,10 +2626,12 @@ def general_chat_stream():
             pass
 
         # v0.19.16：知识库查询——闲聊模式下问"你学过什么/知识库"也走知识库总结
+        # v0.41.9 ⭐ 修复：_tb import 提到 try 外（此前在 try 内，若 try 前段抛异常
+        # → except 分支 _tb 未定义 → NameError；pyright reportPossiblyUnbound 核查发现）
+        import traceback as _tb
         try:
             from meta_router import is_knowledge_query
             _kb_hit = is_knowledge_query(text)
-            import traceback as _tb
             print(f"[PAEG][kb] text={text!r} hit={_kb_hit}")
             if _kb_hit:
                 _kb = _handle_knowledge_query(learner, data.get("subject", "general"))
