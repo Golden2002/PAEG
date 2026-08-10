@@ -2314,7 +2314,9 @@ function updateStats() {
 // ─── 教学主流程（v0.19：流式输出） ───
 async function teach(question, subject, subtopic) {
   const thinking = addThinking('teach');
-  askBtn.disabled = true;
+  // v0.41.9 ⭐ 修复：生成中不设 disabled（disabled 按钮不派发 click →
+  // 停止键点了无反应）。用 data-generating 标记控制样式与行为。
+  askBtn.disabled = false;
   // v0.27 ⭐ 需求：生成中可打断——发送按钮变为"■ 停止"，点击停止
   if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
   const controller = new AbortController();
@@ -2560,7 +2562,8 @@ function renderStepBubble(bubble, text, idx) {
 // v0.19：P1-5/6 流式对话 + 工具调用可视化
 async function generalChat(text) {
   const thinking = addThinking('chat');
-  askBtn.disabled = true;
+  // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
+  askBtn.disabled = false;
   // v0.27 ⭐ 需求：生成中可打断——发送按钮变为"■ 停止"
   if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
   const controller = new AbortController();
@@ -2709,7 +2712,8 @@ async function generalChat(text) {
 // v0.19.14：找答案模式——直接给完整答案（不受教学约束）
 async function answerChat(question, subject) {
   const thinking = addThinking('chat');
-  askBtn.disabled = true;
+  // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
+  askBtn.disabled = false;
   try {
     const result = await api('/api/answer', {
       method: 'POST',
@@ -2743,7 +2747,8 @@ async function answerChat(question, subject) {
 // v0.19.25：学科学习方法模式——独立对话类型
 async function methodChat(question, subject) {
   const thinking = addThinking('chat');
-  askBtn.disabled = true;
+  // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
+  askBtn.disabled = false;
   try {
     const result = await api('/api/method', {
       method: 'POST',
@@ -2780,7 +2785,8 @@ async function methodChat(question, subject) {
 // v0.19.25：知识库模式——独立对话类型（清点 Library）
 async function knowledgeChat(question) {
   const thinking = addThinking('chat');
-  askBtn.disabled = true;
+  // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
+  askBtn.disabled = false;
   try {
     const result = await api('/api/knowledge', {
       method: 'POST',
@@ -2815,7 +2821,8 @@ async function knowledgeChat(question) {
 // v0.19.29：倾诉模式——情绪与心理支持（不教不答，以注意力陪伴）
 async function affectionChat(text) {
   const thinking = addThinking('chat');
-  askBtn.disabled = true;
+  // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
+  askBtn.disabled = false;
   try {
     const result = await api('/api/affection', {
       method: 'POST',
@@ -2959,11 +2966,21 @@ async function loadConversations() {
   try {
     const r = await api(`/api/conversations/${encodeURIComponent(lid)}`);
     const convs = r.conversations || [];
+    // v0.41.9 ⭐ 修复：stat-sessions 取真实会话数（此前 STATE.sessions 内存自增，
+    // 刷新归零 → "教学会话"数字刷新后丢失，与后端历史会话数不一致）
+    STATE.sessions = convs.length;
+    updateStats();
     if (!convs.length) {
       list.innerHTML = `<div class="log-item"><div class="txt" style="color:var(--text-dim)">${isAnon ? '暂无历史对话（登录账号可跨设备同步）' : '暂无历史对话'}</div></div>`;
       return;
     }
-    const MODE_CN = { teach: '教学', chat: '闲聊', solve: '做题' };
+    // v0.41.9 ⭐ 修复：MODE_CN 补全（此前缺 answer/method/knowledge/affection 等 →
+  // 历史会话列表显示原始 mode 字符串而非中文名）
+  const MODE_CN = {
+    teach: '教学', chat: '闲聊', solve: '做题',
+    answer: '找答案', method: '学方法', knowledge: '知识库',
+    affection: '倾诉', knowledge_map: '导图', ppt: 'PPT', problem: '出题',
+  };
     list.innerHTML = convs.map(c => `
       <div class="conv-item" data-cid="${c.id}">
         <span class="conv-mode">${MODE_CN[c.mode] || c.mode}</span>
@@ -3389,6 +3406,9 @@ askBtn.addEventListener('click', () => {
       teach(norm, document.getElementById('subject-select') ? subjectSelect.value : '',
             document.getElementById('subfield-select') ? subfieldSelect.value : '');
     }
+    // v0.41.9 ⭐ 修复：发送后清空输入框（此前 input.value = norm 残留 →
+    // 用户看到"已发送一条 + 输入框还留同一条"）
+    input.value = '';
     return true;
   }
   function _startBackendSTT() {

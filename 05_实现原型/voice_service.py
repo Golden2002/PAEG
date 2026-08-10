@@ -32,7 +32,9 @@ def _voice_path(learner_id: str, text_hash: str) -> Path:
 def tts_synthesize(text: str, voice: str = "zh-CN-XiaoxiaoNeural",
                    learner_id: str = "anon") -> Optional[str]:
     """文本转语音 → 返回可访问 URL（/uploads/voice/<id>/<hash>.mp3）或 None。
-    edge-tts 未安装 / 生成失败 → None（前端按钮变灰，不报错）。"""
+    edge-tts 未安装 / 生成失败 → None（前端按钮变灰，不报错）。
+    v0.41.9 ⭐ 修复：首请求偶发 500——edge-tts 首次网络握手可能超时，
+    加指数退避重试（1s/2s/4s，最多 3 次），消除"第一次点朗读失败"。"""
     if not EDGE_TTS_OK or not text:
         return None
     try:
@@ -44,9 +46,19 @@ def tts_synthesize(text: str, voice: str = "zh-CN-XiaoxiaoNeural",
         async def _gen():
             communicate = edge_tts.Communicate(text, voice)
             await communicate.save(str(path))
-        asyncio.run(_gen())
-        if path.exists():
-            return f"/uploads/voice/{learner_id}/{text_hash}.mp3"
+        import time as _time
+        _last_err = None
+        for _attempt in range(3):  # 指数退避：1s / 2s / 4s
+            try:
+                asyncio.run(_gen())
+                if path.exists():
+                    return f"/uploads/voice/{learner_id}/{text_hash}.mp3"
+                break
+            except Exception as _e:
+                _last_err = _e
+                if _attempt < 2:
+                    _time.sleep(1 << _attempt)  # 1, 2 秒
+        logger.warning("[tts] 生成失败（重试 3 次后）: %s", _last_err)
         return None
     except Exception:
         return None
