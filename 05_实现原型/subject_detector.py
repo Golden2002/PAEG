@@ -97,7 +97,9 @@ def detect_subject(text: str, llm=None, user_subject: str = "", grade: str = "")
                     "middle_school": "初中", "high_school": "高中",
                     "undergraduate": "大学本科", "graduate_exam": "考研",
                 }.get(need_grade, need_grade)
-                result["subject"] = None
+                # v0.41.9 ⭐ 修复：保留 subject（不清 None）+ 加 required_grade——
+                # 此前清 None → _finalize 的 switched 判断失效 → 自动切换学段不生效
+                result["required_grade"] = need_grade
                 result["reason"] = f"学科 {_cn} 需 {need_grade} 及以上学段"
         except Exception:
             pass
@@ -106,9 +108,10 @@ def detect_subject(text: str, llm=None, user_subject: str = "", grade: str = "")
 
 
 def _finalize(result: dict, user_subject: str) -> dict:
-    """补充 switched 判断。"""
+    """补充 switched 判断。v0.41.9 ⭐ grade_blocked 时也置 switched（检测到需切学段）。"""
     subj = result.get("subject")
-    result["switched"] = bool(subj and subj != user_subject and not result.get("unknown"))
+    result["switched"] = bool(subj and subj != user_subject) and (
+        not result.get("unknown") or bool(result.get("required_grade")))
     return result
 
 

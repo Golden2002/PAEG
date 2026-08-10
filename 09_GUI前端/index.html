@@ -2472,7 +2472,7 @@ async function teach(question, subject, subtopic) {
             // 此前强制 gradeSel.value = required_grade 会静默替用户切换学段，且后端缓存未同步导致死循环
             if (obj.grade_blocked && obj.required_grade) {
               const gradeLabel = { middle_school: '初中', high_school: '高中', undergraduate: '大学本科', graduate_exam: '考研' }[obj.required_grade] || obj.required_grade;
-              addMsg('paeg', `<small>提示：「${obj.subject_requested || '该学科'}」更适合<b>${gradeLabel}</b>学段。若想正式学习，可在左上角切换学段；当前对话仍会尽量按你的选择继续。</small>`);
+              addMsg('paeg', `<small>提示：「${obj.subject_requested || '该学科'}」更适合<b>${gradeLabel}</b>学段。若想正式学习，可在底部输入栏左侧切换学段；当前对话仍会尽量按你的选择继续。</small>`);
             }
           } catch (e) {
             console.warn('[PAEG] done 事件处理异常:', e);
