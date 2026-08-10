@@ -787,6 +787,9 @@ def teach_stream():
         print(f"[PAEG] teach_stream 情绪支持钩子跳过: {_e}")
 
     # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（流式版本）
+    # v0.41.8 ⭐ 修复：_steer 在 try 内定义但被 generate() 闭包引用——
+    # 若 _steer_subject 抛异常 → NameError（pyright reportPossiblyUnbound 核查发现）
+    _steer = {}
     try:
         _steer = _steer_subject(concept, subject, learner, learner_id, llm=llm, evolver=EVOLVER)
         # v0.25 学段-学科联动：跨学段学科 → SSE 推"需切换学段"反馈
@@ -2448,6 +2451,10 @@ def general_chat_stream():
     # v0.22.3：个体化注入（Individuality subagent——16 维画像 + LLM 建模 + 母语控制）
     _ind = None  # v0.23.0：闭包传给 generate() 用于 persist()
     _ind_run_ok = False
+    # v0.41.8 ⭐ 修复：_ind_result 在 try 内定义但被 generate() 闭包引用——
+    # 若 _ind.run 抛异常 → 闭包内 `_ind_result or {}` 前先求值 → NameError
+    # （pyright reportPossiblyUnbound 核查发现）
+    _ind_result = {}
     try:
         from subagents import Individuality
         _ind = Individuality()
