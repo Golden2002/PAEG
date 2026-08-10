@@ -2351,6 +2351,32 @@ function updateStats() {
     ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '-';
 }
 
+// ─── v0.42.2 ⭐ 修复：停止按钮三件套提升到模块顶层 ───
+// 此前 _showStopBtn/_hideStopBtn/_finalizeGeneration 只在 teach() 函数体内定义，
+// generalChat/affectionChat 的 finally 调 window._finalizeGeneration() 时，
+// 若用户从未进过 teach 模式 → undefined → finally 抛 TypeError → 按钮卡在"■ 停止"。
+// 现提升到模块顶层（任何模式调用前必已定义），各模式 finally 调用恒有效。
+window._showStopBtn = () => {
+  try {
+    const ab = document.getElementById('ask-btn');
+    ab.textContent = '■ 停止';
+    ab.dataset.generating = '1';
+  } catch(e){}
+};
+window._hideStopBtn = () => {
+  try {
+    const ab = document.getElementById('ask-btn');
+    ab.textContent = '发送';
+    delete ab.dataset.generating;
+  } catch(e){}
+};
+window._finalizeGeneration = () => {
+  try { if (askBtn) askBtn.disabled = false; } catch (e) {}
+  try { window._hideStopBtn && window._hideStopBtn(); } catch (e) {}
+  window._genAbort = null;
+  try { loadConversations(); } catch (e) {}
+};
+
 // ─── 教学主流程（v0.19：流式输出） ───
 async function teach(question, subject, subtopic) {
   const thinking = addThinking('teach');
@@ -2361,28 +2387,8 @@ async function teach(question, subject, subtopic) {
   if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
   const controller = new AbortController();
   window._genAbort = controller;
-  window._showStopBtn = () => {
-    try {
-      const ab = document.getElementById('ask-btn');
-      ab.textContent = '■ 停止';
-      ab.dataset.generating = '1';
-    } catch(e){}
-  };
-  window._hideStopBtn = () => {
-    try {
-      const ab = document.getElementById('ask-btn');
-      ab.textContent = '发送';
-      delete ab.dataset.generating;
-    } catch(e){}
-  };
-  // v0.x ⭐ 修复：统一所有模式 finally 收尾——以前只有 teach/generalChat 调 _hideStopBtn，
-  // answer/method/knowledge/affection 4 个模式中途异常时按钮卡在"■ 停止"红样式。
-  window._finalizeGeneration = () => {
-    try { askBtn.disabled = false; } catch (e) {}
-    try { window._hideStopBtn && window._hideStopBtn(); } catch (e) {}
-    window._genAbort = null;
-    try { loadConversations(); } catch (e) {}
-  };
+  // v0.42.2 ⭐ 修复：_showStopBtn/_hideStopBtn/_finalizeGeneration 已提升到模块顶层
+  // （定义于 updateStats 后），此处仅调用，不再重复定义——保证任何模式都可用。
   window._showStopBtn();
   try {
     const resp = await fetch(API_BASE + '/api/teach/stream', {
@@ -2754,10 +2760,15 @@ async function answerChat(question, subject) {
   const thinking = addThinking('chat');
   // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
   askBtn.disabled = false;
+  if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
+  const controller = new AbortController();
+  window._genAbort = controller;
+  window._showStopBtn();
   try {
     const result = await api('/api/answer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         question: question,
         subject: subject,
@@ -2777,7 +2788,11 @@ async function answerChat(question, subject) {
     }
   } catch (e) {
     removeThinking(thinking);
-    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    if (e.name === 'AbortError') {
+      addMsg('paeg', '<small>已停止生成。</small>');
+    } else {
+      addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    }
   } finally {
     // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
     window._finalizeGeneration();
@@ -2789,10 +2804,15 @@ async function methodChat(question, subject) {
   const thinking = addThinking('chat');
   // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
   askBtn.disabled = false;
+  if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
+  const controller = new AbortController();
+  window._genAbort = controller;
+  window._showStopBtn();
   try {
     const result = await api('/api/method', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         concept: question,
         subject: subject,
@@ -2815,7 +2835,11 @@ async function methodChat(question, subject) {
     }
   } catch (e) {
     removeThinking(thinking);
-    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    if (e.name === 'AbortError') {
+      addMsg('paeg', '<small>已停止生成。</small>');
+    } else {
+      addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    }
   } finally {
     // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
     window._finalizeGeneration();
@@ -2827,10 +2851,15 @@ async function knowledgeChat(question) {
   const thinking = addThinking('chat');
   // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
   askBtn.disabled = false;
+  if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
+  const controller = new AbortController();
+  window._genAbort = controller;
+  window._showStopBtn();
   try {
     const result = await api('/api/knowledge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         learner_id: STATE.learnerId,
         nickname: STATE.nickname,
@@ -2851,7 +2880,11 @@ async function knowledgeChat(question) {
     }
   } catch (e) {
     removeThinking(thinking);
-    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    if (e.name === 'AbortError') {
+      addMsg('paeg', '<small>已停止生成。</small>');
+    } else {
+      addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    }
   } finally {
     // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
     window._finalizeGeneration();
@@ -2863,10 +2896,18 @@ async function affectionChat(text) {
   const thinking = addThinking('chat');
   // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
   askBtn.disabled = false;
+  // v0.42.2 ⭐ 修复：affectionChat 此前无 AbortController/signal/按钮切换——
+  // 用户点"■ 停止"时 dataset.generating 不存在 → 走普通发送分支再发一次（假"卡住"），
+  // 且 /api/affection 非流式只能等 LLM 跑完。现补全停止机制（至少能断网络层+恢复按钮）。
+  if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
+  const controller = new AbortController();
+  window._genAbort = controller;
+  window._showStopBtn();
   try {
     const result = await api('/api/affection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         text: text,
         learner_id: STATE.learnerId,
@@ -2888,9 +2929,14 @@ async function affectionChat(text) {
     }
   } catch (e) {
     removeThinking(thinking);
-    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    if (e.name === 'AbortError') {
+      addMsg('paeg', '<small>已停止生成。</small>');
+    } else {
+      addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    }
   } finally {
     // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
+    // v0.42.2 ⭐ _finalizeGeneration 已模块级定义，任何模式 finally 恒有效
     window._finalizeGeneration();
   }
 }

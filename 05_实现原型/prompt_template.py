@@ -85,6 +85,13 @@ def _render_slot(key: str, title: str, value: Any, max_chars: int = 800) -> str:
     return f"## {title}\n{text}"
 
 
+# v0.42.2 ⭐ 每槽最大长度覆盖：chat_history 装 10 轮对话（20 条 × 300 字）
+# 远超默认 800 字，单独放大到 6000，避免对话历史被截断导致代词回指失败。
+_SLOT_MAX_CHARS = {
+    "chat_history": 6000,
+}
+
+
 def render_dynamic_slots(context: Optional[Dict[str, Any]] = None,
                          slots: Optional[List] = None) -> str:
     """只渲染动态槽（不含固定块）。
@@ -105,7 +112,8 @@ def render_dynamic_slots(context: Optional[Dict[str, Any]] = None,
     dynamic_parts = []
     for key, title, required in _slots:
         if key in ctx and ctx[key]:
-            dynamic_parts.append(_render_slot(key, title, ctx[key]))
+            _max = _SLOT_MAX_CHARS.get(key, 800)  # v0.42.2 ⭐ 按槽覆盖截断上限
+            dynamic_parts.append(_render_slot(key, title, ctx[key], max_chars=_max))
         elif required:
             dynamic_parts.append(f"## {title}\n（未提供）")
     return "\n\n".join(dynamic_parts)

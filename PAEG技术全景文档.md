@@ -4538,3 +4538,135 @@ python arch_check.py          # 输出连通性报告 + arch_report.json
 
 #### 新铁律
 > **"能跑"和"活着"之间隔着 9 个静默故障**：① 代码层测试（audit / smoke / 契约 / 属性）只能查"功能存在 + 功能正确"，查不出"事件顺序错位 / 缩进错位 / 路径错位 / 静默吞噬"；② AI 真人 E2E 是唯一能抓"体验错位"的手段；③ 升级前必须三层叠加（4 路探索 + Oracle 诊断 + AI E2E），任何一层省略都会漏掉"看着正常其实死了"的功能（详见 [维护手册 §十](../维护手册.md) 与 [元能力 §6.30](../元能力文档.md)）。
+
+### 10.2.36 ⭐ 共享能力接线审计（v0.42.3）
+
+> **触发**：用户原话"语言规范检测、记忆功能、按钮功能应该是每一个对话模块都有的能力"——v0.42.3 启动 5 路并行审计，按能力维度（语言/记忆/检索/停止/架构）而非按模式维度切，发现并修复了一批"看着能用实则残废"的隐性 bug。
+
+#### 一、审计方法论（5 路并行）
+
+```
+Layer 1：能力维度横向切（5 路 explore）
+├─ 语言规范接入（grep _polish_text / LANGUAGE_STYLE 注入点）
+├─ 记忆写回完整性（grep _append_chat_hist 调用 vs 读取）
+├─ 检索三线（KB / Library / Web 调用入口）
+├─ 停止按钮（前端 AbortController + signal 配对）
+└─ 架构审计（Oracle：每模式"接口→调用→消费→持久化"穿透）
+```
+
+> **方法论价值**：按能力维度切比按模式逐个看更容易发现"系统性缺失"——比如"affection/method/knowledge 三个模式都只读 chat_hist 不写回"——按能力维度（"哪些模式在写回？"）一扫就能抓到，按模式逐个看则三个都要"碰巧注意到同一类问题"才暴露。
+
+#### 二、审计发现（修复前矩阵）
+
+| 模式 | 语言规范 | 历史写回 | 画像注入 | 停止按钮 | KB 检索 | Web 检索 |
+|---|---|---|---|---|---|---|
+| **teach** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **chat_stream** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **answer** | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| **method** | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| **knowledge** | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| **affection** | ✅ | ❌ | ✅ | ✅ | — | — |
+
+> 修复前 36 项中只有 18 项 ✅——**50% 残废率**。
+
+#### 三、修复技术细节
+
+##### 3.1 `_append_chat_hist` 统一 helper（防"读而不写"断文）
+
+**痛点**：affection / method / knowledge 三个模式各自重复写 `users_data/<uid>/chat_hist.json` 样板，且 affection **只读不写**——用户问"她对我要求太高"时 LLM 看不到上文"我被妈妈骂了"，**续问丢上文 = 读而不写 = 断文**。
+
+**实现**：
+
+```python
+# server.py
+def _append_chat_hist(uid: str, role: str, text: str, source_mode: str):
+    """统一写回 chat_hist 入口（v0.42.3 抽出）。
+    
+    Args:
+        uid: 用户 ID
+        role: 'user' 或 'assistant'
+        text: 消息内容
+        source_mode: 触发模式（teach/chat/answer/method/knowledge/affection）
+    """
+    path = user_data_paths(uid)["history"]
+    arr = _safe_read_json(path, default=[])
+    arr.append({"role": role, "text": text, "mode": source_mode, "ts": time.time()})
+    _safe_write_json(path, arr)
+```
+
+**调用点**：affection / method / knowledge 三个流的 user 消息前 + assistant 消息后各调一次（**漏调 = 续问断文**）。
+
+##### 3.2 polish 收口范式（语言规范统一入口）
+
+**痛点**：`_polish_text` 在 teach_stream / chat_stream 散落调用，answer / method / knowledge 三个模式**完全没接**——用户进这些模式时 LLM 输出无范式化收口，"AI 味"重、句子残缺。
+
+**实现**：
+
+```python
+# 收口范式（每个流末尾统一调用，不依赖散落拼接）
+def chat_xxx_stream(uid, text, source_mode):
+    system = build_xxx_system(learner, mode=source_mode)   # 1. 基座含 LANGUAGE_STYLE
+    response = _safe_chat_with_retrieval(system, ...)      # 2. LLM 调用
+    final = _polish_text(response)                         # 3. 范式化收口（统一收口）
+    _append_chat_hist(uid, "assistant", final, source_mode) # 4. 历史写回
+    return final
+```
+
+> **核心**：**收口集中在 LLM 调用之后**——不论中间拼了多少 system / 多少 dynamic slot，最终输出前 `_polish_text` 必须跑一遍。三个补接模式（answer/method/knowledge）全部加上。
+
+##### 3.3 LANGUAGE_STYLE 注入位置（5 个模式基座统一）
+
+**修复前**：LANGUAGE_STYLE 只在 `build_teach_system` 和 `build_affection_system` 的 system 字符串里拼入，`build_answer_system` / `build_method_system` / `build_knowledge_system` **全部缺失**。
+
+**修复**：`build_general_chat_system(learner, mode)` 加 `mode` 参数（v0.41.6 已落），5 个模式的基座 builder 全部统一调用 `LANGUAGE_STYLE`，不再单独依赖 mode 字符串拼接。
+
+##### 3.4 method 检索改造（KB+Library+Web 三线统一入口）
+
+**修复前**：method 模式直调 LLM（`/api/chat/method` → `llm.chat(...)`），无 KB 检索、无 Library 检索、无 Web 检索——用户问"记忆英语单词的方法"时 LLM 答不到 PAEG 资料库里的语法讲义。
+
+**修复**：改用 `_safe_chat_with_retrieval`（v0.41.9 引入的统一检索入口），自动走 KB → Library → Web 三线：
+
+```python
+# 修复前
+response = llm.chat(system, history, user_msg)
+
+# 修复后
+response = _safe_chat_with_retrieval(
+    system, history, user_msg,
+    enable_kb=True, enable_library=True, enable_web=True
+)
+```
+
+#### 四、修复后矩阵（6 模式 × 6 能力 = 36/36 ✅）
+
+| 模式 | 语言规范 | 历史写回 | 画像注入 | 停止按钮 | KB 检索 | Web 检索 |
+|---|---|---|---|---|---|---|
+| **teach** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **chat_stream** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **answer** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **method** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **knowledge** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **affection** | ✅ | ✅ | ✅ | ✅ | — | — |
+
+> **affection 的 KB/Web 检索为 —**：情感对话不调外部资料（用户讲"被妈妈骂了"时不需要查 KB），但其他 5 项全部 ✅。
+
+#### 五、验证
+
+| 维度 | 结果 |
+|---|---|
+| `audit_check.py` | **40/40 全绿**（新增维度 16：共享能力接线完整性） |
+| 5 模式 smoke | 全 200（answer / method / knowledge / chat_stream / teach） |
+| 记忆回指 E2E | ✅ "被妈妈骂了" → 追问"她对我要求太高" → LLM 正确回指"妈妈" |
+| Python 综合 | 114+ 全过，无回归 |
+
+#### 六、踩坑教训
+
+> **教训：验证必须重启服务器**——改完后台代码（`_append_chat_hist` / `_polish_text`）不重启就测试，会测到旧代码（Python 进程缓存模块）。**曾踩过**：第一次修复后立刻跑测试显示"续问丢上文"，差点误判修复无效；重启 server 后立即正常——这种"幽灵 bug"如果不识别会浪费几小时排查。
+
+#### 元能力沉淀
+
+- **§6.31 共享能力与差异化**：模式差异化 ≠ 共享能力缺失（teach 六阶段/affection 子代理是差异化，但语言规范/记忆/停止按钮/检索是底座不能省）
+- **审计要按能力维度切，不是按模式切**：本次按"语言规范接入了几处"搜一遍，比按模式逐个看更容易发现缺失
+- **"读历史"和"写历史"是两件事**：affection 读了 chat_hist 但从不写回，续问丢上文（读而不写 = 断文）
+
+> **配套文档**：[CHANGELOG v0.42.3](../CHANGELOG.md)（变更明细）/ [维护手册 §十一](../维护手册.md)（新模式 checklist）/ [元能力 §6.31](../元能力文档.md)（元能力沉淀）

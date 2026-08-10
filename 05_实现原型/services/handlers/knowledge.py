@@ -89,12 +89,45 @@ def _handle_knowledge_query(learner, subject):
         "5. 结尾自然引导：**明确告诉学生以后只要问'知识库'/'你学过什么'，我就会为你打开这份资料清单**。"
         "同时邀请 ta 问我这些领域的任何问题；想让更精通某领域就上传资料（点书本图标）\n"
         "6. 语言像认真备课的老师，主谓宾完整\n"
-        "7. 如果某文件内容不可读，如实说'这份是 PDF，我存着但还没细读内容'\n"
-        "8. 如果清单是空的，就说'目前我的资料库还比较空，你可以先问我任何问题，或者上传资料让我更擅长'"
+         "7. 如果某文件内容不可读，如实说'这份是 PDF，我存着但还没细读内容'\n"
+         "8. 如果清单是空的，就说'目前我的资料库还比较空，你可以先问我任何问题，或者上传资料让我更擅长'"
     )
+    # v0.42.3 ⭐ P1 修复：knowledge 接入语言规范层（LANGUAGE_STYLE）——
+    # 此前 system 无语言规范约束，输出风格不受薇依式朴素语言约束。
+    try:
+        from prompts import LANGUAGE_STYLE
+        system = f"{LANGUAGE_STYLE}\n\n" + system
+    except Exception:
+        pass
+    # v0.42.3 ⭐ P1 修复：knowledge 注入对话历史 + 用户事实（共享记忆能力）
+    try:
+        from infra.sessions import SESSIONS
+        _hist = SESSIONS.get(f"chat_hist_{getattr(learner, 'id', '')}", [])
+        if _hist:
+            _hl = []
+            for _m in _hist[-20:]:
+                _rc = "学生" if _m.get("role") == "user" else "Émile"
+                _cc = str(_m.get("content") or "")[:300]
+                if _cc.strip():
+                    _hl.append(f"{_rc}: {_cc}")
+            if _hl:
+                system = system + "\n\n## 对话历史\n" + "\n".join(_hl)
+        from context_bundle import extract_user_facts
+        _facts = extract_user_facts(_hist)
+        if _facts:
+            _facts_str = "\n".join(f"- {f}" for f in _facts)
+            system = system + "\n\n## 用户说过的事实\n" + _facts_str
+    except Exception:
+        pass
     user = f"【Library 资料库实际内容】\n{inventory_text}\n\n请逐份基于这些内容，用老师式的语言总结你掌握的知识。"
     llm_answer = _safe_chat(llm, system, user, max_tokens=900)
     answer = llm_answer or ("我目前的知识库里收录了这些领域的资料，你可以问我相关问题，也可以上传资料让我更擅长。")
+    # v0.42.3 ⭐ P1 修复：knowledge 语言规范收口（L2/L3）——对齐 affection 接入范式
+    try:
+        from services.polish import _polish_text
+        answer = _polish_text(answer, context=f"knowledge:{subject[:30]}")
+    except Exception:
+        pass
 
     return {
         "session_id": f"kb_{learner.id}",

@@ -155,6 +155,23 @@ def _inject_skill_catalog(system: str) -> str:
         return system
     return system + "\n\n" + catalog
 
+
+def _append_chat_hist(learner_id: str, user_content: str, assistant_content: str = "") -> None:
+    """v0.42.3 ⭐ P0 修复：统一对话历史写回（method/knowledge/affection 三端点共用）。
+
+    - 此前这 3 个端点只读 chat_hist 不写回（或完全不写），续问丢上文（"她"→"妈妈"回指失败）
+    - 统一窗口 20 条（10 轮），与 teach/chat/answer 对齐
+    """
+    try:
+        _ch = SESSIONS.setdefault(f"chat_hist_{learner_id}", [])
+        if isinstance(_ch, list):
+            _ch.append({"role": "user", "content": user_content})
+            if assistant_content:
+                _ch.append({"role": "assistant", "content": assistant_content})
+            SESSIONS[f"chat_hist_{learner_id}"] = _ch[-20:]
+    except Exception as _che:
+        print(f"[PAEG] {learner_id} 写回 chat_hist 失败: {_che}")
+
 # ─────────────────────────────────────
 # 静态文件（GUI 前端）
 # ─────────────────────────────────────
@@ -2537,6 +2554,24 @@ def general_chat_stream():
     # render_dynamic_slots 按重要性降序组织（替代 system = system + X 散落拼接）。
     _dyn_ctx = {}
 
+    # v0.42.2 ⭐ P0 修复：填充 chat_history 槽——此前 DYNAMIC_SLOTS 定义了
+    # "chat_history" 槽但全项目 0 处赋值，system prompt 无对话历史段，
+    # LLM 看到"她对我要求太高了"无从回指"妈妈"（代词回指失败）。
+    # 取最近 10 轮（20 条）格式化为"学生/老师"交替文本注入。
+    try:
+        _hist_ctx = SESSIONS.get(f"chat_hist_{learner_id}", [])
+        if _hist_ctx:
+            _hist_lines = []
+            for _m in _hist_ctx[-20:]:
+                _role_cn = "学生" if _m.get("role") == "user" else "Émile"
+                _c = str(_m.get("content") or "")[:300]
+                if _c.strip():
+                    _hist_lines.append(f"{_role_cn}: {_c}")
+            if _hist_lines:
+                _dyn_ctx["chat_history"] = "\n".join(_hist_lines)
+    except Exception as _he:
+        print(f"[PAEG] chat_stream chat_history 装配跳过: {_he}")
+
     # v0.19.7：注入可编辑教学记忆（teaching_memory，CLAUDE.md 风格）
     try:
         from teaching_memory import load_teaching_memory
@@ -2874,6 +2909,16 @@ def general_chat_stream():
             pass
             pass
 
+        # v0.42.3 ⭐ P1 修复：chat 语言规范收口——此前 chat_stream 的 reply 只过
+        # ExpertGuard（专业深度守门，非语言规范），AI 味/语法残缺可能泄漏。
+        # 补 _polish_text（L1 已在 system；此处 L2/L3 收口），对齐 affection 范式。
+        # _polish_text 已在模块级 import（L60），无需局部重复导入。
+        try:
+            if reply:
+                reply = _polish_text(reply, context=f"chat:{text[:30]}")
+        except Exception as _cpe:
+            print(f"[PAEG][server.py] chat_stream 语言规范收口跳过: {_cpe}")
+
         # 3) SSE 推送工具记录
         for tc in tool_log:
             yield f"event: tool\ndata: {json.dumps(tc, ensure_ascii=False)}\n\n"
@@ -3050,6 +3095,34 @@ def general_chat():
     # v0.42 ⭐ 提示词模板化：散落注入段统一收集到 _dyn_ctx，末尾用
     # render_dynamic_slots 按重要性降序组织（替代 system = system + X 散落拼接）。
     _dyn_ctx = {}
+
+    # v0.42.2 ⭐ P0 修复：填充 chat_history 槽（对齐 chat_stream）——非流式闲聊
+    # 此前 system 无对话历史段，代词回指失败（"她"→"妈妈"）。取最近 10 轮注入。
+    try:
+        _hist_ctx = SESSIONS.get(f"chat_hist_{learner_id}", [])
+        if _hist_ctx:
+            _hist_lines = []
+            for _m in _hist_ctx[-20:]:
+                _role_cn = "学生" if _m.get("role") == "user" else "Émile"
+                _c = str(_m.get("content") or "")[:300]
+                if _c.strip():
+                    _hist_lines.append(f"{_role_cn}: {_c}")
+            if _hist_lines:
+                _dyn_ctx["chat_history"] = "\n".join(_hist_lines)
+    except Exception as _he:
+        print(f"[PAEG] general_chat chat_history 装配跳过: {_he}")
+
+    # v0.42.3 ⭐ P1 修复：general_chat 补 user_facts 槽（对齐 chat_stream）——
+    # v0.42.2 补了 chat_history 但漏了 user_facts，"我喜欢蓝绿色"类事实在
+    # 非流式闲聊中不被注入（多轮注意力缺失）。
+    try:
+        from context_bundle import extract_user_facts
+        _facts = extract_user_facts(SESSIONS.get(f"chat_hist_{learner_id}", []))
+        if _facts:
+            _facts_str = "\n".join(f"- {f}" for f in _facts)
+            _dyn_ctx["user_facts"] = _facts_str
+    except Exception as _ufe:
+        print(f"[PAEG] general_chat user_facts 装配跳过: {_ufe}")
 
     # v0.16：注入用户画像 + BDI（让"随便说说"也有个体性）
     try:
@@ -3238,6 +3311,14 @@ def general_chat():
         pass
         pass
 
+    # v0.42.3 ⭐ P1 修复：general_chat 语言规范收口（对齐 chat_stream 修复）
+    # _polish_text 已在模块级 import（L60），无需局部重复导入。
+    try:
+        if reply:
+            reply = _polish_text(reply, context=f"chat:{text[:30]}")
+    except Exception as _cpe2:
+        print(f"[PAEG][server.py] general_chat 语言规范收口跳过: {_cpe2}")
+
     # v0.17：按 【NEXT】 切分为多段（自我反思与迭代：核心回应→补充→推荐）
     import re as _re
     raw_segments = _re.split(r'【NEXT】', reply)
@@ -3391,17 +3472,16 @@ def answer_api():
                 print(f"[PAEG][server.py] answer_api 异常忽略: {_e}")
                 pass
                 pass
-        # v0.21.8：answer 也写入 chat_hist（修复多轮上下文丢失——"那 x³ 呢"必须记得上文在讲积分）
-        if learner_id:
-            try:
-                _ch = SESSIONS.setdefault(f"chat_hist_{learner_id}", [])
-                _ch.append({"role": "user", "content": question})
-                _ch.append({"role": "assistant", "content": result.get("answer") or ""})
-                SESSIONS[f"chat_hist_{learner_id}"] = _ch[-20:]  # v0.26 统一窗口 20
-            except Exception as _e:
-                print(f"[PAEG][server.py] answer_api 异常忽略: {_e}")
-                pass
-                pass
+        # v0.21.8：answer 也写入 chat_hist（统一 helper——"那 x³ 呢"必须记得上文在讲积分）
+        _append_chat_hist(learner_id, question, result.get("answer") or "")
+        # v0.42.3 ⭐ P1 修复：answer 语言规范收口——此前 AnswerSolver 直接 return，
+        # 未过 L1/L2/L3 语言质量层（只有 teach/affection 过 polish）。
+        try:
+            _ans = result.get("answer") or ""
+            if _ans:
+                result["answer"] = _polish_text(_ans, context=f"answer:{question[:30]}")
+        except Exception as _ape:
+            print(f"[PAEG] answer 语言规范收口跳过: {_ape}")
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -3549,6 +3629,14 @@ def method_advice():
             SESSIONS[f"conv_method_{learner_id}"] = cid
     except Exception as _e:
         print(f"[PAEG] method 保存会话失败: {_e}")
+    # v0.42.3 ⭐ P0 修复：method 写回 chat_hist（统一 helper）
+    _m_content = ""
+    if isinstance(result, dict):
+        _m_content = (result.get("presentations") or [{}])[0].get("content", "")
+    elif hasattr(result, "get_json"):
+        _rd = result.get_json()
+        _m_content = (_rd.get("presentations") or [{}])[0].get("content", "")
+    _append_chat_hist(learner_id, concept, _m_content)
     return result
 
 @app.route("/api/knowledge", methods=["POST"])
@@ -3589,6 +3677,11 @@ def knowledge_query():
             SESSIONS[f"conv_knowledge_{learner_id}"] = cid
     except Exception as _e:
         print(f"[PAEG] knowledge 保存会话失败: {_e}")
+    # v0.42.3 ⭐ P0 修复：knowledge 写回 chat_hist（统一 helper）
+    _kq = data.get("text") or data.get("concept") or "知识库"
+    _k_content = (result.get("presentations") or [{}])[0].get("content", "") \
+        if isinstance(result, dict) else ""
+    _append_chat_hist(learner_id, _kq, _k_content)
     return jsonify(result)
 
 @app.route("/api/affection", methods=["POST"])
@@ -3631,6 +3724,9 @@ def affection_support():
             SESSIONS[f"conv_affection_{learner_id}"] = cid
     except Exception as _e:
         print(f"[PAEG] affection 保存会话失败: {_e}")
+    # v0.42.3 ⭐ P0 修复：affection 写回 chat_hist（统一 helper）——
+    # 此前只读不写，第二句倾诉看不到第一句，情绪陪伴连贯性断裂。
+    _append_chat_hist(learner_id, text, _emo_content)
     return jsonify({
         "session_id": f"affection_{learner_id}",
         "summary": {"avg_score": 0},
