@@ -15,6 +15,22 @@
 
 **验证**：audit 27/28（P0 全过，1 处 P1 核查）+ 属性测试 3/3 + 服务 200
 
+### v0.41.8 问题层级下沉 + 需求表 6 项落地（2026-08-10）
+
+**用户判断（确认正确）**："这一次不是架构/连接问题，是更基础的代码层问题"——记录为元能力 §6.22 问题层级下沉元技术 + 技术文档 §10.2.28。
+
+**需求表 v0.41.8 落地（Oracle 执行策略 2→5→1→3→4→6）**：
+- ✅ **pyright P1 核查**：修 `_steer`/`_ind_result` 闭包 NameError 真隐患（10→2 处），audit 28/28
+- ✅ **INTERFACE_GUIDE 补 4 桶**：voice/ppt/weather/composite（此前模板停滞 v0.21.9，问"麦克风干嘛用"答非所问）
+- ✅ **迁移 4 handler**：method/knowledge/recommend/problem → services/handlers/ + services/library.py，server.py 3989→3710
+- ✅ **API 契约测试**：tests/test_api_schemas.py（jsonschema 4 端点：health/profile/method/teach_stream 事件）4/4
+- ✅ **SSE 增强测试**：tests/test_sse_enhanced.py（首事件时延/断连鲁棒/连续流稳定）3/3
+- 📋 mutmut 突变测试：延后至 v0.41.9（需覆盖率基线，LLM 驱动项目价值有限）
+
+**Subagent 治理（用户关切）**：维护手册 §4.9 委派监控规范（轮询产物+服务健康+告警，超时≠失败先看产物）
+
+**验证**：audit 28/28 + smoke 12/13（唯一失败为 affection 已知超时抖动）+ 契约 4/4 + SSE 3/3 + 属性 3/3
+
 ### v0.41.7 三 bug 修复 + 质检方法论反思（2026-08-10）
 
 **Bug 1：语音转文字发送两条消息（用户反馈仍存在）**

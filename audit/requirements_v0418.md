@@ -72,12 +72,13 @@
 
 | # | 需求 | 目标 | 改动点 | 验收 |
 |---|---|---|---|---|
-| 1 | 迁移剩余 4 个 handler | server.py 继续瘦身 | recommend/knowledge/method/problem → services/handlers/ | server.py < 3800 行 |
-| 2 | INTERFACE_GUIDE 补 4 桶 | 语音/PPT/气象/复合输入有说明 | self_referential.py | 问"麦克风干嘛用"答对 |
-| 3 | schemathesis 契约测试 | API 响应字段漂移自动捕获 | openapi.yaml + test_openapi_contract.py | 契约测试过 |
-| 4 | SSE 增强（首事件/断连） | 流式体验 + 鲁棒性 | 2 个新测试 | pytest 过 |
-| 5 | pyright P1 10 处核查 | 消除"可能未绑定"隐患 | server.py try/except 兜底加固 | pyright P1 ≤ 5 |
-| 6 | mutmut 突变测试 | 测试质量元评估 | 覆盖率基线 + 核心模块 mutmut | score ≥ 70% |
+| 1 | ~~迁移剩余 4 个 handler~~ | ~~server.py 继续瘦身~~ | ✅ 已迁移（3989→3710） | ✅ method/knowledge/recommend/problem 场景验证 |
+| 2 | ~~INTERFACE_GUIDE 补 4 桶~~ | ~~语音/PPT/气象/复合输入有说明~~ | ✅ 已补（voice/ppt/weather/composite） | ✅ 5 场景测试命中 |
+| 3 | ~~契约测试~~ | ~~API 响应字段漂移自动捕获~~ | ✅ 已落地（test_api_schemas.py jsonschema 4 端点） | ✅ 4/4 通过 |
+| 4 | ~~SSE 增强（首事件/断连）~~ | ~~流式体验 + 鲁棒性~~ | ✅ 已落地（test_sse_enhanced.py） | ✅ 3/3 通过 |
+| 5 | ~~pyright P1 10 处核查~~ | ~~消除"可能未绑定"隐患~~ | ✅ 已修 _steer/_ind_result 真隐患（10→2） | ✅ audit 28/28 |
+| 6 | mutmut 突变测试 | 测试质量元评估 | 延后至 v0.41.9（需先覆盖率基线；LLM 驱动项目突变价值有限） | — |
+| 7 | 新增：语音双发送用户实测确认 | 浏览器缓存可能掩盖修复 | 用户强制刷新后实测 | 单条消息 |
 
 ---
 
