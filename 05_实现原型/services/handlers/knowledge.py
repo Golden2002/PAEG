@@ -107,6 +107,14 @@ def _handle_knowledge_query(learner, subject):
             system = f"{_qq}\n\n" + system
     except Exception:
         pass
+    # v0.43 ⭐ P1 修复：knowledge 消费约束掩码（此前 handler 不读）
+    try:
+        from prompts import _build_constraint_layers
+        _cf = getattr(learner, "_constraint_flags", ()) or ()
+        if _cf:
+            system = f"{_build_constraint_layers(_cf)}\n\n" + system
+    except Exception:
+        pass
     # v0.42.3 ⭐ P1 修复：knowledge 注入对话历史 + 用户事实（共享记忆能力）
     try:
         from infra.sessions import SESSIONS

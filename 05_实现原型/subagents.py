@@ -1332,6 +1332,14 @@ class AnswerSolver:
         # v0.43 ⭐ 注册问卷固定提示词（answer 模式接入，用户专属教学指令）
         _qq_block = _build_questionnaire_block(learner)
         _qq_prefix = (f"{_qq_block}\n\n" if _qq_block else "")
+        # v0.43 ⭐ P1 修复：answer 消费约束掩码（此前端点设置了但 AnswerSolver 不读）
+        try:
+            from prompts import _build_constraint_layers
+            _cf = getattr(learner, "_constraint_flags", ()) or ()
+            if _cf:
+                _qq_prefix += _build_constraint_layers(_cf) + "\n\n"
+        except Exception:
+            pass
 
         # 找答案模式的 system：明确"直接给完整答案"，不受教学范式约束
         system = (

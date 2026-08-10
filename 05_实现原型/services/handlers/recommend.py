@@ -40,6 +40,22 @@ def _handle_recommend_query(learner, question, subject, llm_arg):
             "4. 用中文回答，语气亲切实用\n\n"
             f"检索到的资料：\n{results_text[:3000] if results_text else '（无检索结果）'}"
         )
+        # v0.43 ⭐ P0 修复：recommend 注入注册问卷（此前缺失，与其他模式对齐）
+        try:
+            from prompts import _build_questionnaire_block
+            _qq = _build_questionnaire_block(learner)
+            if _qq:
+                sys_prompt = f"{_qq}\n\n" + sys_prompt
+        except Exception:
+            pass
+        # v0.43 ⭐ P1 修复：recommend 消费约束掩码
+        try:
+            from prompts import _build_constraint_layers
+            _cf = getattr(learner, "_constraint_flags", ()) or ()
+            if _cf:
+                sys_prompt = f"{_build_constraint_layers(_cf)}\n\n" + sys_prompt
+        except Exception:
+            pass
         user_msg = f"学生问：{question}"
         answer = _safe_chat(llm_arg, sys_prompt, user_msg, max_tokens=900) or ""
     except Exception:
@@ -49,6 +65,12 @@ def _handle_recommend_query(learner, question, subject, llm_arg):
             "关于推荐，我帮你查了一些资料，但信息有限。"
             "你可以告诉我你的具体水平和目标，我帮你更精准地推荐。"
         )
+    # v0.43 ⭐ P1 修复：recommend 语言规范收口（此前未过 polish）
+    try:
+        from services.polish import _polish_text
+        answer = _polish_text(answer, context=f"recommend:{question[:30]}")
+    except Exception:
+        pass
 
     return {
         "session_id": f"rec_{learner.id}",

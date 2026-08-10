@@ -53,6 +53,14 @@ def _handle_problem_request(learner, concept, subject):
             system = f"{_qq}\n\n" + system
     except Exception:
         pass
+    # v0.43 ⭐ P1 修复：problem 消费约束掩码（此前 handler 不读）
+    try:
+        from prompts import _build_constraint_layers
+        _cf = getattr(learner, "_constraint_flags", ()) or ()
+        if _cf:
+            system = f"{_build_constraint_layers(_cf)}\n\n" + system
+    except Exception:
+        pass
 
     user = (
         f"请给我一道{grade_cn}{subject_cn}经典题目。\n"
@@ -64,6 +72,12 @@ def _handle_problem_request(learner, concept, subject):
         answer = (f"好，这是一道{grade_cn}{subject_cn}经典题：\n"
                   f"【题目】请证明/求解以下问题（{concept}）……\n"
                   f"（生成失败，请重试）")
+    # v0.43 ⭐ P1 修复：problem 语言规范收口 + 问卷注入对齐（此前未过 polish）
+    try:
+        from services.polish import _polish_text
+        answer = _polish_text(answer, context=f"problem:{concept[:30]}")
+    except Exception:
+        pass
 
     return jsonify({
         "session_id": f"prob_{learner.id}",

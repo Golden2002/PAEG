@@ -840,6 +840,37 @@ body {
 .desc-save:hover { opacity: .9; }
 .desc-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; line-height: 1.5; }
 
+/* ─── v0.42：问卷状态条（OMIT-5/OMIT-13，左侧栏"告诉老师你是谁"下方） ─── */
+.questionnaire-status {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, var(--text-dim));
+  border-radius: 8px;
+  background: var(--bg-soft, rgba(127,127,127,.06));
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.questionnaire-status-row { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.questionnaire-status-icon { font-size: 14px; line-height: 1; flex: 0 0 auto; }
+.questionnaire-status-text {
+  font-size: var(--fs-xs, 11px); color: var(--text-dim); line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.questionnaire-status-text.filled { color: var(--text); }
+.questionnaire-status-text.empty { color: var(--accent); }
+.questionnaire-status-btn {
+  flex: 0 0 auto;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft, transparent);
+  color: var(--accent);
+  font-size: var(--fs-xs, 11px);
+  padding: 3px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.questionnaire-status-btn:hover { background: var(--accent); color: #fff; }
+
 /* ─── 文件生成栏（v0.12） ─── */
 .generate-bar { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
 .generate-btn {
@@ -1459,6 +1490,14 @@ body {
           aria-label="描述你的学习情况和目标"></textarea>
         <button class="desc-save" id="desc-save">保存（每次对话都会记住）</button>
         <div class="desc-hint">写下你是怎样的人、学习目标、擅长与不擅长——之后每一次对话，PAEG 都会带着这段描述来教你。</div>
+      </div>
+      <!-- OMIT-5/OMIT-13：问卷状态 + 入口（登录后由 JS 填充；初始隐藏） -->
+      <div class="questionnaire-status" id="questionnaire-status" style="display:none">
+        <div class="questionnaire-status-row">
+          <span class="questionnaire-status-icon" aria-hidden="true">📝</span>
+          <span class="questionnaire-status-text" id="questionnaire-status-text">加载中…</span>
+        </div>
+        <button class="questionnaire-status-btn" id="questionnaire-status-btn" type="button">查看/修改</button>
       </div>
       <div class="mastery-list" id="mastery-list"><!-- 动态 --></div>
     </div>
@@ -2360,6 +2399,14 @@ async function loadProfile() {
       STATE.avatarUrl = p.avatar_url;
       try { localStorage.setItem('paeg-avatar', p.avatar_url); } catch (e) {}
       renderAvatar();
+    }
+    // OMIT-5：读取并显示问卷答案（已填 / 未填 + 摘要 + 入口）
+    if (p.questionnaire_answers && Object.keys(p.questionnaire_answers).length > 0) {
+      STATE.questionnaireAnswers = p.questionnaire_answers;
+      renderQuestionnaireStatus(p.questionnaire_answers);
+    } else {
+      STATE.questionnaireAnswers = null;
+      renderQuestionnaireStatus(null);
     }
   } catch (e) {
     // 新学习者，暂无画像
@@ -3474,15 +3521,70 @@ function collectQuestionnaireAnswers() {
   return answers;
 }
 
-function openQuestionnaire(learnerId) {
+function openQuestionnaire(learnerId, existingAnswers) {
   const modal = document.getElementById('questionnaire-modal');
   const msgEl = document.getElementById('questionnaire-msg');
   if (!modal) return;
   msgEl.textContent = '';
   msgEl.className = 'questionnaire-msg';
+  // OMIT-14：若有已填答案，先清空再回显（避免上次勾选残留）
+  const form = document.getElementById('questionnaire-form');
+  if (form) {
+    form.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(i => { i.checked = false; });
+  }
+  if (existingAnswers && typeof existingAnswers === 'object') {
+    fillQuestionnaireAnswers(existingAnswers);
+  } else if (STATE.questionnaireAnswers && typeof STATE.questionnaireAnswers === 'object') {
+    // 兜底：从 STATE 读（避免调用方忘记传）
+    fillQuestionnaireAnswers(STATE.questionnaireAnswers);
+  }
   updateQuestionnaireProgress();
   modal.classList.add('open');
   modal.dataset.learnerId = learnerId || STATE.learnerId || '';
+}
+
+// OMIT-14：把已有答案回显到表单（radio 单选 / checkbox 多选）
+function fillQuestionnaireAnswers(answers) {
+  const form = document.getElementById('questionnaire-form');
+  if (!form || !answers) return;
+  Q_FIELDS.forEach(name => {
+    const val = answers[name];
+    if (val === undefined || val === null) return;
+    if (Q_MULTI.has(name)) {
+      const arr = Array.isArray(val) ? val : [val];
+      arr.forEach(v => {
+        const el = form.querySelector(`input[name="${name}"][value="${CSS.escape(String(v))}"]`);
+        if (el) el.checked = true;
+      });
+    } else {
+      const el = form.querySelector(`input[name="${name}"][value="${CSS.escape(String(val))}"]`);
+      if (el) el.checked = true;
+    }
+  });
+}
+
+// OMIT-5：把问卷答案摘要显示到左侧栏（已填 / 未填 + 关键标签 + 入口）
+function renderQuestionnaireStatus(answers) {
+  const box = document.getElementById('questionnaire-status');
+  const textEl = document.getElementById('questionnaire-status-text');
+  const btn = document.getElementById('questionnaire-status-btn');
+  if (!box || !textEl) return;
+  if (answers && typeof answers === 'object' && Object.keys(answers).length > 0) {
+    // 摘要：学段 · 风格 · 深度
+    const parts = [];
+    if (answers.grade_level) parts.push(answers.grade_level);
+    if (answers.cognitive_style) parts.push(answers.cognitive_style.replace(/型$/, '型'));
+    if (answers.depth_pref) parts.push(answers.depth_pref);
+    const summary = parts.length ? parts.join(' · ') : '已填写注册问卷';
+    textEl.textContent = '已填写注册问卷 · ' + summary;
+    textEl.className = 'questionnaire-status-text filled';
+    if (btn) btn.textContent = '查看/修改';
+  } else {
+    textEl.textContent = '尚未填写注册问卷 · 老师会更懂你';
+    textEl.className = 'questionnaire-status-text empty';
+    if (btn) btn.textContent = '去填写';
+  }
+  box.style.display = '';
 }
 
 function closeQuestionnaire() {
@@ -3519,6 +3621,11 @@ async function submitQuestionnaire() {
     if (result && result.ok) {
       msgEl.textContent = '已保存 · 老师会更懂你';
       msgEl.className = 'questionnaire-msg ok';
+      // OMIT-5：保存成功后立即更新 STATE + 左侧栏状态（无需刷新页面）
+      try {
+        STATE.questionnaireAnswers = answers;
+        renderQuestionnaireStatus(answers);
+      } catch (e) { /* 状态更新失败不影响主流程 */ }
       // 关闭弹窗 + 在聊天区友好提示
       setTimeout(() => {
         closeQuestionnaire();
@@ -3550,6 +3657,11 @@ document.addEventListener('keydown', (e) => {
     const modal = document.getElementById('questionnaire-modal');
     if (modal && modal.classList.contains('open')) closeQuestionnaire();
   }
+});
+
+// OMIT-13：左侧栏"查看/修改 / 去填写"按钮 → 打开问卷（带已填答案回显）
+document.getElementById('questionnaire-status-btn').addEventListener('click', () => {
+  openQuestionnaire(STATE.learnerId, STATE.questionnaireAnswers || null);
 });
 
 // ─── 事件 ───

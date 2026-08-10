@@ -68,9 +68,31 @@ def handle_keyword_doc(user_text: str, reply: str, learner, data: dict):
         '笔记': "把主题「{topic}」整理成**学生笔记版**（{grade}·{subject}）：比讲义更简洁，保留核心框架和公式，关键处留出思考留白的提示。",
     }
     system = sys_tpl[doc_type].format(topic=topic, grade=grade_cn, subject=subject_cn)
+    # v0.43 ⭐ P0 修复：keyword_doc 注入注册问卷（此前缺失，与其他模式对齐）
+    try:
+        from prompts import _build_questionnaire_block
+        _qq = _build_questionnaire_block(learner)
+        if _qq:
+            system = f"{_qq}\n\n" + system
+    except Exception:
+        pass
+    # v0.43 ⭐ P1 修复：keyword_doc 消费约束掩码
+    try:
+        from prompts import _build_constraint_layers
+        _cf = getattr(learner, "_constraint_flags", ()) or ()
+        if _cf:
+            system = f"{_build_constraint_layers(_cf)}\n\n" + system
+    except Exception:
+        pass
     doc_content = _safe_chat(llm, system, f"请生成{doc_type}文档。", max_tokens=1800)
     if not doc_content:
         doc_content = f"# {topic}\n\n（生成失败，请重试）"
+    # v0.43 ⭐ P1 修复：keyword_doc 语言规范收口（此前未过 polish）
+    try:
+        from services.polish import _polish_text
+        doc_content = _polish_text(doc_content, context=f"doc:{doc_type}:{topic[:20]}")
+    except Exception:
+        pass
 
     # 保存并返回下载链接
     try:

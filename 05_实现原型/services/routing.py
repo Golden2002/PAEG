@@ -62,11 +62,19 @@ def _mode_auto_correct(
             _hist = SESSIONS.get(f"chat_hist_{learner_id}", [])
             _llm = get_llm()
             _res = _emo.run(_llm, text, learner, history=_hist)
+            _emo_content = _polish_text(_res.get("content", ""), context=f"affection:{text[:30]}")
             from flask import jsonify
+            # v0.43 ⭐ P0 修复：模式纠正分支写回 chat_hist（此前纠正后对话不持久化，
+            # 连续纠正对话丢上下文——与 method/knowledge/affection/answer 写回对齐）
+            try:
+                from infra.sessions import append_chat_hist as _append_chat_hist
+                _append_chat_hist(learner_id, text, _emo_content)
+            except Exception:
+                pass
             return jsonify({
                 "session_id": f"affection_{learner_id}",
                 "summary": {"avg_score": 0}, "worldview_used": "weil", "tone_ratio": 0,
-                "presentations": [{"step_id": 1, "content": _polish_text(_res.get("content", ""), context=f"affection:{text[:30]}"), "step_type": "affection"}],
+                "presentations": [{"step_id": 1, "content": _emo_content, "step_type": "affection"}],
                 "evaluations": [], "diagnosis": {}, "plan": {"steps": []}, "reflections": [],
                 "learner": {"id": learner.id, "nickname": learner.nickname,
                             "grade_level": learner.grade_level, "subjects_mastery": learner.subjects_mastery},
@@ -81,6 +89,13 @@ def _mode_auto_correct(
             _kb["actual_mode"] = "knowledge"
             _kb["requested_mode"] = requested_mode
             _kb["was_redirected"] = True
+            # v0.43 ⭐ P0 修复：纠正分支写回 chat_hist（连续纠正对话不丢上下文）
+            try:
+                from infra.sessions import append_chat_hist as _append_chat_hist
+                _kbc = (_kb.get("presentations") or [{}])[0].get("content", "")
+                _append_chat_hist(learner_id, text, _kbc)
+            except Exception:
+                pass
             return jsonify(_kb)
         if requested_mode not in ("method", "affection") and is_method_advice(text):
             from services.handlers.method import _handle_method_advice
@@ -90,6 +105,13 @@ def _mode_auto_correct(
             _ma_data["actual_mode"] = "method"
             _ma_data["requested_mode"] = requested_mode
             _ma_data["was_redirected"] = True
+            # v0.43 ⭐ P0 修复：纠正分支写回 chat_hist
+            try:
+                from infra.sessions import append_chat_hist as _append_chat_hist
+                _mac = (_ma_data.get("presentations") or [{}])[0].get("content", "")
+                _append_chat_hist(learner_id, text, _mac)
+            except Exception:
+                pass
             return jsonify(_ma_data)
         if requested_mode not in ("answer", "problem") and is_problem_request(text):
             from services.handlers.problem import _handle_problem_request
@@ -99,6 +121,13 @@ def _mode_auto_correct(
             _pr_data["actual_mode"] = "problem"
             _pr_data["requested_mode"] = requested_mode
             _pr_data["was_redirected"] = True
+            # v0.43 ⭐ P0 修复：纠正分支写回 chat_hist
+            try:
+                from infra.sessions import append_chat_hist as _append_chat_hist
+                _prc = (_pr_data.get("presentations") or [{}])[0].get("content", "")
+                _append_chat_hist(learner_id, text, _prc)
+            except Exception:
+                pass
             return jsonify(_pr_data)
     except Exception as _e:
         print(f"[PAEG][services.routing] _mode_auto_correct 异常忽略: {_e}")

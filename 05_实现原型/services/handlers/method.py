@@ -62,6 +62,14 @@ def _handle_method_advice(learner, concept, subject):
             system = f"{_qq}\n\n" + system
     except Exception:
         pass
+    # v0.43 ⭐ P1 修复：method 消费约束掩码（此前 _set_constraint_flags 设置了但 handler 不读）
+    try:
+        from prompts import _build_constraint_layers
+        _cf = getattr(learner, "_constraint_flags", ()) or ()
+        if _cf:
+            system = f"{_build_constraint_layers(_cf)}\n\n" + system
+    except Exception:
+        pass
     # v0.42.3 ⭐ P1 修复：method 注入对话历史 + 用户事实（共享记忆能力）——
     # 此前 handler 完全不看历史，连问两次"怎么学数学"第二次无上文。
     try:

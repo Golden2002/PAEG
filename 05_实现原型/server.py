@@ -155,7 +155,6 @@ def _inject_skill_catalog(system: str) -> str:
         return system
     return system + "\n\n" + catalog
 
-
 def _append_chat_hist(learner_id: str, user_content: str, assistant_content: str = "") -> None:
     """v0.42.3 ⭐ P0 修复：统一对话历史写回（method/knowledge/affection 三端点共用）。
 
@@ -171,6 +170,23 @@ def _append_chat_hist(learner_id: str, user_content: str, assistant_content: str
             SESSIONS[f"chat_hist_{learner_id}"] = _ch[-20:]
     except Exception as _che:
         print(f"[PAEG] {learner_id} 写回 chat_hist 失败: {_che}")
+
+def _set_constraint_flags(learner, user_text: str, mode: str, affection: bool = False) -> None:
+    """v0.43 ⭐ 统一设置 learner 的约束掩码（3 位掩码，各端点共用）。
+
+    从用户输入/问卷检测 DIRECT/EMOTION/PREF → 存入 learner._constraint_flags，
+    供 build_presenter_system/build_general_chat_system 的 constraint_flags 消费。
+    """
+    try:
+        from utils.constraint_signals import detect_constraint_flags
+        _cf = detect_constraint_flags(
+            user_text=user_text, key_need="", mode=mode,
+            profile={"questionnaire_answers": getattr(learner, "questionnaire_answers", {}) or {}},
+            affection_signal=affection,
+        )
+        learner._constraint_flags = _cf  # type: ignore[attr-defined]
+    except Exception:
+        learner._constraint_flags = ()  # type: ignore[attr-defined]
 
 # ─────────────────────────────────────
 # 静态文件（GUI 前端）
@@ -424,6 +440,9 @@ def teach():
     )
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
+    # v0.43 ⭐ P0 修复：teach sync 也设置约束掩码（此前只有 teach_stream 有）
+    _set_constraint_flags(learner, data.get("concept", ""), "teach")
+
     # 教学
     concept = data["concept"]
     subject = data["subject"]
@@ -501,10 +520,8 @@ def teach():
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
 
-    # v0.17.1：元问题/寒暄拦截——用户问"你是谁/能做什么/能调用知识库吗"或打招呼，
-    # 走闲聊模式回答，避免被当成学科概念去教学（幻觉/答非所问）。
-    # v0.41.5 ⭐ 加固：功能/使用/界面类问题（"你有什么功能""怎么用"）复用
-    # handle_interface_query 确定性模板（含完整功能清单），不交给 LLM 自由发挥。
+    # v0.17.1 元问题/寒暄拦截（"你是谁/能做什么"走闲聊，避免当学科概念教学）
+    # v0.41.5 ⭐ 加固：功能/使用/界面问题复用 handle_interface_query 确定性模板
     try:
         from meta_router import is_meta_question, is_greeting
         if is_meta_question(concept) or is_greeting(concept):
@@ -634,11 +651,8 @@ def teach():
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
 
-    # v0.19.21：意向性层 ⭐——规则都没拦住的输入，用 LLM 判断是否为教学意图。
-    # 若用户其实在寒暄/闲聊/倾诉/问老师近况（如"你今天怎么样"），
-    # 就一般化响应，不让教学 harness 的指令覆盖用户提问的出发点与目的。
-    # v0.26 ⭐ C3-1 P0 修复：改用 meta_router.route() 集中路由（含 _llm_route_intent 9 类
-    # LLM 综合意图判断）替代单点 is_teaching_intent——生产路径真正使用 LLM 意图路由。
+    # v0.19.21 意向性层：规则没拦住时用 LLM 判断教学意图；非教学走一般化响应
+    # v0.26 C3-1 P0：meta_router.route() 优先 LLM 综合意图判断（_llm_route_intent）
     try:
         from meta_router import route as _paeg_route
         _route = _paeg_route(concept, learner=learner, llm=llm, fallback_to_teach=True)
@@ -738,6 +752,15 @@ def teach():
             PERIODIC_UPDATER.mark_activity()
         except Exception as _mae:
             print(f"[PAEG] teach mark_activity 失败: {_mae}")
+        # v0.43 ⭐ P1 修复：teach 同步端点写回 chat_hist（此前与 stream 不对称，
+        # 同步教学后续问丢上文）——与 teach_stream/chat 对齐
+        try:
+            _teach_reply = " ".join(
+                str(p.get("content") or "") for p in (result.get("session") or {}).history
+                if isinstance(p, dict) and p.get("content"))
+            _append_chat_hist(learner_id, concept, _teach_reply)
+        except Exception as _th:
+            print(f"[PAEG] teach 写回 chat_hist 失败: {_th}")
         return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -757,16 +780,7 @@ def teach_stream():
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
     # v0.43 ⭐ 输出效果约束 3 参数（DIRECT/EMOTION/PREF → Presenter 读取）
-    try:
-        from utils.constraint_signals import detect_constraint_flags
-        _cf_teach = detect_constraint_flags(
-            user_text=data.get("concept", ""), key_need="", mode="teach",
-            profile={"questionnaire_answers": getattr(learner, "questionnaire_answers", {}) or {}},
-            affection_signal=False,
-        )
-        learner._constraint_flags = _cf_teach  # type: ignore[attr-defined]
-    except Exception:
-        learner._constraint_flags = ()  # type: ignore[attr-defined]
+    _set_constraint_flags(learner, data.get("concept", ""), "teach")
 
     concept = data["concept"]
     subject = data["subject"]
@@ -774,11 +788,7 @@ def teach_stream():
     # → NameError: subtopic 未定义 → SSE 中途中断 → 教学模式不输出内容
     subtopic = (data.get("subtopic") or "").strip()
 
-    # v0.36.2 ⭐ 统一历史保存（修复：15 个早退分支跳过 CONV_STORE → "对话有时不在历史里"）
-    # 此前只有主教学循环（L1686 附近）保存；v0.36.2 首批补 9 个：gen_aff/gen_grade_blocked/
-    # gen_unknown/gen_ui/gen_rec/gen_kb/gen_map/gen_composite/gen_ppt；v0.34+ 又增 6 个：
-    # gen_intent×2/composite_chat/gen_method/gen_problem/gen_emotion/meta_chat → 用户在这些场景
-    # 对话"看似成功但历史无记录"。统一出口：所有分支在 done 前调用 _save_teach_turn(mode, reply_text)。
+    # v0.36.2 ⭐ 统一历史保存（15 个早退分支曾跳过 CONV_STORE；统一出口 _save_teach_turn）
     def _save_teach_turn(mode: str, reply_text: str):
         try:
             if CONV_STORE is not None and _is_registered(learner_id):
@@ -865,24 +875,14 @@ def teach_stream():
         # v0.37.1 ⭐ Oracle P1-3 修复：不再静默吞——用户改学科"没生效"正是这类失败导致
         print(f"[PAEG] teach_stream steering 失败（学科未切换）: {_steer_e}")
 
-    # v0.35 ⭐ LLM 优先意图路由（用户原则：LLM 是被充分调用的主体，规则只兜底）
-    # 大模型先判断用户意图（在 14 项里选一个）；置信度 ≥0.6 时作为分支选择的第一依据
-    # ——置信度不足或 LLM 不可用时保留所有现有规则链（向后兼容）。
-    # 设计：_llm_intent is None = 完全走规则链；_llm_intent == "teach"/"answer" = 教学请求必走完整管线（核心修复）
-    # v0.41.6 ⭐ 模式短路：前端已选模式（mode 字段）是最强确定性信号——
-    # 用户点了"闲聊"就不必让 LLM 再判断意图，直接走 chat 分支。
-    # v0.41.9 ⭐ 会话意图延续（用户洞察）：短输入（<6 字，如"我猜是en"）是
-    # 对上一轮问题的承接，应复用上轮意图而非重新路由——否则短输入被当独立
-    # 新概念处理 → 误判/误触发检索 → 答非所问。
+    # v0.35 ⭐ LLM 优先意图路由（LLM 是被充分调用的主体，规则只兜底）
+    # v0.41.6 ⭐ 模式短路：前端已选模式是最强确定性信号（用户点"闲聊"不必再判断）
+    # v0.41.9 ⭐ 会话意图延续：短输入（<6 字）复用上轮意图，防误判误触发检索
     _prev_intent = SESSIONS.get(f"current_intent_{learner_id}")
     _prev_concept = SESSIONS.get(f"current_concept_{learner_id}")
     _prev_subject = SESSIONS.get(f"current_subject_{learner_id}")
     _is_short_in = (len(str(concept).strip()) < 6)
-    # v0.41.9 ⭐ 意图延续安全边界（Oracle 副作用评估 + explore 冲突扫描）：
-    # 1. mode 字段优先级最高——前端切了模式，短输入不得延续（否则模式形同虚设）
-    # 2. 情绪/危机词必须先于延续（"好累/救救我"绝不能延续到教学）
-    # 3. 学科变化不延续（上轮数学的"那这个"不能被物理语境延续）
-    # 4. 退出/确认词不延续（"懂了/好的"不无意义续教学）
+    # v0.41.9 ⭐ 意图延续安全边界：mode 优先级最高 / 情绪危机词先于延续 / 学科变化不延续 / 退出词不延续
     _MODE_FOR_CONT = {"teach": "teach", "chat": "chat", "answer": "answer",
                       "method": "method", "knowledge": "knowledge",
                       "affection": "emotion", "ppt": "ppt", "problem": "problem"}
@@ -1083,10 +1083,8 @@ def teach_stream():
         print(f"[PAEG][server.py] gen_composite 异常忽略: {_e}")
         pass
 
-    # v0.35 ⭐ PPT / 演示文稿生成（流式版本兜底分支）——
-    # LLM/规则判定用户要生成 PPT / 课件 / 演示文稿时，统一引导至课程备课流程，
-    # 暂走通用 chat 响应 + 引导文案（避免误入教学管线把概念当学科讲）。
-    # v0.35 ⭐ LLM 优先：LLM 判 ppt → 该分支；LLM 不可用时规则兜底
+    # v0.35 ⭐ PPT/演示文稿生成（流式兜底：统一引导至课程备课流程，避免误入教学管线）
+    # v0.35 ⭐ LLM 优先判 ppt → 该分支；LLM 不可用时规则兜底
     try:
         from meta_router import is_ppt_request
         if _llm_intent == "ppt" or (_llm_intent is None and is_ppt_request(concept)):
@@ -1111,16 +1109,13 @@ def teach_stream():
         print(f"[PAEG][server.py] gen_ppt 异常忽略: {_e}")
         pass
 
-    # v0.19.22：意向性层（流式版本）——非教学意图走一般化响应
-    # v0.26 ⭐ C3-1 P0 修复：改用 meta_router.route() 集中路由（LLM 综合意图判断）
-    # v0.34 ⭐ 教学端点语义锚定：/api/teach/stream 是教学专用端点，meta_router 不应把概念提问降级为 chat
-    # v0.35 ⭐ LLM 优先生效：本块作为"上游规则链漏过"时的兜底；当 route_intent 已明确
-    # 给出 teach/answer 时，强制走完整管线（不被 meta_router.route() 的非教学分支吞掉）
+    # v0.19.22 意向性层（流式）：非教学意图走一般化响应
+    # v0.26/v0.34/v0.35 ⭐ meta_router.route() 智能路由 + 教学端点语义锚定（LLM 综合意图判断）
     try:
         from meta_router import route as _paeg_route
-        # v0.34 ⭐：endpoint_hint 透传给 meta_router（目前 route() 未读取该 kwarg，留作未来扩展；
-        # 治本在 prompt 端点语义锚点 + 兜底在本 if 分支——三层防御确保教学请求必走完整管线）
+        # v0.34 ⭐ endpoint_hint 透传（route() 未取用该 kwarg，但保留向后兼容扩展点）
         _route = _paeg_route(concept, learner=learner, llm=llm, fallback_to_teach=True,
+
                              endpoint_hint="teach_stream")
         _route_type = _route.get("type")
         # v0.35 ⭐ LLM 优先：当 LLM 在更细粒度 route_intent 已判 teach/answer 时，
@@ -1330,11 +1325,7 @@ def teach_stream():
                     # 短输入（如"我猜是en"）会检索出"en 嗯 同音"等无关内容污染回答。
                     # 与 chat_stream（L3069 should_search 前置）对齐。
                     from web_search_tool import should_search, web_search
-                    # v0.42 ⭐ P1 修复：短输入短路误伤中文短概念——
-                    # 此前 len<6 对中文按字符数判定，"熵""导数""光合作用"等 2-4 字标准概念
-                    # 全被短路 → KB miss 时纯靠 LLM 训练知识裸答。
-                    # 修正：仅"纯英文/无中文且长度<6"才短路（防"我猜是en"这类污染），
-                    # 中文概念词（含 ≥1 个汉字）一律允许走 should_search 判定。
+                    # v0.42 ⭐ 短输入短路修复：仅"纯英文且<6字"短路（防"我猜是en"污染），中文概念词不误伤
                     _text = str(concept).strip()
                     _has_cjk = any('\u4e00' <= c <= '\u9fff' for c in _text)
                     _is_short = (len(_text) < 6) and (not _has_cjk)
@@ -1854,6 +1845,29 @@ def profile_questionnaire(learner_id):
         learner.questionnaire_answers = _clean  # type: ignore[attr-defined]
         if str(learner_id).startswith('u') and USER_STORE is not None:
             USER_STORE.save_learner(learner_id, learner)
+        else:
+            # v0.43 ⭐ P0 修复：web_ 匿名用户问卷落盘（此前只存内存，刷新即丢）——
+            # 匿名用户也持久化到 users_data/<uid>/profile.json（独立 JSON，不依赖 USER_STORE）
+            try:
+                import os as _qos
+                _base = _qos.path.dirname(_qos.path.abspath(__file__))
+                _udir = _qos.path.join(_base, 'users_data', str(learner_id))
+                _qos.makedirs(_udir, exist_ok=True)
+                _pp = _qos.path.join(_udir, 'profile.json')
+                _existing = {}
+                if _qos.path.exists(_pp):
+                    try:
+                        import json as _qjson
+                        with open(_pp, encoding='utf-8') as _pf:
+                            _existing = _qjson.load(_pf)
+                    except Exception:
+                        _existing = {}
+                _existing['questionnaire_answers'] = _clean
+                import json as _qjson2
+                with open(_pp, 'w', encoding='utf-8') as _pf2:
+                    _qjson2.dump(_existing, _pf2, ensure_ascii=False, indent=1)
+            except Exception as _qe:
+                print(f"[PAEG] 匿名问卷落盘失败: {_qe}")
         return jsonify({"ok": True, "saved": list(_clean.keys())})
     except Exception as e:
         print(f"[PAEG][server.py] profile_questionnaire 异常: {e}")
@@ -2547,11 +2561,8 @@ def general_chat_stream():
     _cf_flags = ()
     try:
         from utils.constraint_signals import detect_constraint_flags
-        _cf_flags = detect_constraint_flags(
-            user_text=text, key_need="", mode=data.get("mode", ""),
-            profile={"questionnaire_answers": getattr(learner, "questionnaire_answers", {}) or {}},
-            affection_signal=False,
-        )
+        _cf_flags = detect_constraint_flags(text, "", data.get("mode", ""),
+                                            {"questionnaire_answers": getattr(learner, "questionnaire_answers", {}) or {}})
     except Exception:
         _cf_flags = ()
 
@@ -2644,16 +2655,9 @@ def general_chat_stream():
     except Exception as _ie:
         print(f"[PAEG] 个体化注入跳过: {_ie}")
 
-    # v0.24 修复 1：技能 L1 目录注入 system prompt（chat_stream）
-    # —— 之前 SkillRegistry 扫描了 10 个 SKILL.md 但从未被注入，技能功能上等价于不存在；
-    # —— 现在把技能目录（name + description）一次性注入，LLM 知道何时用 load_skill__<name>。
-    # v0.42 ⭐ P2 修复：移除 user_corpus 重复注入——get_user_library（L2546，5×500）
-    # 与 read_user_corpus（此处，3×300）同源（都读 Library/usr_knowledge/），
-    # 此前同一份资料在 system prompt 里出现两遍，浪费 context 且干扰注意力。
-    # 保留更完整的 user_library 槽即可，teach_stream 路径不受影响。
-    # v0.41.9 ⭐ 修复：chat_stream 注入 KB 检索结果（此前通用话题不查知识库——
-    # 只有 teach 用 kb.resolve_node、answer 用 _pre_retrieve；chat 全靠 LLM 自身，
-    # 接线缺口。用 _pre_retrieve（KB+Library 三线）增强闲聊的知识支撑）
+    # v0.24 修复 1：技能 L1 目录注入（此前 10 个 SKILL.md 从未注入，技能等价不存在）
+    # v0.42 ⭐ 移除 user_corpus 重复注入（与 get_user_library 同源，保留 user_library 槽）
+    # v0.41.9 ⭐ chat_stream 注入 KB 检索结果（此前通用话题不查知识库，接线缺口）
     try:
         if text and len(text) <= 100:
             from subagents import _pre_retrieve
@@ -2875,21 +2879,15 @@ def general_chat_stream():
                 "### 四、输出高质量内容\n"
                 "最终输出像一份**优秀讲义的片段**：观点明确、层次清晰、内容详实、公式用 LaTeX（$...$）、"
                 "像一位真正的好老师当面讲解，而不是搜索结果的堆砌。")
-            # v0.27 ⭐ 需求：对话输出前检索状态标志（前端小徽章"已完成知识库/网络检索"）
-            # v0.32：移到 run_agent_loop 之后，根据 LLM 是否真调 web_search 发"网络检索"或"知识库检索"
-            # v0.19.4：把打包后的 user（含当前设定/历史/身份）传给 agent loop，
-            # 修复"偏离提问"——之前传的是原始 text，LLM 收不到上下文
-            # v0.20.2：同时传真 messages 历史（多轮连贯性——LLM 能记住上文）
+            # v0.27/v0.32 ⭐ 对话输出前检索状态标志（前端徽章"已完成知识库/网络检索"）
+            # v0.19.4/v0.20.2 ⭐ 已带完整 user+messages 历史（修复"偏离原话题" + 多轮连续性）
             _hist_msgs = [{"role": "user", "content": u["content"]} if u["role"] == "user"
                           else {"role": "assistant", "content": u["content"]}
                           for u in chat_hist[-10:]]
             _ar = run_agent_loop(llm, _agent_sys, user, max_iterations=3, history=_hist_msgs)
             reply = _ar.get("answer")
             tool_log = _ar.get("tool_calls", [])
-            # v0.32 ⭐ 网络检索 badge 区分：LLM 实际调用 web_search 时前端显示"网络检索"；
-            # 未发生 web_search 则显示"知识库检索"兜底。两条互斥，只发一条
-            # （前端 insertRetrievalBadge 有 _retrievalBadgeShown 去重，但本路径本就只发一次）
-            # 此处放 run_agent_loop 之后：需要先知道是否真调了 web_search
+            # v0.32 ⭐ 检索 badge：LLM 调 web_search →"网络检索"，否则"知识库检索"（互斥单条）
             try:
                 _badge_text = "网络检索" if _ar.get("web_searched") else "知识库检索"
                 yield f"event: retrieval\ndata: {json.dumps({'done': _badge_text}, ensure_ascii=False)}\n\n"
@@ -2984,11 +2982,8 @@ def general_chat_stream():
                     print(f"[PAEG] 个体化画像已持久化: learner_id={learner_id}")
             except Exception as _pe:
                 print(f"[PAEG] 个体化持久化失败（不影响主流程）: {_pe}")
-            # v0.36.1 ⭐ 修复：chat 路径也写 user_modeling 到元认知日志
-            # （此前只有 teach_stream 写 → u 账号 meta-log 只有 self_reflect/adaptation，
-            #   前端 fallback 显示用户提问 → 元认知日志看起来像"对话历史"）
-            # v0.37.1 ⭐ Oracle P0-1 修复：改用 append_reflection（append + _save 落盘），
-            # 此前直接 history.append 不落盘 → 元认知日志重启即丢
+            # v0.36.1 ⭐ chat 路径也写 user_modeling 元认知日志（此前仅 teach_stream）
+            # v0.37.1 ⭐ Oracle P0-1：append_reflection 走 append+_save（此前 history.append 不持久化）
             try:
                 _trait_chat = (_ind_result or {}).get("trait") or {}
                 _facts_chat = (_ind_result or {}).get("facts") or []
@@ -3096,11 +3091,8 @@ def general_chat():
     _cf_flags = ()
     try:
         from utils.constraint_signals import detect_constraint_flags
-        _cf_flags = detect_constraint_flags(
-            user_text=text, key_need="", mode=data.get("mode", ""),
-            profile={"questionnaire_answers": getattr(learner, "questionnaire_answers", {}) or {}},
-            affection_signal=False,
-        )
+        _cf_flags = detect_constraint_flags(text, "", data.get("mode", ""),
+                                            {"questionnaire_answers": getattr(learner, "questionnaire_answers", {}) or {}})
     except Exception:
         _cf_flags = ()
 
@@ -3459,6 +3451,8 @@ def answer_api():
     if learner_id:
         learner = SESSIONS.get(f"learner_{learner_id}")
         _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
+        # v0.43 ⭐ P0 修复：answer 端点设置约束掩码（与其他模式对齐）
+        _set_constraint_flags(learner, data.get("question", ""), "answer")
     try:
         from subagents import AnswerSolver
         solver = AnswerSolver()
@@ -3606,6 +3600,8 @@ def method_advice():
     # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原内联 — 无 elif、无 target_exam）
     learner = ensure_learner_session(learner_id, data, SESSIONS)
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
+    # v0.43 ⭐ P0 修复：method 端点设置约束掩码（与其他模式对齐）
+    _set_constraint_flags(learner, data.get("concept") or data.get("text") or "", "method")
     concept = data.get("concept") or data.get("text") or ""
     subject = data.get("subject", "general")
     if not concept:
@@ -3657,6 +3653,8 @@ def knowledge_query():
     # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原内联 — 无 elif、无 target_exam）
     learner = ensure_learner_session(learner_id, data, SESSIONS)
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
+    # v0.43 ⭐ P0 修复：knowledge 端点设置约束掩码（与其他模式对齐）
+    _set_constraint_flags(learner, data.get("text") or data.get("concept") or "", "knowledge")
     subject = data.get("subject", "general")
     # v0.20.3：知识库模式若用户实际在倾诉/问方法，自动纠正
     try:
@@ -3702,6 +3700,8 @@ def affection_support():
     # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原内联 — 无 elif、无 target_exam）
     learner = ensure_learner_session(learner_id, data, SESSIONS)
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
+    # v0.43 ⭐ P0 修复：affection 端点设置约束掩码（affection 模式本身即情绪信号 → 组B）
+    _set_constraint_flags(learner, data.get("text") or data.get("concept") or "", "affection", affection=True)
     text = data.get("text") or data.get("concept") or ""
     if not text:
         return jsonify({"error": "text is required"}), 400
