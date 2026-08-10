@@ -73,7 +73,9 @@ def _mode_auto_correct(
                 "actual_mode": "affection", "requested_mode": requested_mode, "was_redirected": True,
             })
         if requested_mode != "knowledge" and is_knowledge_query(text):
-            from server import _handle_knowledge_query
+            # v0.41.9 ⭐ 修复：直接导入 services.handlers（此前 from server import
+            # → 循环依赖 server→services/routing→server；handler 已迁出）
+            from services.handlers.knowledge import _handle_knowledge_query
             from flask import jsonify
             _kb = _handle_knowledge_query(learner, subject)
             _kb["actual_mode"] = "knowledge"
@@ -81,7 +83,7 @@ def _mode_auto_correct(
             _kb["was_redirected"] = True
             return jsonify(_kb)
         if requested_mode not in ("method", "affection") and is_method_advice(text):
-            from server import _handle_method_advice
+            from services.handlers.method import _handle_method_advice
             from flask import jsonify
             _ma = _handle_method_advice(learner, text, subject)
             _ma_data = _ma.get_json()
@@ -90,7 +92,7 @@ def _mode_auto_correct(
             _ma_data["was_redirected"] = True
             return jsonify(_ma_data)
         if requested_mode not in ("answer", "problem") and is_problem_request(text):
-            from server import _handle_problem_request
+            from services.handlers.problem import _handle_problem_request
             from flask import jsonify
             _pr = _handle_problem_request(learner, text, subject)
             _pr_data = _pr.get_json()
