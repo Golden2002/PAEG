@@ -3950,6 +3950,35 @@ def knowledge_query():
     except Exception as _e:
         print(f"[PAEG][server.py] knowledge_query 异常忽略: {_e}")
         pass
+    # v6.0 ⭐ P0 修复：知识库模式下自我指涉问题（"你有哪些功能/你是谁"）应走
+    # 确定性模板而非库清点——与 teach/chat 端点对齐（Cascade 规则优先）
+    try:
+        from self_referential import is_interface_query, handle_interface_query
+        if _q and is_interface_query(_q):
+            _ui_reply = handle_interface_query(_q, learner)
+            return jsonify({
+                "presentations": [{"step_id": 1, "content": _ui_reply, "step_type": "interface"}],
+                "mode": "knowledge",
+                "ok": True,
+            })
+    except Exception as _e:
+        print(f"[PAEG][server.py] knowledge interface 拦截异常忽略: {_e}")
+        pass
+    # v6.0 ⭐ 乱码/无意义输入快速兜底（测试发现 zzz 触发 78s LLM 推理）
+    try:
+        from utils.gibberish import is_gibberish
+        if _q and is_gibberish(_q):
+            _gib_reply = ("好的，我收到你的输入了。刚才那串内容我没能识别成具体的问题——"
+                          "可能是手滑或乱码。你可以重新说一遍想问的，比如「查一下什么是导数」"
+                          "或者「你的知识库里有什么」。我会一直在这儿。")
+            return jsonify({
+                "presentations": [{"step_id": 1, "content": _gib_reply, "step_type": "chat"}],
+                "mode": "knowledge",
+                "ok": True,
+            })
+    except Exception as _e:
+        print(f"[PAEG][server.py] knowledge gibberish 兜底异常忽略: {_e}")
+        pass
     result = _handle_knowledge_query(learner, subject)
     # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
     # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
