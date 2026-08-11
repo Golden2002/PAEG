@@ -52,7 +52,7 @@ from config import (
     LLM_PROVIDER, LLM_MODEL,
     GUI_DIR, FALLBACK_DOWNLOAD_DIR,
     APP_HOST, APP_PORT, MCP_PORT,
-    CORS_ORIGINS,
+    CORS_ORIGINS, PAEG_ENV,
 )
 
 # v0.40 P1-1 ⭐ server.py Phase1 拆分: 从 utils.py 导入无全局依赖的纯函数
@@ -99,6 +99,16 @@ _LOGIN_FAILS: dict = {}
 app = Flask(__name__, static_folder=None)
 # v0.51 ⭐ P0-1（Oracle）：CORS 白名单——开发默认 *，生产用 PAEG_CORS_ORIGINS 显式收敛
 CORS(app, resources={r"/api/*": {"origins": CORS_ORIGINS}})
+# v0.51 ⭐ P1-1（Oracle）：HTTPS 反代支持——信任 X-Forwarded-Proto（Nginx/Caddy/cloudflared 前置）
+# 生产安全 Cookie：PAEG_ENV=production 时 cookie 仅 HTTPS 传输
+try:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+except Exception:
+    pass
+if PAEG_ENV == "production":
+    app.config["SESSION_COOKIE_SECURE"] = True
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
 
 # ═══════════════════════════════════════════════════════════
 # v0.51 ⭐ P0-3（Oracle）：全局滑动窗口限流
