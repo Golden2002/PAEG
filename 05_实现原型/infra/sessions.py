@@ -43,3 +43,42 @@ def append_chat_hist(learner_id: str, user_content: str, assistant_content: str 
                 SESSIONS[f"chat_hist_{learner_id}"] = _ch[-20:]
     except Exception as _che:
         print(f"[PAEG] {learner_id} 写回 chat_hist 失败: {_che}")
+
+
+# ═══════════════════════════════════════════════════════════
+# v0.51 ⭐ P0-2（Oracle）：SESSIONS 惰性 TTL 清理——防内存无限增长
+# ═══════════════════════════════════════════════════════════
+import time as _time
+
+SESSIONS_TS: Dict[str, float] = {}
+SESSIONS_TTL = 7200  # 2 小时滑动过期
+_LAST_CLEAN = [0.0]
+_CLEAN_INTERVAL = 300  # 每 5 分钟最多全扫一次
+
+
+def session_touch(key: str) -> None:
+    """记录键最近访问时间（滑动 TTL）。"""
+    with _LOCK:
+        SESSIONS_TS[key] = _time.time()
+
+
+def session_cleanup(force: bool = False) -> int:
+    """惰性清理过期会话键（超过 TTL 未访问的删除）。返回清理数。
+
+    - 由 server.py before_request 每请求调用（内部限频 5 分钟一次全扫）
+    - chat_hist 已有 LRU 20 条截断，此处清理的是 current_intent/conv_/constraint 等杂键
+    """
+    global _LAST_CLEAN
+    _now = _time.time()
+    if not force and _now - _LAST_CLEAN[0] < _CLEAN_INTERVAL:
+        return 0
+    _LAST_CLEAN[0] = _now
+    removed = 0
+    with _LOCK:
+        _expired = [k for k, ts in SESSIONS_TS.items()
+                    if _now - ts > SESSIONS_TTL]
+        for k in _expired:
+            SESSIONS.pop(k, None)
+            SESSIONS_TS.pop(k, None)
+            removed += 1
+    return removed

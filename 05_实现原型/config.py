@@ -73,6 +73,11 @@ APP_PORT: int = int(os.environ.get("PORT", 5000))
 # 绑定地址(0.0.0.0 让 LAN 设备也可访问; 本机测试可改为 127.0.0.1)
 APP_HOST: str = os.environ.get("PAEG_HOST", "0.0.0.0")
 
+# v0.51 ⭐ P0-1（Oracle）：CORS 白名单——生产必须显式配置，禁止裸通配
+# 开发默认 *（本地前端跨端口）；生产设 PAEG_CORS_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+CORS_ORIGINS: list = [o.strip() for o in os.environ.get(
+    "PAEG_CORS_ORIGINS", "*").split(",") if o.strip()]
+
 # MCP 工具网关端口(v0.19 P0-3 后台线程)
 MCP_PORT: int = int(os.environ.get("MCP_PORT", 8765))
 
