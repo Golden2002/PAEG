@@ -12,6 +12,7 @@ from knowledge_base import KnowledgeBase
 from subagents import (
     Diagnostor, Planner, Presenter, Evaluator, Adapter,
     AnswerSolver, AffectionSupportor, SelfUpdateAgent, Individuality,
+    ResourceLibrarian,
 )
 from world_view import select_tone
 from self_update import SelfUpdater
@@ -33,6 +34,10 @@ class LearnerProfile:
     specialty_target: Optional[str] = None
     # v0.10：用户自我描述（"我是怎样的人/目标/擅长与不擅长"），每次对话自动注入
     self_description: str = ""
+    # v0.43 ⭐ 注册问卷答案（用户初始画像，固定注入所有对话模式）
+    # 结构：{学段, 学习风格, 学习动机, 学习节奏, 学习时段, 希望老师性格,
+    #        薄弱学科[], 擅长学科[], 学习目标} —— 每次 LLM 调用都作为固定提示词注入
+    questionnaire_answers: dict = field(default_factory=dict)
     # v0.37 ⭐ 危机状态机（Oracle 方案 C）：opt_out 结构化 + 风险历史 + 现实锚点
     # 兼容旧 _crisis_opt_out(bool)：读取时优先 _crisis_state，缺失则迁移旧值
     _crisis_state: Optional[dict] = field(default=None)
@@ -77,9 +82,18 @@ class PAEG:
         # 7. 情绪支持（危机信号时走这条而非教学）
         self.affection_supportor = AffectionSupportor()
         # 8. 自我更新（基于反馈生成结构化建议）
-        self.self_update_agent = SelfUpdateAgent()
+        # v0.42 ⭐ P1 修复：改为懒初始化——此前这里直接构造 SelfUpdateAgent()，
+        # 但全项目只有 /api/self-update/from-feedback 端点调用 .run()，教学/闲聊路径
+        # 从不触发（僵尸实例，误导读者以为自我更新在教学时被驱动）。现改为 None +
+        # _get_self_update_agent() 懒创建，语义清晰且节省构造开销。
+        self.self_update_agent = None
+        self._self_update_agent_loaded = False
         # 9. 个体化（聚合 16 维画像 + 控制 LLM 教学）
         self.individuality = Individuality()
+        # 10. 资料检索员（v0.43 ⭐ P0-C 提升：从"按请求构造"升级为全局持有）
+        # ResourceLibrarian 构造无状态（仅绑定 model/kb），用户隔离靠 run(learner=...) 参数，
+        # 因此全局持有完全安全——真正实现"9+1 全持有"，不再每请求 new 实例。
+        self.resource_librarian = ResourceLibrarian(model=model_api, kb=knowledge_base)
         self.self_updater = SelfUpdater(knowledge_base) if enable_self_update else None
         # v0.12：语言优化 Agent（薇依语料矫正，去除 AI 痕迹）
         self.refiner = None
@@ -101,6 +115,22 @@ class PAEG:
     def _log(self, msg: str):
         if self.verbose:
             print(msg)
+
+    def _get_self_update_agent(self):
+        """v0.42 ⭐ P1 修复：懒创建 SelfUpdateAgent（替代僵尸实例）。
+
+        首次调用时构造，幂等（_self_update_agent_loaded 守卫）。
+        由 /api/self-update/from-feedback 端点驱动（server.py）。
+        """
+        if not self._self_update_agent_loaded:
+            try:
+                from subagents import SelfUpdateAgent
+                self.self_update_agent = SelfUpdateAgent()
+            except Exception as _e:
+                print(f"[PAEG][paeg.py] SelfUpdateAgent 懒创建失败: {_e}")
+                self.self_update_agent = None
+            self._self_update_agent_loaded = True
+        return self.self_update_agent
 
     def teach(self, learner: LearnerProfile, question: str, subject: str,
               subtopic: str = "") -> dict:
@@ -552,6 +582,17 @@ class PAEG:
         except Exception as _e:
             print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
             pass
+            pass
+
+        # v0.42 ⭐ P0 修复：教学路径持久化个体化画像——此前 /api/teach（sync）只跑
+        # Individuality.run()（写内存 _individuality_trait），从未调 persist()，
+        # 注册用户的 profile.json 不会写入本轮 LLM 建模结果，前端 /api/profile 看不到。
+        # 对齐 /api/chat 行为（u<digits> 才落盘，匿名自动跳过）。
+        try:
+            if getattr(self, "individuality", None) is not None:
+                self.individuality.persist(learner, getattr(learner, "id", "") or "")
+        except Exception as _pe:
+            print(f"[PAEG][paeg.py] teach 个体化持久化异常忽略: {_pe}")
             pass
 
         return {
