@@ -29,7 +29,17 @@ from typing import Any, Callable, Dict, List, Optional
 # ─────────────────────────────────────
 
 def _make_tool(name: str, description: str, properties: dict,
-               required: List[str]) -> dict:
+               required: List[str], risk: str = "read") -> dict:
+    """构造工具定义。v0.46 ⭐ P0：风险分级（对照 OWASP Agentic Top10 / 发布标准）。
+
+    risk 取值：
+      - "read"   ：只读安全工具（检索/查询）——LLM 可自由调用
+      - "write"  ：写入工具（上传/生成文件）——需策略门放行
+      - "destructive"：破坏性工具（删除/覆盖）——需 HITL 人工确认（预留）
+    风险分级元数据存入 _RISK_LEVELS，供执行前 policy gate 校验。
+    """
+    global _RISK_LEVELS
+    _RISK_LEVELS[name] = risk
     return {
         "type": "function",
         "function": {
@@ -42,6 +52,31 @@ def _make_tool(name: str, description: str, properties: dict,
             },
         },
     }
+
+
+# v0.46 ⭐ P0：工具风险分级注册表（执行前策略门依据）
+_RISK_LEVELS: Dict[str, str] = {}
+
+
+def get_tool_risk(name: str) -> str:
+    """返回工具风险等级（默认 read——未知工具保守对待）。"""
+    return _RISK_LEVELS.get(name, "read")
+
+
+def is_tool_allowed(name: str, action: str = "auto") -> bool:
+    """v0.46 ⭐ P0：工具调用策略门（对照调研 B 表安全维度）。
+
+    规则：
+      - read 工具：auto 模式允许（LLM 自主调用）
+      - write/destructive 工具：默认拦截（需显式 HITL/人工确认）
+    当前 PAEG 全部工具为 read 级（web_search/verify_math/fetch_page/daily_quote/get_time），
+    未来加写工具时此处即拦截点。
+    """
+    risk = get_tool_risk(name)
+    if risk == "read":
+        return True
+    # write/destructive：仅显式人工授权时放行
+    return action == "manual_confirm"
 
 
 def get_tool_defs() -> List[dict]:
