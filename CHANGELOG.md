@@ -1,3 +1,39 @@
+### v0.44.0 收尾式升级：联网检索多查询词联想 + 可观测性 + 配置安全（2026-08-11）
+
+**本版定位**：收尾式升级——修复用户真实使用发现的 P0 级问题（联网检索贫乏），落地此前
+设计文档声称但从未实现的"agent 联想多种查询词"设计；接入 logging/request_id/health 深度化；
+SECRET_KEY 生产强制；ResourceLibrarian 全局持有；文件操作能力扩展到教学路径。
+
+**P0 修复**：
+- **联网检索多查询词联想**（web_search_tool.py 新增 `expand_queries` + `web_search_multi`）：
+  此前只用 1 个关键词调 1 次检索（max_results=3）→ 结果贫乏且无正文；现由 LLM 根据提问
+  联想 n 个多样化查询词（定义/应用/例子/最新进展角度）→ 逐一检索 → 合并去重（可达 12 条
+  含正文摘要）。规则兜底（无 LLM 时 5 个查询变体）。实测：联想"约瑟夫森结/超导量子比特"
+  等专业子概念，返回 6 条带正文结果（原 3 条干 URL）。
+- **PPT 大纲实质化**（subagents.py ResourceLibrarian.run）：ppt_outline 从"仅标题"升级为
+  "标题+正文要点"（snippet ≤80 字），PPT 不再只有干链接。
+- **双进程端口冲突**：启动前查 netstat 杀残留旧进程，防 health 打到旧代码（经验入 memo/009）。
+
+**工程化升级（P1）**：
+- **logging 接入**：server.py 全局 logger + request_id 中间件（X-Request-ID 头往返，异常链路追踪）。
+- **/api/health 深度化**：新增 llm_ok / db_ok 字段（此前仅 mcp/skill/agent 检查）。
+- **SECRET_KEY 双轨**（config.py）：PAEG_ENV=production 且未设 PAEG_SECRET_KEY → 启动即 KeyError
+  阻断（防生产裸跑）；development 默认值保留丝滑启动。
+- **ResourceLibrarian 全局持有**（paeg.py）：从"每请求 new"升级为主 agent 持有（构造无状态，
+  用户隔离靠 run(learner=...) 参数，安全）。README 恢复"9 全持有"真实表述。
+- **文件操作统一入口**（server.py `_try_file_operation`）：chat_stream + teach_stream 复用
+  （教学路径也支持"按我上传的讲义讲X"）。
+
+**测试与文档**：
+- memo/009_测试卡住经验与E2E盲区反思.md：3 次卡住根因（LLM 真实调用无 mock/Start-Job 被回收/
+  旧进程端口污染/PS5.1 Start-Process 重定向 bug）+ 5 层 E2E 盲区反思（断言只看形状不看内容/文档-代码漂移无检测/测试数据太正常/网络检索被 mock/交互心智未测）。
+- memo/010_测试哲学升级_既测有无也测好坏.md：**测试只测功能有无、没测功能好坏**——检索/PPT
+  核心功能"能用但不好用"的根因诊断 + 三层测试架构（质量层/联通层/代码层）+ 检索质量 KPI。
+- E2E 实测：冷门概念"超导隧穿效应"触发联网 → 徽章"已完成网络检索" + 联想关键词 + 3 条带正文资源。
+
+**已知待办（入需求清单）**：查资料按钮 ChatGPT 式悬浮选项（P2）；favicon 404（P2）；
+徽章复合值"知识库+网络检索"（P2）；密码哈希/原子写/限流/CORS 白名单（Oracle P0 清单，未纳入本版）。
+
 ### v0.43.1 输出效果约束 3 位掩码架构 + subagent 副本教训（2026-08-10）
 
 **核心创新**：把 v0.42.3 "高/中/低"三档约束粒度提升为 **3 位掩码（bitmask）**——3 个布尔变量精确表达"哪一组约束启用 / 取消"，配合 **L0 保底层**（永不跳过）实现 8 种可组合约束策略。

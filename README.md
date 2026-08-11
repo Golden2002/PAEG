@@ -1,6 +1,6 @@
 # PAEG — Pedagogical Agent with Evolving Growth
 
-基于**西蒙娜·薇依（Simone Weil）**教育哲学、由 Agent 架构驱动的 AI 教育智能体（**v0.43 关键节点 · 35 学科 + 学段联动 + 3 位掩码约束架构 + 注册问卷 + 自我进化**）。
+基于**西蒙娜·薇依（Simone Weil）**教育哲学、由 Agent 架构驱动的 AI 教育智能体（**v0.44 关键节点 · 35 学科 + 学段联动 + 3 位掩码约束架构 + 注册问卷 + 联网检索多查询词联想 + 自我进化**）。
 
 > **定位**：PAEG = **新一代教育智能体解决方案**——为教育重新设计的 Agent 架构，让智能体指挥大模型完成教学全过程（诊断、计划、讲解、评估、调整、反思），使教育从"一次性问答"跃迁为"有教学法、有过程、有陪伴、能自我进化"的完整闭环。
 
@@ -16,8 +16,9 @@ PAEG 不是"给 LLM 套聊天框"的教育产品，而是**为教育重新设计
 ### 1. 完整教学循环（不是聊天，是教学）
 `paeg.teach()` 六阶段闭环：**诊断 → 计划 → 呈现 → 评估 → 调整 → 反思 → 自更新**。评估用确定性启发式（可复现不随机），LLM 只负责最擅长的"讲解"。
 
-### 2. 9 个子代理架构（LLM 只做擅长的事 · v0.25 全持有）
-Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（评估）/ Adapter（调整）/ AnswerSolver（找答案）/ AffectionSupportor（情绪陪伴 · 立德树人）/ SelfUpdateAgent（自我更新）/ **Individuality（个体化因材施教 · 17 维画像）**。**v0.24 修复**：PAEG 主 agent 现在持有全部 9 个 subagent 统一调度。设计原则：诊断深度、评估分数、调整决策用确定性规则（可测试可复现），只有"生成讲解"用 LLM。
+### 2. 9 个子代理架构（LLM 只做擅长的事 · v0.43 全持有）
+Diagnostor（诊断）/ Planner（计划）/ Presenter（呈现）/ Evaluator（评估）/ Adapter（调整）/ AnswerSolver（找答案）/ AffectionSupportor（情绪陪伴 · 立德树人）/ SelfUpdateAgent（自我更新）/ **Individuality（个体化因材施教 · 17 维画像）** + **ResourceLibrarian（资料检索员）**。
+**v0.43 持有说明（真实状态）**：PAEG 主 agent **全局持有全部 9+1 个子代理**——8 个即时构造持有（Diagnostor/Planner/Presenter/Evaluator/Adapter/AnswerSolver/AffectionSupportor/Individuality）+ **ResourceLibrarian 全局持有**（构造无状态，用户隔离靠 run(learner=...) 参数，v0.43 从"每请求 new"升级为复用）+ **SelfUpdateAgent 按需创建**（仅 /api/self-update/from-feedback 触发，语义清晰节省构造开销）。设计原则：诊断深度、评估分数、调整决策用确定性规则（可测试可复现），只有"生成讲解"用 LLM。
 
 ### 3. 多层意图路由（Agent 自动判断该做什么）
 用户设定"考研政治"问经济学 → 自动切换学科（Steering）；问"你今天怎么样" → 意向性层走一般化回应；问"我最近好难过" → 情绪拦截走 affection；选错模式 → 后端自动纠正；问"有哪些 subagent" → 自我指涉路由（v0.21.6）；**粘贴"帮我分析这段话：<长文>" → 复合输入检测（v0.21.9），用 DeepSeek 结构化模板区分指令与资料，防注入**。
