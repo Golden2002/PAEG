@@ -5006,3 +5006,29 @@ agent(LLM) → /api/ppt/generate → pptx_mcp_server.py → Library/ppt_template
 ```
 
 详见 [维护手册 §十六](../维护手册.md) + [元能力文档 §6.35](../元能力文档.md) + [memo/019](../memo/019_PPT生成方法论与质量标准.md)。
+
+## 10.8.3.4 视频生成 pipeline（v0.53 ⭐ Oracle 设计 —— 演讲稿驱动）
+
+> 视频生成从"标题+要点拼接"升级为"演讲稿驱动"（memo/021）。
+
+### pipeline
+
+```
+Step 0 演讲稿生成（LLM）：结构化教学演讲稿（narration，问题→概念→例子→总结，页间过渡语）
+Step 1 大纲：教学式标题
+Step 2 帧设计：PIL 渲染（标题/要点/公式/字幕区）
+Step 3 配音：edge-tts 读 narration
+Step 4 合成：ffmpeg（页面时长 = narration 音频时长 + 0.3s）
+Step 5 QA：结构/音频/字幕/转帧
+```
+
+### 实测
+
+- 光合作用 7 页 128s（升级前 3 页 20s）——内容深度大幅提升
+- 视频插入 PPT：python-pptx add_movie 嵌入 mp4（PowerPoint 内可播放）
+
+### 与 PPT 统一 LearningPlan
+
+- 共享：学习目标/标题/要点/公式/视觉规格
+- 视频独有：narration/audio_duration/subtitle_cues
+- 详见 [维护手册 §十七](../维护手册.md) + [元能力 §6.36](../元能力文档.md) + [memo/021](../memo/021_视频生成升级设计.md)
