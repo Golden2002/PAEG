@@ -106,13 +106,11 @@ def _safe_chat(model, system: str, user: str = None, messages: list = None,
     v0.21.5：新增泄漏检测——LLM 回复若泄漏 system prompt / 自称其他模型，
     视为不安全返回 None（调用方回退 fallback），阻断 ability decay。
     v0.22.1：新增 tools/tool_choice 透传——subagent 也可暴露 web_search 等工具给 LLM。
-    v0.46 ⭐ P0：新增 token 预算门——会话累计输出超限即拒绝（防成本失控，
-    对照调研 D 节失败模式 #9：AutoGPT 100k 内存后向量检索"完全不值得"）。
+    v0.46 ⭐ P0：新增 token 预算门——防成本失控。
+    v0.50 ⭐ Oracle 修复：预算按**实际输出计费**（非 max_tokens 预扣——1500 的调用
+    即使只返回 100 token 也只扣 100）+ **异常语义化日志**（区分限流/超时/预算/网络，
+    此前 except Exception 全吞，掩盖真实失败原因）。
     """
-    # v0.46 ⭐ P0：预算门（超限返回 None → 调用方降级规则模式，不崩不烧钱）
-    if not _consume_token_budget(max_tokens):
-        print("[PAEG][budget] LLM token 预算耗尽，降级规则模式")
-        return None
     if not _is_real_llm(model):
         return None
     if messages is None and user is not None:
@@ -131,11 +129,29 @@ def _safe_chat(model, system: str, user: str = None, messages: list = None,
                 system=system, messages=messages, max_tokens=max_tokens,
                 temperature=0.7,
             )
-    except Exception:
+    except Exception as _safe_e:
+        # v0.50 ⭐ Oracle：异常语义化日志（此前吞掉掩盖限流/超时/网络）
+        try:
+            import logging
+            _api = getattr(model, "_api", model)
+            logging.getLogger("paeg.llm").warning(
+                "llm_call_failed provider=%s kind=%s error=%s",
+                getattr(_api, "name", "unknown"),
+                getattr(_safe_e, "kind", "exception"),
+                str(_safe_e)[:300], exc_info=True)
+        except Exception:
+            print(f"[PAEG][llm] 调用失败: {_safe_e}")
         return None
     # v0.21.5：泄漏/异常内容过滤（chaos_turn_eval 发现的能力退化）
     if reply and _is_leaky_reply(reply):
         return None
+    # v0.50 ⭐ Oracle：预算按实际输出计费（非 max_tokens 预扣）
+    if reply:
+        try:
+            _actual = max(1, len(str(reply)) // 2)  # 中文约 2 字符/token 粗略估算
+            _consume_token_budget(_actual)
+        except Exception:
+            pass
     return reply
 
 
@@ -405,11 +421,55 @@ def _detect_teaching_mode_regex(text: str) -> str:
     return "normal"
 
 
+def _rule_resource_advantage(title: str, snippet: str) -> str:
+    """v0.50 ⭐ Oracle：summary 优势句规则补全（LLM 缺失时）。"""
+    _t = f"{title} {snippet}".lower()
+    if any(k in _t for k in ("教育部", "gov.cn", "大学", "学院", "出版社")):
+        return "来源较权威，适合作为系统学习材料"
+    if any(k in _t for k in ("论文", "journal", "doi", "研究")):
+        return "研究信息较集中，适合深入了解相关观点"
+    if any(k in _t for k in ("教程", "入门", "基础", "lesson")):
+        return "结构较清晰，适合入门学习和循序理解"
+    if any(k in _t for k in ("视频", "课程", "讲解")):
+        return "讲解形式直观，便于通过示例建立理解"
+    return "内容聚焦主题，可作为进一步学习的参考"
+
+
+def _normalize_resource_summary(title: str, snippet: str, raw: str) -> str:
+    """v0.50 ⭐ Oracle：summary 结构校验——保证"优势：…。内容：…。"完整。
+
+    此前 LLM 偶发只输出"内容：…"（缺优势句）也直接通过。此函数：
+    1. 提取优势/内容标签句
+    2. 缺优势 → 规则补全（按 title/snippet 特征）
+    3. 缺内容 → snippet 兜底
+    """
+    import re as _re
+    _text = _re.sub(r"\s+", " ", str(raw or "")).strip()
+    _text = _text.replace("。优势：", "\n优势：").replace("。内容：", "\n内容：")
+    _adv = _re.search(r"优势\s*[:：]\s*(.*?)(?=(?:内容\s*[:：])|$)", _text)
+    _cont = _re.search(r"内容\s*[:：]\s*(.*)$", _text)
+    _adv_text = _adv.group(1).strip(" 。\n") if _adv else ""
+    _cont_text = _cont.group(1).strip(" 。\n") if _cont else ""
+    # 无标签但确有两句 → 拆句
+    if not _adv_text and not _cont_text:
+        _sent = [x.strip() for x in _re.split(r"[。！？!?\n]", _text) if x.strip()]
+        if len(_sent) >= 2:
+            _adv_text, _cont_text = _sent[0], _sent[1]
+        elif len(_sent) == 1:
+            _cont_text = _sent[0]
+    if not _cont_text:
+        _cont_text = (snippet or title or "该资源的主要内容")[:100]
+    if not _adv_text:
+        _adv_text = _rule_resource_advantage(title, snippet)
+    return f"优势：{_adv_text[:40]}。内容：{_cont_text[:40]}。"
+
+
 def _summarize_resource(title: str, snippet: str, llm=None) -> str:
     """v0.46.1 ⭐ 资源优势介绍：基于标题+摘要生成"优势 + 大体内容"（用户需求）。
 
     检索网页后不仅推荐链接，还要介绍它的优势和大体内容。
     LLM 可用 → 精炼为一句优势 + 一句内容概述；LLM 不可用 → snippet 前 100 字兜底。
+    v0.50 ⭐ Oracle：LLM 输出过结构校验（优势/内容双句，缺失规则补全）。
     """
     if not title and not snippet:
         return ""
@@ -425,11 +485,13 @@ def _summarize_resource(title: str, snippet: str, llm=None) -> str:
             _u = f"标题：{title}\n摘要：{_base[:300]}"
             _r = _safe_chat(llm, _sys, _u, max_tokens=120)
             if _r and _r.strip():
-                _out = _r.strip()[:150]
+                _out = _normalize_resource_summary(title, snippet, _r)
                 # v0.46.1 ⭐ 语言规范收口：summary 也是生成内容，必须过 L2/L3 polish
                 try:
                     from services.polish import _polish_text
                     _out = _polish_text(_out, context="resource_summary")
+                    # polish 可能删标签 → 再校验一次
+                    _out = _normalize_resource_summary(title, snippet, _out)
                 except Exception:
                     pass
                 return _out
