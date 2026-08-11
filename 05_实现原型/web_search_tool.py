@@ -577,28 +577,38 @@ def web_search_multi(question: str, llm=None, subject: str = "", n_queries: int 
     _docmap = {}                 # url -> item
 
     def _fetch_one(_q):
-        try:
-            # Bing 对连续中文分词差 → 先 _shorten_query 切出空格分隔短词
-            _sq = _shorten_query(_q)
-            _query = _sq if _sq else _q
-            _res = web_search(_query, max_results=per_query)
-        except Exception:
-            return []
-        if not _res or "未返回" in str(_res) or "未找到" in str(_res):
-            return []
+        # v0.53 ⭐ 多轮变体：每查询尝试 2-3 个变体（原词 + shorten + 学科组合），
+        # 合并去重（5 主题 × 3 轮 = 15 次请求 → 可达 20+ 条）
+        _variants = [_q]
+        _sq = _shorten_query(_q)
+        if _sq and _sq != _q:
+            _variants.append(_sq)
+        if subject:
+            _variants.append(f"{subject} {_q[:30]}")
         _items = []
-        for _blk in str(_res).split("\n\n"):
-            _m = _re.search(r"URL:\s*(\S+)", _blk)
-            if not _m:
+        for _v in _variants[:3]:
+            try:
+                _res = web_search(_v, max_results=per_query)
+            except Exception:
                 continue
-            _url = _m.group(1)[:300]
-            _t = _re.match(r"\[来源 \d+\]\s*(.+)", _blk.strip())
-            _snippet = _blk.split("URL:", 1)[-1].split("\n", 1)[-1].strip()
-            _items.append({
-                "title": (_t.group(1).strip() if _t else "")[:200],
-                "url": _url,
-                "content": (_snippet or "")[:500],
-            })
+            if not _res or "未返回" in str(_res) or "未找到" in str(_res):
+                continue
+            for _blk in str(_res).split("\n\n"):
+                _m = _re.search(r"URL:\s*(\S+)", _blk)
+                if not _m:
+                    continue
+                _url = _m.group(1)[:300]
+                if any(it.get("url") == _url for it in _items):
+                    continue
+                _t = _re.match(r"\[来源 \d+\]\s*(.+)", _blk.strip())
+                _snippet = _blk.split("URL:", 1)[-1].split("\n", 1)[-1].strip()
+                _items.append({
+                    "title": (_t.group(1).strip() if _t else "")[:200],
+                    "url": _url,
+                    "content": (_snippet or "")[:500],
+                })
+                if len(_items) >= per_query * 2:
+                    break
         return _items
 
     # v0.44 ⭐ 并行检索（最多 4 线程），整体受硬超时保护

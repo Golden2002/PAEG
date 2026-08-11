@@ -24,7 +24,7 @@
       "-y",
       "@modelcontextprotocol/server-fetch"
     ],
-    "enabled": false,
+    "enabled": true,
     "note": "网页抓取。标准包名已变动导致 npx 404，默认关闭。"
   },
   "git": {
@@ -33,7 +33,7 @@
       "-y",
       "@modelcontextprotocol/server-git"
     ],
-    "enabled": false,
+    "enabled": true,
     "note": "Git 操作。默认关闭，按需启用。"
   },
   "brave-search": {
@@ -42,7 +42,7 @@
       "-y",
       "@modelcontextprotocol/server-brave-search"
     ],
-    "enabled": false,
+    "enabled": true,
     "environment": {
       "BRAVE_API_KEY": ""
     },
