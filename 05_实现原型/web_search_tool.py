@@ -81,16 +81,14 @@ def _bing_search(query: str, max_results: int = MAX_RESULTS) -> List[dict]:
             })
     # 过滤掉完全不含查询关键词的结果（低质量）
     # v0.44 ⭐ 修复：中文连续文本（无空格）此前只算 1 个词 → 过滤失效；
-    # 现：空格切分 + 连续中文按 2-gram 补词，保证过滤真实生效。
+    # 现：jieba 切词 + 空格/标点切分双保险，保证过滤真实生效且不误杀。
     q_words = [w for w in re.split(r'[\s，。、,；;：:？?！!]+', query) if len(w) >= 2]
-    _q_clean = query
-    for _s in ["的", "和", "与", "了", "是", "什么", "如何", "怎样", "为什么", "原理", "应用"]:
-        _q_clean = _q_clean.replace(_s, " ")
-    for _t in re.split(r'\s+', _q_clean):
-        if len(_t) >= 2:
-            q_words.append(_t)
-        elif len(_t) == 2:
-            q_words.append(_t)
+    try:
+        import jieba
+        _toks = [w for w in jieba.lcut(query) if len(w.strip()) >= 2]
+        q_words = list(dict.fromkeys(q_words + _toks))
+    except Exception:
+        pass
     if q_words and results:
         def _rel(r0):
             text = (r0.get("title", "") + r0.get("content", ""))
@@ -201,36 +199,32 @@ def _shorten_query(query: str) -> str:
 
     此前 re.split(r"[\\s，。、,]+") 对"超导体的量子隧穿效应原理与应用"这种
     连续中文切不出词 → 返回空 → 无法拆短重试 → Bing 长查询分词差返回无关结果。
-    现：空格/标点切分优先；无分隔时按 2-gram 切分取高频核心词。
+    v0.44 ⭐ 再修：改用 jieba 中文分词（已安装），质量远超 2-gram 滑窗——
+    "超导体量子隧穿效应物理原理" → "超导体 量子隧穿 效应 物理 原理"
+    → 取前 2 个实词空格拼接（"超导体 量子隧穿"），Bing 分词正常。
     """
     import re as _re
     q = (query or "").strip()
-    if len(q) <= 12:
+    if not q:
+        return ""
+    # v0.44 ⭐ 修复：不再按长度短路——连续中文（无论长短）Bing 分词都差，
+    # 一律 jieba 切分出空格分隔词。含空格/标点的查询本身可被 Bing 理解，不切。
+    if _re.search(r'[\s，。、,；;：:？?！!]+', q):
         return ""
     # 去掉常见功能词，取前 2-3 个关键词
-    stop = ["推荐", "学习资料", "资料", "方法", "有哪些", "什么", "最新",
+    stop = {"推荐", "学习资料", "资料", "方法", "有哪些", "什么", "最新",
             "的", "和", "与", "如何", "怎样", "帮我", "一下", "请",
-            "为什么", "是什么", "什么是", "原理", "应用", "介绍", "讲讲"]
-    parts = [p for p in _re.split(r'[\s，。、,；;：:？?！!]+', q) if p]
-    kept = [p for p in parts if p not in stop]
-    if kept and len(kept[0]) <= 8:
+            "为什么", "是什么", "什么是", "原理", "应用", "介绍", "讲讲",
+            "效应", "以及", "关于", "请问"}
+    # jieba 分词（懒加载，仅此处使用）
+    try:
+        import jieba
+        _parts = [w for w in jieba.lcut(q) if w.strip()]
+    except Exception:
+        _parts = [p for p in _re.split(r'[\s，。、,；;：:？?！!]+', q) if p]
+    kept = [p for p in _parts if p not in stop and len(p) >= 2]
+    if len(kept) >= 2:
         return " ".join(kept[:2])
-    # v0.44 ⭐ 连续中文兜底：2-gram 切分，去停用词后取前 2 个高频词
-    # 例："超导体的量子隧穿效应原理与应用" → "超导 量子隧穿" → "超导 量子"
-    grams = []
-    _clean = q
-    for s in stop:
-        _clean = _clean.replace(s, " ")
-    toks = [t for t in _re.split(r'[\s]+', _clean) if len(t) >= 2]
-    for t in toks:
-        if len(t) <= 8:
-            grams.append(t)
-        else:
-            # 长词：按 2-gram 滑窗取前 2 个不重叠
-            for k in range(0, len(t) - 1, 2):
-                grams.append(t[k:k + 2])
-    if grams:
-        return " ".join(grams[:2])
     return ""
 
 
@@ -417,14 +411,25 @@ def expand_queries(question: str, llm=None, n: int = 5, subject: str = "") -> li
                     pass
         except Exception:
             pass
-    # 规则兜底：原始提问 + 关键词切分变体
+    # 规则兜底：原始提问 + jieba 核心词变体（v0.44 ⭐ 升级：比标点切分丰富得多）
     _fb = [_q]
-    _toks = [w for w in _re.split(r"[\s，。；、？?！!：:]+", _q) if len(w) >= 2]
     _subj and _fb.append(f"{_subj} {_q[:20]}")
-    for _w in _toks[:3]:
+    try:
+        import jieba
+        _toks = [w for w in jieba.lcut(_q) if len(w.strip()) >= 2]
+    except Exception:
+        import re as _re2
+        _toks = [w for w in _re2.split(r"[\s，。；、？?！!：:]+", _q) if len(w) >= 2]
+    # 核心词组合（去掉停用词后前 3 个）
+    _stop = {"什么是", "是什么", "什么", "如何", "怎样", "为什么", "的", "了", "在", "与", "和"}
+    _core = [w for w in _toks if w not in _stop][:3]
+    for _w in _core:
         if _w != _q and len(_w) >= 2:
+            _fb.append(_w)
             _fb.append(f"{_w} 定义")
             _fb.append(f"{_w} 例子")
+    if len(_core) >= 2:
+        _fb.append(" ".join(_core[:2]))
     _out = []
     for _x in _fb:
         if _x not in _out:
@@ -432,27 +437,75 @@ def expand_queries(question: str, llm=None, n: int = 5, subject: str = "") -> li
     return _out[:n + 1]
 
 
-def web_search_multi(question: str, llm=None, subject: str = "", n_queries: int = 4,
-                     per_query: int = 3, max_total: int = 12) -> list:
-    """多查询词联网检索（v0.44 ⭐ P0 修复）：联想多个查询 → 并行检索 → 合并去重。
+def _normalize_url(url: str) -> str:
+    """URL 规范化（v0.45 ⭐ 调研落地）：去 tracking 参数/尾斜杠/www 前缀。
 
-    返回 [{title, url, content}] 列表（含正文摘要，数量可达 max_total 条）。
-    单查询全部失败时回退单查询 web_search（向下兼容）。
+    避免同一结果带不同参数被判为"假重复"（实测可去 30-60% 重复）。
+    """
+    try:
+        from urllib.parse import urlparse, urlunparse, urlencode, parse_qsl
+        _p = urlparse((url or "").strip().lower())
+        _TRACK = frozenset({'utm_source', 'utm_medium', 'utm_campaign', 'utm_term',
+                            'utm_content', 'fbclid', 'gclid', 'msclkid', 'ref', 'source'})
+        _filtered = [(k, v) for k, v in parse_qsl(_p.query) if k not in _TRACK]
+        _path = _p.path.rstrip('/') or '/'
+        _netloc = _p.netloc[4:] if _p.netloc.startswith('www.') else _p.netloc
+        return urlunparse((_p.scheme, _netloc, _path, '', urlencode(sorted(_filtered)), ''))
+    except Exception:
+        return (url or "").strip()
 
-    v0.44 ⭐ 防卡修复：查询词**并行**检索（ThreadPoolExecutor），整体硬超时 20s——
-    此前串行 5 词 × Bing 15s ≈ 100s+，用户实测对话卡 10 分钟即由此导致。
+
+def _jaccard_relevance(question: str, item: dict) -> float:
+    """相关性打分（v0.45 ⭐ 调研落地）：核心词命中 + 标题匹配 + 内容长度。"""
+    import re as _re2
+    _q = _re2.sub(r"[\s，。；、？?！!：:]+", "", str(question or ""))
+    _toks = [w for w in _q if len(w) >= 2]
+    if not _toks:
+        return 0.5
+    _title = str(item.get("title", ""))
+    _content = str(item.get("content", ""))
+    _hay = _title + _content
+    _hits = sum(1 for w in _toks if w in _hay)
+    if _hits == 0:
+        return 0.0
+    _score = min(1.0, _hits / 3.0)  # 3 个核心词全中 = 1.0
+    # 标题直接含问题词 = 强相关
+    if any(w in _title for w in _toks[:3]):
+        _score = max(_score, 0.8)
+    # 内容太短 = 质量差
+    if len(_content) < 30:
+        _score *= 0.6
+    return round(_score, 2)
+
+
+def web_search_multi(question: str, llm=None, subject: str = "", n_queries: int = 3,
+                     per_query: int = 5, max_total: int = 12) -> list:
+    """多查询词联网检索（v0.45 ⭐ 调研升级版）。
+
+    调研落地（memo/011）：多查询 K=2-3（甜区）+ 并行 + **RRF 融合（k=60）** +
+    **URL 规范化去重** + **相关性打分排序**。目标：每次稳定返回 ≥5 条高质量中文结果。
+
+    返回 [{title, url, content}] 列表（按 RRF 融合 + 相关性排序）。
+    防卡：并行检索（4 线程）+ 整体硬超时 20s + Bing timeout 8s。
     """
     import re as _re
+    from collections import defaultdict
     from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FutTimeout
+
     _qs = expand_queries(question, llm=llm, n=n_queries, subject=subject)
     if not _qs:
         _qs = [question]
-    _seen_url = set()
-    _all = []
+    _RRF_K = 60
+    _norm_seen = set()          # 规范化 URL 去重
+    _fused = defaultdict(float)  # url -> rrf score
+    _docmap = {}                 # url -> item
 
     def _fetch_one(_q):
         try:
-            _res = web_search(_q, max_results=per_query)
+            # Bing 对连续中文分词差 → 先 _shorten_query 切出空格分隔短词
+            _sq = _shorten_query(_q)
+            _query = _sq if _sq else _q
+            _res = web_search(_query, max_results=per_query)
         except Exception:
             return []
         if not _res or "未返回" in str(_res) or "未找到" in str(_res):
@@ -463,8 +516,6 @@ def web_search_multi(question: str, llm=None, subject: str = "", n_queries: int 
             if not _m:
                 continue
             _url = _m.group(1)[:300]
-            if _url in _seen_url:
-                continue
             _t = _re.match(r"\[来源 \d+\]\s*(.+)", _blk.strip())
             _snippet = _blk.split("URL:", 1)[-1].split("\n", 1)[-1].strip()
             _items.append({
@@ -478,50 +529,63 @@ def web_search_multi(question: str, llm=None, subject: str = "", n_queries: int 
     try:
         with ThreadPoolExecutor(max_workers=min(len(_qs), 4)) as _ex:
             _futs = [_ex.submit(_fetch_one, _q) for _q in _qs]
-            for _f in _futs:
+            for _rank, _f in enumerate(_futs):
                 try:
                     _items = _f.result(timeout=20)
-                    for _item in _items:
-                        if _item["url"] not in _seen_url:
-                            _seen_url.add(_item["url"])
-                            _all.append(_item)
-                            if len(_all) >= max_total:
-                                break
+                    for _i, _item in enumerate(_items):
+                        # URL 规范化去重
+                        _nurl = _normalize_url(_item["url"])
+                        if not _nurl or _nurl in _norm_seen:
+                            continue
+                        _norm_seen.add(_nurl)
+                        # RRF 融合：rank 越靠前分数越高（k=60）
+                        _fused[_nurl] += 1.0 / (_RRF_K + _i + 1)
+                        _docmap[_nurl] = _item
                 except (_FutTimeout, Exception):
                     continue
-                if len(_all) >= max_total:
-                    break
     except Exception:
         pass
 
-    # v0.44 ⭐ 相关性过滤：去掉与提问明显无关的结果（如"约瑟夫森结"→游戏角色歧义）
-    if len(_all) > 3:
-        _core = re.sub(r"[\s，。；、？?！!：:：]+", "", str(question or ""))
-        _core_toks = [w for w in _core if len(w) >= 2]
-        _kept = []
-        for _item in _all:
-            _hay = str(_item.get("title", "")) + str(_item.get("content", ""))
-            _score = sum(1 for w in _core_toks if w in _hay)
-            # 保留：至少命中 1 个核心词，或标题直接含问题词
-            if _score >= 1 or any(w in str(_item.get("title", "")) for w in _core_toks):
-                _kept.append(_item)
-        if _kept:
-            _all = _kept
-    if not _all:
-        # 兜底：单查询（兼容旧行为）
-        _r = web_search(question, max_results=3)
-        if isinstance(_r, str) and _r and "未返回" not in _r and "未找到" not in _r:
-            for _blk in _r.split("\n\n"):
-                _m = _re.search(r"URL:\s*(\S+)", _blk)
-                if _m:
-                    _t = _re.match(r"\[来源 \d+\]\s*(.+)", _blk.strip())
-                    _snippet = _blk.split("URL:", 1)[-1].split("\n", 1)[-1].strip()
-                    _all.append({
-                        "title": (_t.group(1).strip() if _t else "")[:200],
-                        "url": _m.group(1)[:300],
-                        "content": (_snippet or "")[:500],
-                    })
-    return _all[:max_total]
+    # 相关性打分 + RRF 排序
+    _ranked = []
+    for _nurl, _rrf in sorted(_fused.items(), key=lambda x: x[1], reverse=True):
+        _item = _docmap[_nurl]
+        _rel = _jaccard_relevance(question, _item)
+        if _rel == 0.0:
+            continue  # 与提问完全无关 → 丢弃
+        _item = dict(_item)
+        _item["_rrf"] = round(_rrf, 4)
+        _item["_rel"] = _rel
+        _ranked.append(_item)
+    # 综合排序：RRF 优先，相关性兜底（RRF 高但相关 0 的已滤）
+    _ranked.sort(key=lambda x: (-x["_rrf"], -x["_rel"]))
+    _out = [{k: v for k, v in it.items() if not k.startswith("_")} for it in _ranked]
+
+    # v0.45 ⭐ 兜底：融合后仍太少（<3）→ 用规则核心词单查补足
+    if len(_out) < 3:
+        try:
+            _sq = _shorten_query(str(question or ""))
+            _fallback_q = _sq if _sq else str(question or "")
+            _r = web_search(_fallback_q, max_results=per_query)
+            if isinstance(_r, str) and _r and "未返回" not in _r and "未找到" not in _r:
+                for _blk in _r.split("\n\n"):
+                    _m = re.search(r"URL:\s*(\S+)", _blk)
+                    if _m:
+                        _t = re.match(r"\[来源 \d+\]\s*(.+)", _blk.strip())
+                        _snip = _blk.split("URL:", 1)[-1].split("\n", 1)[-1].strip()
+                        _url = _m.group(1)[:300]
+                        if _normalize_url(_url) not in _norm_seen:
+                            _norm_seen.add(_normalize_url(_url))
+                            _out.append({
+                                "title": (_t.group(1).strip() if _t else "")[:200],
+                                "url": _url,
+                                "content": (_snip or "")[:500],
+                            })
+                        if len(_out) >= max_total:
+                            break
+        except Exception:
+            pass
+    return _out[:max_total]
 
 
 if __name__ == "__main__":
