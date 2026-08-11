@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """生成 PPT MCP server（v0.25 ⭐）
 PAEG 通过 MCP 调用本 server 的 generate_ppt 工具：
 - 输入：主题 + 来源（用户文档/知识库检索结果/对话历史摘要）
@@ -162,8 +162,8 @@ def _extract_material_text(uid: str, max_files: int = 3, max_chars: int = 8000) 
 
 
 def generate_ppt(topic: str, outline: str = "", sources: str = "",
-                 out_name: str = "", uid: str = "") -> dict:
-    """生成演示文稿 .pptx。
+                 out_name: str = "", uid: str = "", style: str = "paeg_standard") -> dict:
+    """生成演示文稿 .pptx（v0.52 ⭐ 支持风格模板）。
 
     Args:
         topic: 演示主题（如"语言学导论"）
@@ -172,10 +172,21 @@ def generate_ppt(topic: str, outline: str = "", sources: str = "",
         out_name: 输出文件名（不含扩展名，默认按主题+时间戳）
         uid: v0.26 ⭐ 用户 id——若提供，自动从 Library/usr_knowledge/<uid>/
              提取用户上传物料（md/pdf/docx 文字+图片说明）作为内容补充
+        style: v0.52 ⭐ 风格模板——'paeg_standard'（深蓝#0F2A52+金#E6A528，默认）/
+               'presentation_zen'（极简留白）/'dark_premium'（深色高级）
 
     Returns:
         {"ok": bool, "path": str, "slides": int, "error": str}
     """
+    # v0.52 ⭐ 风格模板：覆盖全局配色（方法论见 Library/ppt_templates/PPT_方法论与质量标准.md）
+    global C_PRIMARY, C_ACCENT, C_LIGHT, C_DARK
+    from pptx.dml.color import RGBColor as _RGB
+    if style == "presentation_zen":
+        C_PRIMARY, C_ACCENT, C_LIGHT, C_DARK = _RGB(0x2C, 0x5F, 0x2D), _RGB(0x97, 0xBC, 0x62), _RGB(0xF5, 0xF5, 0xF5), _RGB(0x21, 0x21, 0x21)
+    elif style == "dark_premium":
+        C_PRIMARY, C_ACCENT, C_LIGHT, C_DARK = _RGB(0x1E, 0x27, 0x61), _RGB(0xCA, 0xDC, 0xFC), _RGB(0x11, 0x14, 0x20), _RGB(0xFF, 0xFF, 0xFF)
+    else:  # paeg_standard（默认，与路演 PPT 一致）
+        C_PRIMARY, C_ACCENT, C_LIGHT, C_DARK = _RGB(0x0F, 0x2A, 0x52), _RGB(0xE6, 0xA5, 0x28), _RGB(0xF5, 0xF2, 0xEC), _RGB(0x0F, 0x2A, 0x52)
     try:
         os.makedirs(OUT_DIR, exist_ok=True)
         slides_data = _parse_outline(outline or topic)
@@ -243,11 +254,16 @@ try:
 
     @mcp.tool()
     def generate_presentation(topic: str, outline: str = "", sources: str = "",
-                              out_name: str = "", uid: str = "") -> dict:
+                              out_name: str = "", uid: str = "",
+                              style: str = "paeg_standard") -> dict:
         """根据主题+大纲+来源生成演示文稿 PPT（PAEG 教育智能体调用）。
+
         大纲格式：每页以 '## 标题' 或 '1. 标题' 开头，要点以 '- ' 开头。
-        uid（可选）：用户 id——提供时自动提取该用户上传物料（md/pdf/docx）的文字补充内容。"""
-        return generate_ppt(topic, outline, sources, out_name, uid)
+        uid（可选）：用户 id——提供时自动提取该用户上传物料（md/pdf/docx）的文字补充内容。
+        style（v0.52 ⭐）：风格模板——'paeg_standard'（深蓝+金，默认）/
+          'presentation_zen'（极简留白）/'dark_premium'（深色高级）。模板资源在
+          Library/ppt_templates/，风格方法论见 PPT_方法论与质量标准.md。"""
+        return generate_ppt(topic, outline, sources, out_name, uid, style=style)
 
     if __name__ == "__main__":
         mcp.run(transport="stdio")
