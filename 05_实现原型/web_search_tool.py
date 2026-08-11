@@ -223,8 +223,18 @@ def _shorten_query(query: str) -> str:
     except Exception:
         _parts = [p for p in _re.split(r'[\s，。、,；;：:？?！!]+', q) if p]
     kept = [p for p in _parts if p not in stop and len(p) >= 2]
-    if len(kept) >= 2:
-        return " ".join(kept[:2])
+    # v0.45 ⭐ 修复：jieba 可能把学科核心词切丢（如"熵"单字被滤），且泛化词
+    # （物理/意义）先出现会挤掉后面的核心词（热力学/定律）。策略：
+    #   1) 若存在非泛化核心词 → 优先用核心词（如"热力学 定律"）
+    #   2) 全泛化词 → 退回原始完整问题
+    _generic = {"物理", "数学", "化学", "生物", "哲学", "历史", "地理", "语文",
+                "英语", "意义", "方法", "概念", "原理", "应用", "基础", "知识",
+                "第二", "分析", "研究", "介绍", "内容"}
+    _core = [p for p in kept if p not in _generic]
+    if _core:
+        return " ".join(_core[:2])
+    if kept:
+        return q  # 全泛化词 → 用原始整句
     return ""
 
 
@@ -378,16 +388,43 @@ def expand_queries(question: str, llm=None, n: int = 5, subject: str = "") -> li
     if llm is not None:
         try:
             from subagents import _safe_chat
-            _sys = (
-                "你是 PAEG 的检索查询联想器。根据学生的提问，从不同角度联想 "
-                f"{n} 个多样化、可能符合学生期望的网络检索查询词。\n"
-                "要求：\n"
-                "- 每个查询词 2-8 个词，独立完整，能直接提交给搜索引擎\n"
-                "- 覆盖不同角度：概念定义、应用案例、历史背景、最新进展、常见误区、学习方法（按问题性质取舍）\n"
-                "- 若学科已知（" + _subj + "），融入学科术语\n"
-                "- 输出 JSON 数组，如 [\"词1\", \"词2\"]，只输出 JSON"
+            # v0.45 ⭐ 短长结合：把 单字词 → 短语 → 整句 全量提供给 LLM 编辑，
+            # LLM 从中挑选/重组出最佳查询词（比规则"取前2词"质量高得多）。
+            try:
+                import jieba
+                _toks = [w for w in jieba.lcut(_q) if w.strip()]
+            except Exception:
+                _toks = []
+            # 词表：单字词 + 双字词 + 3字词 + 标点分段短语 + 整句
+            _word_bank = _toks  # 含单字
+            _seg_parts = [p for p in re.split(r"[\s，。、；:：！!？?]+", _q) if p.strip()]  # 标点分段
+            _bank_repr = " | ".join(
+                ["(单字词) " + "、".join([w for w in _word_bank if len(w) == 1][:12])] +
+                ["(多字词) " + "、".join([w for w in _word_bank if len(w) >= 2][:20])] +
+                ["(分段短语) " + " | ".join(_seg_parts[:6])] +
+                ["(完整原文) " + _q[:200]]
             )
-            _r = _safe_chat(llm, _sys, _q[:300], max_tokens=200)
+            _sys = (
+                "## 角色\n"
+                "你是专业的网络检索关键词规划师（Query Planner）。你的唯一任务："
+                "把学生的一句话提问，转化为一组高质量的中文检索查询词，"
+                "让搜索引擎返回最相关、最丰富的结果。\n\n"
+                "## 输入素材\n"
+                "系统已把提问切分为 4 种粒度的素材（单字词 / 多字词 / 标点分段短语 / 完整原文），"
+                "你从中挑选、组合、改写，而非凭空编造。\n\n"
+                "## 输出要求（必守）\n"
+                f"1. 恰好 {n} 个查询词，覆盖不同检索角度（概念定义 / 原理机制 / 应用案例 / 最新进展，按问题性质取舍）\n"
+                "2. 长短结合：至少 1 个极短查询（2-4 字，如『热力学 熵』），至少 1 个完整句查询\n"
+                "3. 保留学科核心词：学科已知时（" + _subj + "），查询词必须融入该学科术语\n"
+                "4. 每个查询词 2-15 字，独立完整、可直接提交搜索引擎，禁止带标点结尾\n"
+                "5. 只输出 JSON 数组（如 [\"词1\", \"词2\"]），不要任何解释"
+            )
+            _user = (
+                f"[学生提问]\n{_q[:200]}\n\n"
+                f"[学科]\n{_subj if _subj else '未知'}\n\n"
+                f"[切分素材（短→长）]\n{_bank_repr}"
+            )
+            _r = _safe_chat(llm, _sys, _user, max_tokens=240)
             if _r:
                 import json as _json
                 _clean = _r.strip()
@@ -400,6 +437,10 @@ def expand_queries(question: str, llm=None, n: int = 5, subject: str = "") -> li
                     _parsed = _json.loads(_clean)
                     if isinstance(_parsed, list):
                         _qs = [str(x).strip() for x in _parsed if str(x).strip()]
+                        # v0.45 ⭐ 修复：过滤纯拉丁/符号查询（"F=ma"在 Bing 中文
+                        # 语境返回"f 字母符号"等污染）；保留含中文的混合查询
+                        _qs = [x for x in _qs
+                               if re.search(r'[\u4e00-\u9fff]', x) or len(x) > 6]
                         if _qs:
                             _uniq = []
                             for _x in _qs:
