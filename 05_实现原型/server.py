@@ -2711,6 +2711,37 @@ def _generate_ppt_from_outline(
     except Exception as e:
         return {"ok": False, "path": "", "url": "", "slides": 0, "error": f"PPT 生成异常: {e}"}
 
+@app.route("/api/ppt/generate", methods=["POST"])
+@require_module("file_gen")
+def ppt_generate_api():
+    """v0.52 ⭐ PPT 生成接口（agent 可调用，支持风格模板）。
+
+    请求：{topic, outline, style?, learner_id?}
+      - style: 'paeg_standard'（深蓝金，默认）/'presentation_zen'/'dark_premium'
+      - outline: '## 标题 + - 要点' 结构
+    响应：{ok, path, url, slides, error} —— url 可下载 .pptx
+    """
+    data = request.get_json(force=True) or {}
+    topic = (data.get("topic") or "").strip() or "演示文稿"
+    outline = (data.get("outline") or "").strip()
+    style = (data.get("style") or "paeg_standard").strip()
+    learner_id = data.get("learner_id") or "anon"
+    if not outline:
+        return jsonify({"ok": False, "error": "outline is required"}), 400
+    try:
+        import pptx_mcp_server
+        result = pptx_mcp_server.generate_ppt(
+            topic, outline, sources="", uid=str(learner_id), style=style)
+        if result.get("ok"):
+            from pathlib import Path as _P
+            import urllib.parse as _up
+            _fname = _P(result.get("path") or "").name
+            result["url"] = f"/api/download/ppt/{_up.quote(_fname)}"
+            return jsonify(result)
+        return jsonify(result), 500
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"PPT 生成异常: {e}"}), 500
+
 @app.route("/api/generate", methods=["POST"])
 @require_module("file_gen")
 def generate_file():
