@@ -45,12 +45,37 @@ class UserStore:
         self._data.setdefault("next_id", 1)
 
     def _save(self):
-        with open(self.data_path, 'w', encoding='utf-8') as f:
+        # v0.46 ⭐ P0-5 修复：原子写（tmp + os.replace）——此前直接写可能因
+        # 进程崩溃/并发截断 users.json（对照发布标准：存储原子性）。
+        import os as _os
+        _tmp = f"{self.data_path}.tmp"
+        with open(_tmp, 'w', encoding='utf-8') as f:
             json.dump(self._data, f, ensure_ascii=False, indent=1)
+            f.flush()
+            _os.fsync(f.fileno())
+        _os.replace(_tmp, self.data_path)
 
     @staticmethod
     def _hash_password(password: str, salt: str) -> str:
-        return hashlib.sha256(f"{salt}:{password}".encode('utf-8')).hexdigest()
+        # v0.46 ⭐ P0-4 修复：SHA-256 → PBKDF2-HMAC-SHA256（10 万次迭代）
+        # 对照发布标准（memo/013 P0-4）：SHA-256 可 GPU 秒破，PBKDF2 提高暴力破解成本
+        # （标准库 hashlib，无新依赖；新密码用 PBKDF2 格式，旧 SHA-256 哈希在
+        #  verify_password 中兼容验证）
+        return "pbkdf2$" + hashlib.pbkdf2_hmac(
+            "sha256", password.encode("utf-8"), salt.encode("utf-8"),
+            100_000
+        ).hex()
+
+    @staticmethod
+    def _verify_password(password: str, salt: str, stored: str) -> bool:
+        """兼容验证：新 PBKDF2 格式 + 旧 SHA-256 格式。"""
+        if stored.startswith("pbkdf2$"):
+            _try = hashlib.pbkdf2_hmac(
+                "sha256", password.encode("utf-8"), salt.encode("utf-8"),
+                100_000).hex()
+            return _try == stored.split("$", 1)[1]
+        # 旧格式（SHA-256）：兼容验证
+        return hashlib.sha256(f"{salt}:{password}".encode('utf-8')).hexdigest() == stored
 
     @staticmethod
     def _is_valid_identifier(identifier: str) -> bool:
@@ -105,7 +130,7 @@ class UserStore:
         user = self._data["users"].get(identifier)
         if not user:
             return {"ok": False, "error": "账号不存在，请先注册"}
-        if user["password_hash"] != self._hash_password(password, user["salt"]):
+        if not self._verify_password(password, user["salt"], user["password_hash"]):
             return {"ok": False, "error": "密码错误"}
         user["last_login"] = time.time()
         self._save()

@@ -4118,6 +4118,35 @@ PPT 大纲 ≥ 3 章节且围绕提问。**"能用就行"不算完成，质量�
 
 **测试后处理**：录像/问卷 → 整理成反馈文件 → 走 §10.8.1 闭环 → 修改 → 回归测试 → CHANGELOG 记录"用户测试轮次"。
 
+## 10.8.3.2 安全加固设计（v0.46 ⭐ 借鉴成功 Agent 项目 —— memo/013）
+
+> **借鉴项目**：Claude Code（工具风险分级 + permission modes）、OWASP GenAI/Agentic Top 10
+> 2026、PSF 32 控制项、AutoGPT（成本教训）、Khanmigo（教育安全）、Brave 安全研究（间接注入）。
+
+### 工具风险分级 + 策略门（tool_registry.py）
+- **技术路线**：`_make_tool(..., risk="read")` → `get_tool_risk()` → `is_tool_allowed(name, action)`
+- **作用**：防 LLM 被诱导执行写/破坏性操作（工具投毒防护）。当前 7 工具全 read 级，
+  未来写工具传 `risk="write"` 自动进入 HITL 确认流程（入口已预留）。
+
+### LLM 成本预算门（subagents.py _safe_chat）
+- **技术路线**：模块级 token 预算计数器（`_TOKEN_BUDGET_MAX=60000`/会话）+ 调用前扣减，
+  超限返回 None → 调用方降级规则模式
+- **作用**：防成本失控（对照 AutoGPT 教训）；超限优雅降级不崩。
+
+### 间接注入数据信封（subagents.py _pre_retrieve）
+- **技术路线**：检索/网页/用户资料注入 system 前加 `<<UNTRUSTED trust=external>>` 标记
+- **作用**：防网页/资料中恶意指令劫持 agent（最危险注入向量，Tabstack 漏洞教训）。
+
+### 认证与存储加固（user_store.py）
+- **密码**：SHA-256 → PBKDF2-HMAC-SHA256（10 万迭代），`_verify_password` 兼容旧哈希
+- **原子写**：users.json tmp+fsync+os.replace（对齐 conversations.json）
+- **登录限流**：IP+账号双维失败计数（15 分钟窗口 10 次 → 429），实测第 12 次触发
+
+### 验证状态
+- audit 39/40（P0 归零）；登录限流实测 429；检索无回归（9 条/7.4s）；
+  设计说明详见 [维护手册 §十五](../维护手册.md) + [元能力文档 §6.34](../元能力文档.md)
+
+
 ## 10.9 关键节点标记与回退流程（v0.21.4 ⭐ SOP）
 
 > 元技能说明见 **元能力文档 §二.5 版本标记与回退**。本节是操作手册（SOP）。
