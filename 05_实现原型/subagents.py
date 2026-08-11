@@ -1066,10 +1066,11 @@ class ResourceLibrarian:
                 if len(_kw) < 2:
                     _kw = question[:30]
             # v0.44 ⭐ 多查询词检索（LLM 联想查询词 → 丰富结果，含正文摘要）
-            # v0.53 ⭐ 修复：per_query 提到 5、max_total 提到 15（用户要求每次 ≥10 条）
+            # v0.53 ⭐ 修复：per_query 5、n_queries 5、max_total 20——多查询合并最大化
+            #（Bing 单查询约 10 条硬限制，靠多查询合并达 20 条）
             _web_items = web_search_multi(
                 question, llm=llm, subject=subject,
-                n_queries=5, per_query=5, max_total=15,
+                n_queries=5, per_query=5, max_total=20,
             )
             for _r in _web_items:
                 # v0.46.1 ⭐ 资源优势介绍：LLM 基于摘要生成"优势 + 大体内容"（用户需求：
