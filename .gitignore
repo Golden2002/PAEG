@@ -22,3 +22,8 @@ snapshots/*.zip
 # IDE
 .idea/
 .vscode/
+
+# v0.46: 运行时数据与清理备份不入库
+05_实现原型/downloads/
+05_实现原型/data/version.txt
+.cleanup_backup_*/
