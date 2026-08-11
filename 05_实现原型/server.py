@@ -927,11 +927,19 @@ def teach_stream():
         except Exception as _e:
             print(f"[PAEG] teach_stream 早退分支保存会话失败({mode}): {_e}")
 
-    # v0.26 ⭐ P0 安全修复（Oracle 审查发现）：teach_stream 此前绕过 _affection_gate_check，
-    # 危机输入（"我想死"等）直接进 Diagnostor 当学科问题诊断，跳过 SafetyChecker 热线注入。
-    # 与 paeg.teach 行为对齐：危机/纯情绪在入口短路到 AffectionSupportor。
+    # v0.46 ⭐ P0 根因修复：情绪门用 LLM 路由优先 + 正则兜底（此前仅 _affection_gate_check
+    # 词表匹配——"难过"单字词不在其词表 → 被路由到教学答非所问。而 route_intent 的
+    # LLM 判断对"难过"返回 emotion（实测 conf=1.0）。LLM 判断优先、正则兜底，与设计一致。
     try:
         _crisis, _emotion_only = paeg._affection_gate_check(learner, concept)
+        # LLM 路由优先：intent=emotion → 走情绪支持（正则兜底之上）
+        try:
+            from meta_router import route_intent
+            _ri = route_intent(concept, llm=llm, use_cache=True)
+            if not (_crisis or _emotion_only) and (_ri or {}).get("intent") == "emotion":
+                _emotion_only = True
+        except Exception:
+            pass
         if _crisis or _emotion_only:
             print(f"[PAEG] teach_stream 情绪支持钩子触发（crisis={_crisis}, emotion_only={_emotion_only}）")
             _aff_reply = paeg.affection_supportor.run(
