@@ -4970,3 +4970,113 @@ def detect_constraint_flags(user_message: str, history: list) -> dict:
 - §6.6 综合测试完整性盲区：本节是"约束架构完整但用户诉求被吞"的根治方案——让约束可被精确取消
 
 > **配套文档**：[CHANGELOG v0.43](../CHANGELOG.md)（变更明细·3 位掩码条目）/ [维护手册 §十三](../维护手册.md)（新约束归组说明）/ [元能力 §6.33](../元能力文档.md)（元能力方法论 + agent 使用注意事项）
+
+## 10.8.3.3 PPT 生成方法论与 pipeline（v0.51 ⭐ 依据 memo/019）
+
+> 商业 PPT 方法论（调研 YC/McKinsey/Apple Keynote）+ 路演实践。
+> 风格基准：`交付物/路演PPT/PAEG路演PPT_v0.51.pptx`（深蓝 #0F2A52 + 金 #E6A528）。
+
+### pipeline（v0.52 pptx_mcp_server 升级设计）
+
+```
+输入：主题/受众/页数/风格
+  → Step1 大纲（LLM）：行动式标题 + Read-Through Test 自检
+  → Step2 设计（LLM+规则）：配色/布局/视觉锚点（大数字/图标）
+  → Step3 填充（LLM）：观点 + 大数字 + 关键对话（实测）
+  → Step4 渲染：pptxgenjs/python-pptx（shape 用常量）
+  → Step5 QA 循环：转图 → 找重叠/溢出/对比度 → 修复 → 复验
+```
+
+### 质量标准
+
+| 维度 | 标准 |
+|---|---|
+| 标题 | 行动式观点句，全部标题连贯短文 |
+| 配色 | 模板或主题化（禁默认蓝）|
+| 每页 | 视觉锚点必含，无纯文字页 |
+| 排版 | QA 循环验证无重叠/溢出/对比度 |
+| 实测 | 关键对话大字号文本 + 截图小凭证 |
+| 密度 | 正文 ≤40 词/页，bullet ≤10 词 |
+
+### 接线（v0.52 落地）
+
+```
+agent(LLM) → /api/ppt/generate → pptx_mcp_server.py → Library/ppt_templates/ 模板
+           → pptxgenjs/python-pptx 渲染 → QA 循环 → 输出 .pptx
+```
+
+详见 [维护手册 §十六](../维护手册.md) + [元能力文档 §6.35](../元能力文档.md) + [memo/019](../memo/019_PPT生成方法论与质量标准.md)。
+
+## 10.8.3.4 视频生成 pipeline（v0.53 ⭐ Oracle 设计 —— 演讲稿驱动）
+
+> 视频生成从"标题+要点拼接"升级为"演讲稿驱动"（memo/021）。
+
+### pipeline
+
+```
+Step 0 演讲稿生成（LLM）：结构化教学演讲稿（narration，问题→概念→例子→总结，页间过渡语）
+Step 1 大纲：教学式标题
+Step 2 帧设计：PIL 渲染（标题/要点/公式/字幕区）
+Step 3 配音：edge-tts 读 narration
+Step 4 合成：ffmpeg（页面时长 = narration 音频时长 + 0.3s）
+Step 5 QA：结构/音频/字幕/转帧
+```
+
+### 实测
+
+- 光合作用 7 页 128s（升级前 3 页 20s）——内容深度大幅提升
+- 视频插入 PPT：python-pptx add_movie 嵌入 mp4（PowerPoint 内可播放）
+
+### 与 PPT 统一 LearningPlan
+
+- 共享：学习目标/标题/要点/公式/视觉规格
+- 视频独有：narration/audio_duration/subtitle_cues
+- 详见 [维护手册 §十七](../维护手册.md) + [元能力 §6.36](../元能力文档.md) + [memo/021](../memo/021_视频生成升级设计.md)
+
+
+---
+
+## 12. 新增资产：PPT 脚本 + Logo 品牌（2026-08-12 ⭐）
+
+### 12.1 PPT v8 终版 + 生成脚本
+
+**PPT v8**（`交付物/路演PPT/PAEG路演PPT_v8_终版.pptx`，59 页）由 3 个 pptxgenjs 脚本从零构建：
+
+| 脚本 | 内容 | 位置 |
+|---|---|---|
+| build_main.js | 主演示 P1-14（L0-L7 阶梯图、母版 Logo）| `assets/ppt_scripts/` |
+| build_appendix.js | 附录 A-E（教学/倾诉/找答案/查资料/扩展测试）| `assets/ppt_scripts/` |
+| build_FT.js | 附录 F-T（产出物/数据/能力/技术/测试/时间线）| `assets/ppt_scripts/` |
+
+**方法论**：pptxgenjs 精确坐标控制（无 python-pptx auto_size 陷阱）；母版 defineSlideMaster 加 Logo；emoji 用 SVG 图标替代（`assets/ppt_scripts/icons_*.svg`）。详见维护手册 §18.6/18.7。
+
+### 12.2 Logo 品牌资产（三套）
+
+| 套系 | 文件 | 用途 |
+|---|---|---|
+| 主版（含文字+米白底）| paeg_logo.svg + 512/1024/2048/4096 | PPT/文档/品牌页 |
+| 白色线条图标版 | paeg-logo.svg + icon_* | 前端顶栏（深色底）|
+| 深蓝线条图标版 | paeg_logo_icon_dark.svg + icon_dark_* | 手机/浅色背景 |
+
+位置：`assets/logo/`；设计理念：`assets/logo/Logo Design Philosophy.md`（山/三角/火箭/树/花 五重视角）。
+
+
+### 12.3 视频生成依赖链（2026-08-12 ⭐）
+
+**生成视频功能依赖 PPT 生成 + 讲稿生成**，依赖链如下：
+
+```
+主题/教学材料
+   ├─→ PPT 生成（pptx_mcp_server.py v0.60）
+   │      └─→ .pptx 文件（品牌 Logo + 自适应排版）
+   ├─→ 讲稿生成（LLM → narration 演讲稿）
+   │      └─→ 演讲稿文本（narration 字段）
+   └─→ 视频生成（video_service.py）
+          ├─ TTS 合成音频（edge-tts，audio_duration）
+          ├─ 字幕对齐（subtitle_cues）
+          └─ 合并输出（视频帧 = PPT 页面 + 音频）
+
+**关键依赖**：
+- 视频内容源自 PPT 页面（每页 = 一帧画面）
+- 视频旁白源自讲稿（narration 驱动 TTS）
+- 讲稿生成（v0.53）：先写演讲稿 → 再生成视频，保证音画同步
