@@ -30,6 +30,16 @@ from typing import Any, Dict, Optional
 # 让 server.py 能找到同目录的模块
 sys.path.insert(0, str(Path(__file__).parent))
 
+# v0.43 ⭐ P0-2 接入 logging（异常可观测：从"静默吞掉"升级为"带 stack trace 的日志"）
+import logging
+logger = logging.getLogger("paeg")
+if not logger.handlers:  # 避免重复添加 handler（模块重载时）
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter(
+        "[PAEG][%(asctime)s][%(levelname)s] %(message)s"))
+    logger.addHandler(_h)
+    logger.setLevel(logging.INFO)
+
 from flask import Flask, Response, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -89,6 +99,22 @@ if SECRET_KEY_IS_DEV_DEFAULT:
     print("[PAEG Server][SECURITY] PAEG_SECRET_KEY 未设置，使用开发默认值（生产环境必须设置！）")
 app.secret_key = SECRET_KEY
 
+# v0.43 ⭐ P0-2 可观测性：request_id 中间件（追踪单请求全链路日志，异常排查必备）
+@app.before_request
+def _assign_request_id():
+    """每个请求生成 request_id（响应头返回 + g 存储，日志可关联）。"""
+    from flask import g
+    g.request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:12]
+
+
+@app.after_request
+def _attach_request_id(resp):
+    from flask import g
+    _rid = getattr(g, "request_id", None)
+    if _rid:
+        resp.headers["X-Request-ID"] = _rid
+    return resp
+
 # 运行时依赖由 infra.runtime 统一托管；保留兼容别名，避免既有调用点改动。
 llm = get_llm()
 kb = get_kb()
@@ -127,6 +153,11 @@ def _norm_trait_scalar(value, mapping):
         return ""
     if v in mapping:
         return mapping[v]
+    # v0.42.1 ⭐ P1 修复：LLM 可能输出组合值（如 "neutral_curiosity"）——
+    # 精确映射失败时做子串匹配（含 "neutral" → "平静"），杜绝英文枚举残留进 meta-log。
+    for k, cn in mapping.items():
+        if k in v:
+            return cn
     return v[:16] + ("…" if len(v) > 16 else "")
 
 def _inject_skill_catalog(system: str) -> str:
@@ -141,7 +172,8 @@ def _inject_skill_catalog(system: str) -> str:
         return system
     try:
         catalog = SKILL_REGISTRY.catalog_prompt()
-    except Exception:
+    except Exception as _e:
+        logger.warning("skill catalog 读取失败: %s", _e)
         catalog = ""
     if not catalog:
         return system
@@ -149,6 +181,102 @@ def _inject_skill_catalog(system: str) -> str:
     if "## 可用技能" in system:
         return system
     return system + "\n\n" + catalog
+
+def _append_chat_hist(learner_id: str, user_content: str, assistant_content: str = "") -> None:
+    """v0.42.3 ⭐ P0 修复：统一对话历史写回（method/knowledge/affection 三端点共用）。
+
+    - 此前这 3 个端点只读 chat_hist 不写回（或完全不写），续问丢上文（"她"→"妈妈"回指失败）
+    - 统一窗口 20 条（10 轮），与 teach/chat/answer 对齐
+    """
+    try:
+        _ch = SESSIONS.setdefault(f"chat_hist_{learner_id}", [])
+        if isinstance(_ch, list):
+            _ch.append({"role": "user", "content": user_content})
+            if assistant_content:
+                _ch.append({"role": "assistant", "content": assistant_content})
+            SESSIONS[f"chat_hist_{learner_id}"] = _ch[-20:]
+    except Exception as _che:
+        print(f"[PAEG] {learner_id} 写回 chat_hist 失败: {_che}")
+
+def _set_constraint_flags(learner, user_text: str, mode: str, affection: bool = False) -> None:
+    """v0.43 ⭐ 统一设置 learner 的约束掩码（3 位掩码，各端点共用）。
+
+    从用户输入/问卷检测 DIRECT/EMOTION/PREF → 存入 learner._constraint_flags，
+    供 build_presenter_system/build_general_chat_system 的 constraint_flags 消费。
+    """
+    try:
+        from utils.constraint_signals import detect_constraint_flags
+        _cf = detect_constraint_flags(
+            user_text=user_text, key_need="", mode=mode,
+            profile={"questionnaire_answers": getattr(learner, "questionnaire_answers", {}) or {}},
+            affection_signal=affection,
+        )
+        learner._constraint_flags = _cf  # type: ignore[attr-defined]
+    except Exception as _e:
+        logger.warning("约束掩码检测失败: %s", _e)
+        learner._constraint_flags = ()  # type: ignore[attr-defined]
+
+
+def _try_file_operation(learner_id: str, text: str, llm):
+    """v0.43 ⭐ P0-D 修复：用户文件 4 能力统一入口（chat/teach 等端点复用）。
+
+    触发：用户输入含"我的资料/上传的文件/讲义/笔记/文件里/原文"等文件操作信号。
+    流程：意图路由 → BM25 检索用户文件 → 对应 handler → SSE 流式返回。
+    返回：SSE Response（命中文件操作时）或 None（普通对话，调用方继续正常流程）。
+    """
+    try:
+        from lib.ingest.intent_router import is_file_operation, route_intent, extract_filename
+        if not is_file_operation(text):
+            return None
+        from lib.ingest.readers import read_corpus_full
+        from lib.ingest.chunker import chunk_documents
+        from lib.ingest.retriever import make_retriever
+        from lib.ingest import handlers as _fh
+        _docs = read_corpus_full(learner_id)
+        if not _docs:
+            return None
+        _chunks = chunk_documents(_docs, max_chars=400, overlap=50)
+        _retriever, _mode = make_retriever(_chunks)
+        _intent = route_intent(text)
+        _fname = extract_filename(text)
+        _candidates = [c for c in _chunks if (not _fname) or (_fname.lower() in c.get("doc_name", "").lower())] \
+            if _fname else _chunks
+        _hits = _retriever.search(text, top_k=4) if _candidates else []
+        _hit_chunks = []
+        _hit_keys = set()
+        for h in _hits:
+            _key = (h.get("doc_name"), h.get("chunk_index"))
+            if _key not in _hit_keys:
+                _hit_keys.add(_key)
+                _hit_chunks.append(h)
+        if not _hit_chunks and _candidates:
+            _hit_chunks = _candidates[:2]  # 检索无命中 → 用候选块前 2 个兜底
+        _handler = {
+            "file_qa": _fh.file_qa, "file_explain": _fh.file_explain,
+            "file_quote": _fh.file_quote, "file_restructure": _fh.file_restructure,
+        }.get(_intent.value, _fh.file_qa)
+        _reply = _handler.handle(learner_id, text, _hit_chunks, llm)
+
+        def gen_file_op():
+            # v0.36.2 ⭐ 早退分支补保存（文件操作提前 return，主流程保存不执行）
+            try:
+                if CONV_STORE is not None and _is_registered(learner_id):
+                    _fcid = SESSIONS.get(f"conv_{learner_id}")
+                    _fcid = CONV_STORE.add_message(
+                        learner_id, "chat", str(text)[:60], "user", text, conv_id=_fcid)
+                    _frep = str(_reply or "").strip()[:2000] or f"（文件操作：{_intent.value}）"
+                    _fcid = CONV_STORE.add_message(
+                        learner_id, "chat", _frep[:30], "assistant", _frep, conv_id=_fcid)
+                    SESSIONS[f"conv_{learner_id}"] = _fcid
+            except Exception as _fe2:
+                logger.warning("文件操作保存会话失败: %s", _fe2)
+            yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _reply, 'step_type': 'file_' + _intent.value}, ensure_ascii=False)}\n\n"
+            yield f"event: done\ndata: {json.dumps({'status': 'completed', 'file_op': _intent.value, 'retriever': _mode}, ensure_ascii=False)}\n\n"
+        return Response(gen_file_op(), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception as _fe:
+        logger.warning("文件操作处理失败（降级普通对话）: %s", _fe)
+        return None
 
 # ─────────────────────────────────────
 # 静态文件（GUI 前端）
@@ -179,7 +307,6 @@ def static_files(filename):
                 return "气象模块已下架（在 paeg_modules.json 中启用）", 403
         except Exception as _e:
             print(f"[PAEG][server.py] static_files 异常忽略: {_e}")
-            pass
             pass
     resp = send_from_directory(str(GUI_DIR), filename)
     # v0.21.7：静态资源也 no-cache（前端功能更新频繁，避免旧 JS 缓存）
@@ -297,10 +424,8 @@ def health():
             except Exception as _e:
                 print(f"[PAEG][server.py] health 异常忽略: {_e}")
                 pass
-                pass
     except Exception as _e:
         print(f"[PAEG][server.py] health 异常忽略: {_e}")
-        pass
         pass
     mcp_status = "ok" if mcp_stats.get("connected", 0) > 0 else (
         "degraded" if mcp_stats.get("configured", 0) > 0 else "not_configured")
@@ -313,16 +438,30 @@ def health():
         except Exception as _e:
             print(f"[PAEG][server.py] health 异常忽略: {_e}")
             pass
-            pass
 
     # AgentEngine
     agent_engine_ok = AGENT_ENGINE is not None
 
+    # v0.43 ⭐ P0-2 可观测性：llm 可达 + db 可写检查（生产 k8s/反代 liveness 依据）
+    llm_ok = "unknown"
+    db_ok = "unknown"
+    try:
+        _llm = getattr(llm, "chat", None)
+        llm_ok = "ok" if callable(_llm) else "degraded"
+    except Exception as _e:
+        llm_ok = f"error:{_e}"
+    try:
+        db_ok = "ok" if USER_STORE is not None else "degraded"
+    except Exception as _e:
+        db_ok = f"error:{_e}"
+
     return jsonify({
         "status": "ok",
-        "version": "0.40.4",
+        "version": "0.44.0",
         "llm_provider": LLM_PROVIDER,
         "llm_model": LLM_MODEL,
+        "llm_ok": llm_ok,
+        "db_ok": db_ok,
         "kb_stats": kb.stats(),
         "mcp": mcp_stats,
         "mcp_status": mcp_status,
@@ -406,6 +545,9 @@ def teach():
     )
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
+    # v0.43 ⭐ P0 修复：teach sync 也设置约束掩码（此前只有 teach_stream 有）
+    _set_constraint_flags(learner, data.get("concept", ""), "teach")
+
     # 教学
     concept = data["concept"]
     subject = data["subject"]
@@ -421,7 +563,6 @@ def teach():
             subject = _steer["subject"]
     except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
-        pass
         pass
 
     # v0.19.27：界面自指涉拦截——"界面/按钮/怎么用"类问题返回结构化说明
@@ -448,7 +589,6 @@ def teach():
     except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
-        pass
 
     # v0.19.21：知识库查询拦截必须先于 meta——"知识库/你学过什么"应清点 Library 而非讲身份
     try:
@@ -457,7 +597,6 @@ def teach():
             return jsonify(_handle_knowledge_query(learner, subject))
     except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
-        pass
         pass
 
     # v0.20.5：知识导图拦截——"画知识导图/列提纲/思维导图/知识结构/脉络/系统"
@@ -485,12 +624,9 @@ def teach():
     except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
-        pass
 
-    # v0.17.1：元问题/寒暄拦截——用户问"你是谁/能做什么/能调用知识库吗"或打招呼，
-    # 走闲聊模式回答，避免被当成学科概念去教学（幻觉/答非所问）。
-    # v0.41.5 ⭐ 加固：功能/使用/界面类问题（"你有什么功能""怎么用"）复用
-    # handle_interface_query 确定性模板（含完整功能清单），不交给 LLM 自由发挥。
+    # v0.17.1 元问题/寒暄拦截（"你是谁/能做什么"走闲聊，避免当学科概念教学）
+    # v0.41.5 ⭐ 加固：功能/使用/界面问题复用 handle_interface_query 确定性模板
     try:
         from meta_router import is_meta_question, is_greeting
         if is_meta_question(concept) or is_greeting(concept):
@@ -541,7 +677,6 @@ def teach():
     except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
-        pass
 
     # v0.19：出题意图拦截——"给我一道经典题目" → 结合学段/学科/画像生成题目
     try:
@@ -550,7 +685,6 @@ def teach():
             return _handle_problem_request(learner, concept, subject)
     except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
-        pass
         pass
 
     # v0.19.27：情绪与心理支持拦截——情绪/心理/人生困惑走 AffectionSupportor
@@ -581,7 +715,6 @@ def teach():
             })
     except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
-        pass
         pass
 
     # v0.21.9：复合输入拦截（同步版）——"指令+资料"走资源分析，不走教学 harness
@@ -622,13 +755,9 @@ def teach():
     except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
         pass
-        pass
 
-    # v0.19.21：意向性层 ⭐——规则都没拦住的输入，用 LLM 判断是否为教学意图。
-    # 若用户其实在寒暄/闲聊/倾诉/问老师近况（如"你今天怎么样"），
-    # 就一般化响应，不让教学 harness 的指令覆盖用户提问的出发点与目的。
-    # v0.26 ⭐ C3-1 P0 修复：改用 meta_router.route() 集中路由（含 _llm_route_intent 9 类
-    # LLM 综合意图判断）替代单点 is_teaching_intent——生产路径真正使用 LLM 意图路由。
+    # v0.19.21 意向性层：规则没拦住时用 LLM 判断教学意图；非教学走一般化响应
+    # v0.26 C3-1 P0：meta_router.route() 优先 LLM 综合意图判断（_llm_route_intent）
     try:
         from meta_router import route as _paeg_route
         _route = _paeg_route(concept, learner=learner, llm=llm, fallback_to_teach=True)
@@ -723,6 +852,20 @@ def teach():
                 EVOLVER.distill_knowledge(result.get("session"))
             except Exception as _e:
                 print(f"[Server] 知识蒸馏失败: {_e}")
+        # v0.42 ⭐ P1 修复：同步教学也标记调度器活跃（此前仅 chat_stream 标记）
+        try:
+            PERIODIC_UPDATER.mark_activity()
+        except Exception as _mae:
+            print(f"[PAEG] teach mark_activity 失败: {_mae}")
+        # v0.43 ⭐ P1 修复：teach 同步端点写回 chat_hist（此前与 stream 不对称，
+        # 同步教学后续问丢上文）——与 teach_stream/chat 对齐
+        try:
+            _teach_reply = " ".join(
+                str(p.get("content") or "") for p in (result.get("session") or {}).history
+                if isinstance(p, dict) and p.get("content"))
+            _append_chat_hist(learner_id, concept, _teach_reply)
+        except Exception as _th:
+            print(f"[PAEG] teach 写回 chat_hist 失败: {_th}")
         return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -741,17 +884,16 @@ def teach_stream():
     learner = ensure_learner_session(learner_id, data, SESSIONS)
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
+    # v0.43 ⭐ 输出效果约束 3 参数（DIRECT/EMOTION/PREF → Presenter 读取）
+    _set_constraint_flags(learner, data.get("concept", ""), "teach")
+
     concept = data["concept"]
     subject = data["subject"]
     # v0.41.7 ⭐ 修复：重构时 subtopic 定义被误删（同步 teach 端点 L413 有，stream 版丢失）
     # → NameError: subtopic 未定义 → SSE 中途中断 → 教学模式不输出内容
     subtopic = (data.get("subtopic") or "").strip()
 
-    # v0.36.2 ⭐ 统一历史保存（修复：15 个早退分支跳过 CONV_STORE → "对话有时不在历史里"）
-    # 此前只有主教学循环（L1686 附近）保存；v0.36.2 首批补 9 个：gen_aff/gen_grade_blocked/
-    # gen_unknown/gen_ui/gen_rec/gen_kb/gen_map/gen_composite/gen_ppt；v0.34+ 又增 6 个：
-    # gen_intent×2/composite_chat/gen_method/gen_problem/gen_emotion/meta_chat → 用户在这些场景
-    # 对话"看似成功但历史无记录"。统一出口：所有分支在 done 前调用 _save_teach_turn(mode, reply_text)。
+    # v0.36.2 ⭐ 统一历史保存（15 个早退分支曾跳过 CONV_STORE；统一出口 _save_teach_turn）
     def _save_teach_turn(mode: str, reply_text: str):
         try:
             if CONV_STORE is not None and _is_registered(learner_id):
@@ -794,6 +936,13 @@ def teach_stream():
     except Exception as _e:
         print(f"[PAEG] teach_stream 情绪支持钩子跳过: {_e}")
 
+    # v0.43 ⭐ P0-D 文件能力扩展：教学模式同样支持用户文件 4 能力
+    # （找答案/讲解/输出原文/重组结构——"按我上传的讲义讲X"等触发）。
+    # 优先级：危机/情绪 > 文件操作 > 学科 Steering > 常规教学。
+    _file_resp = _try_file_operation(learner_id, concept, llm)
+    if _file_resp is not None:
+        return _file_resp
+
     # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（流式版本）
     # v0.41.8 ⭐ 修复：_steer 在 try 内定义但被 generate() 闭包引用——
     # 若 _steer_subject 抛异常 → NameError（pyright reportPossiblyUnbound 核查发现）
@@ -810,7 +959,6 @@ def teach_stream():
                     _gb_content = _gb_json.get("presentations", [{}])[0].get("content", "")
                 except Exception as _e:
                     print(f"[PAEG][server.py] gen_aff 异常忽略: {_e}")
-                    pass
                     pass
 
                 def gen_grade_blocked():
@@ -839,24 +987,14 @@ def teach_stream():
         # v0.37.1 ⭐ Oracle P1-3 修复：不再静默吞——用户改学科"没生效"正是这类失败导致
         print(f"[PAEG] teach_stream steering 失败（学科未切换）: {_steer_e}")
 
-    # v0.35 ⭐ LLM 优先意图路由（用户原则：LLM 是被充分调用的主体，规则只兜底）
-    # 大模型先判断用户意图（在 14 项里选一个）；置信度 ≥0.6 时作为分支选择的第一依据
-    # ——置信度不足或 LLM 不可用时保留所有现有规则链（向后兼容）。
-    # 设计：_llm_intent is None = 完全走规则链；_llm_intent == "teach"/"answer" = 教学请求必走完整管线（核心修复）
-    # v0.41.6 ⭐ 模式短路：前端已选模式（mode 字段）是最强确定性信号——
-    # 用户点了"闲聊"就不必让 LLM 再判断意图，直接走 chat 分支。
-    # v0.41.9 ⭐ 会话意图延续（用户洞察）：短输入（<6 字，如"我猜是en"）是
-    # 对上一轮问题的承接，应复用上轮意图而非重新路由——否则短输入被当独立
-    # 新概念处理 → 误判/误触发检索 → 答非所问。
+    # v0.35 ⭐ LLM 优先意图路由（LLM 是被充分调用的主体，规则只兜底）
+    # v0.41.6 ⭐ 模式短路：前端已选模式是最强确定性信号（用户点"闲聊"不必再判断）
+    # v0.41.9 ⭐ 会话意图延续：短输入（<6 字）复用上轮意图，防误判误触发检索
     _prev_intent = SESSIONS.get(f"current_intent_{learner_id}")
     _prev_concept = SESSIONS.get(f"current_concept_{learner_id}")
     _prev_subject = SESSIONS.get(f"current_subject_{learner_id}")
     _is_short_in = (len(str(concept).strip()) < 6)
-    # v0.41.9 ⭐ 意图延续安全边界（Oracle 副作用评估 + explore 冲突扫描）：
-    # 1. mode 字段优先级最高——前端切了模式，短输入不得延续（否则模式形同虚设）
-    # 2. 情绪/危机词必须先于延续（"好累/救救我"绝不能延续到教学）
-    # 3. 学科变化不延续（上轮数学的"那这个"不能被物理语境延续）
-    # 4. 退出/确认词不延续（"懂了/好的"不无意义续教学）
+    # v0.41.9 ⭐ 意图延续安全边界：mode 优先级最高 / 情绪危机词先于延续 / 学科变化不延续 / 退出词不延续
     _MODE_FOR_CONT = {"teach": "teach", "chat": "chat", "answer": "answer",
                       "method": "method", "knowledge": "knowledge",
                       "affection": "emotion", "ppt": "ppt", "problem": "problem"}
@@ -960,7 +1098,6 @@ def teach_stream():
     except Exception as _e:
         print(f"[PAEG][server.py] gen_ui 异常忽略: {_e}")
         pass
-        pass
 
     # v0.35 ⭐ 推荐类问题优先处理（在知识库拦截之前）——"有什么推荐/推荐几本/哪个软件好"
     # 应联网检索真实推荐，而不是清点 Library 答非所问（之前被 is_knowledge_query 误判→答"清点藏书"）。
@@ -986,7 +1123,6 @@ def teach_stream():
     except Exception as _e:
         print(f"[PAEG][server.py] gen_rec 异常忽略: {_e}")
         pass
-        pass
 
     # v0.19.22：知识库查询拦截必须先于 meta（流式版本）——"知识库/你学过什么"应清点 Library
     # v0.35 ⭐ LLM 优先：LLM 判 knowledge → 知识库分支；LLM 不可用时规则兜底
@@ -1006,7 +1142,6 @@ def teach_stream():
     except Exception as _e:
         print(f"[PAEG][server.py] gen_kb 异常忽略: {_e}")
         pass
-        pass
 
     # v0.20.5：知识导图拦截（流式版本）——"画知识导图/列提纲/知识结构"
     # v0.35 ⭐ LLM 优先：LLM 判 knowledge_map → 思维导图分支；LLM 不可用时规则兜底
@@ -1025,7 +1160,6 @@ def teach_stream():
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception as _e:
         print(f"[PAEG][server.py] gen_map 异常忽略: {_e}")
-        pass
         pass
 
     # v0.21.9：复合输入拦截（流式版）——"指令+资料"走资源分析，不走教学 harness
@@ -1060,12 +1194,9 @@ def teach_stream():
     except Exception as _e:
         print(f"[PAEG][server.py] gen_composite 异常忽略: {_e}")
         pass
-        pass
 
-    # v0.35 ⭐ PPT / 演示文稿生成（流式版本兜底分支）——
-    # LLM/规则判定用户要生成 PPT / 课件 / 演示文稿时，统一引导至课程备课流程，
-    # 暂走通用 chat 响应 + 引导文案（避免误入教学管线把概念当学科讲）。
-    # v0.35 ⭐ LLM 优先：LLM 判 ppt → 该分支；LLM 不可用时规则兜底
+    # v0.35 ⭐ PPT/演示文稿生成（流式兜底：统一引导至课程备课流程，避免误入教学管线）
+    # v0.35 ⭐ LLM 优先判 ppt → 该分支；LLM 不可用时规则兜底
     try:
         from meta_router import is_ppt_request
         if _llm_intent == "ppt" or (_llm_intent is None and is_ppt_request(concept)):
@@ -1089,18 +1220,14 @@ def teach_stream():
     except Exception as _e:
         print(f"[PAEG][server.py] gen_ppt 异常忽略: {_e}")
         pass
-        pass
 
-    # v0.19.22：意向性层（流式版本）——非教学意图走一般化响应
-    # v0.26 ⭐ C3-1 P0 修复：改用 meta_router.route() 集中路由（LLM 综合意图判断）
-    # v0.34 ⭐ 教学端点语义锚定：/api/teach/stream 是教学专用端点，meta_router 不应把概念提问降级为 chat
-    # v0.35 ⭐ LLM 优先生效：本块作为"上游规则链漏过"时的兜底；当 route_intent 已明确
-    # 给出 teach/answer 时，强制走完整管线（不被 meta_router.route() 的非教学分支吞掉）
+    # v0.19.22 意向性层（流式）：非教学意图走一般化响应
+    # v0.26/v0.34/v0.35 ⭐ meta_router.route() 智能路由 + 教学端点语义锚定（LLM 综合意图判断）
     try:
         from meta_router import route as _paeg_route
-        # v0.34 ⭐：endpoint_hint 透传给 meta_router（目前 route() 未读取该 kwarg，留作未来扩展；
-        # 治本在 prompt 端点语义锚点 + 兜底在本 if 分支——三层防御确保教学请求必走完整管线）
+        # v0.34 ⭐ endpoint_hint 透传（route() 未取用该 kwarg，但保留向后兼容扩展点）
         _route = _paeg_route(concept, learner=learner, llm=llm, fallback_to_teach=True,
+
                              endpoint_hint="teach_stream")
         _route_type = _route.get("type")
         # v0.35 ⭐ LLM 优先：当 LLM 在更细粒度 route_intent 已判 teach/answer 时，
@@ -1171,7 +1298,6 @@ def teach_stream():
     except Exception as _e:
         print(f"[PAEG][server.py] gen_intent 异常忽略: {_e}")
         pass
-        pass
 
     # v0.19.7：学习方法咨询拦截（流式版本）——v0.35 ⭐ LLM 优先
     try:
@@ -1189,7 +1315,6 @@ def teach_stream():
     except Exception as _e:
         print(f"[PAEG][server.py] gen_ma 异常忽略: {_e}")
         pass
-        pass
 
     # v0.19：出题意图拦截（流式版本）——v0.35 ⭐ LLM 优先
     try:
@@ -1206,7 +1331,6 @@ def teach_stream():
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception as _e:
         print(f"[PAEG][server.py] gen_pr 异常忽略: {_e}")
-        pass
         pass
 
     # v0.19.27：情绪与心理支持拦截（流式版本）——v0.35 ⭐ LLM 优先（emotion LLM 路由含危机检测）
@@ -1228,7 +1352,6 @@ def teach_stream():
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception as _e:
         print(f"[PAEG][server.py] gen_emo 异常忽略: {_e}")
-        pass
         pass
 
     # v0.17.1：元问题/寒暄走闲聊（流式版本直接返回单段回答）——v0.35 ⭐ LLM 优先
@@ -1266,7 +1389,6 @@ def teach_stream():
     except Exception as _e:
         print(f"[PAEG][server.py] gen_meta 异常忽略: {_e}")
         pass
-        pass
 
     def generate():
         # v0.20.3：补 user_model/BDI 推断（原漏洞——手动教学循环没走 paeg.teach 的注入）
@@ -1277,7 +1399,6 @@ def teach_stream():
                               getattr(learner, "self_description", ""))
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-            pass
             pass
         # 诊断
         yield f"event: diagnosis\ndata: {json.dumps({'status': 'diagnosing'})}\n\n"
@@ -1316,30 +1437,44 @@ def teach_stream():
                     # 短输入（如"我猜是en"）会检索出"en 嗯 同音"等无关内容污染回答。
                     # 与 chat_stream（L3069 should_search 前置）对齐。
                     from web_search_tool import should_search, web_search
-                    _is_short = (len(str(concept).strip()) < 6) or \
-                                not any('\u4e00' <= c <= '\u9fff' for c in str(concept))
-                    if _is_short or not should_search(str(concept)):
+                    # v0.42 ⭐ 短输入短路修复：仅"纯英文且<6字"短路（防"我猜是en"污染），中文概念词不误伤
+                    _text = str(concept).strip()
+                    _has_cjk = any('\u4e00' <= c <= '\u9fff' for c in _text)
+                    _is_short = (len(_text) < 6) and (not _has_cjk)
+                    if _is_short or not should_search(_text):
                         _web_raw = None  # 短输入/非检索意图 → 不联网，不污染
                     else:
-                        _web_raw = web_search(f"{subject} {concept}", max_results=3)
-                if _web_raw and "搜索未返回" not in str(_web_raw):
-                    _teach_badge = "网络检索"
-                    _teach_web_ctx = str(_web_raw)[:600]
-                    try:
-                        learner._teach_web_ctx = _teach_web_ctx  # type: ignore[attr-defined]  # 供 Presenter 消费
-                    except Exception as _e:
-                        print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-                        pass
-                        pass
+                        # v0.44 ⭐ 升级：单查询 web_search → 多查询词联想（LLM 联想
+                        # 定义/应用/例子等角度查询词 → 逐一检索 → 合并去重含正文）
+                        try:
+                            from web_search_tool import web_search_multi
+                            _multi = web_search_multi(
+                                concept, llm=llm, subject=subject,
+                                n_queries=4, per_query=3, max_total=10,
+                            )
+                            if _multi:
+                                _web_raw = "\n\n".join(
+                                    f"[来源 {i+1}] {it['title']}\nURL: {it['url']}\n{it['content']}"
+                                    for i, it in enumerate(_multi))
+                            else:
+                                _web_raw = None
+                        except Exception:
+                            _web_raw = web_search(f"{subject} {concept}", max_results=3)
+                    if _web_raw and "搜索未返回" not in str(_web_raw):
+                        _teach_badge = "网络检索"
+                        _teach_web_ctx = str(_web_raw)[:600]
+                        try:
+                            learner._teach_web_ctx = _teach_web_ctx  # type: ignore[attr-defined]  # 供 Presenter 消费
+                        except Exception as _e:
+                            print(f"[PAEG][server.py] generate 异常忽略: {_e}")
+                            pass
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-            pass
             pass
         try:
             yield f"event: retrieval\ndata: {json.dumps({'done': _teach_badge, 'subject': subject}, ensure_ascii=False)}\n\n"
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-            pass
             pass
         # v0.27 ⭐ 需求A：教学模式一次识别（入口用原句，存 learner 供 Presenter 全程消费）
         try:
@@ -1347,7 +1482,6 @@ def teach_stream():
             learner._teaching_mode = _detect_teaching_mode(concept, llm)  # type: ignore[attr-defined]
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-            pass
             pass
         diagnosis = paeg.diagnostor.run(learner, concept, subject)
         yield f"event: diagnosis\ndata: {json.dumps(diagnosis, ensure_ascii=False)}\n\n"
@@ -1380,6 +1514,13 @@ def teach_stream():
                     individuality_control=_ind_control,
                     individuality_profile_prompt=_ind_profile,
                 )
+            # v0.42 ⭐ P0 修复：teach_stream 持久化个体化画像——此前 SSE 教学流只
+            # run() + set_pending_overrides（内存注入），从未 persist()，
+            # 注册用户教学后 profile.json 缺本轮 LLM 建模结果（与 /api/chat 行为对齐）。
+            try:
+                _ind_stream.persist(learner, learner_id)
+            except Exception as _pe:
+                print(f"[PAEG] teach_stream 个体化持久化异常忽略: {_pe}")
             # v0.32 ⭐ meta-log 接入 LLM 建模：把 Individuality 的 trait（学习风格/擅长/薄弱等）写入元认知日志
             # —— meta-log 之前只记录"教学打分/自检"（agent 视角），缺 LLM 对用户建模后的判断（用户视角）
             # —— 注：即使 trait 为空也记录一条（llm_modeled=False 标记未建模），保证 meta-log 有建模轨迹
@@ -1453,7 +1594,6 @@ def teach_stream():
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
-            pass
 
         # 教学循环
         _assistant_parts = []  # v0.21.3：累积助手回复（用于会话保存）
@@ -1470,7 +1610,6 @@ def teach_stream():
                 })
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-            pass
             pass
         # v0.26 ⭐ subtopic 注入每个 step（前端三级选择；空则不注入）
         if subtopic:
@@ -1563,7 +1702,6 @@ def teach_stream():
                 })
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-            pass
             pass
         reflection = paeg._reflect(_fs_shared)
 
@@ -1678,6 +1816,14 @@ def teach_stream():
         except Exception as _eh:
             print(f"[PAEG] teach_stream 写回 chat_hist 失败: {_eh}")
 
+        # v0.42 ⭐ P1 修复：teach_stream 标记调度器活跃——此前只有 chat_stream 调
+        # mark_activity()，教学流（含同步/SSE）不标记，周期调度器误判"7 天无活跃"
+        # 而跳过周度自我更新任务。
+        try:
+            PERIODIC_UPDATER.mark_activity()
+        except Exception as _mae:
+            print(f"[PAEG] teach_stream mark_activity 失败: {_mae}")
+
         # v0.19.6：关键词触发文档（教学对话中"讲义/要点/例题/笔记"）
         try:
             doc_evt = _handle_keyword_doc(concept, "", learner, data)
@@ -1685,7 +1831,6 @@ def teach_stream():
                 yield f"event: doc\ndata: {json.dumps(doc_evt, ensure_ascii=False)}\n\n"
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-            pass
             pass
 
         # v0.26 ⭐ done 事件携带 steering 信息：前端据此自动更新学段/学科下拉（自动切换）
@@ -1702,7 +1847,6 @@ def teach_stream():
                     _done_extra["required_grade"] = ""
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-            pass
             pass
         _done_payload = {"status": "completed"}
         _done_payload.update(_done_extra)
@@ -1800,7 +1944,61 @@ def profile(learner_id):
         "subjects_mastery": learner.subjects_mastery,
         "world_view_blend": learner.world_view_blend,
         "self_description": learner.self_description,
+        # v0.43 ⭐ 注册问卷答案（前端判断是否已填 / 展示已填内容）
+        "questionnaire_answers": getattr(learner, "questionnaire_answers", None) or {},
     })
+
+@app.route("/api/profile/<learner_id>/questionnaire", methods=["POST", "PUT"])
+def profile_questionnaire(learner_id):
+    """v0.43 ⭐ 保存注册问卷答案（注册后弹出问卷 + 事后可修改）。
+
+    入参：{answers: {field: value}} —— 问卷答案映射到 questionnaire_answers 字典，
+    作为用户专属固定提示词注入所有对话模式 + 进入 Individuality 建模。
+    """
+    if USER_STORE is None:
+        return jsonify({"ok": False, "error": "用户系统不可用"}), 500
+    data = request.get_json(force=True) or {}
+    answers = data.get("answers") or {}
+    if not isinstance(answers, dict):
+        return jsonify({"ok": False, "error": "answers 必须为对象"}), 400
+    # 只接受问卷已知字段，防止任意字段污染
+    _allowed = {"grade_level", "cognitive_style", "motivation", "depth_pref",
+                "learning_rhythm", "time_preference", "personality_pref",
+                "weak_subjects", "strong_subjects", "study_goal", "extra_pref"}
+    _clean = {k: v for k, v in answers.items() if k in _allowed}
+    try:
+        learner = ensure_learner_session(
+            learner_id, {}, SESSIONS, default_nickname="学习者")
+        learner.questionnaire_answers = _clean  # type: ignore[attr-defined]
+        if str(learner_id).startswith('u') and USER_STORE is not None:
+            USER_STORE.save_learner(learner_id, learner)
+        else:
+            # v0.43 ⭐ P0 修复：web_ 匿名用户问卷落盘（此前只存内存，刷新即丢）——
+            # 匿名用户也持久化到 users_data/<uid>/profile.json（独立 JSON，不依赖 USER_STORE）
+            try:
+                import os as _qos
+                _base = _qos.path.dirname(_qos.path.abspath(__file__))
+                _udir = _qos.path.join(_base, 'users_data', str(learner_id))
+                _qos.makedirs(_udir, exist_ok=True)
+                _pp = _qos.path.join(_udir, 'profile.json')
+                _existing = {}
+                if _qos.path.exists(_pp):
+                    try:
+                        import json as _qjson
+                        with open(_pp, encoding='utf-8') as _pf:
+                            _existing = _qjson.load(_pf)
+                    except Exception:
+                        _existing = {}
+                _existing['questionnaire_answers'] = _clean
+                import json as _qjson2
+                with open(_pp, 'w', encoding='utf-8') as _pf2:
+                    _qjson2.dump(_existing, _pf2, ensure_ascii=False, indent=1)
+            except Exception as _qe:
+                print(f"[PAEG] 匿名问卷落盘失败: {_qe}")
+        return jsonify({"ok": True, "saved": list(_clean.keys())})
+    except Exception as e:
+        print(f"[PAEG][server.py] profile_questionnaire 异常: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/profile/<learner_id>", methods=["PUT"])
 def profile_update(learner_id):
@@ -1856,7 +2054,6 @@ def meta_log(learner_id):
             return jsonify({"logs": logs, "total": _rs.count(learner_id)})
     except Exception as _e:
         print(f"[PAEG][server.py] meta_log 异常忽略: {_e}")
-        pass
         pass
     learner_logs = [h for h in paeg.self_updater.history if h.get("learner_id") == learner_id]
     return jsonify({
@@ -2062,7 +2259,6 @@ def upload_avatar():
                         _os.remove(_old)
                     except Exception as _e:
                         print(f"[PAEG][server.py] upload_avatar 异常忽略: {_e}")
-                        pass
                         pass
         from urllib.parse import quote
         return jsonify({"ok": True, "url": f"/uploads/avatar/{quote(fname)}"})
@@ -2278,8 +2474,8 @@ def resource_lookup():
     subject = data.get("subject") or getattr(learner, "_current_subject", "") or "default"
     for_ppt = bool(data.get("for_ppt", False))
     try:
-        from subagents import ResourceLibrarian
-        _rl = ResourceLibrarian(model=llm)
+        # v0.43 ⭐ P0-C 提升：复用主 agent 全局持有的 ResourceLibrarian（替代每请求 new）
+        _rl = paeg.resource_librarian
         _result = _rl.run(
             question, learner=learner, llm=llm, subject=subject,
             scope=data.get("scope", "all"),
@@ -2488,7 +2684,16 @@ def general_chat_stream():
     )
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
-    system = build_general_chat_system(learner, mode=data.get("mode"))
+    # v0.43 ⭐ 输出效果约束 3 参数（DIRECT/EMOTION/PREF → 放开对应层，L0 保底永不放开）
+    _cf_flags = ()
+    try:
+        from utils.constraint_signals import detect_constraint_flags
+        _cf_flags = detect_constraint_flags(text, "", data.get("mode", ""),
+                                            {"questionnaire_answers": getattr(learner, "questionnaire_answers", {}) or {}})
+    except Exception:
+        _cf_flags = ()
+
+    system = build_general_chat_system(learner, mode=data.get("mode"), constraint_flags=_cf_flags)
 
     # 用户画像 + BDI
     try:
@@ -2496,31 +2701,50 @@ def general_chat_stream():
         um = infer_user_model([{'content': text}], learner.self_description or "")
         um['bdi'] = infer_bdi([{'content': text}], learner.self_description or "")
         learner._user_model = um  # type: ignore[attr-defined]
-        system = build_general_chat_system(learner, mode=data.get("mode"))
+        system = build_general_chat_system(learner, mode=data.get("mode"), constraint_flags=_cf_flags)
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
         pass
-        pass
+
+    # v0.42 ⭐ 提示词模板化：散落注入段统一收集到 _dyn_ctx，末尾用
+    # render_dynamic_slots 按重要性降序组织（替代 system = system + X 散落拼接）。
+    _dyn_ctx = {}
+
+    # v0.42.2 ⭐ P0 修复：填充 chat_history 槽——此前 DYNAMIC_SLOTS 定义了
+    # "chat_history" 槽但全项目 0 处赋值，system prompt 无对话历史段，
+    # LLM 看到"她对我要求太高了"无从回指"妈妈"（代词回指失败）。
+    # 取最近 10 轮（20 条）格式化为"学生/老师"交替文本注入。
+    try:
+        _hist_ctx = SESSIONS.get(f"chat_hist_{learner_id}", [])
+        if _hist_ctx:
+            _hist_lines = []
+            for _m in _hist_ctx[-20:]:
+                _role_cn = "学生" if _m.get("role") == "user" else "Émile"
+                _c = str(_m.get("content") or "")[:300]
+                if _c.strip():
+                    _hist_lines.append(f"{_role_cn}: {_c}")
+            if _hist_lines:
+                _dyn_ctx["chat_history"] = "\n".join(_hist_lines)
+    except Exception as _he:
+        print(f"[PAEG] chat_stream chat_history 装配跳过: {_he}")
 
     # v0.19.7：注入可编辑教学记忆（teaching_memory，CLAUDE.md 风格）
     try:
         from teaching_memory import load_teaching_memory
         _tm = load_teaching_memory()
         if _tm:
-            system = system + "\n\n" + _tm
+            _dyn_ctx["teaching_memory"] = _tm
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
-        pass
         pass
 
     # v0.19.11：注入用户专属资料库（上传的资料，回答相关问题时参考）
     try:
         _ulib = get_user_library(learner_id)
         if _ulib:
-            system = system + "\n\n" + _ulib
+            _dyn_ctx["user_library"] = _ulib
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
-        pass
         pass
 
     # v0.21.8：注入用户关键事实（多轮注意力——"我喜欢蓝绿色"第N轮追问仍可见）
@@ -2529,12 +2753,9 @@ def general_chat_stream():
         _facts = extract_user_facts(SESSIONS.get(f"chat_hist_{learner_id}", []))
         if _facts:
             _facts_str = "\n".join(f"- {f}" for f in _facts)
-            system = system + (
-                "\n\n## 用户说过的事实（v0.21.8 记忆锚点，回答相关问题时必须引用）\n"
-                + _facts_str)
+            _dyn_ctx["user_facts"] = _facts_str
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat_stream 异常忽略: {_e}")
-        pass
         pass
 
     # v0.22.3：个体化注入（Individuality subagent——16 维画像 + LLM 建模 + 母语控制）
@@ -2555,96 +2776,41 @@ def general_chat_stream():
             history=_ind_history,
             subject=data.get("subject", "general"))
         if _ind_result.get("profile_prompt"):
-            system = system + "\n\n" + _ind_result["profile_prompt"]
+            _dyn_ctx["individuality"] = _ind_result["profile_prompt"]
         system = _ind.inject_control(system, _ind_result.get("control"))
         _ind_run_ok = True
     except Exception as _ie:
         print(f"[PAEG] 个体化注入跳过: {_ie}")
 
-    # v0.24 修复 1：技能 L1 目录注入 system prompt（chat_stream）
-    # —— 之前 SkillRegistry 扫描了 10 个 SKILL.md 但从未被注入，技能功能上等价于不存在；
-    # —— 现在把技能目录（name + description）一次性注入，LLM 知道何时用 load_skill__<name>。
-    # v0.41.9 ⭐ 修复：chat_stream 注入用户资料库（此前只 teach_stream 有——
-    # 学生聊天时问"我笔记里讲的X"LLM 拿不到用户上传的资料，接线缺口）
-    try:
-        _uid_chat = getattr(learner, "id", "") or ""
-        if _uid_chat:
-            from lib.library_store import read_user_corpus
-            _uc_chat = read_user_corpus(str(_uid_chat), max_files=3, per_file=300)
-            if _uc_chat:
-                system = system + "\n\n## 用户上传的资料（供回答参考）\n" + _uc_chat
-    except Exception as _uce:
-        print(f"[PAEG] chat_stream 用户资料注入跳过: {_uce}")
-    # v0.41.9 ⭐ 修复：chat_stream 注入 KB 检索结果（此前通用话题不查知识库——
-    # 只有 teach 用 kb.resolve_node、answer 用 _pre_retrieve；chat 全靠 LLM 自身，
-    # 接线缺口。用 _pre_retrieve（KB+Library 三线）增强闲聊的知识支撑）
+    # v0.24 修复 1：技能 L1 目录注入（此前 10 个 SKILL.md 从未注入，技能等价不存在）
+    # v0.42 ⭐ 移除 user_corpus 重复注入（与 get_user_library 同源，保留 user_library 槽）
+    # v0.41.9 ⭐ chat_stream 注入 KB 检索结果（此前通用话题不查知识库，接线缺口）
     try:
         if text and len(text) <= 100:
             from subagents import _pre_retrieve
             _retr_chat = _pre_retrieve(
                 text, data.get("subject", ""), learner=learner, llm=llm)
             if _retr_chat:
-                system = system + "\n\n" + _retr_chat
+                _dyn_ctx["web_retrieval"] = _retr_chat
     except Exception as _rce:
         print(f"[PAEG] chat_stream KB 检索注入跳过: {_rce}")
+
+    # v0.42 ⭐ 提示词模板化：把收集到的动态槽按重要性降序组织注入 system
+    try:
+        from prompt_template import render_dynamic_slots
+        _dyn_str = render_dynamic_slots(_dyn_ctx)
+        if _dyn_str:
+            system = system + "\n\n\n" + _dyn_str
+    except Exception as _de:
+        print(f"[PAEG] chat_stream 动态槽组装跳过: {_de}")
+
     system = _inject_skill_catalog(system)
 
-    # v0.22.0：基于用户上传文件的 4 能力（找答案/讲解/输出原文/重组结构）
+    # v0.43 ⭐ P0-D 文件能力扩展：chat_stream 复用统一入口（teach/answer 同享）
     # 触发：用户输入含"我的资料/上传的文件/讲义/笔记/文件里/原文"等文件操作信号
-    # 流程：意图路由 → BM25 检索用户文件 → 对应 handler → SSE 返回
-    try:
-        from lib.ingest.intent_router import is_file_operation, route_intent, extract_filename
-        if is_file_operation(text):
-            from lib.ingest.readers import read_corpus_full
-            from lib.ingest.chunker import chunk_documents
-            from lib.ingest.retriever import make_retriever
-            from lib.ingest import handlers as _fh
-            _docs = read_corpus_full(learner_id)
-            if _docs:
-                _chunks = chunk_documents(_docs, max_chars=400, overlap=50)
-                _retriever, _mode = make_retriever(_chunks)
-                _intent = route_intent(text)
-                _fname = extract_filename(text)
-                # 指定文件名则只检索该文件
-                _candidates = [c for c in _chunks if (not _fname) or (_fname.lower() in c.get("doc_name", "").lower())] \
-                    if _fname else _chunks
-                _hits = _retriever.search(text, top_k=4) if _candidates else []
-                # 组装 handler 需要的 chunks（含 doc_name 等元数据）
-                _hit_chunks = []
-                _hit_keys = set()
-                for h in _hits:
-                    _key = (h.get("doc_name"), h.get("chunk_index"))
-                    if _key not in _hit_keys:
-                        _hit_keys.add(_key)
-                        _hit_chunks.append(h)
-                if not _hit_chunks and _candidates:
-                    # 检索无命中 → 用候选块前 2 个兜底
-                    _hit_chunks = _candidates[:2]
-                _handler = {
-                    "file_qa": _fh.file_qa, "file_explain": _fh.file_explain,
-                    "file_quote": _fh.file_quote, "file_restructure": _fh.file_restructure,
-                }.get(_intent.value, _fh.file_qa)
-                _reply = _handler.handle(learner_id, text, _hit_chunks, llm)
-
-                def gen_file_op():
-                    # v0.36.2 ⭐ 早退分支补保存（chat_stream 文件操作提前 return，主流程保存不执行）
-                    try:
-                        if CONV_STORE is not None and _is_registered(learner_id):
-                            _fcid = SESSIONS.get(f"conv_{learner_id}")
-                            _fcid = CONV_STORE.add_message(
-                                learner_id, "chat", str(text)[:60], "user", text, conv_id=_fcid)
-                            _frep = str(_reply or "").strip()[:2000] or f"（文件操作：{_intent.value}）"
-                            _fcid = CONV_STORE.add_message(
-                                learner_id, "chat", _frep[:30], "assistant", _frep, conv_id=_fcid)
-                            SESSIONS[f"conv_{learner_id}"] = _fcid
-                    except Exception as _fe2:
-                        print(f"[PAEG] chat_stream 文件操作保存会话失败: {_fe2}")
-                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _reply, 'step_type': 'file_' + _intent.value}, ensure_ascii=False)}\n\n"
-                    yield f"event: done\ndata: {json.dumps({'status': 'completed', 'file_op': _intent.value, 'retriever': _mode}, ensure_ascii=False)}\n\n"
-                return Response(gen_file_op(), mimetype="text/event-stream",
-                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception as _fe:
-        print(f"[PAEG] 文件操作处理失败（降级普通对话）: {_fe}")
+    _file_resp = _try_file_operation(learner_id, text, llm)
+    if _file_resp is not None:
+        return _file_resp
 
     # 三层记忆
     mem_ctx = ""
@@ -2673,7 +2839,6 @@ def general_chat_stream():
     except Exception as _e:
         print(f"[PAEG][server.py] gen_file_op 异常忽略: {_e}")
         pass
-        pass
 
     user = build_general_chat_user(text)
     ctx_parts = [p for p in [long_ctx, mem_ctx] if p]
@@ -2691,7 +2856,6 @@ def general_chat_stream():
         ctx_parts.insert(0, page_ctx)
     except Exception as _e:
         print(f"[PAEG][server.py] gen_file_op 异常忽略: {_e}")
-        pass
         pass
     if ctx_parts:
         user = f"{chr(10).join(ctx_parts)}\n\n【学生现在说】\n{text}"
@@ -2718,7 +2882,6 @@ def general_chat_stream():
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
-            pass
 
         # v0.35 ⭐ 推荐类问题优先于知识库拦截——闲聊端点里用户也可能问"有什么推荐"。
         # 与 teach_stream 同理由：推荐问题应联网检索，不能答"清点藏书"。
@@ -2739,7 +2902,6 @@ def general_chat_stream():
                 return
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-            pass
             pass
 
         # v0.19.16：知识库查询——闲聊模式下问"你学过什么/知识库"也走知识库总结
@@ -2793,27 +2955,20 @@ def general_chat_stream():
                 "### 四、输出高质量内容\n"
                 "最终输出像一份**优秀讲义的片段**：观点明确、层次清晰、内容详实、公式用 LaTeX（$...$）、"
                 "像一位真正的好老师当面讲解，而不是搜索结果的堆砌。")
-            # v0.27 ⭐ 需求：对话输出前检索状态标志（前端小徽章"已完成知识库/网络检索"）
-            # v0.32：移到 run_agent_loop 之后，根据 LLM 是否真调 web_search 发"网络检索"或"知识库检索"
-            # v0.19.4：把打包后的 user（含当前设定/历史/身份）传给 agent loop，
-            # 修复"偏离提问"——之前传的是原始 text，LLM 收不到上下文
-            # v0.20.2：同时传真 messages 历史（多轮连贯性——LLM 能记住上文）
+            # v0.27/v0.32 ⭐ 对话输出前检索状态标志（前端徽章"已完成知识库/网络检索"）
+            # v0.19.4/v0.20.2 ⭐ 已带完整 user+messages 历史（修复"偏离原话题" + 多轮连续性）
             _hist_msgs = [{"role": "user", "content": u["content"]} if u["role"] == "user"
                           else {"role": "assistant", "content": u["content"]}
                           for u in chat_hist[-10:]]
             _ar = run_agent_loop(llm, _agent_sys, user, max_iterations=3, history=_hist_msgs)
             reply = _ar.get("answer")
             tool_log = _ar.get("tool_calls", [])
-            # v0.32 ⭐ 网络检索 badge 区分：LLM 实际调用 web_search 时前端显示"网络检索"；
-            # 未发生 web_search 则显示"知识库检索"兜底。两条互斥，只发一条
-            # （前端 insertRetrievalBadge 有 _retrievalBadgeShown 去重，但本路径本就只发一次）
-            # 此处放 run_agent_loop 之后：需要先知道是否真调了 web_search
+            # v0.32 ⭐ 检索 badge：LLM 调 web_search →"网络检索"，否则"知识库检索"（互斥单条）
             try:
                 _badge_text = "网络检索" if _ar.get("web_searched") else "知识库检索"
                 yield f"event: retrieval\ndata: {json.dumps({'done': _badge_text}, ensure_ascii=False)}\n\n"
             except Exception as _e:
                 print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-                pass
                 pass
         except Exception:
             reply = None
@@ -2827,7 +2982,6 @@ def general_chat_stream():
             except Exception as _e:
                 print(f"[PAEG][server.py] generate 异常忽略: {_e}")
                 pass
-                pass
 
         # 2) 深度守门
         try:
@@ -2836,7 +2990,16 @@ def general_chat_stream():
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
-            pass
+
+        # v0.42.3 ⭐ P1 修复：chat 语言规范收口——此前 chat_stream 的 reply 只过
+        # ExpertGuard（专业深度守门，非语言规范），AI 味/语法残缺可能泄漏。
+        # 补 _polish_text（L1 已在 system；此处 L2/L3 收口），对齐 affection 范式。
+        # _polish_text 已在模块级 import（L60），无需局部重复导入。
+        try:
+            if reply:
+                reply = _polish_text(reply, context=f"chat:{text[:30]}")
+        except Exception as _cpe:
+            print(f"[PAEG][server.py] chat_stream 语言规范收口跳过: {_cpe}")
 
         # 3) SSE 推送工具记录
         for tc in tool_log:
@@ -2851,7 +3014,6 @@ def general_chat_stream():
                            tool=tc.get("name", ""), session=learner_id[:8])
             except Exception as _e:
                 print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-                pass
                 pass
 
         # 4) 分段推送回复（模拟流式，兼顾 P1-5 体验）
@@ -2875,7 +3037,6 @@ def general_chat_stream():
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
-            pass
 
         # 5) 保存历史 + 记忆
         chat_hist.append({'role': 'user', 'content': text})
@@ -2888,7 +3049,6 @@ def general_chat_stream():
             except Exception as _e:
                 print(f"[PAEG][server.py] generate 异常忽略: {_e}")
                 pass
-                pass
         # v0.23.0 ⭐ 个体化画像持久化闭环——把本轮 LLM 建模结果写回 learner
         # 并落盘（仅注册用户 u<digits>；匿名 web_xxx 仅内存保留）
         if _ind_run_ok and _ind is not None:
@@ -2898,11 +3058,8 @@ def general_chat_stream():
                     print(f"[PAEG] 个体化画像已持久化: learner_id={learner_id}")
             except Exception as _pe:
                 print(f"[PAEG] 个体化持久化失败（不影响主流程）: {_pe}")
-            # v0.36.1 ⭐ 修复：chat 路径也写 user_modeling 到元认知日志
-            # （此前只有 teach_stream 写 → u 账号 meta-log 只有 self_reflect/adaptation，
-            #   前端 fallback 显示用户提问 → 元认知日志看起来像"对话历史"）
-            # v0.37.1 ⭐ Oracle P0-1 修复：改用 append_reflection（append + _save 落盘），
-            # 此前直接 history.append 不落盘 → 元认知日志重启即丢
+            # v0.36.1 ⭐ chat 路径也写 user_modeling 元认知日志（此前仅 teach_stream）
+            # v0.37.1 ⭐ Oracle P0-1：append_reflection 走 append+_save（此前 history.append 不持久化）
             try:
                 _trait_chat = (_ind_result or {}).get("trait") or {}
                 _facts_chat = (_ind_result or {}).get("facts") or []
@@ -2948,13 +3105,11 @@ def general_chat_stream():
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
-            pass
         # v0.19.21：标记调度器活跃（周期自我更新的前提）
         try:
             PERIODIC_UPDATER.mark_activity()
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-            pass
             pass
         # v0.19.22：自进化——工具调用经验学习（从 tool_log 提炼）
         if EVOLVER is not None:
@@ -2979,7 +3134,6 @@ def general_chat_stream():
                 SESSIONS[f"conv_chat_{learner_id}"] = cid
             except Exception as _e:
                 print(f"[PAEG][server.py] generate 异常忽略: {_e}")
-                pass
                 pass
 
         yield f"event: done\ndata: {json.dumps({'ok': True}, ensure_ascii=False)}\n\n"
@@ -3009,7 +3163,48 @@ def general_chat():
     )
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
-    system = build_general_chat_system(learner, mode=data.get("mode"))
+    # v0.43 ⭐ 输出效果约束 3 参数（DIRECT/EMOTION/PREF → 放开对应层，L0 保底永不放开）
+    _cf_flags = ()
+    try:
+        from utils.constraint_signals import detect_constraint_flags
+        _cf_flags = detect_constraint_flags(text, "", data.get("mode", ""),
+                                            {"questionnaire_answers": getattr(learner, "questionnaire_answers", {}) or {}})
+    except Exception:
+        _cf_flags = ()
+
+    system = build_general_chat_system(learner, mode=data.get("mode"), constraint_flags=_cf_flags)
+
+    # v0.42 ⭐ 提示词模板化：散落注入段统一收集到 _dyn_ctx，末尾用
+    # render_dynamic_slots 按重要性降序组织（替代 system = system + X 散落拼接）。
+    _dyn_ctx = {}
+
+    # v0.42.2 ⭐ P0 修复：填充 chat_history 槽（对齐 chat_stream）——非流式闲聊
+    # 此前 system 无对话历史段，代词回指失败（"她"→"妈妈"）。取最近 10 轮注入。
+    try:
+        _hist_ctx = SESSIONS.get(f"chat_hist_{learner_id}", [])
+        if _hist_ctx:
+            _hist_lines = []
+            for _m in _hist_ctx[-20:]:
+                _role_cn = "学生" if _m.get("role") == "user" else "Émile"
+                _c = str(_m.get("content") or "")[:300]
+                if _c.strip():
+                    _hist_lines.append(f"{_role_cn}: {_c}")
+            if _hist_lines:
+                _dyn_ctx["chat_history"] = "\n".join(_hist_lines)
+    except Exception as _he:
+        print(f"[PAEG] general_chat chat_history 装配跳过: {_he}")
+
+    # v0.42.3 ⭐ P1 修复：general_chat 补 user_facts 槽（对齐 chat_stream）——
+    # v0.42.2 补了 chat_history 但漏了 user_facts，"我喜欢蓝绿色"类事实在
+    # 非流式闲聊中不被注入（多轮注意力缺失）。
+    try:
+        from context_bundle import extract_user_facts
+        _facts = extract_user_facts(SESSIONS.get(f"chat_hist_{learner_id}", []))
+        if _facts:
+            _facts_str = "\n".join(f"- {f}" for f in _facts)
+            _dyn_ctx["user_facts"] = _facts_str
+    except Exception as _ufe:
+        print(f"[PAEG] general_chat user_facts 装配跳过: {_ufe}")
 
     # v0.16：注入用户画像 + BDI（让"随便说说"也有个体性）
     try:
@@ -3022,16 +3217,14 @@ def general_chat():
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
         pass
-        pass
 
     # v0.26 ⭐ 连接修复：/api/chat 非流式补用户资料注入（对齐 chat_stream 2046-2048）
     try:
         _ulib_chat = get_user_library(learner_id)
         if _ulib_chat:
-            system = system + "\n\n" + _ulib_chat
+            _dyn_ctx["user_library"] = _ulib_chat
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
-        pass
         pass
 
     # v0.24 修复 6：/api/chat 补 Individuality 注入（与 chat_stream 行为对齐）
@@ -3049,11 +3242,20 @@ def general_chat():
             history=_ind_history,
             subject=data.get("subject", "general"))
         if _ind_result.get("profile_prompt"):
-            system = system + "\n\n" + _ind_result["profile_prompt"]
+            _dyn_ctx["individuality"] = _ind_result["profile_prompt"]
         system = _ind.inject_control(system, _ind_result.get("control"))
         _ind_run_ok = True
     except Exception as _ie:
         print(f"[PAEG] general_chat 个体化注入跳过: {_ie}")
+
+    # v0.42 ⭐ 提示词模板化：把收集到的动态槽按重要性降序组织注入 system
+    try:
+        from prompt_template import render_dynamic_slots
+        _dyn_str = render_dynamic_slots(_dyn_ctx)
+        if _dyn_str:
+            system = system + "\n\n\n" + _dyn_str
+    except Exception as _de:
+        print(f"[PAEG] general_chat 动态槽组装跳过: {_de}")
 
     # v0.24 修复 1：技能 L1 目录注入 system prompt（general_chat 同 chat_stream）
     system = _inject_skill_catalog(system)
@@ -3134,9 +3336,17 @@ def general_chat():
         # 兜底：原启发式搜索 + 普通对话
         search_result = None
         try:
-            from web_search_tool import should_search, web_search
+            from web_search_tool import should_search, web_search_multi
             if should_search(text):
-                search_result = web_search(text, max_results=5)
+                # v0.44 ⭐ 升级：单查询 → 多查询词联想（LLM 联想查询词 → 丰富结果）
+                _multi = web_search_multi(
+                    text, llm=llm, subject=subject,
+                    n_queries=4, per_query=3, max_total=10,
+                )
+                if _multi:
+                    search_result = "\n\n".join(
+                        f"[来源 {i+1}] {it['title']}\nURL: {it['url']}\n{it['content']}"
+                        for i, it in enumerate(_multi))
         except Exception:
             search_result = None
         if search_result:
@@ -3159,7 +3369,6 @@ def general_chat():
         reply = _guard.refine(text, reply, subject=data.get("subject", "chat"))
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
-        pass
         pass
     if not reply:
         reply = f"我听到你说：{text}。想多说说吗？我会认真听。"
@@ -3187,7 +3396,14 @@ def general_chat():
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
         pass
-        pass
+
+    # v0.42.3 ⭐ P1 修复：general_chat 语言规范收口（对齐 chat_stream 修复）
+    # _polish_text 已在模块级 import（L60），无需局部重复导入。
+    try:
+        if reply:
+            reply = _polish_text(reply, context=f"chat:{text[:30]}")
+    except Exception as _cpe2:
+        print(f"[PAEG][server.py] general_chat 语言规范收口跳过: {_cpe2}")
 
     # v0.17：按 【NEXT】 切分为多段（自我反思与迭代：核心回应→补充→推荐）
     import re as _re
@@ -3208,7 +3424,6 @@ def general_chat():
             mem.compress_if_needed()
         except Exception as _e:
             print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
-            pass
             pass
 
     # v0.18：保存完整对话到 conversations（前端可恢复）
@@ -3242,13 +3457,18 @@ def general_chat():
     except Exception as _e:
         print(f"[PAEG][server.py] general_chat 异常忽略: {_e}")
         pass
-        pass
+
+    # v0.42 ⭐ P1 修复：同步闲聊也标记调度器活跃（此前仅 chat_stream 标记）
+    try:
+        PERIODIC_UPDATER.mark_activity()
+    except Exception as _mae:
+        print(f"[PAEG] general_chat mark_activity 失败: {_mae}")
 
     return jsonify({
         "reply": reply,            # 兼容旧前端
-        "segments": segments,       # v0.17：多段输出
-        "doc": doc_urls,            # v0.18：若生成了文档则返回下载链接
-        "tools": tool_log,          # v0.19：工具调用记录（前端可视化）
+        "segments": segments,      # v0.17：多段输出
+        "doc": doc_urls,           # v0.18：若生成了文档则返回下载链接
+        "tools": tool_log,         # v0.19：工具调用记录（前端可视化）
         "agent_trace": _agent_trace,  # v0.24：AgentEngine trace（仅 mode=agent 填充）
         "learner": {
             "id": learner.id,
@@ -3315,6 +3535,8 @@ def answer_api():
     if learner_id:
         learner = SESSIONS.get(f"learner_{learner_id}")
         _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
+        # v0.43 ⭐ P0 修复：answer 端点设置约束掩码（与其他模式对齐）
+        _set_constraint_flags(learner, data.get("question", ""), "answer")
     try:
         from subagents import AnswerSolver
         solver = AnswerSolver()
@@ -3335,18 +3557,16 @@ def answer_api():
             except Exception as _e:
                 print(f"[PAEG][server.py] answer_api 异常忽略: {_e}")
                 pass
-                pass
-        # v0.21.8：answer 也写入 chat_hist（修复多轮上下文丢失——"那 x³ 呢"必须记得上文在讲积分）
-        if learner_id:
-            try:
-                _ch = SESSIONS.setdefault(f"chat_hist_{learner_id}", [])
-                _ch.append({"role": "user", "content": question})
-                _ch.append({"role": "assistant", "content": result.get("answer") or ""})
-                SESSIONS[f"chat_hist_{learner_id}"] = _ch[-20:]  # v0.26 统一窗口 20
-            except Exception as _e:
-                print(f"[PAEG][server.py] answer_api 异常忽略: {_e}")
-                pass
-                pass
+        # v0.21.8：answer 也写入 chat_hist（统一 helper——"那 x³ 呢"必须记得上文在讲积分）
+        _append_chat_hist(learner_id, question, result.get("answer") or "")
+        # v0.42.3 ⭐ P1 修复：answer 语言规范收口——此前 AnswerSolver 直接 return，
+        # 未过 L1/L2/L3 语言质量层（只有 teach/affection 过 polish）。
+        try:
+            _ans = result.get("answer") or ""
+            if _ans:
+                result["answer"] = _polish_text(_ans, context=f"answer:{question[:30]}")
+        except Exception as _ape:
+            print(f"[PAEG] answer 语言规范收口跳过: {_ape}")
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -3464,6 +3684,8 @@ def method_advice():
     # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原内联 — 无 elif、无 target_exam）
     learner = ensure_learner_session(learner_id, data, SESSIONS)
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
+    # v0.43 ⭐ P0 修复：method 端点设置约束掩码（与其他模式对齐）
+    _set_constraint_flags(learner, data.get("concept") or data.get("text") or "", "method")
     concept = data.get("concept") or data.get("text") or ""
     subject = data.get("subject", "general")
     if not concept:
@@ -3475,7 +3697,6 @@ def method_advice():
             return _correct
     except Exception as _e:
         print(f"[PAEG][server.py] method_advice 异常忽略: {_e}")
-        pass
         pass
     result = _handle_method_advice(learner, concept, subject)
     # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
@@ -3494,6 +3715,14 @@ def method_advice():
             SESSIONS[f"conv_method_{learner_id}"] = cid
     except Exception as _e:
         print(f"[PAEG] method 保存会话失败: {_e}")
+    # v0.42.3 ⭐ P0 修复：method 写回 chat_hist（统一 helper）
+    _m_content = ""
+    if isinstance(result, dict):
+        _m_content = (result.get("presentations") or [{}])[0].get("content", "")
+    elif hasattr(result, "get_json"):
+        _rd = result.get_json()
+        _m_content = (_rd.get("presentations") or [{}])[0].get("content", "")
+    _append_chat_hist(learner_id, concept, _m_content)
     return result
 
 @app.route("/api/knowledge", methods=["POST"])
@@ -3508,6 +3737,8 @@ def knowledge_query():
     # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原内联 — 无 elif、无 target_exam）
     learner = ensure_learner_session(learner_id, data, SESSIONS)
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
+    # v0.43 ⭐ P0 修复：knowledge 端点设置约束掩码（与其他模式对齐）
+    _set_constraint_flags(learner, data.get("text") or data.get("concept") or "", "knowledge")
     subject = data.get("subject", "general")
     # v0.20.3：知识库模式若用户实际在倾诉/问方法，自动纠正
     try:
@@ -3518,7 +3749,6 @@ def knowledge_query():
                 return _correct
     except Exception as _e:
         print(f"[PAEG][server.py] knowledge_query 异常忽略: {_e}")
-        pass
         pass
     result = _handle_knowledge_query(learner, subject)
     # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
@@ -3534,6 +3764,11 @@ def knowledge_query():
             SESSIONS[f"conv_knowledge_{learner_id}"] = cid
     except Exception as _e:
         print(f"[PAEG] knowledge 保存会话失败: {_e}")
+    # v0.42.3 ⭐ P0 修复：knowledge 写回 chat_hist（统一 helper）
+    _kq = data.get("text") or data.get("concept") or "知识库"
+    _k_content = (result.get("presentations") or [{}])[0].get("content", "") \
+        if isinstance(result, dict) else ""
+    _append_chat_hist(learner_id, _kq, _k_content)
     return jsonify(result)
 
 @app.route("/api/affection", methods=["POST"])
@@ -3549,6 +3784,8 @@ def affection_support():
     # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原内联 — 无 elif、无 target_exam）
     learner = ensure_learner_session(learner_id, data, SESSIONS)
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
+    # v0.43 ⭐ P0 修复：affection 端点设置约束掩码（affection 模式本身即情绪信号 → 组B）
+    _set_constraint_flags(learner, data.get("text") or data.get("concept") or "", "affection", affection=True)
     text = data.get("text") or data.get("concept") or ""
     if not text:
         return jsonify({"error": "text is required"}), 400
@@ -3559,7 +3796,6 @@ def affection_support():
             return _correct
     except Exception as _e:
         print(f"[PAEG][server.py] affection_support 异常忽略: {_e}")
-        pass
         pass
     from subagents import AffectionSupportor
     _emo = AffectionSupportor()
@@ -3576,6 +3812,9 @@ def affection_support():
             SESSIONS[f"conv_affection_{learner_id}"] = cid
     except Exception as _e:
         print(f"[PAEG] affection 保存会话失败: {_e}")
+    # v0.42.3 ⭐ P0 修复：affection 写回 chat_hist（统一 helper）——
+    # 此前只读不写，第二句倾诉看不到第一句，情绪陪伴连贯性断裂。
+    _append_chat_hist(learner_id, text, _emo_content)
     return jsonify({
         "session_id": f"affection_{learner_id}",
         "summary": {"avg_score": 0},
@@ -3668,6 +3907,19 @@ def cleanup_conversations():
 # v0.19.21：周期自我更新调度器
 # ─────────────────────────────────────
 PERIODIC_UPDATER = get_periodic_updater()
+
+def init_periodic_updater() -> None:
+    """v0.42 ⭐ P0 修复：显式启动周期自我更新调度器。
+
+    - 此前 .start() 只在 __main__ 块执行，gunicorn/WSGI 导入模式下调度器永不启动。
+    - 修复：抽成可调用函数，__main__ 启动时调用；gunicorn 部署可在 app 工厂/入口
+      显式调用本函数（import server 时不启动，避免 import 期线程副作用）。
+    """
+    try:
+        PERIODIC_UPDATER.start()
+        print("[PAEG] 周期自我更新调度器已启动")
+    except Exception as _pe:
+        print(f"[PAEG] 周期自我更新调度器启动失败（不影响主服务）: {_pe}")
 
 @app.route("/api/self-update/run", methods=["POST"])
 @require_module("self_update")
@@ -3787,7 +4039,6 @@ def self_update_from_feedback():
             except Exception as _e:
                 print(f"[PAEG][server.py] self_update_from_feedback 异常忽略: {_e}")
                 pass
-                pass
 
         # 4) 追加建议记录（供人工/调度器后续处理）
         try:
@@ -3827,8 +4078,6 @@ if __name__ == "__main__":
     except Exception as _e:
         print(f"[PAEG Server] MCP 网关启动失败（不影响主服务）: {_e}")
     # v0.19.21：周期自我更新调度器（后台守护线程）
-    try:
-        PERIODIC_UPDATER.start()
-    except Exception as _e:
-        print(f"[PAEG Server] 周期自我更新调度器启动失败（不影响主服务）: {_e}")
+    # v0.42 ⭐ P0 修复：改调 init_periodic_updater()（统一入口，含幂等守卫）
+    init_periodic_updater()
     app.run(host=APP_HOST, port=port, debug=False, threaded=True)
