@@ -882,6 +882,80 @@ MASK_A = 0b100  # 取消组 A（直接性/风格：循循善诱/不剧透/讲义
 MASK_B = 0b010  # 取消组 B（情绪/温度：温柔/比喻/语气词/约纳斯克制）
 MASK_C = 0b001  # 取消组 C（深度/详细度：母语迁移/学科教学法/深度4层）
 
+# ═══════════════════════════════════════════════════════════════
+# v0.50 ⭐ 8 层约束分级（Oracle 设计 · 替代 3 位掩码为 8 层谱）
+# ═══════════════════════════════════════════════════════════════
+# L0 绝对底线（永不绕过）→ L7 自由创造（全部放开）
+# 兼容性：3 位掩码 0-7 自动映射到 L2-L7，旧 A/B/C 调用行为不变
+# ═══════════════════════════════════════════════════════════════
+
+# --- 6 个可调约束组（每组含具体规则）---
+GROUP_M_RHYTHM = [   # 节奏：循循善诱/6拍/不剧透
+    "循循善诱可放宽：用户要答案时可直接给结论，不必强制学生自己走一步",
+    "引导式不剧透协议可放宽：可直接给答案，不必坚持'先问你觉得呢'",
+    "6 拍节奏/讲义式结构可压缩：不必每拍都执行",
+    "多段【NEXT】分段可放开：允许较长单段输出",
+]
+GROUP_R_RHETORIC = [  # 修辞：比喻/语气词/叠词/副词
+    "比喻限制放开：允许 1-2 个比喻帮助理解",
+    "语气词放宽：允许少量'嗯''啊'表达陪伴感",
+    "叠词放宽：允许少量'想想看'等表达",
+    "副词放宽：少量'真的''确实'可允许",
+]
+GROUP_T_TEMPERATURE = [  # 温度：温柔/鼓励/昵称/约纳斯克制
+    "温柔·不评判可放宽：可以更直白",
+    "廉价鼓励可少量使用：允许'别担心，我们一步步来'等温暖鼓励",
+    "昵称使用放宽：允许更频繁地称呼学生",
+    "约纳斯克制笔法可放松：不必每条都那么'克制'",
+    "薇依世界观/扎根清单可轻量化：不强制走完整哲学框架",
+]
+GROUP_D_PEDAGOGY_DEPTH = [  # 教学法深度：讲解4层/6拍/学科黄金法则
+    "好讲解质量标准可精简：可省去'建立直觉'与'有思考余味'两个环节",
+    "讲解深度 4 层可只走 1-2 层：不必层层展开",
+    "学科黄金法则可只取核心 1-2 条，不必每条都执行",
+    "教学策略（Bloom 层级）可放宽：引导步骤也可直接给答案",
+]
+GROUP_S_SUBJECT_METHOD = [  # 学科教学法：母语迁移/CRA/概念对子/纠错
+    "母语迁移可放宽：外语讲解不必每段都对比中文",
+    "学科教学法可简化：物理/数学/计算机/AI 的深层方法不必每条都执行",
+    "概念对子分析放宽：不必每个概念都列对子",
+    "subfield_guide 层级体系可简化：不按完整 6 拍/8 大类体系讲",
+    "错误纠正 4 步/CEFR 分级/词块教学可简化",
+    "最小可运行示例可省略：用户要概念理解时不强制给代码",
+]
+GROUP_P_PHILOSOPHY = [  # 哲学框架：扎根清单/概念对子分析
+    "薇依世界观完整框架可放开：不强制呈现'注意力/重负/善'三角",
+    "概念对子的对照关系可省略：只讲概念本身不讲配对",
+]
+
+# --- 8 层 × 6 组开关矩阵 ---
+# 组编号：M=节奏 R=修辞 T=温度 D=教学法深度 S=学科教学法 P=哲学框架
+CONSTRAINT_LAYERS: dict = {
+    0: frozenset(),                                   # L0 绝对底线（无放开）
+    1: frozenset({"M"}),                              # L1 危机/安全
+    2: frozenset({"M", "R"}),                         # L2 快速应答（诊断）
+    3: frozenset({"M", "R", "T"}),                    # L3 精练新授
+    4: frozenset(),                                   # L4 标准新授（默认）
+    5: frozenset({"M", "D"}),                         # L5 巩固复习
+    6: frozenset({"M", "R", "D", "S"}),               # L6 深入提高
+    7: frozenset({"M", "R", "T", "D", "S", "P"}),     # L7 自由创造
+}
+_GROUP_RULES = {
+    "M": GROUP_M_RHYTHM, "R": GROUP_R_RHETORIC, "T": GROUP_T_TEMPERATURE,
+    "D": GROUP_D_PEDAGOGY_DEPTH, "S": GROUP_S_SUBJECT_METHOD, "P": GROUP_P_PHILOSOPHY,
+}
+_GROUP_NAMES = {
+    "M": "节奏", "R": "修辞", "T": "温度",
+    "D": "教学法深度", "S": "学科教学法", "P": "哲学框架",
+}
+
+# --- 3 位掩码 → 8 层映射（兼容性核心）---
+_MASK_TO_LAYER = {
+    0b000: 4, 0b001: 5, 0b010: 3, 0b011: 6,
+    0b100: 2, 0b101: 2, 0b110: 3, 0b111: 7,
+}
+
+
 # --- L0 保底约束（坚决不放开，任何 mask 都保留）---
 L0_RESERVED_RULES = [
     "数学公式必须 LaTeX（$...$/$$...$$，禁止中文括号包公式）——放开则前端公式无法渲染，是功能问题非风格问题",
@@ -944,73 +1018,85 @@ MASK_DETECTION_INSTRUCTION = """
 """
 
 
-def _build_constraint_layers(constraint_flags: tuple = ()) -> str:
-    """v0.43 ⭐ 输出效果约束 3 位掩码段（创新设计 v2）。
+def _flags_to_layer(constraint_flags) -> int:
+    """v0.50 ⭐ 兼容旧 flags → 8 层映射（Oracle 设计）。"""
+    if isinstance(constraint_flags, int):
+        return _MASK_TO_LAYER.get(constraint_flags & 0b111, 4)
+    mask = 0
+    _legacy = {"DIRECT": "A", "EMOTION": "B", "PREF": "C"}
+    for f in constraint_flags:
+        f = _legacy.get(f, f)
+        if f == "A":
+            mask |= MASK_A
+        elif f == "B":
+            mask |= MASK_B
+        elif f == "C":
+            mask |= MASK_C
+    return _MASK_TO_LAYER.get(mask, 4)
 
-    3 个变量 = 3 位掩码，每位为 1 → 取消对应组约束：
-    - 位0(100) → 取消组 A（直接性/风格）
-    - 位1(010) → 取消组 B（情绪/温度）
-    - 位2(001) → 取消组 C（深度/详细度）
-    - mask=000 → 完整约束；mask=111 → 仅保底层
-    - L0 保底层（语言规范/格式/反AI腔核心/安全伦理）永远保留，不在任何位
+
+def _build_constraint_layers(constraint_flags: tuple = (),
+                             layer: int = 4,
+                             crisis_signal: bool = False) -> str:
+    """v0.50 ⭐ 8 层约束分级段（Oracle 设计 v3 · 替代 3 位掩码）。
+
+    8 层线性约束谱：L0 绝对底线（永不绕过）→ L7 自由创造（全部放开）。
+    每层声明"哪些约束组允许放开"（6 组：节奏/修辞/温度/教学法深度/学科教学法/哲学）。
 
     Args:
-        constraint_flags: 命中的位集合，如 ("A",) 或 ("A","B") 或 ("A","B","C")；
-            也接受整数 mask（0-7）或 DIR/EMOTION/PREF 旧名（自动映射）。
+        constraint_flags: 兼容旧 API，位名("A","B","C") / 整数 mask(0-7) / 旧名。
+        layer: 显式指定层 0-7，若提供且非默认(4)则优先于 flag 映射。
+        crisis_signal: 危机信号 → 强制 L0/L1（安全第一）。
     Returns:
-        动态约束段字符串（含 L0 保底 + 已取消组说明）。
+        动态约束段字符串（L0 保底 + 本层放开说明 + 层判断指令）。
     """
-    # 兼容三种输入：位名("A","B","C") / 整数 mask / 旧参数名(DIRECT/EMOTION/PREF)
-    mask = 0
-    if isinstance(constraint_flags, int):
-        mask = constraint_flags & 0b111
-    else:
-        _legacy = {"DIRECT": "A", "EMOTION": "B", "PREF": "C"}
-        for f in constraint_flags:
-            f = _legacy.get(f, f)
-            if f == "A":
-                mask |= MASK_A
-            elif f == "B":
-                mask |= MASK_B
-            elif f == "C":
-                mask |= MASK_C
+    # 1. 解析 layer（显式 > 危机 > flag 映射）
+    if crisis_signal:
+        layer = 1
+    elif layer == 4:  # 默认值 + 无危机 → 用 flag 映射
+        layer = _flags_to_layer(constraint_flags)
+    layer = max(0, min(7, int(layer)))
 
-    parts = ["## 输出效果约束（v0.43 ⭐ 3 位掩码动态调节）"]
+    # 2. 取本层放开组
+    opened = CONSTRAINT_LAYERS[layer]
+    opened_rules = []
+    for g in sorted(opened):
+        opened_rules.extend(_GROUP_RULES[g])
 
-    # L0 保底层（永远保留）
-    parts.append("\n### L0 · 保底层（语言规范/格式/反AI腔核心/安全伦理，坚决不放开）")
+    # 3. 拼装
+    parts = [f"## 输出效果约束（v0.50 ⭐ 8 层约束分级 · 当前 L{layer}）"]
+
+    # L0 绝对底线（永远保留）
+    parts.append("\n### L0 · 绝对底线（语言规范/格式/反AI腔核心/安全伦理，坚决不放开）")
     for rule in L0_RESERVED_RULES:
         parts.append(f"- {rule}")
 
-    # 各组按位取消
-    canceled = []
-    if mask & MASK_A:
-        canceled.extend(GROUP_A_RULES)
-    if mask & MASK_B:
-        canceled.extend(GROUP_B_RULES)
-    if mask & MASK_C:
-        canceled.extend(GROUP_C_RULES)
-
-    if canceled:
-        _labels = []
-        for m, label in _MASK_LABELS.items():
-            if mask & m:
-                _labels.append(label)
-        parts.append(f"\n### 已取消约束（mask={mask:03b}，命中：{'、'.join(_labels)}）")
+    if opened_rules:
+        labels = "、".join(_GROUP_NAMES[g] for g in sorted(opened))
+        parts.append(f"\n### L{layer} · 已放开约束组（{labels}）")
         seen = set()
-        for r in canceled:
+        for r in opened_rules:
             if r not in seen:
                 seen.add(r)
                 parts.append(f"- {r}")
-        parts.append("\n注意：L0 保底约束仍严格生效——取消仅影响风格/温度/深度，不影响功能与价值观。")
+        parts.append("\n注意：L0 绝对底线仍严格生效。放开组 ≠ 删除规则，只是允许 LLM 在该层范围内灵活处理。")
     else:
-        parts.append("\n### 完整约束生效（mask=000，所有组约束均生效）")
-        parts.append("循循善诱、温柔陪伴、深度讲解等全部生效——这是默认状态。")
+        parts.append(f"\n### L{layer} · 完整约束生效")
+        parts.append("全部 6 个约束组生效——这是默认状态。")
 
-    # v0.43 ⭐ P1 修复：注入掩码判断指令——让 LLM 参与 3 位掩码判断
-    # （此前 MASK_DETECTION_INSTRUCTION 定义了但从未拼入 system，LLM 看不到）
-    parts.append("\n\n" + MASK_DETECTION_INSTRUCTION)
-
+    # 4. 层判断指令
+    parts.append("\n\n## 8 层约束判断（v0.50 ⭐）\n"
+                 "每次回复前，先内部判断 8 层（0-7），据此决定哪些组可放开：\n"
+                 "- L0 绝对底线：全场景，11 条不可越过\n"
+                 "- L1 危机/安全：检测到自伤/未成年人敏感 → 仅放开节奏，最快响应\n"
+                 "- L2 快速应答：用户要'直接/快/别铺垫' → 放开节奏+修辞\n"
+                 "- L3 精练新授：用户要'讲重点/少安慰' → 放开节奏+修辞+温度\n"
+                 "- L4 标准新授：默认状态，全保留\n"
+                 "- L5 巩固复习：用户已掌握，要'换个角度' → 放开节奏+教学法深度\n"
+                 "- L6 深入提高：用户要'讲透/本质/研究级' → 放开节奏+修辞+教学法深度+学科教学法\n"
+                 "- L7 自由创造：创意写作/哲学对话 → 全部放开，仅 L0 保留\n"
+                 "判断后形成 layer ∈ {0..7}。layer=4 表示完整约束；layer=7 表示仅 L0。\n"
+                 "注意：L0 绝对底线**永不跳过**——放开只影响教学风格与深度，不影响功能与价值观。")
     return "\n".join(parts)
 
 
