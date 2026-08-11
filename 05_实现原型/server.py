@@ -220,8 +220,8 @@ def _set_constraint_flags(learner, user_text: str, mode: str, affection: bool = 
         logger.warning("约束掩码检测失败: %s", _e)
         try:
             learner._constraint_flags = ()  # type: ignore[attr-defined]
-        except Exception:
-            pass
+        except Exception as _e2:
+            logger.warning("约束掩码重置失败（learner 不可写）: %s", _e2)
 
 
 def _try_file_operation(learner_id: str, text: str, llm):
