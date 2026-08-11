@@ -1,25 +1,29 @@
-# Python
+﻿# Python
 __pycache__/
 *.pyc
-*.pyo
-.venv/
-venv/
-
-# 运行数据
-05_实现原型/data/
-05_实现原型/downloads/
-*.log
-
-# 大型二进制
-Library/**/*.pdf
-Library/**/*.docx
-Library/**/*.doc
-
-# 系统
-.DS_Store
-Thumbs.db
-
-# 敏感数据不上传
+.pytest_cache/
+*.egg-info/
+# 环境/密钥
+.env
+*.token
+token.json
+# 用户数据（敏感——不提交真实账号数据）
 05_实现原型/users.json
+05_实现原型/users.json.*
+05_实现原型/data/
 05_实现原型/users_data/
 05_实现原型/uploads/
+05_实现原型/feedback/
+# 快照/发布包
+snapshots/*.zip
+*.zip
+# 日志
+*.log
+# IDE
+.idea/
+.vscode/
+
+# v0.46: 运行时数据与清理备份不入库
+05_实现原型/downloads/
+05_实现原型/data/version.txt
+.cleanup_backup_*/
