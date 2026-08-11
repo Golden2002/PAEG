@@ -5032,3 +5032,51 @@ Step 5 QA：结构/音频/字幕/转帧
 - 共享：学习目标/标题/要点/公式/视觉规格
 - 视频独有：narration/audio_duration/subtitle_cues
 - 详见 [维护手册 §十七](../维护手册.md) + [元能力 §6.36](../元能力文档.md) + [memo/021](../memo/021_视频生成升级设计.md)
+
+
+---
+
+## 12. 新增资产：PPT 脚本 + Logo 品牌（2026-08-12 ⭐）
+
+### 12.1 PPT v8 终版 + 生成脚本
+
+**PPT v8**（`交付物/路演PPT/PAEG路演PPT_v8_终版.pptx`，59 页）由 3 个 pptxgenjs 脚本从零构建：
+
+| 脚本 | 内容 | 位置 |
+|---|---|---|
+| build_main.js | 主演示 P1-14（L0-L7 阶梯图、母版 Logo）| `assets/ppt_scripts/` |
+| build_appendix.js | 附录 A-E（教学/倾诉/找答案/查资料/扩展测试）| `assets/ppt_scripts/` |
+| build_FT.js | 附录 F-T（产出物/数据/能力/技术/测试/时间线）| `assets/ppt_scripts/` |
+
+**方法论**：pptxgenjs 精确坐标控制（无 python-pptx auto_size 陷阱）；母版 defineSlideMaster 加 Logo；emoji 用 SVG 图标替代（`assets/ppt_scripts/icons_*.svg`）。详见维护手册 §18.6/18.7。
+
+### 12.2 Logo 品牌资产（三套）
+
+| 套系 | 文件 | 用途 |
+|---|---|---|
+| 主版（含文字+米白底）| paeg_logo.svg + 512/1024/2048/4096 | PPT/文档/品牌页 |
+| 白色线条图标版 | paeg-logo.svg + icon_* | 前端顶栏（深色底）|
+| 深蓝线条图标版 | paeg_logo_icon_dark.svg + icon_dark_* | 手机/浅色背景 |
+
+位置：`assets/logo/`；设计理念：`assets/logo/Logo Design Philosophy.md`（山/三角/火箭/树/花 五重视角）。
+
+
+### 12.3 视频生成依赖链（2026-08-12 ⭐）
+
+**生成视频功能依赖 PPT 生成 + 讲稿生成**，依赖链如下：
+
+```
+主题/教学材料
+   ├─→ PPT 生成（pptx_mcp_server.py v0.60）
+   │      └─→ .pptx 文件（品牌 Logo + 自适应排版）
+   ├─→ 讲稿生成（LLM → narration 演讲稿）
+   │      └─→ 演讲稿文本（narration 字段）
+   └─→ 视频生成（video_service.py）
+          ├─ TTS 合成音频（edge-tts，audio_duration）
+          ├─ 字幕对齐（subtitle_cues）
+          └─ 合并输出（视频帧 = PPT 页面 + 音频）
+
+**关键依赖**：
+- 视频内容源自 PPT 页面（每页 = 一帧画面）
+- 视频旁白源自讲稿（narration 驱动 TTS）
+- 讲稿生成（v0.53）：先写演讲稿 → 再生成视频，保证音画同步

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PAEG 图标版（深蓝线条·紧凑）：主版几何裁剪到图形区域，线条相对加粗 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="280 180 480 620">
+  <!-- 根部：三道弧形根须（主版坐标） -->
+  <path d="M 400 560 Q 360 640 340 720" fill="none" stroke="#0F2A52" stroke-width="20" stroke-linecap="round"/>
+  <path d="M 512 590 Q 512 670 512 750" fill="none" stroke="#0F2A52" stroke-width="22" stroke-linecap="round"/>
+  <path d="M 624 560 Q 664 640 684 720" fill="none" stroke="#0F2A52" stroke-width="20" stroke-linecap="round"/>
+
+  <!-- 根部须分支 -->
+  <path d="M 360 650 Q 330 680 320 700" fill="none" stroke="#0F2A52" stroke-width="8" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 664 650 Q 694 680 704 700" fill="none" stroke="#0F2A52" stroke-width="8" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- 茎部 -->
+  <path d="M 420 560 Q 470 400 512 300 Q 554 400 604 560" fill="none" stroke="#0F2A52" stroke-width="24" stroke-linecap="round"/>
+
+  <!-- 幼芽 -->
+  <path d="M 512 300 Q 512 250 480 230 Q 500 240 512 260" fill="#0F2A52" stroke-linecap="round"/>
+  <path d="M 512 300 Q 512 250 544 230 Q 524 240 512 260" fill="#1A3A6B" stroke-linecap="round"/>
+
+  <!-- 光点 -->
+  <circle cx="512" cy="250" r="18" fill="#E6A528"/>
+  <circle cx="512" cy="250" r="30" fill="#E6A528" opacity="0.25"/>
+  <circle cx="512" cy="250" r="46" fill="#E6A528" opacity="0.10"/>
+</svg>

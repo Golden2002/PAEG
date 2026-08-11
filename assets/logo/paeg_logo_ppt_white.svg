@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PAEG 主设计版 Logo（透明底白线）：圆环+根芽光点，方形，适配深色标题条 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- 双圆环（主设计比例：外环粗 22/300，内环细 8/250） -->
+  <circle cx="512" cy="500" r="300" fill="none" stroke="#FFFFFF" stroke-width="22" opacity="0.18"/>
+  <circle cx="512" cy="500" r="250" fill="none" stroke="#FFFFFF" stroke-width="8" opacity="0.30"/>
+
+  <!-- 根须 -->
+  <path d="M 400 590 Q 360 670 340 750" fill="none" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round"/>
+  <path d="M 512 620 Q 512 700 512 780" fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round"/>
+  <path d="M 624 590 Q 664 670 684 750" fill="none" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round"/>
+
+  <!-- 根须分支 -->
+  <path d="M 360 680 Q 330 710 320 730" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 664 680 Q 694 710 704 730" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- 茎 -->
+  <path d="M 420 590 Q 470 420 512 320 Q 554 420 604 590" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
+
+  <!-- 芽 -->
+  <path d="M 512 320 Q 512 260 480 240 Q 500 250 512 270" fill="#FFFFFF"/>
+  <path d="M 512 320 Q 512 260 544 240 Q 524 250 512 270" fill="#FFFFFF"/>
+
+  <!-- 光点（金色） -->
+  <circle cx="512" cy="250" r="18" fill="#E6A528"/>
+  <circle cx="512" cy="250" r="30" fill="#E6A528" opacity="0.25"/>
+  <circle cx="512" cy="250" r="46" fill="#E6A528" opacity="0.10"/>
+</svg>

@@ -276,6 +276,10 @@ body {
   width: 20px; height: 20px; filter: brightness(0) invert(1);
   display: block;
 }
+.brand-logo .logo-svg {
+  width: 100%; height: 100%; filter: none;
+  object-fit: contain; display: block;
+}
 .brand-name { font-size: 17px; font-weight: 650; letter-spacing: .02em; }
 .brand-sub { font-size: 12px; color: var(--text-dim); margin-top: -2px; }
 .topbar-right { display: flex; align-items: center; gap: 12px; }
@@ -536,6 +540,10 @@ body {
   background: var(--surface-2); transition: background .15s;
 }
 .conv-item:hover { background: var(--border); }
+.conv-item .conv-icon {
+  width: 14px; height: 14px; color: var(--accent);
+  flex-shrink: 0; opacity: 0.7;
+}
 .conv-item .conv-mode {
   font-size: 10.5px; padding: 1px 6px; border-radius: 4px;
   background: var(--surface); color: var(--text-dim); flex-shrink: 0;
@@ -1301,7 +1309,7 @@ body {
 <!-- 顶栏 -->
 <header class="topbar">
   <div class="brand">
-    <div class="brand-logo"><img src="assets/icons/graduation-cap.svg" alt="毕业帽" class="logo-svg" /></div>
+    <div class="brand-logo"><img src="assets/icons/paeg-logo.svg" alt="PAEG Logo" class="logo-svg" /></div>
     <div>
       <div class="brand-name">Émile Novis · 教育者</div>
       <div class="brand-sub">Pedagogical Agent with Evolving Growth · 自我更新的教育者</div>
@@ -3336,7 +3344,11 @@ async function loadConversations() {
     STATE.sessions = convs.length;
     updateStats();
     if (!convs.length) {
-      list.innerHTML = `<div class="log-item"><div class="txt" style="color:var(--text-dim)">${isAnon ? '暂无历史对话（登录账号可跨设备同步）' : '暂无历史对话'}</div></div>`;
+      list.innerHTML = `<div class="empty-state" role="status">
+          <img class="empty-icon" src="assets/icons/message-circle.svg" alt="" aria-hidden="true" />
+          <div class="empty-title">暂无历史对话</div>
+          <div class="empty-desc">${isAnon ? '登录账号可跨设备同步；对话会自动归档到这里。' : '开始一段对话，它会自动归档到这里。'}</div>
+        </div>`;
       return;
     }
     // v0.41.9 ⭐ 修复：MODE_CN 补全（此前缺 answer/method/knowledge/affection 等 →
@@ -3348,6 +3360,7 @@ async function loadConversations() {
   };
     list.innerHTML = convs.map(c => `
       <div class="conv-item" data-cid="${c.id}">
+        <img class="conv-icon" src="assets/icons/message-circle.svg" alt="" aria-hidden="true" />
         <span class="conv-mode">${MODE_CN[c.mode] || c.mode}</span>
         <span class="conv-title">${escapeHtml(c.title || '对话')}</span>
         <span class="conv-del" data-cid="${c.id}" title="删除">✕</span>
