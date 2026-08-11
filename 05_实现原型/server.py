@@ -86,6 +86,11 @@ from infra.runtime import (
 )
 from infra.sessions import SESSIONS
 
+# v0.46 ⭐ P0-6：登录限流状态（IP+账号双维度失败计数，15 分钟窗口）
+import threading as _lt_mod
+_LOGIN_LOCK = _lt_mod.Lock()
+_LOGIN_FAILS: dict = {}
+
 # ─────────────────────────────────────
 # Flask 应用初始化
 # ─────────────────────────────────────
@@ -220,8 +225,8 @@ def _set_constraint_flags(learner, user_text: str, mode: str, affection: bool = 
         logger.warning("约束掩码检测失败: %s", _e)
         try:
             learner._constraint_flags = ()  # type: ignore[attr-defined]
-        except Exception:
-            pass
+        except Exception as _e2:
+            logger.warning("约束掩码重置失败（learner 不可写）: %s", _e2)
 
 
 def _try_file_operation(learner_id: str, text: str, llm):
@@ -464,7 +469,7 @@ def health():
 
     return jsonify({
         "status": "ok",
-        "version": "0.44.0",
+        "version": "0.46.0",
         "llm_provider": LLM_PROVIDER,
         "llm_model": LLM_MODEL,
         "llm_ok": llm_ok,
@@ -2659,11 +2664,27 @@ def login():
     """登录（邮箱或手机号 + 密码）。"""
     if USER_STORE is None:
         return jsonify({"ok": False, "error": "用户系统不可用"}), 500
+    # v0.46 ⭐ P0-6：登录限流（对照发布标准 C 表安全维度——防暴力枚举邮箱）
     data = request.get_json(force=True)
     identifier = (data.get("identifier") or "").strip()
     password = data.get("password") or ""
+    _ip = request.remote_addr or "unknown"
+    _lk = f"login_fail_{_ip}"
+    _lk_user = f"login_fail_{_ip}|{identifier[:40]}"
+    from time import time as _now
+    with _LOGIN_LOCK:
+        _rec = [t for t in _LOGIN_FAILS.get(_lk, []) if _now() - t < 900]
+        _LOGIN_FAILS[_lk] = _rec
+        if len(_rec) >= 10:
+            return jsonify({"ok": False, "error": "尝试过于频繁，请 15 分钟后再试"}), 429
+        _rec_u = [t for t in _LOGIN_FAILS.get(_lk_user, []) if _now() - t < 900]
+        if len(_rec_u) >= 10:
+            return jsonify({"ok": False, "error": "该账号尝试过于频繁，请 15 分钟后再试"}), 429
     result = USER_STORE.login(identifier, password)
     if result.get("ok"):
+        with _LOGIN_LOCK:
+            _LOGIN_FAILS.pop(_lk, None)
+            _LOGIN_FAILS.pop(_lk_user, None)
         # 加载该用户的持久化画像到 SESSIONS
         learner_dict = USER_STORE.load_learner(result["user_id"])
         if learner_dict:
@@ -2683,6 +2704,11 @@ def login():
             except Exception as _e:
                 print(f"[Server] 加载用户画像失败: {_e}")
         result["nickname"] = USER_STORE.get_user(result["user_id"]).get("nickname", "学生")
+    else:
+        # 失败：记录（IP + 账号双维度）
+        with _LOGIN_LOCK:
+            _LOGIN_FAILS.setdefault(_lk, []).append(_now())
+            _LOGIN_FAILS.setdefault(_lk_user, []).append(_now())
     code = 200 if result.get("ok") else 401
     return jsonify(result), code
 
