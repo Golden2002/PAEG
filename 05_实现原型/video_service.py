@@ -188,11 +188,12 @@ def _generate_teaching_script(topic: str, outline: str, llm=None) -> list:
                 "2. 讲解顺序：问题引入 → 概念 → 例子 → 练习/总结\n"
                 "3. 页与页之间有过渡语（'上一页我们知道了…接下来…'）\n"
                 "4. 公式解释变量含义，不照搬标题/要点\n"
-                "5. 输出 JSON 数组：[{\"title\": \"页标题\", \"narration\": \"完整讲解词\"}]\n"
-                "6. 只输出 JSON，不要多余文字"
+                "5. **每页输出 2-4 个画面要点（key_points）**——供视频画面展示的短语/短句\n"
+                "6. 输出 JSON 数组：[{\"title\": \"页标题\", \"key_points\": [\"要点1\",\"要点2\"], \"narration\": \"完整讲解词\"}]\n"
+                "7. 只输出 JSON，不要多余文字"
             )
             _u = f"主题：{topic}\n大纲：\n{_src}"
-            _r = _safe_chat(llm, _sys, _u, max_tokens=1500)
+            _r = _safe_chat(llm, _sys, _u, max_tokens=1800)
             if _r:
                 _clean = _r.strip()
                 if _clean.startswith("```"):
@@ -204,9 +205,13 @@ def _generate_teaching_script(topic: str, outline: str, llm=None) -> list:
                     _out = []
                     for _p in _parsed:
                         if isinstance(_p, dict) and _p.get("narration"):
+                            # v0.53 ⭐ 修复：画面要点优先用 LLM key_points（否则帧空白）
+                            _kp = _p.get("key_points") or _p.get("points") or []
+                            if not _kp and len(_out) < len(_slides):
+                                _kp = _slides[len(_out)].get("points") or []
                             _out.append({
                                 "title": str(_p.get("title") or "未命名页"),
-                                "points": _slides[len(_out)]["points"] if len(_out) < len(_slides) else [],
+                                "points": [str(k)[:60] for k in _kp[:6]],
                                 "narration": str(_p["narration"]),
                             })
                     if _out:
