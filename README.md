@@ -100,6 +100,17 @@ pip install flask flask-cors fastmcp pypdf sympy requests
 cd 05_实现原型
 python server.py
 
+# 3.1 生产部署（v0.51 ⭐ 并发务实升级 —— Oracle 方案）
+# 单进程多线程（避免 SESSIONS 跨进程隔离 + 保持内存会话一致）：
+#   gunicorn -w 1 -k gthread --threads 8 -b 0.0.0.0:5000 server:app
+# HTTPS 由反代（Nginx/Caddy/cloudflared）前置，应用已支持 ProxyFix
+# 生产环境变量：
+#   PAEG_ENV=production          # 强制安全 Cookie + SECRET_KEY 检查
+#   PAEG_CORS_ORIGINS=https://你的域名   # CORS 白名单（禁止裸 *）
+# 并发边界（不引入 Redis 的务实上限）：
+#   - ≤200 注册用户 / ≤20 QPS / ≤50 并发 SSE
+#   - 超过须引入 Redis（会话共享 + 限流 + 信号量）
+
 # 4. 打开浏览器
 #    http://localhost:5000
 
