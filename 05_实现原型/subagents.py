@@ -68,15 +68,28 @@ def _inject_skill_catalog(system: str) -> str:
 # v0.46 ⭐ P0：LLM 成本上限（对照调研失败模式 #9 成本失控）
 # 会话级 token 预算——累计输出 token 超限后拒绝进一步 LLM 调用（防长任务烧钱）。
 import threading as _threading
+import time as _time_mod
 _TOKEN_BUDGET_LOCK = _threading.Lock()
 _TOKEN_BUDGET_USED = 0
-_TOKEN_BUDGET_MAX = 60000  # 会话级输出 token 上限（约 15 万字符，DeepSeek 成本可控）
+_TOKEN_BUDGET_START = _time_mod.time()
+_TOKEN_BUDGET_MAX = 60000  # 60 分钟窗口内输出 token 上限
+_TOKEN_BUDGET_WINDOW = 3600  # 窗口秒数（1 小时）
 
 
 def _consume_token_budget(tokens: int) -> bool:
-    """尝试消耗 token 预算；超限返回 False（调用方应降级/停止）。"""
-    global _TOKEN_BUDGET_USED
+    """尝试消耗 token 预算；超限返回 False（调用方应降级/停止）。
+
+    v0.50 ⭐ 修复：时间窗口制——60 分钟窗口内累计 60000 token，窗口滑动自动重置。
+    此前为服务器生命周期累计，长会话（15+ 轮测试）后耗尽 → 全系统 LLM 失败退化为
+    模板（knowledge/method 返回到固定兜底）。窗口制既防单次爆发成本，又不永久锁死。
+    """
+    global _TOKEN_BUDGET_USED, _TOKEN_BUDGET_START
     with _TOKEN_BUDGET_LOCK:
+        _now = _time_mod.time()
+        if _now - _TOKEN_BUDGET_START >= _TOKEN_BUDGET_WINDOW:
+            # 窗口过期 → 重置
+            _TOKEN_BUDGET_USED = 0
+            _TOKEN_BUDGET_START = _now
         if _TOKEN_BUDGET_USED + tokens > _TOKEN_BUDGET_MAX:
             return False
         _TOKEN_BUDGET_USED += tokens
