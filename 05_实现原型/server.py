@@ -980,6 +980,13 @@ def teach_stream():
                 except Exception as _e:
                     print(f"[PAEG][server.py] gen_aff 异常忽略: {_e}")
                     pass
+                # v0.46.1 ⭐ 语言规范收口：grade_blocked 分支的 LLM 内容过 polish
+                try:
+                    from services.polish import _polish_text
+                    _gb_content = _polish_text(_gb_content, context="teach:grade_blocked")
+                except Exception:
+                    pass
+                    pass
 
                 def gen_grade_blocked():
                     _save_teach_turn("teach", _gb_content)  # v0.36.2 早退分支补保存
@@ -993,6 +1000,12 @@ def teach_stream():
             _unk = _steer_unknown_response(concept, learner, learner_id,
                                            _steer.get("unknown_name") or "该学科")
             _unk_content = _unk.get("presentations", [{}])[0].get("content", "")
+            # v0.46.1 ⭐ 语言规范收口：unknown 分支的 LLM 内容过 polish
+            try:
+                from services.polish import _polish_text
+                _unk_content = _polish_text(_unk_content, context="teach:unknown")
+            except Exception:
+                pass
 
             def gen_unknown():
                 _save_teach_turn("teach", _unk_content)  # v0.36.2 早退分支补保存
@@ -1230,6 +1243,12 @@ def teach_stream():
             )
             _ppt_reply = _safe_chat(llm, _ppt_sys, _ppt_usr, max_tokens=400) or \
                 "做演示文稿我建议用课程备课流程——把你的素材和大纲给我，我帮你组织成 PPT。"
+            # v0.46.1 ⭐ 语言规范收口：PPT 分支的 LLM 内容也过 polish
+            try:
+                from services.polish import _polish_text
+                _ppt_reply = _polish_text(_ppt_reply, context="teach:ppt")
+            except Exception:
+                pass
 
             def gen_ppt():
                 _save_teach_turn("ppt", _ppt_reply)  # v0.36.2 早退分支补保存
@@ -1510,8 +1529,18 @@ def teach_stream():
         yield f"event: plan\ndata: {json.dumps({'status': 'planning'})}\n\n"
         from world_view import select_tone
         tone_info = select_tone(subject)
-        plan = paeg.planner.run(learner, diagnosis, subject, concept, tone_info)
-        yield f"event: plan\ndata: {json.dumps(plan, ensure_ascii=False)}\n\n"
+        # v0.46.1 ⭐ 单步教学续讲：若上一轮有剩余 steps（学生回答了上一步的提问），
+        # 直接继续讲下一步（不再重新诊断/计划——保持教学连续性）
+        _pending_steps = SESSIONS.get(f"teach_plan_{learner_id}") or []
+        if _pending_steps:
+            plan = {"steps": _pending_steps}
+            SESSIONS.pop(f"teach_plan_{learner_id}", None)  # 取走即清（本轮再存新的）
+            SESSIONS.pop(f"teach_plan_done_{learner_id}", None)  # v0.46.2 修复：同步清 done 标志
+            # 续讲轮：不重复诊断（诊断已在首轮完成），只推进剩余步骤
+            yield f"event: plan\ndata: {json.dumps({'status': 'continuing', 'steps_left': len(_pending_steps)}, ensure_ascii=False)}\n\n"
+        else:
+            plan = paeg.planner.run(learner, diagnosis, subject, concept, tone_info)
+            yield f"event: plan\ndata: {json.dumps(plan, ensure_ascii=False)}\n\n"
 
         # v0.26 ⭐ C3-3 P0 修复：teach_stream 补 Individuality 注入 + 用户资料注入
         # （此前只有同步 paeg.teach 有——流式教学主路径缺个体化/用户资料，检视确认的断链）
@@ -1639,7 +1668,22 @@ def teach_stream():
         print(f"[PAEG][v0.34-DEBUG] step loop about to start: plan_keys={list(plan.keys())[:5]} "
               f"steps_count={len(plan.get('steps') or [])}",
               file=_sys_dbg6.stderr, flush=True)
-        for i, step in enumerate(plan["steps"]):
+        # v0.46.1 ⭐ P0 根因 3（TutorOS 式单步教学）：新 plan 多步时首轮只讲第 1 步，
+        # 剩余存会话供后续轮（对比文档：期望"判断理解→一个教学动作→等学生→再下一步"）。
+        # 续讲轮（_pending_steps 取出）则全部讲完（学生已回到对话，连续推进剩余步骤）。
+        _steps_all = plan.get("steps") or []
+        _steps_total = len(_steps_all)
+        _is_continuation = bool(SESSIONS.get(f"teach_plan_done_{learner_id}"))
+        if _steps_total > 1 and not _is_continuation:
+            # 新 plan 多步：首轮只推进第 1 步，剩余存会话供后续轮
+            SESSIONS[f"teach_plan_{learner_id}"] = _steps_all[1:]
+            SESSIONS[f"teach_plan_done_{learner_id}"] = 1
+            _steps_this_round = _steps_all[:1]
+        else:
+            SESSIONS.pop(f"teach_plan_{learner_id}", None)
+            SESSIONS.pop(f"teach_plan_done_{learner_id}", None)
+            _steps_this_round = _steps_all
+        for i, step in enumerate(_steps_this_round):
             yield f"event: step\ndata: {json.dumps({'step_id': i + 1, 'status': 'presenting'})}\n\n"
             presentation = paeg.presenter.run(
                 step=step,
@@ -1660,6 +1704,17 @@ def teach_stream():
                             presentation["refined"] = True
                 except Exception as _refine_e:
                     print(f"[PAEG][server.py] generate 异常忽略: {_refine_e}")
+            # v0.46.1 ⭐ 语言规范兜底：教学讲解也过 L2/L3 polish（refiner 侧重薇依语料，
+            # polish 保证主谓宾/词法/介词规范——用户要求"所有生成内容都经语言规范控制"）
+            try:
+                from services.polish import _polish_text
+                _teach_text = presentation.get("content") or ""
+                if _teach_text:
+                    _polished_t = _polish_text(_teach_text, context=f"teach:{concept[:30]}")
+                    if _polished_t and _polished_t != _teach_text:
+                        presentation["content"] = _polished_t
+            except Exception:
+                pass
             _assistant_parts.append(presentation.get("content") or "")  # v0.21.3
             _prev_presentations.append(presentation)  # v0.21.8：累积讲解供下一轮参考
             # v0.40.2 ⭐ 修复：教学主循环 presentation 分片 yield（此前整段一次性 yield → 前端"等很久突然一大段"）
