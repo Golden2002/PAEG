@@ -124,6 +124,18 @@ def is_knowledge_query(text: str) -> bool:
     # 推荐是主动咨询行为，不是"查我的知识库"，应走教学/回答管线。
     if re.search(r"(推荐|推荐什么|有什么推荐|哪个.{0,6}(好|好用|推荐)|推荐几|求推荐|安利)", t):
         return False
+    # v6.0 ⭐ P1 修复：**明确能力类**问题（"你有哪些功能/你能做什么"）是询问 AI 能力，
+    # 应走 interface 确定性模板，不是库清点。规则层只排除**明确**能力类；
+    # ambiguous 输入（"你学过什么/你会什么"）留给 LLM 判断（INTENT_PROMPT 已补示例），
+    # 规则层仍按 knowledge 兜底（问 AI 掌握的知识 = 库清点）。
+    try:
+        from self_referential import is_interface_query
+        _t = text or ""
+        # 明确能力类：含"功能/能力/做什么/帮什么" + "你"前缀
+        if is_interface_query(_t) and re.search(r"(功能|能力|本领|做什么|帮什么|用处)", _t):
+            return False
+    except Exception:
+        pass
     return any(p.search(t) for p in KNOWLEDGE_COMPILED)
 
 
@@ -321,6 +333,9 @@ INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务�
 - "把这些资料做成PPT" → ppt（生成演示文稿），不是 teach
 - "看下我上传的笔记" → material（用户文件），不是 knowledge
 - "换深色模式" → interface（界面操作），不是 teach
+- "你学过什么/你会什么/你懂什么" → **ambiguous**：若指"你（AI）掌握的知识库内容" → knowledge（清点知识库）；若指"你（AI）的能力/本领" → interface（能力）。**由你判断语境**：知识内容 → knowledge，能力本领 → interface
+- "你有哪些功能/你能做什么" → interface（问能力清单），不是 knowledge
+- "知识库里有什么/你收藏了什么资料" → knowledge（清点资料库），不是 interface
 - "今天天气怎么样" → chat（闲聊），不是 teach
 
 【用户输入】
