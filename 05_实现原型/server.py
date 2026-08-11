@@ -30,6 +30,16 @@ from typing import Any, Dict, Optional
 # 让 server.py 能找到同目录的模块
 sys.path.insert(0, str(Path(__file__).parent))
 
+# v0.43 ⭐ P0-2 接入 logging（异常可观测：从"静默吞掉"升级为"带 stack trace 的日志"）
+import logging
+logger = logging.getLogger("paeg")
+if not logger.handlers:  # 避免重复添加 handler（模块重载时）
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter(
+        "[PAEG][%(asctime)s][%(levelname)s] %(message)s"))
+    logger.addHandler(_h)
+    logger.setLevel(logging.INFO)
+
 from flask import Flask, Response, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -89,6 +99,22 @@ if SECRET_KEY_IS_DEV_DEFAULT:
     print("[PAEG Server][SECURITY] PAEG_SECRET_KEY 未设置，使用开发默认值（生产环境必须设置！）")
 app.secret_key = SECRET_KEY
 
+# v0.43 ⭐ P0-2 可观测性：request_id 中间件（追踪单请求全链路日志，异常排查必备）
+@app.before_request
+def _assign_request_id():
+    """每个请求生成 request_id（响应头返回 + g 存储，日志可关联）。"""
+    from flask import g
+    g.request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:12]
+
+
+@app.after_request
+def _attach_request_id(resp):
+    from flask import g
+    _rid = getattr(g, "request_id", None)
+    if _rid:
+        resp.headers["X-Request-ID"] = _rid
+    return resp
+
 # 运行时依赖由 infra.runtime 统一托管；保留兼容别名，避免既有调用点改动。
 llm = get_llm()
 kb = get_kb()
@@ -146,7 +172,8 @@ def _inject_skill_catalog(system: str) -> str:
         return system
     try:
         catalog = SKILL_REGISTRY.catalog_prompt()
-    except Exception:
+    except Exception as _e:
+        logger.warning("skill catalog 读取失败: %s", _e)
         catalog = ""
     if not catalog:
         return system
@@ -185,8 +212,71 @@ def _set_constraint_flags(learner, user_text: str, mode: str, affection: bool = 
             affection_signal=affection,
         )
         learner._constraint_flags = _cf  # type: ignore[attr-defined]
-    except Exception:
+    except Exception as _e:
+        logger.warning("约束掩码检测失败: %s", _e)
         learner._constraint_flags = ()  # type: ignore[attr-defined]
+
+
+def _try_file_operation(learner_id: str, text: str, llm):
+    """v0.43 ⭐ P0-D 修复：用户文件 4 能力统一入口（chat/teach 等端点复用）。
+
+    触发：用户输入含"我的资料/上传的文件/讲义/笔记/文件里/原文"等文件操作信号。
+    流程：意图路由 → BM25 检索用户文件 → 对应 handler → SSE 流式返回。
+    返回：SSE Response（命中文件操作时）或 None（普通对话，调用方继续正常流程）。
+    """
+    try:
+        from lib.ingest.intent_router import is_file_operation, route_intent, extract_filename
+        if not is_file_operation(text):
+            return None
+        from lib.ingest.readers import read_corpus_full
+        from lib.ingest.chunker import chunk_documents
+        from lib.ingest.retriever import make_retriever
+        from lib.ingest import handlers as _fh
+        _docs = read_corpus_full(learner_id)
+        if not _docs:
+            return None
+        _chunks = chunk_documents(_docs, max_chars=400, overlap=50)
+        _retriever, _mode = make_retriever(_chunks)
+        _intent = route_intent(text)
+        _fname = extract_filename(text)
+        _candidates = [c for c in _chunks if (not _fname) or (_fname.lower() in c.get("doc_name", "").lower())] \
+            if _fname else _chunks
+        _hits = _retriever.search(text, top_k=4) if _candidates else []
+        _hit_chunks = []
+        _hit_keys = set()
+        for h in _hits:
+            _key = (h.get("doc_name"), h.get("chunk_index"))
+            if _key not in _hit_keys:
+                _hit_keys.add(_key)
+                _hit_chunks.append(h)
+        if not _hit_chunks and _candidates:
+            _hit_chunks = _candidates[:2]  # 检索无命中 → 用候选块前 2 个兜底
+        _handler = {
+            "file_qa": _fh.file_qa, "file_explain": _fh.file_explain,
+            "file_quote": _fh.file_quote, "file_restructure": _fh.file_restructure,
+        }.get(_intent.value, _fh.file_qa)
+        _reply = _handler.handle(learner_id, text, _hit_chunks, llm)
+
+        def gen_file_op():
+            # v0.36.2 ⭐ 早退分支补保存（文件操作提前 return，主流程保存不执行）
+            try:
+                if CONV_STORE is not None and _is_registered(learner_id):
+                    _fcid = SESSIONS.get(f"conv_{learner_id}")
+                    _fcid = CONV_STORE.add_message(
+                        learner_id, "chat", str(text)[:60], "user", text, conv_id=_fcid)
+                    _frep = str(_reply or "").strip()[:2000] or f"（文件操作：{_intent.value}）"
+                    _fcid = CONV_STORE.add_message(
+                        learner_id, "chat", _frep[:30], "assistant", _frep, conv_id=_fcid)
+                    SESSIONS[f"conv_{learner_id}"] = _fcid
+            except Exception as _fe2:
+                logger.warning("文件操作保存会话失败: %s", _fe2)
+            yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _reply, 'step_type': 'file_' + _intent.value}, ensure_ascii=False)}\n\n"
+            yield f"event: done\ndata: {json.dumps({'status': 'completed', 'file_op': _intent.value, 'retriever': _mode}, ensure_ascii=False)}\n\n"
+        return Response(gen_file_op(), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception as _fe:
+        logger.warning("文件操作处理失败（降级普通对话）: %s", _fe)
+        return None
 
 # ─────────────────────────────────────
 # 静态文件（GUI 前端）
@@ -352,11 +442,26 @@ def health():
     # AgentEngine
     agent_engine_ok = AGENT_ENGINE is not None
 
+    # v0.43 ⭐ P0-2 可观测性：llm 可达 + db 可写检查（生产 k8s/反代 liveness 依据）
+    llm_ok = "unknown"
+    db_ok = "unknown"
+    try:
+        _llm = getattr(llm, "chat", None)
+        llm_ok = "ok" if callable(_llm) else "degraded"
+    except Exception as _e:
+        llm_ok = f"error:{_e}"
+    try:
+        db_ok = "ok" if USER_STORE is not None else "degraded"
+    except Exception as _e:
+        db_ok = f"error:{_e}"
+
     return jsonify({
         "status": "ok",
-        "version": "0.40.4",
+        "version": "0.44.0",
         "llm_provider": LLM_PROVIDER,
         "llm_model": LLM_MODEL,
+        "llm_ok": llm_ok,
+        "db_ok": db_ok,
         "kb_stats": kb.stats(),
         "mcp": mcp_stats,
         "mcp_status": mcp_status,
@@ -830,6 +935,13 @@ def teach_stream():
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     except Exception as _e:
         print(f"[PAEG] teach_stream 情绪支持钩子跳过: {_e}")
+
+    # v0.43 ⭐ P0-D 文件能力扩展：教学模式同样支持用户文件 4 能力
+    # （找答案/讲解/输出原文/重组结构——"按我上传的讲义讲X"等触发）。
+    # 优先级：危机/情绪 > 文件操作 > 学科 Steering > 常规教学。
+    _file_resp = _try_file_operation(learner_id, concept, llm)
+    if _file_resp is not None:
+        return _file_resp
 
     # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（流式版本）
     # v0.41.8 ⭐ 修复：_steer 在 try 内定义但被 generate() 闭包引用——
@@ -1332,7 +1444,22 @@ def teach_stream():
                     if _is_short or not should_search(_text):
                         _web_raw = None  # 短输入/非检索意图 → 不联网，不污染
                     else:
-                        _web_raw = web_search(f"{subject} {concept}", max_results=3)
+                        # v0.44 ⭐ 升级：单查询 web_search → 多查询词联想（LLM 联想
+                        # 定义/应用/例子等角度查询词 → 逐一检索 → 合并去重含正文）
+                        try:
+                            from web_search_tool import web_search_multi
+                            _multi = web_search_multi(
+                                concept, llm=llm, subject=subject,
+                                n_queries=4, per_query=3, max_total=10,
+                            )
+                            if _multi:
+                                _web_raw = "\n\n".join(
+                                    f"[来源 {i+1}] {it['title']}\nURL: {it['url']}\n{it['content']}"
+                                    for i, it in enumerate(_multi))
+                            else:
+                                _web_raw = None
+                        except Exception:
+                            _web_raw = web_search(f"{subject} {concept}", max_results=3)
                     if _web_raw and "搜索未返回" not in str(_web_raw):
                         _teach_badge = "网络检索"
                         _teach_web_ctx = str(_web_raw)[:600]
@@ -2347,8 +2474,8 @@ def resource_lookup():
     subject = data.get("subject") or getattr(learner, "_current_subject", "") or "default"
     for_ppt = bool(data.get("for_ppt", False))
     try:
-        from subagents import ResourceLibrarian
-        _rl = ResourceLibrarian(model=llm)
+        # v0.43 ⭐ P0-C 提升：复用主 agent 全局持有的 ResourceLibrarian（替代每请求 new）
+        _rl = paeg.resource_librarian
         _result = _rl.run(
             question, learner=learner, llm=llm, subject=subject,
             scope=data.get("scope", "all"),
@@ -2679,62 +2806,11 @@ def general_chat_stream():
 
     system = _inject_skill_catalog(system)
 
-    # v0.22.0：基于用户上传文件的 4 能力（找答案/讲解/输出原文/重组结构）
+    # v0.43 ⭐ P0-D 文件能力扩展：chat_stream 复用统一入口（teach/answer 同享）
     # 触发：用户输入含"我的资料/上传的文件/讲义/笔记/文件里/原文"等文件操作信号
-    # 流程：意图路由 → BM25 检索用户文件 → 对应 handler → SSE 返回
-    try:
-        from lib.ingest.intent_router import is_file_operation, route_intent, extract_filename
-        if is_file_operation(text):
-            from lib.ingest.readers import read_corpus_full
-            from lib.ingest.chunker import chunk_documents
-            from lib.ingest.retriever import make_retriever
-            from lib.ingest import handlers as _fh
-            _docs = read_corpus_full(learner_id)
-            if _docs:
-                _chunks = chunk_documents(_docs, max_chars=400, overlap=50)
-                _retriever, _mode = make_retriever(_chunks)
-                _intent = route_intent(text)
-                _fname = extract_filename(text)
-                # 指定文件名则只检索该文件
-                _candidates = [c for c in _chunks if (not _fname) or (_fname.lower() in c.get("doc_name", "").lower())] \
-                    if _fname else _chunks
-                _hits = _retriever.search(text, top_k=4) if _candidates else []
-                # 组装 handler 需要的 chunks（含 doc_name 等元数据）
-                _hit_chunks = []
-                _hit_keys = set()
-                for h in _hits:
-                    _key = (h.get("doc_name"), h.get("chunk_index"))
-                    if _key not in _hit_keys:
-                        _hit_keys.add(_key)
-                        _hit_chunks.append(h)
-                if not _hit_chunks and _candidates:
-                    # 检索无命中 → 用候选块前 2 个兜底
-                    _hit_chunks = _candidates[:2]
-                _handler = {
-                    "file_qa": _fh.file_qa, "file_explain": _fh.file_explain,
-                    "file_quote": _fh.file_quote, "file_restructure": _fh.file_restructure,
-                }.get(_intent.value, _fh.file_qa)
-                _reply = _handler.handle(learner_id, text, _hit_chunks, llm)
-
-                def gen_file_op():
-                    # v0.36.2 ⭐ 早退分支补保存（chat_stream 文件操作提前 return，主流程保存不执行）
-                    try:
-                        if CONV_STORE is not None and _is_registered(learner_id):
-                            _fcid = SESSIONS.get(f"conv_{learner_id}")
-                            _fcid = CONV_STORE.add_message(
-                                learner_id, "chat", str(text)[:60], "user", text, conv_id=_fcid)
-                            _frep = str(_reply or "").strip()[:2000] or f"（文件操作：{_intent.value}）"
-                            _fcid = CONV_STORE.add_message(
-                                learner_id, "chat", _frep[:30], "assistant", _frep, conv_id=_fcid)
-                            SESSIONS[f"conv_{learner_id}"] = _fcid
-                    except Exception as _fe2:
-                        print(f"[PAEG] chat_stream 文件操作保存会话失败: {_fe2}")
-                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _reply, 'step_type': 'file_' + _intent.value}, ensure_ascii=False)}\n\n"
-                    yield f"event: done\ndata: {json.dumps({'status': 'completed', 'file_op': _intent.value, 'retriever': _mode}, ensure_ascii=False)}\n\n"
-                return Response(gen_file_op(), mimetype="text/event-stream",
-                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception as _fe:
-        print(f"[PAEG] 文件操作处理失败（降级普通对话）: {_fe}")
+    _file_resp = _try_file_operation(learner_id, text, llm)
+    if _file_resp is not None:
+        return _file_resp
 
     # 三层记忆
     mem_ctx = ""
@@ -3260,9 +3336,17 @@ def general_chat():
         # 兜底：原启发式搜索 + 普通对话
         search_result = None
         try:
-            from web_search_tool import should_search, web_search
+            from web_search_tool import should_search, web_search_multi
             if should_search(text):
-                search_result = web_search(text, max_results=5)
+                # v0.44 ⭐ 升级：单查询 → 多查询词联想（LLM 联想查询词 → 丰富结果）
+                _multi = web_search_multi(
+                    text, llm=llm, subject=subject,
+                    n_queries=4, per_query=3, max_total=10,
+                )
+                if _multi:
+                    search_result = "\n\n".join(
+                        f"[来源 {i+1}] {it['title']}\nURL: {it['url']}\n{it['content']}"
+                        for i, it in enumerate(_multi))
         except Exception:
             search_result = None
         if search_result:
