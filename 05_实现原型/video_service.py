@@ -163,6 +163,64 @@ async def _tts_to_file(text: str, path: str) -> bool:
 
 
 # ── 主入口 ──────────────────────────────────────
+def _generate_teaching_script(topic: str, outline: str, llm=None) -> list:
+    """v0.53 ⭐ Step 0：LLM 生成结构化教学演讲稿（Oracle pipeline 设计）。
+
+    输入 topic + outline（原始教学意图），输出每页完整 narration（讲解词）。
+    每页 narration 是视频的内容支撑——标题/画面/配音/字幕都从它派生。
+
+    返回 [{title, points, narration}]；LLM 失败则用 outline 的标题+要点拼接兜底。
+    """
+    import json as _json
+    _slides = _parse_outline(outline)
+    if not _slides:
+        return []
+    if llm is not None:
+        try:
+            from subagents import _safe_chat
+            _src = "\n".join(
+                f"## {s.get('title', '')}\n" + "\n".join(f"- {p}" for p in (s.get('points') or [])[:3])
+                for s in _slides[:6])
+            _sys = (
+                "你是资深教学视频撰稿人。为下面的教学主题/大纲撰写**结构化演讲稿**。\n"
+                "要求：\n"
+                "1. 每页输出完整讲解词（narration），口语化、适合朗读，逻辑递进\n"
+                "2. 讲解顺序：问题引入 → 概念 → 例子 → 练习/总结\n"
+                "3. 页与页之间有过渡语（'上一页我们知道了…接下来…'）\n"
+                "4. 公式解释变量含义，不照搬标题/要点\n"
+                "5. 输出 JSON 数组：[{\"title\": \"页标题\", \"narration\": \"完整讲解词\"}]\n"
+                "6. 只输出 JSON，不要多余文字"
+            )
+            _u = f"主题：{topic}\n大纲：\n{_src}"
+            _r = _safe_chat(llm, _sys, _u, max_tokens=1500)
+            if _r:
+                _clean = _r.strip()
+                if _clean.startswith("```"):
+                    _clean = _clean.split("```")[1]
+                    if _clean.startswith("json"):
+                        _clean = _clean[4:]
+                _parsed = _json.loads(_clean.strip())
+                if isinstance(_parsed, list) and _parsed:
+                    _out = []
+                    for _p in _parsed:
+                        if isinstance(_p, dict) and _p.get("narration"):
+                            _out.append({
+                                "title": str(_p.get("title") or "未命名页"),
+                                "points": _slides[len(_out)]["points"] if len(_out) < len(_slides) else [],
+                                "narration": str(_p["narration"]),
+                            })
+                    if _out:
+                        return _out
+        except Exception as _se:
+            print(f"[PAEG][video_service] 演讲稿生成失败，用大纲兜底: {_se}")
+    # 兜底：标题 + 要点拼接（原有行为）
+    for _s in _slides:
+        _t = _s.get("title") or "未命名页"
+        _pts = _s.get("points") or []
+        _s["narration"] = f"{_t}。{'，'.join(_pts[:4])}" if _pts else f"{_t}。"
+    return _slides
+
+
 def generate_teaching_video(topic: str, outline: str,
                             learner_id: str = "anon") -> dict:
     """PPT 大纲 → 授课视频 mp4。
@@ -182,6 +240,14 @@ def generate_teaching_video(topic: str, outline: str,
         return {"ok": False, "path": "", "url": "", "slides": 0, "duration": 0,
                 "error": "大纲为空"}
 
+    # v0.53 ⭐ Step 0：LLM 生成结构化演讲稿（每页 narration 驱动内容/时长/字幕）
+    try:
+        from infra.runtime import get_llm
+        _vllm = get_llm()
+    except Exception:
+        _vllm = None
+    slides = _generate_teaching_script(topic, outline, llm=_vllm)
+
     import asyncio
     _VIDEO_DIR.mkdir(parents=True, exist_ok=True)
     _h = hashlib.sha1((topic + str(time.time())).encode("utf-8")).hexdigest()[:10]
@@ -191,7 +257,7 @@ def generate_teaching_video(topic: str, outline: str,
 
     tmp = Path(tempfile.mkdtemp(prefix="paeg_video_"))
     try:
-        # 1. 每页：绘制帧 + 生成音频 + 测音频时长
+        # 1. 每页：绘制帧 + 生成音频（narration 驱动）+ 测音频时长
         frame_files, audio_files, durations = [], [], []
         for i, sl in enumerate(slides):
             title = sl.get("title") or "未命名页"
@@ -201,8 +267,9 @@ def generate_teaching_video(topic: str, outline: str,
             frame.save(fp)
             frame_files.append(str(fp))
 
-            # 讲解文本：标题 + 要点（自然拼接成解说词）
-            narration = f"{title}。{'，'.join(points[:4])}" if points else f"{title}。"
+            # v0.53 ⭐ 讲解文本 = 演讲稿 narration（非标题+要点拼接）
+            narration = (sl.get("narration") or "").strip() or \
+                f"{title}。{'，'.join(points[:4])}" if points else f"{title}。"
             ap = tmp / f"audio_{i:03d}.mp3"
             ok = asyncio.run(_tts_to_file(narration, str(ap)))
             if ok:
