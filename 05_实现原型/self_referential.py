@@ -180,6 +180,11 @@ INTERFACE_QUERY_PATTERNS = [
     r"(怎么|如何).{0,4}(做|生成|创建).{0,4}(ppt|PPT|演示文稿|课件|幻灯片)",
     r"(怎么看|查|有没有).{0,4}(天气|气象|温度)|天气(怎么|按钮|在哪)",
     r"(帮我|请).{0,4}(分析|解释|看看|理解).{0,4}(这段话|这段代码|这个文章|这段文字|这个作业)",
+    # v6.0 ⭐ P2 修复：身份/能力自陈问题——"你能做什么"是询问 AI 能力，
+    # 应走 interface（identity 桶）。"你学过什么/你会什么"指 AI 掌握的知识
+    # → 属知识库清点（走 knowledge），不走 interface。这符合用户语义。
+    r"你(能|会)(做|提供|帮)(什么|哪些|啥)",
+    r"(你是谁|你叫什么|你的名字|你是什么|你是一个什么)",
 ]
 INTERFACE_COMPILED = [re.compile(p, re.IGNORECASE) for p in INTERFACE_QUERY_PATTERNS]
 
