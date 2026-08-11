@@ -29,6 +29,12 @@ _C_KEYWORDS = (
     "简短", "简洁", "少说", "概括", "一句话", "只讲", "不要深入",
     "表面理解", "定义即可", "大概", "浅一点",
 )
+# v0.46.2 ⭐ 修复（memo/016）：正向深度信号——用户要"深入/讲透/本质/研究级"时
+# 也应放开 C 组（允许 LLM 讲深，而非被深度约束限制在浅层）
+_C_DEEP_KEYWORDS = (
+    "深入", "透彻", "讲透", "本质", "详细", "研究级", "底层原理",
+    "彻底", "深挖", "刨根问底", "核心机制", "内在逻辑",
+)
 
 
 def detect_constraint_flags(
@@ -73,6 +79,9 @@ def detect_constraint_flags(
     except Exception:
         pass
     if any(kw in t for kw in _C_KEYWORDS):
+        flags.add("C")
+    # v0.46.2 ⭐ 正向深度信号：用户要"深入/讲透/本质" → 放开 C（允许讲深）
+    if any(kw in t for kw in _C_DEEP_KEYWORDS):
         flags.add("C")
 
     return tuple(sorted(flags))

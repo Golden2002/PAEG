@@ -1535,6 +1535,7 @@ def teach_stream():
         if _pending_steps:
             plan = {"steps": _pending_steps}
             SESSIONS.pop(f"teach_plan_{learner_id}", None)  # 取走即清（本轮再存新的）
+            SESSIONS.pop(f"teach_plan_done_{learner_id}", None)  # v0.46.2 修复：同步清 done 标志
             # 续讲轮：不重复诊断（诊断已在首轮完成），只推进剩余步骤
             yield f"event: plan\ndata: {json.dumps({'status': 'continuing', 'steps_left': len(_pending_steps)}, ensure_ascii=False)}\n\n"
         else:
