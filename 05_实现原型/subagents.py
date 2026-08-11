@@ -162,6 +162,27 @@ def _llm_choose_retrieval_scope(question: str, llm, subject: str = None,
                           if s in ("public", "subject", "user", "web")]
                 _kw = [str(k).strip()[:20] for k in (_parsed.get("keywords") or [])]
                 _kw = list(dict.fromkeys(k for k in _kw if k))[:3]
+                # v0.45 ⭐ E2E 修复：LLM 偶发返回"问题不明确,请重新提问"等垃圾关键词
+                # → 无检索（sources=0）。过滤无效词，全无效则用原文 jieba 核心词兜底。
+                _junk = ("问题不明确", "请重新提问", "无法确定", "不清楚", "需要更多",
+                         "重新提问", "not clear", "please ask", "n/a", "null", "none",
+                         # v0.45 ⭐ 加强：LLM 偶发返回元话语（非真实关键词）
+                         "检索规划", "资料可选", "无法回答", "信息不足", "无法处理",
+                         "已收录", "可选范围", "根据问题", "待确认", "无关键词",
+                         "search", "retrieval", "plan", "keyword", "none")
+                _kw = [k for k in _kw if not any(j in k.lower() for j in _junk)]
+                # 额外：纯标点/无实义词 → 丢弃
+                _kw = [k for k in _kw if any('\u4e00' <= c <= '\u9fff' for c in k)]
+                if not _kw:
+                    try:
+                        import jieba
+                        _toks = [w for w in jieba.lcut(str(question or ""))
+                                 if len(w.strip()) >= 2]
+                    except Exception:
+                        _toks = []
+                    _stop = {"什么是", "是什么", "什么", "如何", "怎样", "为什么",
+                             "的", "了", "在", "与", "和", "请", "一下", "帮我"}
+                    _kw = [w for w in _toks if w not in _stop][:3]
                 if _valid:
                     return {"scope": _valid[0], "scopes": _valid,
                             "keywords": _kw, "source": "llm"}
@@ -361,6 +382,76 @@ def _safe_chat_with_retrieval(model, system: str, user: str = None,
             system = system + retrieval
     return _safe_chat(model, system, user=user, messages=messages,
                       max_tokens=max_tokens, tools=tools, tool_choice=tool_choice)
+
+
+# ─────────────────────────────────────
+# v0.45 ⭐ 工具调用执行循环（E2E 修复：answer 端点 500）
+# ─────────────────────────────────────
+def _execute_tool_calls(model, answer: Optional[str], question: str,
+                        system: str, user: str, history: list = None) -> Optional[str]:
+    """检测 LLM 返回的工具调用 JSON，实际执行工具并回传结果生成最终答案。
+
+    背景：AnswerSolver 暴露 tools（solve_problem/verify_math/web_search），
+    但 LLM 有时返回 {"tool_calls":[...]} 而未执行 → 原始 JSON 当答案返回
+    （answer 端点 500 根因）。此函数：
+      1. 若 answer 是工具调用 JSON → 逐个执行工具 → 把结果注入 user prompt
+      2. 再调一次 LLM 基于工具结果生成最终答案
+      3. 非工具调用 JSON → 原样返回
+    """
+    import json as _json
+    import re as _re
+    if not answer or not str(answer).strip().startswith("{"):
+        return answer
+    try:
+        _parsed = _json.loads(str(answer))
+    except Exception:
+        return answer
+    _calls = (_parsed or {}).get("tool_calls") if isinstance(_parsed, dict) else None
+    if not _calls:
+        return answer
+
+    _results = []
+    for _c in _calls:
+        try:
+            _name = _c.get("name") or (_c.get("function") or {}).get("name") or ""
+            _args_raw = _c.get("arguments") or ""
+            if isinstance(_args_raw, str):
+                _args = _json.loads(_args_raw) if _args_raw.strip() else {}
+            else:
+                _args = _args_raw or {}
+            _out = ""
+            if _name == "solve_problem":
+                from problem_solver import solve_problem
+                _r = solve_problem(model, _args.get("problem") or question,
+                                   subject=_args.get("subject") or "math",
+                                   grade_level=_args.get("grade_level") or "high_school")
+                _out = str(_r.get("answer") or "")[:1500]
+            elif _name == "verify_math":
+                from verify_math import verify_expression
+                _out = str(verify_expression(_args.get("expression") or ""))[:500]
+            elif _name == "web_search":
+                from web_search_tool import web_search
+                _out = str(web_search(_args.get("query") or question, 3))[:1200]
+            else:
+                _out = f"（工具 {_name} 执行结果未知）"
+            _results.append(f"[工具 {_name} 结果]\n{_out}")
+        except Exception as _te:
+            _results.append(f"[工具 {_c.get('name', '')} 执行失败] {_te}")
+
+    # 把工具结果注入，再调 LLM 生成最终答案
+    _tool_ctx = "\n\n".join(_results) if _results else "（工具执行无输出）"
+    _final_user = (
+        f"{user}\n\n[工具执行结果]\n{_tool_ctx}\n\n"
+        "请基于以上工具结果，直接给出完整、规范的答案（不要重复工具调用）。"
+    )
+    try:
+        _final = _safe_chat(model, system, user=_final_user, max_tokens=1800)
+        if _final:
+            return _final
+    except Exception:
+        pass
+    # 兜底：把工具结果当答案
+    return _tool_ctx[:1800]
 
 
 # v0.21.5：泄漏特征检测（系统提示词外泄 / 自称其他模型 / 元指令串扰）
@@ -1402,6 +1493,10 @@ class AnswerSolver:
             answer = _safe_chat_with_retrieval(
                 model, system, user, subject=subject,
                 max_tokens=1800, tools=_tools)
+        # v0.45 ⭐ E2E 修复：LLM 可能返回工具调用 JSON（{"tool_calls":[...]}）而
+        # 未执行工具 → 原始 JSON 当答案返回（answer 端点 500）。
+        # 此处检测工具调用串并实际执行 solve_problem/verify_math，回传结果再生成最终答案。
+        answer = _execute_tool_calls(model, answer, question, system, user, history)
         if not answer:
             answer = f"（找答案模式生成失败，请重试）\n问题：{question}"
         return {"answer": answer, "mode": "answer"}

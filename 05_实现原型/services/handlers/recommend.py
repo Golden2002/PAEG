@@ -19,11 +19,16 @@ def _handle_recommend_query(learner, question, subject, llm_arg):
     results_text = ""
     web_ok = False
     try:
-        from web_search_tool import web_search
-        search_q = f"{question} 推荐 排名 对比"
-        raw = web_search(search_q, max_results=5)
-        web_ok = bool(raw) and ("搜索未返回" not in raw)
-        results_text = raw or ""
+        # v0.45 ⭐ 修复：单查询 → 多查询词检索（RRF 融合，结果更丰富）
+        from web_search_tool import web_search_multi
+        _q = f"{question} 推荐 排名 对比"
+        _items = web_search_multi(_q, llm=None, subject=subject or "",
+                                  n_queries=3, per_query=5, max_total=10)
+        if _items:
+            results_text = "\n\n".join(
+                f"[来源 {i+1}] {it['title']}\nURL: {it['url']}\n{it['content']}"
+                for i, it in enumerate(_items))
+            web_ok = True
     except Exception:
         results_text, web_ok = "", False
 

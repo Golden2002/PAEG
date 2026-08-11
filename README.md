@@ -107,6 +107,12 @@ python server.py
 python -m pytest tests -q
 python -m pytest "..\06_测试与验证\tests\test_paeg_v0_5.py" -q
 
+# 5.1 测试哲学（v0.45 ⭐ 既测功能有无，也测功能好坏 —— memo/010）
+#    LLM 驱动功能（联网检索/PPT/视频/教学）必须双维度验证：
+#    - 有无：路由存在/返回 200/结构正确（audit + 契约 + 单元）
+#    - 好坏：检索条数≥5/相关性/内容长度/PPT 大纲结构（质量测试 test_quality_*）
+#    "能用就行"不算完成——质量未达 KPI = 缺陷。详见 memo/010 + 维护手册 §3.5
+
 # 6. 多轮提示词注入实验（v0.20.4 ⭐ 验证多轮对话无退化）
 python multi_turn_eval.py --mode all
 #   5 维度：退化/决策/语言风格/harness约束/tool use

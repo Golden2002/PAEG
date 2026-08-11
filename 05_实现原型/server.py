@@ -204,6 +204,10 @@ def _set_constraint_flags(learner, user_text: str, mode: str, affection: bool = 
     从用户输入/问卷检测 DIRECT/EMOTION/PREF → 存入 learner._constraint_flags，
     供 build_presenter_system/build_general_chat_system 的 constraint_flags 消费。
     """
+    # v0.45 ⭐ E2E 修复：learner 可能为 None（未注册用户，SESSIONS 无该 id）——
+    # 此前 except 分支 learner._constraint_flags=() 对 None 抛 AttributeError → answer 500。
+    if learner is None:
+        return
     try:
         from utils.constraint_signals import detect_constraint_flags
         _cf = detect_constraint_flags(
@@ -214,7 +218,10 @@ def _set_constraint_flags(learner, user_text: str, mode: str, affection: bool = 
         learner._constraint_flags = _cf  # type: ignore[attr-defined]
     except Exception as _e:
         logger.warning("约束掩码检测失败: %s", _e)
-        learner._constraint_flags = ()  # type: ignore[attr-defined]
+        try:
+            learner._constraint_flags = ()  # type: ignore[attr-defined]
+        except Exception:
+            pass
 
 
 def _try_file_operation(learner_id: str, text: str, llm):
@@ -2281,6 +2288,30 @@ def voice_tts():
     if url:
         return jsonify({"ok": True, "url": url})
     return jsonify({"ok": False, "error": "语音合成失败"}), 500
+
+@app.route("/api/teach/video", methods=["POST"])
+@require_module("voice")
+def teach_video():
+    """v0.45 ⭐ 授课视频生成：PPT 大纲 → 教学视频（画面 + 语音讲解）。
+
+    请求：{topic, outline, learner_id} —— outline 为 "## 章节 + - 要点" 结构
+    （可与 /api/resources 的 ppt_outline 或 LLM 生成的大纲直接复用）。
+    响应：{ok, url, slides, duration} —— url 可下载播放 mp4。
+    """
+    data = request.get_json(force=True) or {}
+    topic = (data.get("topic") or "").strip() or "授课内容"
+    outline = (data.get("outline") or "").strip()
+    learner_id = data.get("learner_id") or "anon"
+    if not outline:
+        return jsonify({"ok": False, "error": "outline is required"}), 400
+    try:
+        from video_service import generate_teaching_video
+        result = generate_teaching_video(topic, outline, learner_id)
+        if result.get("ok"):
+            return jsonify(result)
+        return jsonify({"ok": False, "error": result.get("error") or "视频生成失败"}), 500
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"授课视频生成异常: {e}"}), 500
 
 @app.route("/api/voice/stt", methods=["POST"])
 @require_module("voice")
