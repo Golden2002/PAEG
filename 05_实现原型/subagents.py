@@ -1725,7 +1725,29 @@ class AffectionSupportor:
             "5. risk（风险等级自检）：本轮属于 0-5 哪一级？决定下一步。\n"
             "6. real_world_anchor（现实连接）：本次至少有一个指向真实关系/地点/行动的句子。"
         )
-        user = f"学生说：{text}"
+        # v0.46 ⭐ P0 修复（memo/014 根因 2）：多轮状态推进——此前 user 只含当前句
+        # （LLM 看不到前几轮 → 每次输出同类承接模板，无澄清/分离/行动闭环）。
+        # 现注入对话历史（最近 6 轮）+ 明确的阶段推进指令。
+        _hist_block = ""
+        if history:
+            _recent = [h for h in history[-6:]]
+            _hist_lines = []
+            for _h in _recent:
+                _c = _h.get("content", "") if isinstance(_h, dict) else str(_h)
+                if _c:
+                    _hist_lines.append(f"- {_c[:120]}")
+            if _hist_lines:
+                _hist_block = "\n\n[最近对话]\n" + "\n".join(_hist_lines)
+        user = (
+            f"学生说：{text}"
+            f"{_hist_block}\n\n"
+            "## 本轮任务（v0.46 状态推进）\n"
+            "根据最近对话判断当前处在哪一阶段，只推进**一步**：\n"
+            "1. 若学生刚开始倾诉（或你在承接）→ 承接 + 澄清一个具体问题（开放式，不替 ta 定义情绪）\n"
+            "2. 若已在澄清 → 允许 ta 修正你的理解，或分离'事实'与'自我评价'（如'这次没考好'≠'我不聪明'）\n"
+            "3. 若已分离 → 给 2-3 个可行动方向，让 ta 选择（重新获得行动能力）\n"
+            "不要重复上一轮已说的话，不要连续输出同类承接模板。"
+        )
         # v0.37 ⭐ Oracle 方案 C：风险分级注入（替代二元 crisis_context，向后兼容）
         # 关键词毫秒级分级 + opt_out 结构化判断；level>=3 强制资源，opt_out 不可压制
         # v0.37.1 ⭐ Oracle P0-3 修复：RiskClassifier 异常时保守回退到 3 级（宁可误报不漏报），
