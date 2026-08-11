@@ -61,24 +61,43 @@ def _bing_search(query: str, max_results: int = MAX_RESULTS) -> List[dict]:
         return []
 
     results = []
-    # 每个结果块：<li class="b_algo"> ... </li>
-    blocks = re.findall(r'<li class="b_algo".*?</li>', html, re.S)
-    for blk in blocks[:max_results]:
-        # 标题
-        tm = re.search(r'<h2[^>]*>.*?<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', blk, re.S)
-        if not tm:
-            continue
-        url = tm.group(1)
-        title = re.sub(r'<[^>]+>', '', tm.group(2)).strip()
-        # 摘要
-        sm = re.search(r'<p[^>]*>(.*?)</p>', blk, re.S)
-        snippet = re.sub(r'<[^>]+>', '', sm.group(1)).strip() if sm else ""
-        if url and title:
-            results.append({
-                "title": title[:150],
-                "url": url[:300],
-                "content": snippet[:MAX_SNIPPET],
-            })
+    # v0.53 ⭐ 翻页抓取：Bing 单页约 10 条 b_algo，请求 >10 时翻第 2 页（&first=11）合并
+    _pages = 1
+    if max_results > 10:
+        _pages = 2  # 最多翻 2 页（~20 条）
+    for _page in range(_pages):
+        _params = {"q": query, "setlang": "zh-hans", "setmkt": "zh-CN",
+                   "count": str(max_results), "ensearch": "0"}
+        if _page > 0:
+            _params["first"] = str(_page * 10 + 1)
+        try:
+            _r = requests.get(
+                "https://www.bing.com/search",
+                params=_params,
+                headers={"User-Agent": _UA},
+                timeout=8,
+            )
+            _r.raise_for_status()
+            _html = _r.text
+        except Exception:
+            break
+        _blocks = re.findall(r'<li class="b_algo".*?</li>', _html, re.S)
+        for blk in _blocks[:max_results]:
+            tm = re.search(r'<h2[^>]*>.*?<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', blk, re.S)
+            if not tm:
+                continue
+            url = tm.group(1)
+            title = re.sub(r'<[^>]+>', '', tm.group(2)).strip()
+            sm = re.search(r'<p[^>]*>(.*?)</p>', blk, re.S)
+            snippet = re.sub(r'<[^>]+>', '', sm.group(1)).strip() if sm else ""
+            if url and title and not any(r0["url"] == url for r0 in results):
+                results.append({
+                    "title": title[:150],
+                    "url": url[:300],
+                    "content": snippet[:MAX_SNIPPET],
+                })
+            if len(results) >= max_results:
+                break
     # 过滤掉完全不含查询关键词的结果（低质量）
     # v0.44 ⭐ 修复：中文连续文本（无空格）此前只算 1 个词 → 过滤失效；
     # 现：jieba 切词 + 空格/标点切分双保险，保证过滤真实生效且不误杀。
@@ -406,25 +425,29 @@ def expand_queries(question: str, llm=None, n: int = 5, subject: str = "") -> li
             )
             _sys = (
                 "## 角色\n"
-                "你是专业的网络检索关键词规划师（Query Planner）。你的唯一任务："
-                "把学生的一句话提问，转化为一组高质量的中文检索查询词，"
-                "让搜索引擎返回最相关、最丰富的结果。\n\n"
+                "你是专业的网络检索关键词规划师（Query Planner）。这是一个**中间过程**——"
+                "你的唯一输出就是关键词列表，直接给关键词，不要任何解释或额外文本。\n\n"
+                "## 任务\n"
+                "把学生的一句话提问，转化为一组**高质量的中英双语检索关键词**，"
+                "让搜索引擎（Bing/Tavily）返回最相关、最丰富的结果。\n\n"
                 "## 输入素材\n"
-                "系统已把提问切分为 4 种粒度的素材（单字词 / 多字词 / 标点分段短语 / 完整原文），"
-                "你从中挑选、组合、改写，而非凭空编造。\n\n"
+                "系统已把提问切分为 4 种粒度的中文素材（单字词 / 多字词 / 标点分段短语 / 完整原文）。\n\n"
                 "## 输出要求（必守）\n"
-                f"1. 恰好 {n} 个查询词，覆盖不同检索角度（概念定义 / 原理机制 / 应用案例 / 最新进展，按问题性质取舍）\n"
-                "2. 长短结合：至少 1 个极短查询（2-4 字，如『热力学 熵』），至少 1 个完整句查询\n"
-                "3. 保留学科核心词：学科已知时（" + _subj + "），查询词必须融入该学科术语\n"
-                "4. 每个查询词 2-15 字，独立完整、可直接提交搜索引擎，禁止带标点结尾\n"
-                "5. 只输出 JSON 数组（如 [\"词1\", \"词2\"]），不要任何解释"
+                f"1. 恰好 {n} 个查询词，**中英双语混合**：至少 2 个中文查询 + 至少 1 个英文查询\n"
+                "2. 英文查询 = 把中文提问**翻译成英文专业术语**（如'哲学入门'→ philosophy for beginners / introduction to philosophy）\n"
+                "3. 覆盖不同检索角度（概念定义 / 原理机制 / 应用案例 / 最新进展）\n"
+                "4. 长短结合：至少 1 个极短查询（2-4 字中文 或 2-4 词英文），至少 1 个完整句查询\n"
+                "5. 保留学科核心词：学科已知时（" + _subj + "），查询词必须融入该学科术语\n"
+                "6. 每个查询词独立完整、可直接提交搜索引擎，禁止带标点结尾\n"
+                "7. 只输出 JSON 数组（如 [\"哲学 入门\", \"philosophy beginners\"]），**不要任何解释**"
             )
             _user = (
                 f"[学生提问]\n{_q[:200]}\n\n"
                 f"[学科]\n{_subj if _subj else '未知'}\n\n"
-                f"[切分素材（短→长）]\n{_bank_repr}"
+                f"[中文切分素材（短→长）]\n{_bank_repr}\n\n"
+                "[注意] 你是关键词规划师：请直接输出关键词 JSON，这是中间过程，无需向用户解释。"
             )
-            _r = _safe_chat(llm, _sys, _user, max_tokens=240)
+            _r = _safe_chat(llm, _sys, _user, max_tokens=300)
             if _r:
                 import json as _json
                 _clean = _r.strip()
@@ -497,10 +520,22 @@ def _normalize_url(url: str) -> str:
 
 
 def _jaccard_relevance(question: str, item: dict) -> float:
-    """相关性打分（v0.45 ⭐ 调研落地）：核心词命中 + 标题匹配 + 内容长度。"""
+    """相关性打分（v0.53 ⭐ 修复：jieba 核心词，去噪音）。
+
+    v0.45 版逐字符取词（中文单字 len<2 全滤 → 判分失效 → 噪音混入）。
+    v0.53：用 jieba 切出 2-6 字核心词判相关，去"智联招聘"类无关结果。
+    """
     import re as _re2
-    _q = _re2.sub(r"[\s，。；、？?！!：:]+", "", str(question or ""))
-    _toks = [w for w in _q if len(w) >= 2]
+    _toks = []
+    try:
+        import jieba
+        _toks = [w for w in jieba.lcut(str(question or ""))
+                 if 2 <= len(w) <= 6 and not _re2.fullmatch(r'[\W\d_]+', w)]
+    except Exception:
+        pass
+    _stop = {"什么是", "是什么", "什么", "如何", "怎样", "为什么", "的", "了", "在", "与", "和",
+             "推荐", "方法", "技巧", "介绍", "请", "一下", "帮我", "哪些"}
+    _toks = [w for w in _toks if w not in _stop][:5]
     if not _toks:
         return 0.5
     _title = str(item.get("title", ""))
@@ -509,8 +544,8 @@ def _jaccard_relevance(question: str, item: dict) -> float:
     _hits = sum(1 for w in _toks if w in _hay)
     if _hits == 0:
         return 0.0
-    _score = min(1.0, _hits / 3.0)  # 3 个核心词全中 = 1.0
-    # 标题直接含问题词 = 强相关
+    _score = min(1.0, _hits / 2.0)  # 2 个核心词全中 = 1.0
+    # 标题直接含核心词 = 强相关
     if any(w in _title for w in _toks[:3]):
         _score = max(_score, 0.8)
     # 内容太短 = 质量差
@@ -542,28 +577,38 @@ def web_search_multi(question: str, llm=None, subject: str = "", n_queries: int 
     _docmap = {}                 # url -> item
 
     def _fetch_one(_q):
-        try:
-            # Bing 对连续中文分词差 → 先 _shorten_query 切出空格分隔短词
-            _sq = _shorten_query(_q)
-            _query = _sq if _sq else _q
-            _res = web_search(_query, max_results=per_query)
-        except Exception:
-            return []
-        if not _res or "未返回" in str(_res) or "未找到" in str(_res):
-            return []
+        # v0.53 ⭐ 多轮变体：每查询尝试 2-3 个变体（原词 + shorten + 学科组合），
+        # 合并去重（5 主题 × 3 轮 = 15 次请求 → 可达 20+ 条）
+        _variants = [_q]
+        _sq = _shorten_query(_q)
+        if _sq and _sq != _q:
+            _variants.append(_sq)
+        if subject:
+            _variants.append(f"{subject} {_q[:30]}")
         _items = []
-        for _blk in str(_res).split("\n\n"):
-            _m = _re.search(r"URL:\s*(\S+)", _blk)
-            if not _m:
+        for _v in _variants[:3]:
+            try:
+                _res = web_search(_v, max_results=per_query)
+            except Exception:
                 continue
-            _url = _m.group(1)[:300]
-            _t = _re.match(r"\[来源 \d+\]\s*(.+)", _blk.strip())
-            _snippet = _blk.split("URL:", 1)[-1].split("\n", 1)[-1].strip()
-            _items.append({
-                "title": (_t.group(1).strip() if _t else "")[:200],
-                "url": _url,
-                "content": (_snippet or "")[:500],
-            })
+            if not _res or "未返回" in str(_res) or "未找到" in str(_res):
+                continue
+            for _blk in str(_res).split("\n\n"):
+                _m = _re.search(r"URL:\s*(\S+)", _blk)
+                if not _m:
+                    continue
+                _url = _m.group(1)[:300]
+                if any(it.get("url") == _url for it in _items):
+                    continue
+                _t = _re.match(r"\[来源 \d+\]\s*(.+)", _blk.strip())
+                _snippet = _blk.split("URL:", 1)[-1].split("\n", 1)[-1].strip()
+                _items.append({
+                    "title": (_t.group(1).strip() if _t else "")[:200],
+                    "url": _url,
+                    "content": (_snippet or "")[:500],
+                })
+                if len(_items) >= per_query * 2:
+                    break
         return _items
 
     # v0.44 ⭐ 并行检索（最多 4 线程），整体受硬超时保护
