@@ -98,9 +98,13 @@ def _handle_method_advice(learner, concept, subject):
     # 换 _safe_chat_with_retrieval（内部 _pre_retrieve 检索 KB+Library+用户资料）。
     try:
         from subagents import _safe_chat_with_retrieval
+        # v0.44 ⭐ 修复：传 tools（含 web_search）——此前未传 → LLM 无联网工具，
+        # 学习方法建议全靠训练知识。现 LLM 可主动联网检索最新学习方法/资料。
+        from tool_registry import get_tool_defs
         answer = _safe_chat_with_retrieval(
             llm, system, user=user, subject=subject,
-            max_tokens=1400, learner=learner, llm=llm)
+            max_tokens=1400, learner=learner, llm=llm,
+            tools=get_tool_defs())
     except Exception:
         answer = _safe_chat(llm, system, user, max_tokens=1400)
     if not answer:

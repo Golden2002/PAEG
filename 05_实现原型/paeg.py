@@ -12,6 +12,7 @@ from knowledge_base import KnowledgeBase
 from subagents import (
     Diagnostor, Planner, Presenter, Evaluator, Adapter,
     AnswerSolver, AffectionSupportor, SelfUpdateAgent, Individuality,
+    ResourceLibrarian,
 )
 from world_view import select_tone
 from self_update import SelfUpdater
@@ -89,6 +90,10 @@ class PAEG:
         self._self_update_agent_loaded = False
         # 9. 个体化（聚合 16 维画像 + 控制 LLM 教学）
         self.individuality = Individuality()
+        # 10. 资料检索员（v0.43 ⭐ P0-C 提升：从"按请求构造"升级为全局持有）
+        # ResourceLibrarian 构造无状态（仅绑定 model/kb），用户隔离靠 run(learner=...) 参数，
+        # 因此全局持有完全安全——真正实现"9+1 全持有"，不再每请求 new 实例。
+        self.resource_librarian = ResourceLibrarian(model=model_api, kb=knowledge_base)
         self.self_updater = SelfUpdater(knowledge_base) if enable_self_update else None
         # v0.12：语言优化 Agent（薇依语料矫正，去除 AI 痕迹）
         self.refiner = None

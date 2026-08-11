@@ -36,10 +36,20 @@ FALLBACK_DOWNLOAD_DIR: str = str(PROJECT_DIR / "downloads")
 # ---------------------------------------------------------------------------
 
 # P0-2 安全基线: 生产必须设置 PAEG_SECRET_KEY; 开发默认值仅供本地启动
+# v0.43 ⭐ P0-E 升级：双轨制——PAEG_ENV=production 时强制 KeyError（堵生产裸跑漏洞），
+# 开发环境（development 默认）保留默认值丝滑启动，不破坏现有部署。
+PAEG_ENV: str = os.environ.get("PAEG_ENV", "development")
 SECRET_KEY: str = os.environ.get("PAEG_SECRET_KEY", "dev-insecure-change-me")
 
 # 是否使用开发默认值(启动期打印警告用, server.py 读取此 flag)
 SECRET_KEY_IS_DEV_DEFAULT: bool = SECRET_KEY == "dev-insecure-change-me"
+
+# 生产环境强制密钥（fail-fast：缺失即启动失败，防裸跑）
+if PAEG_ENV == "production" and SECRET_KEY_IS_DEV_DEFAULT:
+    raise RuntimeError(
+        "[PAEG][SECURITY] PAEG_ENV=production 时必须设置 PAEG_SECRET_KEY 环境变量！"
+        "（复制 .env.example 并填写随机字符串）"
+    )
 
 
 # ---------------------------------------------------------------------------

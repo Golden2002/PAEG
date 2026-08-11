@@ -818,17 +818,18 @@ class ResourceLibrarian:
             pass
         return out
 
-    def _search_web(self, question: str, keywords: list, max_results: int = 3) -> list:
-        """互联网检索（web_search tool；无工具时返回空）。
+    def _search_web(self, question: str, keywords: list, max_results: int = 3,
+                    llm=None, subject: str = "") -> list:
+        """互联网检索（v0.44 ⭐ P0 修复：多查询词联想 → 丰富网页）。
 
         v0.27 ⭐ 修复：web_search 返回格式化 str（LLM 工具入口），需解析为结构化 list。
-        解析失败时回退内部 _bing_search（返回 list）。
+        v0.44 ⭐ 修复：此前仅用 keywords[0] 单查询 max_results=3 → 结果贫乏且无正文。
+        现改用 web_search_multi：LLM 联想 4 个多样化查询词 → 逐一检索 → 合并去重，
+        返回可达 12 条含正文摘要的结果（PPT/资料卡片不再只有 3 个干 URL）。
         """
         out = []
         try:
-            if self.web_search is None:
-                from web_search_tool import web_search
-                self.web_search = web_search
+            from web_search_tool import web_search_multi
             _kw = keywords[0] if keywords else question[:30]
             # v0.27 ⭐ 兜底关键词清理：去掉中文停用词/功能词（无 LLM 规划时）
             if not keywords:
@@ -836,42 +837,36 @@ class ResourceLibrarian:
                 _kw = _re.sub(r"(什么是|是什么|啥是|怎么|如何|为什么|制作|ppt|PPT|演示文稿|帮我|请|一下|介绍|讲讲|说说|最近|今天|最新|新闻)", "", _kw).strip()
                 if len(_kw) < 2:
                     _kw = question[:30]
-            _res = self.web_search(_kw, max_results=max_results)
-            if isinstance(_res, list):
-                for _r in _res[:max_results]:
-                    out.append({
-                        "title": _r.get("title") or _r.get("url") or "",
-                        "url": _r.get("url") or "",
-                        "snippet": (_r.get("snippet") or _r.get("content") or "")[:150],
-                        "type": "web",
-                    })
-            elif isinstance(_res, str) and _res and "未返回" not in _res and "未找到" not in _res:
-                # 解析 "[来源 N] 标题\nURL: url\n内容" 格式
-                import re as _re
-                for _blk in _res.split("\n\n"):
-                    _m = _re.search(r"URL:\s*(\S+)", _blk)
-                    _t = _re.match(r"\[来源 \d+\]\s*(.+)", _blk.strip())
-                    if _m:
+            # v0.44 ⭐ 多查询词检索（LLM 联想查询词 → 丰富结果，含正文摘要）
+            _web_items = web_search_multi(
+                question, llm=llm, subject=subject,
+                n_queries=4, per_query=max(2, max_results), max_total=12,
+            )
+            for _r in _web_items:
+                out.append({
+                    "title": (_r.get("title") or _r.get("url") or "")[:200],
+                    "url": _r.get("url") or "",
+                    # v0.44 ⭐ 正文摘要不再截断到 150 字符（PPT 需要实质内容）
+                    "snippet": (_r.get("content") or _r.get("snippet") or "")[:500],
+                    "type": "web",
+                })
+        except Exception as _fe:
+            print(f"[PAEG][subagents.py] _search_web 异常降级单查询: {_fe}")
+            try:
+                if self.web_search is None:
+                    from web_search_tool import web_search
+                    self.web_search = web_search
+                _res = self.web_search(keywords[0] if keywords else question[:30],
+                                       max_results=max_results)
+                if isinstance(_res, list):
+                    for _r in _res[:max_results]:
                         out.append({
-                            "title": (_t.group(1) if _t else "")[:150],
-                            "url": _m.group(1)[:300],
-                            "snippet": _blk.split("URL:", 1)[-1].split("\n", 1)[-1][:150],
+                            "title": _r.get("title") or _r.get("url") or "",
+                            "url": _r.get("url") or "",
+                            "snippet": (_r.get("snippet") or _r.get("content") or "")[:150],
                             "type": "web",
                         })
-        except Exception:
-            # 兜底：直接调内部 Bing（返回 list）
-            try:
-                from web_search_tool import _bing_search
-                for _r in (_bing_search(_kw, max_results=max_results) or [])[:max_results]:
-                    out.append({
-                        "title": _r.get("title", ""),
-                        "url": _r.get("url", ""),
-                        "snippet": (_r.get("content") or "")[:150],
-                        "type": "web",
-                    })
-            except Exception as _e:
-                print(f"[PAEG][subagents.py] _search_web 异常忽略: {_e}")
-                pass
+            except Exception:
                 pass
         return out
 
@@ -909,8 +904,9 @@ class ResourceLibrarian:
             _sources += self._search_library(learner, _kw, scope=_scope)
         # 互联网（v0.27 ⭐：独立于 LLM scope——include_web=True 时始终尝试 web 检索，
         # 避免 LLM 误判"不需要 web"而完全跳过联网（前端需要"已完成网络检索"徽章））
+        # v0.44 ⭐ P0 修复：传入 llm/subject 供多查询词联想（agent 设计落地）
         if include_web:
-            _sources += self._search_web(question, _kw)
+            _sources += self._search_web(question, _kw, llm=llm, subject=subject or "")
 
         # 去重（按 url）
         _seen = set()
@@ -922,13 +918,47 @@ class ResourceLibrarian:
                 _seen.add(s["url"])
             _uniq.append(s)
 
-        # PPT 大纲（可选）：从资料标题生成
+        # PPT 大纲（可选）：v0.44 ⭐ 修复——LLM 基于检索正文生成结构化教学大纲
+        # 此前规则拼接"网页标题列表"→ PPT 只有提问做标题+网页标题做内容（用户反馈）。
+        # 现：LLM 读取 sources 正文 → 输出 "## 章节 + 要点" 大纲；LLM 不可用才规则兜底。
         _outline = ""
         if for_ppt and _uniq:
-            _lines = []
-            for s in _uniq[:6]:
-                _lines.append(f"- {s['title']}")
-            _outline = f"# {question[:20]}\n" + "\n".join(_lines)
+            try:
+                if llm is not None:
+                    from subagents import _safe_chat
+                    _ctx_lines = []
+                    for _s in _uniq[:8]:
+                        _t = (_s.get("title") or "").strip()
+                        _snip = (_s.get("snippet") or "").strip()
+                        if _t:
+                            _ctx_lines.append(f"- {_t}" + (f"：{_snip[:200]}" if _snip else ""))
+                    _ctx = "\n".join(_ctx_lines) or question
+                    _ppt_sys = (
+                        "你是 PAEG 的 PPT 大纲设计师。根据下面检索到的资料，为学生制作一份教学演示文稿大纲。\n"
+                        "要求：\n"
+                        "- 3-6 页，每页格式：\"## 页面标题\"，下面 2-4 个 \"- 要点\"\n"
+                        "- 内容来自资料正文（不要照抄 URL/标题，要提炼知识要点）\n"
+                        "- 逻辑：引入 → 核心概念 → 原理/机制 → 应用案例 → 总结\n"
+                        "- 只输出大纲文本，不要额外说明"
+                    )
+                    _outline = _safe_chat(llm, _ppt_sys, f"学生提问：{question}\n\n检索资料：\n{_ctx}", max_tokens=800)
+                    if _outline:
+                        _outline = _outline.strip()
+            except Exception as _oe:
+                print(f"[PAEG][subagents.py] PPT 大纲 LLM 生成失败，规则兜底: {_oe}")
+                _outline = ""
+            if not _outline:
+                # 规则兜底（LLM 不可用/失败）：标题 + 正文要点
+                _lines = []
+                for s in _uniq[:6]:
+                    _title = s["title"] or s["url"] or "资料"
+                    _snip = (s.get("snippet") or "").strip()
+                    if _snip:
+                        _lines.append(f"## {_title}")
+                        _lines.append(f"- {_snip[:60]}")
+                    else:
+                        _lines.append(f"## {_title}")
+                _outline = f"# {question[:20]}\n" + "\n".join(_lines)
 
         return {
             "sources": _uniq[:10],

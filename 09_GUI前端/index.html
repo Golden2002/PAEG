@@ -1593,6 +1593,13 @@ body {
       </select>
       <!-- v0.41.9 ⭐ 修复：input→textarea（input 无法换行，长文字只能横向滚动；
            现支持自动换行 + 自适应高度，用户输入长问题也能看到全部内容） -->
+      <!-- v0.44 ⭐ 指令标签栏：ChatGPT 式悬浮选项——点"查资料"激活为指令标签，输入后发送走检索 -->
+      <div class="cmd-tag-bar" id="cmd-tag-bar" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+        <span class="cmd-tag" id="cmd-tag-resource" data-cmd="resource" style="display:inline-flex;align-items:center;gap:5px;background:var(--accent);color:#fff;font-size:12px;padding:3px 10px;border-radius:12px">
+          <img class="link-icon" src="assets/icons/search.svg" alt="" style="width:12px;height:12px"/>查资料
+          <b style="cursor:pointer;margin-left:2px" title="取消查资料模式" id="cmd-tag-resource-x">×</b>
+        </span>
+      </div>
       <textarea class="question-input" id="question-input" rows="1" placeholder="输入你想学习的内容…" autocomplete="off" aria-label="输入你想学习的内容"></textarea>
       <!-- v0.40 ⭐ 录音波形指示器（豆包式：录音时显示音波动画） -->
       <div class="voice-waves" id="voice-waves" role="status" aria-label="正在录音"><span></span><span></span><span></span><span></span><span></span></div>
@@ -1628,10 +1635,7 @@ body {
       <button class="action-btn" id="act-reexplain">换一种解释</button>
       <button class="action-btn" id="act-test">测试我一下</button>
       <button class="action-btn" id="act-example">举个类似例子</button>
-      <!-- v0.x：资料检索（需求C） -->
-      <button class="action-btn" id="resource-btn" title="从知识库/资料库/互联网检索资料">
-        <img class="link-icon" src="assets/icons/search.svg" alt="" style="margin-right:4px"/>查资料
-      </button>
+      <!-- v0.44 ⭐ 查资料改为输入框上方指令标签（见 cmd-tag-bar），此处不再放发送键 -->
     </div>
 
     <div class="generate-bar">
@@ -1718,6 +1722,11 @@ const askBtn = document.getElementById('ask-btn');
     // Enter 发送（Shift+Enter 换行）——textarea 默认 Enter 换行，需拦截
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      // v0.44 ⭐ 查资料指令标签激活时：Enter 走资料检索（ChatGPT 式指令）
+      if (window._resourcesModeActive && window._resourcesModeActive()) {
+        fetchResources();
+        return;
+      }
       // v0.x ⭐ 修复：生成中按 Enter 不再静默吞掉——明确提示先停止再发
       const btn = document.getElementById('ask-btn');
       if (btn && btn.dataset && btn.dataset.generating === '1') {
@@ -4611,9 +4620,25 @@ function renderResourceCards(payload, question) {
   return div;
 }
 
-// "查资料"按钮：调 /api/resources 并渲染结果
+// "查资料"：v0.44 ⭐ 从 action-bar 发送键升级为输入框上方指令标签（ChatGPT 式）
+// 点击标签激活 → 输入内容按 Enter（或点发送）→ 走 /api/resources 检索 → 自动取消激活
+function setResourcesMode(active) {
+  const bar = document.getElementById('cmd-tag-bar');
+  const tag = document.getElementById('cmd-tag-resource');
+  if (!bar || !tag) return;
+  if (active) {
+    bar.style.display = 'flex';
+    tag.style.opacity = '1';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+window._resourcesModeActive = () => {
+  const bar = document.getElementById('cmd-tag-bar');
+  return !!bar && bar.style.display === 'flex';
+};
+
 async function fetchResources() {
-  const btn = document.getElementById('resource-btn');
   const question = (questionInput.value || '').trim();
   if (!question) {
     addMsg('paeg', '请先在输入框写下你要查的主题，例如：<i>什么是贝叶斯定理？</i>');
@@ -4626,10 +4651,11 @@ async function fetchResources() {
   const subjectEl = document.getElementById('subject-select');
   const subfieldEl = document.getElementById('subfield-select');
 
-  if (btn) btn.disabled = true;
   // 用户问句（也作为新消息气泡，让对话流连贯）
   addMsg('user', escapeHtml(question));
   const progress = addResourceProgress(question);
+  // v0.44 ⭐ 发送后自动取消查资料指令标签
+  setResourcesMode(false);
 
   try {
     const resp = await api('/api/resources', {
@@ -4650,12 +4676,29 @@ async function fetchResources() {
   } catch (e) {
     removeResourceProgress(progress);
     addMsg('paeg', `资料检索失败：${escapeHtml(e.message || String(e))}<br><small>请确认后端已实现 POST /api/resources（ResourceLibrarian subagent）。</small>`);
-  } finally {
-    if (btn) btn.disabled = false;
   }
 }
 
-document.getElementById('resource-btn').addEventListener('click', fetchResources);
+// 激活/取消事件：点标签激活，点 × 取消
+(function bindResourceTag() {
+  const tag = document.getElementById('cmd-tag-resource');
+  const x = document.getElementById('cmd-tag-resource-x');
+  const bar = document.getElementById('cmd-tag-bar');
+  if (!tag || !x || !bar) return;
+  // 点击标签主体 → 激活查资料模式（若未激活）
+  tag.addEventListener('click', (e) => {
+    if (e.target === x) return;  // × 单独处理
+    if (bar.style.display !== 'flex') {
+      setResourcesMode(true);
+      questionInput.focus();
+    }
+  });
+  // 点击 × → 取消
+  x.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setResourcesMode(false);
+  });
+})();
 
 // ─── 启动 ───
 checkHealth();

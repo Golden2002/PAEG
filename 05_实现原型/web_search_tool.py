@@ -53,7 +53,7 @@ def _bing_search(query: str, max_results: int = MAX_RESULTS) -> List[dict]:
             params={"q": query, "setlang": "zh-hans", "setmkt": "zh-CN",
                     "count": str(max_results), "ensearch": "0"},
             headers={"User-Agent": _UA},
-            timeout=15,
+            timeout=8,  # v0.44 ⭐ 防卡：15s→8s（Bing 慢时快速放弃，降级下一个）
         )
         r.raise_for_status()
         html = r.text
@@ -80,7 +80,17 @@ def _bing_search(query: str, max_results: int = MAX_RESULTS) -> List[dict]:
                 "content": snippet[:MAX_SNIPPET],
             })
     # 过滤掉完全不含查询关键词的结果（低质量）
-    q_words = [w for w in re.split(r'\s+', query) if len(w) >= 2]
+    # v0.44 ⭐ 修复：中文连续文本（无空格）此前只算 1 个词 → 过滤失效；
+    # 现：空格切分 + 连续中文按 2-gram 补词，保证过滤真实生效。
+    q_words = [w for w in re.split(r'[\s，。、,；;：:？?！!]+', query) if len(w) >= 2]
+    _q_clean = query
+    for _s in ["的", "和", "与", "了", "是", "什么", "如何", "怎样", "为什么", "原理", "应用"]:
+        _q_clean = _q_clean.replace(_s, " ")
+    for _t in re.split(r'\s+', _q_clean):
+        if len(_t) >= 2:
+            q_words.append(_t)
+        elif len(_t) == 2:
+            q_words.append(_t)
     if q_words and results:
         def _rel(r0):
             text = (r0.get("title", "") + r0.get("content", ""))
@@ -187,17 +197,40 @@ def _query_relevance(query: str, results: List[dict]) -> bool:
 
 
 def _shorten_query(query: str) -> str:
-    """把过长的中文查询拆短（Bing 分词优化）。"""
+    """把过长的中文查询拆短（Bing 分词优化）。v0.44 ⭐ 修复：支持无标点连续中文。
+
+    此前 re.split(r"[\\s，。、,]+") 对"超导体的量子隧穿效应原理与应用"这种
+    连续中文切不出词 → 返回空 → 无法拆短重试 → Bing 长查询分词差返回无关结果。
+    现：空格/标点切分优先；无分隔时按 2-gram 切分取高频核心词。
+    """
+    import re as _re
     q = (query or "").strip()
     if len(q) <= 12:
         return ""
     # 去掉常见功能词，取前 2-3 个关键词
     stop = ["推荐", "学习资料", "资料", "方法", "有哪些", "什么", "最新",
-            "的", "和", "与", "如何", "怎样", "帮我", "一下", "请"]
-    parts = [p for p in re.split(r'[\s，。、,]+', q) if p]
+            "的", "和", "与", "如何", "怎样", "帮我", "一下", "请",
+            "为什么", "是什么", "什么是", "原理", "应用", "介绍", "讲讲"]
+    parts = [p for p in _re.split(r'[\s，。、,；;：:？?！!]+', q) if p]
     kept = [p for p in parts if p not in stop]
-    if kept:
+    if kept and len(kept[0]) <= 8:
         return " ".join(kept[:2])
+    # v0.44 ⭐ 连续中文兜底：2-gram 切分，去停用词后取前 2 个高频词
+    # 例："超导体的量子隧穿效应原理与应用" → "超导 量子隧穿" → "超导 量子"
+    grams = []
+    _clean = q
+    for s in stop:
+        _clean = _clean.replace(s, " ")
+    toks = [t for t in _re.split(r'[\s]+', _clean) if len(t) >= 2]
+    for t in toks:
+        if len(t) <= 8:
+            grams.append(t)
+        else:
+            # 长词：按 2-gram 滑窗取前 2 个不重叠
+            for k in range(0, len(t) - 1, 2):
+                grams.append(t[k:k + 2])
+    if grams:
+        return " ".join(grams[:2])
     return ""
 
 
@@ -328,6 +361,167 @@ def search_and_answer(question: str, llm=None, extra_context: str = "") -> Dict:
             answer = None
 
     return {"answer": answer, "sources": sources, "searched": True}
+
+
+# ─────────────────────────────────────
+# v0.44 ⭐ P0 修复：多样化查询词联想（agent 设计落地）
+# ─────────────────────────────────────
+# 背景：此前 web 检索只用 1 个关键词调 1 次（max_results=3）→ 结果贫乏。
+# 设计：agent 收到联网指令后，先让 LLM 根据用户提问联想多种多样可能符合
+# 用户期望的查询词（定义/应用/例子/最新进展/中英双语等角度），
+# 再把这些查询词逐一回传给网络检索工具 → 检索到丰富网页。
+
+def expand_queries(question: str, llm=None, n: int = 5, subject: str = "") -> list:
+    """根据提问联想 n 个多样化检索查询词（LLM 联想优先，规则兜底）。
+
+    返回去重后的查询词列表（至少 1 个，即原始提问）。
+    """
+    import re as _re
+    _q = str(question or "").strip()
+    if not _q:
+        return [""]
+    _subj = (subject or "").strip()
+    if llm is not None:
+        try:
+            from subagents import _safe_chat
+            _sys = (
+                "你是 PAEG 的检索查询联想器。根据学生的提问，从不同角度联想 "
+                f"{n} 个多样化、可能符合学生期望的网络检索查询词。\n"
+                "要求：\n"
+                "- 每个查询词 2-8 个词，独立完整，能直接提交给搜索引擎\n"
+                "- 覆盖不同角度：概念定义、应用案例、历史背景、最新进展、常见误区、学习方法（按问题性质取舍）\n"
+                "- 若学科已知（" + _subj + "），融入学科术语\n"
+                "- 输出 JSON 数组，如 [\"词1\", \"词2\"]，只输出 JSON"
+            )
+            _r = _safe_chat(llm, _sys, _q[:300], max_tokens=200)
+            if _r:
+                import json as _json
+                _clean = _r.strip()
+                if _clean.startswith("```"):
+                    _clean = _clean.split("```")[1]
+                    if _clean.startswith("json"):
+                        _clean = _clean[4:]
+                _clean = _clean.strip()
+                try:
+                    _parsed = _json.loads(_clean)
+                    if isinstance(_parsed, list):
+                        _qs = [str(x).strip() for x in _parsed if str(x).strip()]
+                        if _qs:
+                            _uniq = []
+                            for _x in _qs:
+                                if _x not in _uniq:
+                                    _uniq.append(_x)
+                            # 原始提问放首位（最相关）
+                            return list(dict.fromkeys([_q] + _uniq))[:n + 1]
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    # 规则兜底：原始提问 + 关键词切分变体
+    _fb = [_q]
+    _toks = [w for w in _re.split(r"[\s，。；、？?！!：:]+", _q) if len(w) >= 2]
+    _subj and _fb.append(f"{_subj} {_q[:20]}")
+    for _w in _toks[:3]:
+        if _w != _q and len(_w) >= 2:
+            _fb.append(f"{_w} 定义")
+            _fb.append(f"{_w} 例子")
+    _out = []
+    for _x in _fb:
+        if _x not in _out:
+            _out.append(_x)
+    return _out[:n + 1]
+
+
+def web_search_multi(question: str, llm=None, subject: str = "", n_queries: int = 4,
+                     per_query: int = 3, max_total: int = 12) -> list:
+    """多查询词联网检索（v0.44 ⭐ P0 修复）：联想多个查询 → 并行检索 → 合并去重。
+
+    返回 [{title, url, content}] 列表（含正文摘要，数量可达 max_total 条）。
+    单查询全部失败时回退单查询 web_search（向下兼容）。
+
+    v0.44 ⭐ 防卡修复：查询词**并行**检索（ThreadPoolExecutor），整体硬超时 20s——
+    此前串行 5 词 × Bing 15s ≈ 100s+，用户实测对话卡 10 分钟即由此导致。
+    """
+    import re as _re
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FutTimeout
+    _qs = expand_queries(question, llm=llm, n=n_queries, subject=subject)
+    if not _qs:
+        _qs = [question]
+    _seen_url = set()
+    _all = []
+
+    def _fetch_one(_q):
+        try:
+            _res = web_search(_q, max_results=per_query)
+        except Exception:
+            return []
+        if not _res or "未返回" in str(_res) or "未找到" in str(_res):
+            return []
+        _items = []
+        for _blk in str(_res).split("\n\n"):
+            _m = _re.search(r"URL:\s*(\S+)", _blk)
+            if not _m:
+                continue
+            _url = _m.group(1)[:300]
+            if _url in _seen_url:
+                continue
+            _t = _re.match(r"\[来源 \d+\]\s*(.+)", _blk.strip())
+            _snippet = _blk.split("URL:", 1)[-1].split("\n", 1)[-1].strip()
+            _items.append({
+                "title": (_t.group(1).strip() if _t else "")[:200],
+                "url": _url,
+                "content": (_snippet or "")[:500],
+            })
+        return _items
+
+    # v0.44 ⭐ 并行检索（最多 4 线程），整体受硬超时保护
+    try:
+        with ThreadPoolExecutor(max_workers=min(len(_qs), 4)) as _ex:
+            _futs = [_ex.submit(_fetch_one, _q) for _q in _qs]
+            for _f in _futs:
+                try:
+                    _items = _f.result(timeout=20)
+                    for _item in _items:
+                        if _item["url"] not in _seen_url:
+                            _seen_url.add(_item["url"])
+                            _all.append(_item)
+                            if len(_all) >= max_total:
+                                break
+                except (_FutTimeout, Exception):
+                    continue
+                if len(_all) >= max_total:
+                    break
+    except Exception:
+        pass
+
+    # v0.44 ⭐ 相关性过滤：去掉与提问明显无关的结果（如"约瑟夫森结"→游戏角色歧义）
+    if len(_all) > 3:
+        _core = re.sub(r"[\s，。；、？?！!：:：]+", "", str(question or ""))
+        _core_toks = [w for w in _core if len(w) >= 2]
+        _kept = []
+        for _item in _all:
+            _hay = str(_item.get("title", "")) + str(_item.get("content", ""))
+            _score = sum(1 for w in _core_toks if w in _hay)
+            # 保留：至少命中 1 个核心词，或标题直接含问题词
+            if _score >= 1 or any(w in str(_item.get("title", "")) for w in _core_toks):
+                _kept.append(_item)
+        if _kept:
+            _all = _kept
+    if not _all:
+        # 兜底：单查询（兼容旧行为）
+        _r = web_search(question, max_results=3)
+        if isinstance(_r, str) and _r and "未返回" not in _r and "未找到" not in _r:
+            for _blk in _r.split("\n\n"):
+                _m = _re.search(r"URL:\s*(\S+)", _blk)
+                if _m:
+                    _t = _re.match(r"\[来源 \d+\]\s*(.+)", _blk.strip())
+                    _snippet = _blk.split("URL:", 1)[-1].split("\n", 1)[-1].strip()
+                    _all.append({
+                        "title": (_t.group(1).strip() if _t else "")[:200],
+                        "url": _m.group(1)[:300],
+                        "content": (_snippet or "")[:500],
+                    })
+    return _all[:max_total]
 
 
 if __name__ == "__main__":
