@@ -52,6 +52,7 @@ from config import (
     LLM_PROVIDER, LLM_MODEL,
     GUI_DIR, FALLBACK_DOWNLOAD_DIR,
     APP_HOST, APP_PORT, MCP_PORT,
+    CORS_ORIGINS, PAEG_ENV,
 )
 
 # v0.40 P1-1 ⭐ server.py Phase1 拆分: 从 utils.py 导入无全局依赖的纯函数
@@ -96,7 +97,46 @@ _LOGIN_FAILS: dict = {}
 # ─────────────────────────────────────
 
 app = Flask(__name__, static_folder=None)
-CORS(app)  # 允许跨域（前端 GUI 在不同端口）
+# v0.51 ⭐ P0-1（Oracle）：CORS 白名单——开发默认 *，生产用 PAEG_CORS_ORIGINS 显式收敛
+CORS(app, resources={r"/api/*": {"origins": CORS_ORIGINS}})
+# v0.51 ⭐ P1-1（Oracle）：HTTPS 反代支持——信任 X-Forwarded-Proto（Nginx/Caddy/cloudflared 前置）
+# 生产安全 Cookie：PAEG_ENV=production 时 cookie 仅 HTTPS 传输
+try:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+except Exception:
+    pass
+if PAEG_ENV == "production":
+    app.config["SESSION_COOKIE_SECURE"] = True
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+
+# ═══════════════════════════════════════════════════════════
+# v0.51 ⭐ P0-3（Oracle）：全局滑动窗口限流
+# ═══════════════════════════════════════════════════════════
+_LIMIT_GENERAL = (120, 60)   # 每 IP 120 req/min 通用
+_LIMIT_LLM = (30, 60)        # 每 IP 30 req/min 走 LLM 的端点（防资源耗尽）
+_LIMIT_BUCKETS: dict = {}    # {ip: [(ts, kind), ...]}
+_LIMIT_LOCK = __import__("threading").Lock()
+
+
+def _rate_limit_allow(req) -> bool:
+    """滑动窗口限流：通用端点 120/min，LLM 端点 30/min。返回 True 放行。"""
+    import time as _rt
+    _ip = req.remote_addr or "unknown"
+    _path = req.path or ""
+    _is_llm = any(p in _path for p in ("/api/teach", "/api/chat", "/api/answer",
+                                       "/api/method", "/api/knowledge", "/api/affection",
+                                       "/api/resources", "/api/generate"))
+    _now = _rt.time()
+    _win, _cap = (_LIMIT_LLM if _is_llm else _LIMIT_GENERAL)
+    with _LIMIT_LOCK:
+        _bucket = [t for t in _LIMIT_BUCKETS.get(_ip, []) if _now - t < _win]
+        if len(_bucket) >= _cap:
+            _LIMIT_BUCKETS[_ip] = _bucket
+            return False
+        _bucket.append(_now)
+        _LIMIT_BUCKETS[_ip] = _bucket
+        return True
 
 # P0-2 安全基线: SECRET_KEY 已从 config.py 读取(SECRET_KEY_IS_DEV_DEFAULT 用于启动警告)
 # 注: SECRET_KEY / LLM_PROVIDER / LLM_MODEL 均由 config.py 统一管理, 这里仅做副作用输出与 Flask secret_key 赋值
@@ -110,6 +150,15 @@ def _assign_request_id():
     """每个请求生成 request_id（响应头返回 + g 存储，日志可关联）。"""
     from flask import g
     g.request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:12]
+    # v0.51 ⭐ P0-2（Oracle）：SESSIONS 惰性 TTL 清理（防内存无限增长）
+    try:
+        from infra.sessions import session_cleanup
+        session_cleanup()
+    except Exception:
+        pass
+    # v0.51 ⭐ P0-3（Oracle）：全局滑动窗口限流（防 LLM 资源耗尽）
+    if not _rate_limit_allow(request):
+        return jsonify({"error": "请求过于频繁，请稍后再试"}), 429
 
 
 @app.after_request
