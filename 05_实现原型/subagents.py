@@ -392,6 +392,40 @@ def _detect_teaching_mode_regex(text: str) -> str:
     return "normal"
 
 
+def _summarize_resource(title: str, snippet: str, llm=None) -> str:
+    """v0.46.1 ⭐ 资源优势介绍：基于标题+摘要生成"优势 + 大体内容"（用户需求）。
+
+    检索网页后不仅推荐链接，还要介绍它的优势和大体内容。
+    LLM 可用 → 精炼为一句优势 + 一句内容概述；LLM 不可用 → snippet 前 100 字兜底。
+    """
+    if not title and not snippet:
+        return ""
+    _base = snippet or title
+    if llm is not None:
+        try:
+            _sys = (
+                "你是资源导览员。根据下面网页的标题和摘要，用 2 句话介绍它：\n"
+                "1. 这个资源的**优势**（为什么值得看/权威性/独特价值）\n"
+                "2. 它的**大体内容**（讲了什么）\n"
+                "要求：每句 ≤40 字，用中文，格式：'优势：…。内容：…。'"
+            )
+            _u = f"标题：{title}\n摘要：{_base[:300]}"
+            _r = _safe_chat(llm, _sys, _u, max_tokens=120)
+            if _r and _r.strip():
+                _out = _r.strip()[:150]
+                # v0.46.1 ⭐ 语言规范收口：summary 也是生成内容，必须过 L2/L3 polish
+                try:
+                    from services.polish import _polish_text
+                    _out = _polish_text(_out, context="resource_summary")
+                except Exception:
+                    pass
+                return _out
+        except Exception:
+            pass
+    # LLM 不可用兜底：snippet 前 100 字
+    return f"内容：{_base[:100]}"
+
+
 def _safe_chat_with_retrieval(model, system: str, user: str = None,
                               messages: list = None, subject: str = None,
                               max_tokens: int = 512, tools: list = None,
@@ -962,11 +996,16 @@ class ResourceLibrarian:
                 n_queries=4, per_query=max(2, max_results), max_total=12,
             )
             for _r in _web_items:
+                # v0.46.1 ⭐ 资源优势介绍：LLM 基于摘要生成"优势 + 大体内容"（用户需求：
+                # 检索网页后不仅推荐链接，还要介绍它的优势和大体内容）
+                _title = (_r.get("title") or _r.get("url") or "")[:200]
+                _snippet = (_r.get("content") or _r.get("snippet") or "")[:500]
+                _summary = _summarize_resource(_title, _snippet, llm)
                 out.append({
-                    "title": (_r.get("title") or _r.get("url") or "")[:200],
+                    "title": _title,
                     "url": _r.get("url") or "",
-                    # v0.44 ⭐ 正文摘要不再截断到 150 字符（PPT 需要实质内容）
-                    "snippet": (_r.get("content") or _r.get("snippet") or "")[:500],
+                    "snippet": _snippet,
+                    "summary": _summary,  # 优势 + 大体内容（前端资源卡片展示）
                     "type": "web",
                 })
         except Exception as _fe:

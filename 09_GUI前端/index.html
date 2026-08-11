@@ -1109,6 +1109,12 @@ body {
 .resource-card .rc-badge.lib  { background: color-mix(in srgb, var(--lib-badge) 14%, transparent); color: var(--lib-badge); }
 .resource-card .rc-badge.web  { background: color-mix(in srgb, var(--web-badge) 16%, transparent); color: var(--web-badge); }
 .resource-card .rc-badge.unknown { background: var(--surface-2); color: var(--text-dim); }
+.resource-card .rc-summary {
+  font-size: var(--fs-sm); color: var(--text); line-height: 1.6;
+  word-break: break-word; background: var(--accent-soft, rgba(74,144,226,.08));
+  border-left: 3px solid var(--accent); padding: 4px 8px; border-radius: 4px;
+  margin-bottom: 6px;
+}
 .resource-card .rc-snippet {
   font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.6;
   word-break: break-word;
@@ -4575,6 +4581,7 @@ function renderResourceCards(payload, question) {
             <span class="rc-badge ${typeBadge}">${escapeHtml(typeLabel)}</span>
             <span class="rc-title-text">${title}</span>
           </div>
+          ${s.summary ? `<div class="rc-summary">${escapeHtml(s.summary)}</div>` : ''}
           ${snippet ? `<div class="rc-snippet">${snippet}</div>` : ''}
           ${linkHtml}
         </div>`;
