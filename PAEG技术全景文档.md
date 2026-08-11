@@ -4970,3 +4970,39 @@ def detect_constraint_flags(user_message: str, history: list) -> dict:
 - §6.6 综合测试完整性盲区：本节是"约束架构完整但用户诉求被吞"的根治方案——让约束可被精确取消
 
 > **配套文档**：[CHANGELOG v0.43](../CHANGELOG.md)（变更明细·3 位掩码条目）/ [维护手册 §十三](../维护手册.md)（新约束归组说明）/ [元能力 §6.33](../元能力文档.md)（元能力方法论 + agent 使用注意事项）
+
+## 10.8.3.3 PPT 生成方法论与 pipeline（v0.51 ⭐ 依据 memo/019）
+
+> 商业 PPT 方法论（调研 YC/McKinsey/Apple Keynote）+ 路演实践。
+> 风格基准：`交付物/路演PPT/PAEG路演PPT_v0.51.pptx`（深蓝 #0F2A52 + 金 #E6A528）。
+
+### pipeline（v0.52 pptx_mcp_server 升级设计）
+
+```
+输入：主题/受众/页数/风格
+  → Step1 大纲（LLM）：行动式标题 + Read-Through Test 自检
+  → Step2 设计（LLM+规则）：配色/布局/视觉锚点（大数字/图标）
+  → Step3 填充（LLM）：观点 + 大数字 + 关键对话（实测）
+  → Step4 渲染：pptxgenjs/python-pptx（shape 用常量）
+  → Step5 QA 循环：转图 → 找重叠/溢出/对比度 → 修复 → 复验
+```
+
+### 质量标准
+
+| 维度 | 标准 |
+|---|---|
+| 标题 | 行动式观点句，全部标题连贯短文 |
+| 配色 | 模板或主题化（禁默认蓝）|
+| 每页 | 视觉锚点必含，无纯文字页 |
+| 排版 | QA 循环验证无重叠/溢出/对比度 |
+| 实测 | 关键对话大字号文本 + 截图小凭证 |
+| 密度 | 正文 ≤40 词/页，bullet ≤10 词 |
+
+### 接线（v0.52 落地）
+
+```
+agent(LLM) → /api/ppt/generate → pptx_mcp_server.py → Library/ppt_templates/ 模板
+           → pptxgenjs/python-pptx 渲染 → QA 循环 → 输出 .pptx
+```
+
+详见 [维护手册 §十六](../维护手册.md) + [元能力文档 §6.35](../元能力文档.md) + [memo/019](../memo/019_PPT生成方法论与质量标准.md)。
