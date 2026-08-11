@@ -840,6 +840,37 @@ body {
 .desc-save:hover { opacity: .9; }
 .desc-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; line-height: 1.5; }
 
+/* ─── v0.42：问卷状态条（OMIT-5/OMIT-13，左侧栏"告诉老师你是谁"下方） ─── */
+.questionnaire-status {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, var(--text-dim));
+  border-radius: 8px;
+  background: var(--bg-soft, rgba(127,127,127,.06));
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.questionnaire-status-row { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.questionnaire-status-icon { font-size: 14px; line-height: 1; flex: 0 0 auto; }
+.questionnaire-status-text {
+  font-size: var(--fs-xs, 11px); color: var(--text-dim); line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.questionnaire-status-text.filled { color: var(--text); }
+.questionnaire-status-text.empty { color: var(--accent); }
+.questionnaire-status-btn {
+  flex: 0 0 auto;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft, transparent);
+  color: var(--accent);
+  font-size: var(--fs-xs, 11px);
+  padding: 3px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.questionnaire-status-btn:hover { background: var(--accent); color: #fff; }
+
 /* ─── 文件生成栏（v0.12） ─── */
 .generate-bar { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
 .generate-btn {
@@ -904,6 +935,91 @@ body {
   float: right; border: none; background: none; font-size: 18px;
   cursor: pointer; color: var(--text-dim); line-height: 1;
 }
+
+/* ─── 注册问卷弹窗（v0.42：复用 auth-modal 遮罩/居中风格） ─── */
+.questionnaire-modal {
+  display: none; position: fixed; inset: 0; z-index: 110;
+  background: rgba(15, 23, 42, 0.5); align-items: center; justify-content: center;
+  padding: 24px 0;
+}
+.questionnaire-modal.open { display: flex; }
+.questionnaire-card {
+  background: var(--surface); border-radius: 16px; padding: 26px 28px;
+  width: 640px; max-width: 94vw; max-height: 86vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+.questionnaire-card h2 {
+  font-family: var(--font-display);
+  font-size: 20px; margin-bottom: 4px; color: var(--text);
+  font-weight: 600;
+}
+.questionnaire-sub {
+  font-size: var(--fs-sm); color: var(--text-dim);
+  margin-bottom: 18px;
+}
+.questionnaire-progress {
+  font-size: var(--fs-xs); color: var(--accent);
+  background: var(--accent-soft); padding: 3px 10px;
+  border-radius: 10px; display: inline-block; margin-bottom: 16px;
+}
+.questionnaire-list { display: flex; flex-direction: column; gap: 14px; }
+.q-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px; padding: 12px 14px;
+  background: var(--surface-2);
+  transition: border-color .15s var(--ease-out);
+}
+.q-item:focus-within { border-color: var(--accent); }
+.q-item .q-label {
+  display: block; font-size: 13px; font-weight: 600;
+  color: var(--text); margin-bottom: 8px;
+}
+.q-item .q-num {
+  color: var(--accent); font-weight: 700; margin-right: 4px;
+}
+.q-options { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+.q-options.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.q-option {
+  position: relative; display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border: 1px solid var(--border);
+  border-radius: 999px; font-size: 13px; color: var(--text-dim);
+  background: var(--surface); cursor: pointer; user-select: none;
+  transition: all .15s var(--ease-out);
+}
+.q-option input { position: absolute; opacity: 0; pointer-events: none; }
+.q-option:hover { border-color: var(--accent); color: var(--text); }
+.q-option:has(input:checked) {
+  background: var(--accent-soft); border-color: var(--accent);
+  color: var(--accent); font-weight: 600;
+}
+.q-options.grid .q-option { justify-content: center; }
+.q-actions {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; margin-top: 18px; padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+.q-actions .q-hint { font-size: var(--fs-xs); color: var(--text-dim); flex: 1; }
+.q-btn {
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-dim); padding: 9px 18px; border-radius: 10px;
+  font-size: 13px; cursor: pointer; transition: all .15s;
+}
+.q-btn:hover { border-color: var(--accent); color: var(--accent); }
+.q-btn.primary {
+  border: none; color: #fff; font-weight: 600;
+  background: linear-gradient(135deg, var(--grad-from), var(--accent-2));
+  padding: 10px 22px;
+}
+.q-btn.primary:hover { opacity: .92; }
+.q-btn.primary:disabled { opacity: .6; cursor: not-allowed; }
+.questionnaire-msg { font-size: var(--fs-sm); margin-top: 8px; min-height: 16px; }
+.questionnaire-msg.ok { color: var(--success); }
+.questionnaire-msg.err { color: var(--danger); }
+@media (max-width: 560px) {
+  .questionnaire-card { padding: 20px 18px; }
+  .q-options.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .user-badge {
   font-size: var(--fs-sm); color: var(--accent); font-weight: 600;
   padding: 4px 10px; background: var(--accent-soft); border-radius: 14px;
@@ -1221,6 +1337,138 @@ body {
   </div>
 </div>
 
+<!-- v0.42：注册问卷（注册成功后弹出，收集 10 维画像写入后端提示词） -->
+<div class="questionnaire-modal" id="questionnaire-modal" role="dialog" aria-modal="true" aria-label="注册问卷">
+  <div class="questionnaire-card">
+    <h2>认识一下你<span style="font-size:13px;font-weight:400;color:var(--text-dim);margin-left:6px">（帮助老师更好地教你）</span></h2>
+    <div class="questionnaire-sub">10 个小问题 · 任意题可跳过 · 写完后老师每次都会按你给的画像来教</div>
+    <div class="questionnaire-progress" id="questionnaire-progress">0 / 10 已作答</div>
+
+    <form class="questionnaire-list" id="questionnaire-form" onsubmit="return false;">
+      <!-- 1. 学段 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">1.</span>你目前的学段</label>
+        <div class="q-options" role="radiogroup" aria-label="学段">
+          <label class="q-option"><input type="radio" name="grade_level" value="初中">初中</label>
+          <label class="q-option"><input type="radio" name="grade_level" value="高中">高中</label>
+          <label class="q-option"><input type="radio" name="grade_level" value="大学本科">大学本科</label>
+          <label class="q-option"><input type="radio" name="grade_level" value="考研">考研</label>
+          <label class="q-option"><input type="radio" name="grade_level" value="通识素养">通识素养</label>
+        </div>
+      </div>
+      <!-- 2. 学习风格 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">2.</span>你更习惯哪种学习方式</label>
+        <div class="q-options" role="radiogroup" aria-label="学习风格">
+          <label class="q-option"><input type="radio" name="cognitive_style" value="视觉型">看图示图表</label>
+          <label class="q-option"><input type="radio" name="cognitive_style" value="听觉型">听讲解音频</label>
+          <label class="q-option"><input type="radio" name="cognitive_style" value="阅读型">阅读文字</label>
+          <label class="q-option"><input type="radio" name="cognitive_style" value="动觉型">动手练习</label>
+          <label class="q-option"><input type="radio" name="cognitive_style" value="混合型">多种混合</label>
+        </div>
+      </div>
+      <!-- 3. 学习动机 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">3.</span>你学习最主要的动力是</label>
+        <div class="q-options" role="radiogroup" aria-label="学习动机">
+          <label class="q-option"><input type="radio" name="motivation" value="真正理解">真正理解</label>
+          <label class="q-option"><input type="radio" name="motivation" value="考高分">考高分</label>
+          <label class="q-option"><input type="radio" name="motivation" value="不落后于人">不落后于人</label>
+          <label class="q-option"><input type="radio" name="motivation" value="出于兴趣">出于兴趣</label>
+          <label class="q-option"><input type="radio" name="motivation" value="将来帮助他人">将来帮助他人</label>
+        </div>
+      </div>
+      <!-- 4. 教学深度 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">4.</span>你希望老师讲多深</label>
+        <div class="q-options" role="radiogroup" aria-label="教学深度">
+          <label class="q-option"><input type="radio" name="depth_pref" value="基础入门">基础入门（听懂会用）</label>
+          <label class="q-option"><input type="radio" name="depth_pref" value="中等深入">中等深入（理解原理）</label>
+          <label class="q-option"><input type="radio" name="depth_pref" value="深入钻研">深入钻研（定理推导）</label>
+        </div>
+      </div>
+      <!-- 5. 学习节奏 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">5.</span>你一次能专注多久</label>
+        <div class="q-options" role="radiogroup" aria-label="学习节奏">
+          <label class="q-option"><input type="radio" name="learning_rhythm" value="短">短（&lt;30 分钟）</label>
+          <label class="q-option"><input type="radio" name="learning_rhythm" value="中">中（30-90 分钟）</label>
+          <label class="q-option"><input type="radio" name="learning_rhythm" value="长">长（90 分钟+）</label>
+        </div>
+      </div>
+      <!-- 6. 学习时段 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">6.</span>你通常什么时段学习</label>
+        <div class="q-options" role="radiogroup" aria-label="学习时段">
+          <label class="q-option"><input type="radio" name="time_preference" value="早晨">早晨</label>
+          <label class="q-option"><input type="radio" name="time_preference" value="下午">下午</label>
+          <label class="q-option"><input type="radio" name="time_preference" value="晚上">晚上</label>
+          <label class="q-option"><input type="radio" name="time_preference" value="深夜">深夜</label>
+          <label class="q-option"><input type="radio" name="time_preference" value="灵活">灵活</label>
+        </div>
+      </div>
+      <!-- 7. 希望老师性格 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">7.</span>你希望老师是什么风格</label>
+        <div class="q-options" role="radiogroup" aria-label="希望老师性格">
+          <label class="q-option"><input type="radio" name="personality_pref" value="温和鼓励">温和鼓励</label>
+          <label class="q-option"><input type="radio" name="personality_pref" value="直接挑战">直接挑战</label>
+          <label class="q-option"><input type="radio" name="personality_pref" value="严肃中立">严肃中立</label>
+          <label class="q-option"><input type="radio" name="personality_pref" value="幽默轻松">幽默轻松</label>
+        </div>
+      </div>
+      <!-- 8. 薄弱科目（多选） -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">8.</span>你目前比较薄弱的科目（可多选）</label>
+        <div class="q-options grid" role="group" aria-label="薄弱科目">
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="数学">数学</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="物理">物理</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="化学">化学</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="语文">语文</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="英语">英语</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="历史">历史</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="政治">政治</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="地理">地理</label>
+          <label class="q-option"><input type="checkbox" name="weak_subjects" value="生物">生物</label>
+        </div>
+      </div>
+      <!-- 9. 擅长科目（多选） -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">9.</span>你比较擅长的科目（可多选）</label>
+        <div class="q-options grid" role="group" aria-label="擅长科目">
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="数学">数学</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="物理">物理</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="化学">化学</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="语文">语文</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="英语">英语</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="历史">历史</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="政治">政治</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="地理">地理</label>
+          <label class="q-option"><input type="checkbox" name="strong_subjects" value="生物">生物</label>
+        </div>
+      </div>
+      <!-- 10. 学习目标 -->
+      <div class="q-item">
+        <label class="q-label"><span class="q-num">10.</span>你现阶段最想达到的目标</label>
+        <div class="q-options" role="radiogroup" aria-label="学习目标">
+          <label class="q-option"><input type="radio" name="study_goal" value="中考高考">中考高考</label>
+          <label class="q-option"><input type="radio" name="study_goal" value="考研">考研</label>
+          <label class="q-option"><input type="radio" name="study_goal" value="出国留学">出国留学</label>
+          <label class="q-option"><input type="radio" name="study_goal" value="职业发展">职业发展</label>
+          <label class="q-option"><input type="radio" name="study_goal" value="自我提升">自我提升</label>
+        </div>
+      </div>
+    </form>
+
+    <div class="questionnaire-msg" id="questionnaire-msg"></div>
+    <div class="q-actions">
+      <span class="q-hint">填写后老师更懂你 · 也可稍后在左侧"告诉老师你是谁"补充</span>
+      <button class="q-btn" id="questionnaire-skip" type="button">跳过</button>
+      <button class="q-btn primary" id="questionnaire-save" type="button">保存并开始</button>
+    </div>
+  </div>
+</div>
+
 <!-- 主体 -->
 <main class="main">
 
@@ -1242,6 +1490,14 @@ body {
           aria-label="描述你的学习情况和目标"></textarea>
         <button class="desc-save" id="desc-save">保存（每次对话都会记住）</button>
         <div class="desc-hint">写下你是怎样的人、学习目标、擅长与不擅长——之后每一次对话，PAEG 都会带着这段描述来教你。</div>
+      </div>
+      <!-- OMIT-5/OMIT-13：问卷状态 + 入口（登录后由 JS 填充；初始隐藏） -->
+      <div class="questionnaire-status" id="questionnaire-status" style="display:none">
+        <div class="questionnaire-status-row">
+          <span class="questionnaire-status-icon" aria-hidden="true">📝</span>
+          <span class="questionnaire-status-text" id="questionnaire-status-text">加载中…</span>
+        </div>
+        <button class="questionnaire-status-btn" id="questionnaire-status-btn" type="button">查看/修改</button>
       </div>
       <div class="mastery-list" id="mastery-list"><!-- 动态 --></div>
     </div>
@@ -1290,7 +1546,7 @@ body {
   <!-- 右栏：对话 -->
   <section class="chat-area">
     <div class="chat-header">
-      <span class="title">与 PAEG 对话</span>
+      <span class="title">与 PAEG 对话 <span class="mode-tag" id="current-mode-tag" style="margin-left:8px;margin-bottom:0;vertical-align:middle;">当前：学科教学</span></span>
       <span class="meta">基于 DeepSeek 大模型 · 本地中转 · 数据不落第三方</span>
     </div>
 
@@ -1337,6 +1593,13 @@ body {
       </select>
       <!-- v0.41.9 ⭐ 修复：input→textarea（input 无法换行，长文字只能横向滚动；
            现支持自动换行 + 自适应高度，用户输入长问题也能看到全部内容） -->
+      <!-- v0.44 ⭐ 指令标签栏：ChatGPT 式悬浮选项——点"查资料"激活为指令标签，输入后发送走检索 -->
+      <div class="cmd-tag-bar" id="cmd-tag-bar" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+        <span class="cmd-tag" id="cmd-tag-resource" data-cmd="resource" style="display:inline-flex;align-items:center;gap:5px;background:var(--accent);color:#fff;font-size:12px;padding:3px 10px;border-radius:12px">
+          <img class="link-icon" src="assets/icons/search.svg" alt="" style="width:12px;height:12px"/>查资料
+          <b style="cursor:pointer;margin-left:2px" title="取消查资料模式" id="cmd-tag-resource-x">×</b>
+        </span>
+      </div>
       <textarea class="question-input" id="question-input" rows="1" placeholder="输入你想学习的内容…" autocomplete="off" aria-label="输入你想学习的内容"></textarea>
       <!-- v0.40 ⭐ 录音波形指示器（豆包式：录音时显示音波动画） -->
       <div class="voice-waves" id="voice-waves" role="status" aria-label="正在录音"><span></span><span></span><span></span><span></span><span></span></div>
@@ -1372,10 +1635,7 @@ body {
       <button class="action-btn" id="act-reexplain">换一种解释</button>
       <button class="action-btn" id="act-test">测试我一下</button>
       <button class="action-btn" id="act-example">举个类似例子</button>
-      <!-- v0.x：资料检索（需求C） -->
-      <button class="action-btn" id="resource-btn" title="从知识库/资料库/互联网检索资料">
-        <img class="link-icon" src="assets/icons/search.svg" alt="" style="margin-right:4px"/>查资料
-      </button>
+      <!-- v0.44 ⭐ 查资料改为输入框上方指令标签（见 cmd-tag-bar），此处不再放发送键 -->
     </div>
 
     <div class="generate-bar">
@@ -1462,13 +1722,25 @@ const askBtn = document.getElementById('ask-btn');
     // Enter 发送（Shift+Enter 换行）——textarea 默认 Enter 换行，需拦截
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      // v0.44 ⭐ 查资料指令标签激活时：Enter 走资料检索（ChatGPT 式指令）
+      if (window._resourcesModeActive && window._resourcesModeActive()) {
+        fetchResources();
+        return;
+      }
+      // v0.x ⭐ 修复：生成中按 Enter 不再静默吞掉——明确提示先停止再发
       const btn = document.getElementById('ask-btn');
+      if (btn && btn.dataset && btn.dataset.generating === '1') {
+        addMsg('paeg', '<small>正在生成上一条回复，请先点击「■ 停止」再发送新内容。</small>');
+        return;
+      }
       if (btn) btn.click();
     }
   });
-  // 发送后清空并重置高度
-  const askBtnEl = document.getElementById('ask-btn');
-  if (askBtnEl) askBtnEl.addEventListener('click', () => setTimeout(() => { qi.value = ''; window._resetInputHeight(); }, 100));
+  // v0.42 ⭐ P0 修复：删除此处独立清空监听器——子代理 v0.42 #5 修复误在此加了
+  // askBtn click 清空监听器，但该监听器注册早于 L3219 主发送 handler，触发顺序
+  // 是先清空再读取 → 主 handler 读到空值 if(!q) return → 发送被吞（E2E 实测抓到）。
+  // 主 handler（L3219）已含同步清空逻辑（addMsg 后 questionInput.value=''），
+  // 无需此处再清。此块整体移除，恢复发送功能。
 })();
 
 // ─── v0.25 学段-学科联动 + v0.27 三级级联（学段→一级学科→二级学科）───
@@ -2137,6 +2409,14 @@ async function loadProfile() {
       try { localStorage.setItem('paeg-avatar', p.avatar_url); } catch (e) {}
       renderAvatar();
     }
+    // OMIT-5：读取并显示问卷答案（已填 / 未填 + 摘要 + 入口）
+    if (p.questionnaire_answers && Object.keys(p.questionnaire_answers).length > 0) {
+      STATE.questionnaireAnswers = p.questionnaire_answers;
+      renderQuestionnaireStatus(p.questionnaire_answers);
+    } else {
+      STATE.questionnaireAnswers = null;
+      renderQuestionnaireStatus(null);
+    }
   } catch (e) {
     // 新学习者，暂无画像
   }
@@ -2344,6 +2624,32 @@ function updateStats() {
     ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '-';
 }
 
+// ─── v0.42.2 ⭐ 修复：停止按钮三件套提升到模块顶层 ───
+// 此前 _showStopBtn/_hideStopBtn/_finalizeGeneration 只在 teach() 函数体内定义，
+// generalChat/affectionChat 的 finally 调 window._finalizeGeneration() 时，
+// 若用户从未进过 teach 模式 → undefined → finally 抛 TypeError → 按钮卡在"■ 停止"。
+// 现提升到模块顶层（任何模式调用前必已定义），各模式 finally 调用恒有效。
+window._showStopBtn = () => {
+  try {
+    const ab = document.getElementById('ask-btn');
+    ab.textContent = '■ 停止';
+    ab.dataset.generating = '1';
+  } catch(e){}
+};
+window._hideStopBtn = () => {
+  try {
+    const ab = document.getElementById('ask-btn');
+    ab.textContent = '发送';
+    delete ab.dataset.generating;
+  } catch(e){}
+};
+window._finalizeGeneration = () => {
+  try { if (askBtn) askBtn.disabled = false; } catch (e) {}
+  try { window._hideStopBtn && window._hideStopBtn(); } catch (e) {}
+  window._genAbort = null;
+  try { loadConversations(); } catch (e) {}
+};
+
 // ─── 教学主流程（v0.19：流式输出） ───
 async function teach(question, subject, subtopic) {
   const thinking = addThinking('teach');
@@ -2354,20 +2660,8 @@ async function teach(question, subject, subtopic) {
   if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
   const controller = new AbortController();
   window._genAbort = controller;
-  window._showStopBtn = () => {
-    try {
-      const ab = document.getElementById('ask-btn');
-      ab.textContent = '■ 停止';
-      ab.dataset.generating = '1';
-    } catch(e){}
-  };
-  window._hideStopBtn = () => {
-    try {
-      const ab = document.getElementById('ask-btn');
-      ab.textContent = '发送';
-      delete ab.dataset.generating;
-    } catch(e){}
-  };
+  // v0.42.2 ⭐ 修复：_showStopBtn/_hideStopBtn/_finalizeGeneration 已提升到模块顶层
+  // （定义于 updateStats 后），此处仅调用，不再重复定义——保证任何模式都可用。
   window._showStopBtn();
   try {
     const resp = await fetch(API_BASE + '/api/teach/stream', {
@@ -2544,10 +2838,8 @@ async function teach(question, subject, subtopic) {
       addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
     }
   } finally {
-    askBtn.disabled = false;
-    try { window._hideStopBtn && window._hideStopBtn(); } catch(e2){}
-    window._genAbort = null;
-    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+    // v0.x ⭐ 统一收尾（替代原 4 行手写）
+    window._finalizeGeneration();
   }
 }
 
@@ -2731,14 +3023,8 @@ async function generalChat(text) {
       addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
     }
   } finally {
-    askBtn.disabled = false;
-    try {
-      const ab = document.getElementById('ask-btn');
-      ab.textContent = '发送';
-      delete ab.dataset.generating;
-    } catch(e2){}
-    window._genAbort = null;
-    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+    // v0.x ⭐ 统一收尾（替代原 6 行手写）
+    window._finalizeGeneration();
   }
 }
 
@@ -2747,10 +3033,15 @@ async function answerChat(question, subject) {
   const thinking = addThinking('chat');
   // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
   askBtn.disabled = false;
+  if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
+  const controller = new AbortController();
+  window._genAbort = controller;
+  window._showStopBtn();
   try {
     const result = await api('/api/answer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         question: question,
         subject: subject,
@@ -2770,10 +3061,14 @@ async function answerChat(question, subject) {
     }
   } catch (e) {
     removeThinking(thinking);
-    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    if (e.name === 'AbortError') {
+      addMsg('paeg', '<small>已停止生成。</small>');
+    } else {
+      addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    }
   } finally {
-    askBtn.disabled = false;
-    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+    // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
+    window._finalizeGeneration();
   }
 }
 
@@ -2782,10 +3077,15 @@ async function methodChat(question, subject) {
   const thinking = addThinking('chat');
   // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
   askBtn.disabled = false;
+  if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
+  const controller = new AbortController();
+  window._genAbort = controller;
+  window._showStopBtn();
   try {
     const result = await api('/api/method', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         concept: question,
         subject: subject,
@@ -2808,10 +3108,14 @@ async function methodChat(question, subject) {
     }
   } catch (e) {
     removeThinking(thinking);
-    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    if (e.name === 'AbortError') {
+      addMsg('paeg', '<small>已停止生成。</small>');
+    } else {
+      addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    }
   } finally {
-    askBtn.disabled = false;
-    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+    // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
+    window._finalizeGeneration();
   }
 }
 
@@ -2820,10 +3124,15 @@ async function knowledgeChat(question) {
   const thinking = addThinking('chat');
   // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
   askBtn.disabled = false;
+  if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
+  const controller = new AbortController();
+  window._genAbort = controller;
+  window._showStopBtn();
   try {
     const result = await api('/api/knowledge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         learner_id: STATE.learnerId,
         nickname: STATE.nickname,
@@ -2844,10 +3153,14 @@ async function knowledgeChat(question) {
     }
   } catch (e) {
     removeThinking(thinking);
-    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    if (e.name === 'AbortError') {
+      addMsg('paeg', '<small>已停止生成。</small>');
+    } else {
+      addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    }
   } finally {
-    askBtn.disabled = false;
-    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+    // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
+    window._finalizeGeneration();
   }
 }
 
@@ -2856,10 +3169,18 @@ async function affectionChat(text) {
   const thinking = addThinking('chat');
   // v0.41.9 ⭐ 修复：不 disabled（disabled 不派发 click → 停止键失效）
   askBtn.disabled = false;
+  // v0.42.2 ⭐ 修复：affectionChat 此前无 AbortController/signal/按钮切换——
+  // 用户点"■ 停止"时 dataset.generating 不存在 → 走普通发送分支再发一次（假"卡住"），
+  // 且 /api/affection 非流式只能等 LLM 跑完。现补全停止机制（至少能断网络层+恢复按钮）。
+  if (window._genAbort) { try { window._genAbort.abort(); } catch(e){} }
+  const controller = new AbortController();
+  window._genAbort = controller;
+  window._showStopBtn();
   try {
     const result = await api('/api/affection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         text: text,
         learner_id: STATE.learnerId,
@@ -2881,10 +3202,15 @@ async function affectionChat(text) {
     }
   } catch (e) {
     removeThinking(thinking);
-    addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    if (e.name === 'AbortError') {
+      addMsg('paeg', '<small>已停止生成。</small>');
+    } else {
+      addMsg('paeg', `出错了：${e.message}<br><small>请确认后端服务已启动（python server.py）</small>`);
+    }
   } finally {
-    askBtn.disabled = false;
-    loadConversations();  // v0.21.7：发完消息刷新历史会话列表（否则需刷新页面才看到）
+    // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
+    // v0.42.2 ⭐ _finalizeGeneration 已模块级定义，任何模式 finally 恒有效
+    window._finalizeGeneration();
   }
 }
 
@@ -3146,7 +3472,15 @@ document.getElementById('auth-submit').addEventListener('click', async () => {
       msgEl.textContent = authMode === 'login' ? '登录成功' : '注册成功';
       msgEl.className = 'auth-msg ok';
       applyLogin(result);
-      setTimeout(() => document.getElementById('auth-modal').classList.remove('open'), 800);
+      // v0.42：仅注册成功才弹问卷；登录成功不弹
+      if (authMode === 'register') {
+        setTimeout(() => {
+          document.getElementById('auth-modal').classList.remove('open');
+          openQuestionnaire(result.user_id);
+        }, 800);
+      } else {
+        setTimeout(() => document.getElementById('auth-modal').classList.remove('open'), 800);
+      }
     } else {
       msgEl.textContent = result.error || '操作失败';
       msgEl.className = 'auth-msg err';
@@ -3155,6 +3489,188 @@ document.getElementById('auth-submit').addEventListener('click', async () => {
     msgEl.textContent = e.message;
     msgEl.className = 'auth-msg err';
   }
+});
+
+// ─── v0.42：注册问卷（10 道选择题）───
+// 后端白名单字段：grade_level, cognitive_style, motivation, depth_pref, learning_rhythm,
+// time_preference, personality_pref, weak_subjects, strong_subjects, study_goal, extra_pref
+const Q_FIELDS = [
+  'grade_level', 'cognitive_style', 'motivation', 'depth_pref',
+  'learning_rhythm', 'time_preference', 'personality_pref',
+  'weak_subjects', 'strong_subjects', 'study_goal'
+];
+const Q_MULTI = new Set(['weak_subjects', 'strong_subjects']);  // 多选字段
+
+function updateQuestionnaireProgress() {
+  const form = document.getElementById('questionnaire-form');
+  if (!form) return;
+  let answered = 0;
+  Q_FIELDS.forEach(name => {
+    if (Q_MULTI.has(name)) {
+      if (form.querySelectorAll(`input[name="${name}"]:checked`).length > 0) answered++;
+    } else {
+      if (form.querySelector(`input[name="${name}"]:checked`)) answered++;
+    }
+  });
+  document.getElementById('questionnaire-progress').textContent = `${answered} / 10 已作答`;
+}
+
+function collectQuestionnaireAnswers() {
+  const form = document.getElementById('questionnaire-form');
+  const answers = {};
+  Q_FIELDS.forEach(name => {
+    if (Q_MULTI.has(name)) {
+      const vals = Array.from(form.querySelectorAll(`input[name="${name}"]:checked`)).map(i => i.value);
+      if (vals.length) answers[name] = vals;
+    } else {
+      const checked = form.querySelector(`input[name="${name}"]:checked`);
+      if (checked) answers[name] = checked.value;
+    }
+  });
+  return answers;
+}
+
+function openQuestionnaire(learnerId, existingAnswers) {
+  const modal = document.getElementById('questionnaire-modal');
+  const msgEl = document.getElementById('questionnaire-msg');
+  if (!modal) return;
+  msgEl.textContent = '';
+  msgEl.className = 'questionnaire-msg';
+  // OMIT-14：若有已填答案，先清空再回显（避免上次勾选残留）
+  const form = document.getElementById('questionnaire-form');
+  if (form) {
+    form.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(i => { i.checked = false; });
+  }
+  if (existingAnswers && typeof existingAnswers === 'object') {
+    fillQuestionnaireAnswers(existingAnswers);
+  } else if (STATE.questionnaireAnswers && typeof STATE.questionnaireAnswers === 'object') {
+    // 兜底：从 STATE 读（避免调用方忘记传）
+    fillQuestionnaireAnswers(STATE.questionnaireAnswers);
+  }
+  updateQuestionnaireProgress();
+  modal.classList.add('open');
+  modal.dataset.learnerId = learnerId || STATE.learnerId || '';
+}
+
+// OMIT-14：把已有答案回显到表单（radio 单选 / checkbox 多选）
+function fillQuestionnaireAnswers(answers) {
+  const form = document.getElementById('questionnaire-form');
+  if (!form || !answers) return;
+  Q_FIELDS.forEach(name => {
+    const val = answers[name];
+    if (val === undefined || val === null) return;
+    if (Q_MULTI.has(name)) {
+      const arr = Array.isArray(val) ? val : [val];
+      arr.forEach(v => {
+        const el = form.querySelector(`input[name="${name}"][value="${CSS.escape(String(v))}"]`);
+        if (el) el.checked = true;
+      });
+    } else {
+      const el = form.querySelector(`input[name="${name}"][value="${CSS.escape(String(val))}"]`);
+      if (el) el.checked = true;
+    }
+  });
+}
+
+// OMIT-5：把问卷答案摘要显示到左侧栏（已填 / 未填 + 关键标签 + 入口）
+function renderQuestionnaireStatus(answers) {
+  const box = document.getElementById('questionnaire-status');
+  const textEl = document.getElementById('questionnaire-status-text');
+  const btn = document.getElementById('questionnaire-status-btn');
+  if (!box || !textEl) return;
+  if (answers && typeof answers === 'object' && Object.keys(answers).length > 0) {
+    // 摘要：学段 · 风格 · 深度
+    const parts = [];
+    if (answers.grade_level) parts.push(answers.grade_level);
+    if (answers.cognitive_style) parts.push(answers.cognitive_style.replace(/型$/, '型'));
+    if (answers.depth_pref) parts.push(answers.depth_pref);
+    const summary = parts.length ? parts.join(' · ') : '已填写注册问卷';
+    textEl.textContent = '已填写注册问卷 · ' + summary;
+    textEl.className = 'questionnaire-status-text filled';
+    if (btn) btn.textContent = '查看/修改';
+  } else {
+    textEl.textContent = '尚未填写注册问卷 · 老师会更懂你';
+    textEl.className = 'questionnaire-status-text empty';
+    if (btn) btn.textContent = '去填写';
+  }
+  box.style.display = '';
+}
+
+function closeQuestionnaire() {
+  const modal = document.getElementById('questionnaire-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+async function submitQuestionnaire() {
+  const modal = document.getElementById('questionnaire-modal');
+  const msgEl = document.getElementById('questionnaire-msg');
+  const saveBtn = document.getElementById('questionnaire-save');
+  const skipBtn = document.getElementById('questionnaire-skip');
+  const learnerId = modal.dataset.learnerId || STATE.learnerId;
+  if (!learnerId) {
+    msgEl.textContent = '未识别到用户，无法保存';
+    msgEl.className = 'questionnaire-msg err';
+    return;
+  }
+  const answers = collectQuestionnaireAnswers();
+  if (Object.keys(answers).length === 0) {
+    msgEl.textContent = '请至少回答一题，或直接跳过';
+    msgEl.className = 'questionnaire-msg err';
+    return;
+  }
+  saveBtn.disabled = true; skipBtn.disabled = true;
+  msgEl.textContent = '保存中…';
+  msgEl.className = 'questionnaire-msg';
+  try {
+    const result = await api(`/api/profile/${encodeURIComponent(learnerId)}/questionnaire`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers })
+    });
+    if (result && result.ok) {
+      msgEl.textContent = '已保存 · 老师会更懂你';
+      msgEl.className = 'questionnaire-msg ok';
+      // OMIT-5：保存成功后立即更新 STATE + 左侧栏状态（无需刷新页面）
+      try {
+        STATE.questionnaireAnswers = answers;
+        renderQuestionnaireStatus(answers);
+      } catch (e) { /* 状态更新失败不影响主流程 */ }
+      // 关闭弹窗 + 在聊天区友好提示
+      setTimeout(() => {
+        closeQuestionnaire();
+        try { addMsg('assistant', '谢谢！我已经更了解你了。', 'warm'); } catch (e) { /* addMsg 可选 */ }
+      }, 600);
+    } else {
+      msgEl.textContent = (result && result.error) || '保存失败，请稍后重试';
+      msgEl.className = 'questionnaire-msg err';
+      saveBtn.disabled = false; skipBtn.disabled = false;
+    }
+  } catch (e) {
+    msgEl.textContent = e && e.message ? e.message : '保存失败，请稍后重试';
+    msgEl.className = 'questionnaire-msg err';
+    saveBtn.disabled = false; skipBtn.disabled = false;
+  }
+}
+
+// 事件绑定：保存 / 跳过 / 进度更新 / Esc 关闭
+document.getElementById('questionnaire-save').addEventListener('click', submitQuestionnaire);
+document.getElementById('questionnaire-skip').addEventListener('click', () => {
+  closeQuestionnaire();
+});
+document.getElementById('questionnaire-form').addEventListener('change', updateQuestionnaireProgress);
+document.getElementById('questionnaire-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('questionnaire-modal')) closeQuestionnaire();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.keyCode === 27) {
+    const modal = document.getElementById('questionnaire-modal');
+    if (modal && modal.classList.contains('open')) closeQuestionnaire();
+  }
+});
+
+// OMIT-13：左侧栏"查看/修改 / 去填写"按钮 → 打开问卷（带已填答案回显）
+document.getElementById('questionnaire-status-btn').addEventListener('click', () => {
+  openQuestionnaire(STATE.learnerId, STATE.questionnaireAnswers || null);
 });
 
 // ─── 事件 ───
@@ -3713,12 +4229,33 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     document.querySelectorAll('.mode-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
     btn.classList.add('active');
     btn.setAttribute('aria-selected', 'true');
+    // v0.x ⭐ 修复：切走前先保存当前学段/学科/二级学科到全局 stash
+    // （此前用 btn.dataset 写在被切走的按钮上，切回 teach 时取不到——改存到 window）
+    const _gradeEl = document.getElementById('grade-select');
+    const _subjectEl = document.getElementById('subject-select');
+    const _subfieldEl = document.getElementById('subfield-select');
+    if (!window._paegModeStash) window._paegModeStash = { grade: '', subject: '', subfield: '' };
+    if (_gradeEl && _gradeEl.value) window._paegModeStash.grade = _gradeEl.value;
+    if (_subjectEl && _subjectEl.value) window._paegModeStash.subject = _subjectEl.value;
+    if (_subfieldEl && _subfieldEl.value) window._paegModeStash.subfield = _subfieldEl.value;
     currentMode = btn.dataset.mode;
+    // v0.x ⭐ 切回 teach 时从 stash 恢复（学段/学科/二级学科联动会自然触发 subfield 重填）
+    const isTeach = currentMode === 'teach';
+    if (isTeach) {
+      if (_gradeEl && window._paegModeStash.grade) _gradeEl.value = window._paegModeStash.grade;
+      if (_subjectEl && window._paegModeStash.subject) _subjectEl.value = window._paegModeStash.subject;
+      // 切回 teach 后派发 change 事件，触发既有 onGradeChange / onSubjectChange 重建 subfield
+      try { _gradeEl.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+      try { _subjectEl.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+      if (_subfieldEl && window._paegModeStash.subfield) {
+        // 等 subfield 重建后再设（默认异步一帧）
+        setTimeout(() => { try { _subfieldEl.value = window._paegModeStash.subfield; } catch (e) {} }, 0);
+      }
+    }
     // v0.19.7：教学模式/找答案模式显示学科+学段选择；闲聊模式全部隐藏
     // v0.19.14：新增 answer（找答案）模式
     // v0.19.25：新增 method（学习方法）/ knowledge（知识库）模式
     // v0.19.29：新增 affection（倾诉）模式
-    const isTeach = currentMode === 'teach';
     const isAnswer = currentMode === 'answer';
     const isMethod = currentMode === 'method';
     const isKnowledge = currentMode === 'knowledge';
@@ -3733,6 +4270,15 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
       : (isAnswer ? '输入题目，直接给你完整答案（论述/计算/证明）…'
          : (isMethod ? '问这门课该怎么学、怎么复习、怎么规划…'
             : (isAffection ? '难过、焦虑、迷茫……想说什么都可以' : '输入任意内容，查看我的知识库…')));
+    // v0.x ⭐ 修复：聊天头部动态模式 tag——切换时更新（用户能直观看到当前模式）
+    const _modeTag = document.getElementById('current-mode-tag');
+    if (_modeTag) {
+      const _labels = {
+        teach: '学科教学', chat: '闲聊', answer: '找答案',
+        method: '学习方法', knowledge: '知识库', affection: '倾诉',
+      };
+      _modeTag.textContent = '当前：' + (_labels[currentMode] || currentMode);
+    }
     questionInput.focus();
   });
 });
@@ -4074,9 +4620,25 @@ function renderResourceCards(payload, question) {
   return div;
 }
 
-// "查资料"按钮：调 /api/resources 并渲染结果
+// "查资料"：v0.44 ⭐ 从 action-bar 发送键升级为输入框上方指令标签（ChatGPT 式）
+// 点击标签激活 → 输入内容按 Enter（或点发送）→ 走 /api/resources 检索 → 自动取消激活
+function setResourcesMode(active) {
+  const bar = document.getElementById('cmd-tag-bar');
+  const tag = document.getElementById('cmd-tag-resource');
+  if (!bar || !tag) return;
+  if (active) {
+    bar.style.display = 'flex';
+    tag.style.opacity = '1';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+window._resourcesModeActive = () => {
+  const bar = document.getElementById('cmd-tag-bar');
+  return !!bar && bar.style.display === 'flex';
+};
+
 async function fetchResources() {
-  const btn = document.getElementById('resource-btn');
   const question = (questionInput.value || '').trim();
   if (!question) {
     addMsg('paeg', '请先在输入框写下你要查的主题，例如：<i>什么是贝叶斯定理？</i>');
@@ -4089,10 +4651,11 @@ async function fetchResources() {
   const subjectEl = document.getElementById('subject-select');
   const subfieldEl = document.getElementById('subfield-select');
 
-  if (btn) btn.disabled = true;
   // 用户问句（也作为新消息气泡，让对话流连贯）
   addMsg('user', escapeHtml(question));
   const progress = addResourceProgress(question);
+  // v0.44 ⭐ 发送后自动取消查资料指令标签
+  setResourcesMode(false);
 
   try {
     const resp = await api('/api/resources', {
@@ -4113,12 +4676,29 @@ async function fetchResources() {
   } catch (e) {
     removeResourceProgress(progress);
     addMsg('paeg', `资料检索失败：${escapeHtml(e.message || String(e))}<br><small>请确认后端已实现 POST /api/resources（ResourceLibrarian subagent）。</small>`);
-  } finally {
-    if (btn) btn.disabled = false;
   }
 }
 
-document.getElementById('resource-btn').addEventListener('click', fetchResources);
+// 激活/取消事件：点标签激活，点 × 取消
+(function bindResourceTag() {
+  const tag = document.getElementById('cmd-tag-resource');
+  const x = document.getElementById('cmd-tag-resource-x');
+  const bar = document.getElementById('cmd-tag-bar');
+  if (!tag || !x || !bar) return;
+  // 点击标签主体 → 激活查资料模式（若未激活）
+  tag.addEventListener('click', (e) => {
+    if (e.target === x) return;  // × 单独处理
+    if (bar.style.display !== 'flex') {
+      setResourcesMode(true);
+      questionInput.focus();
+    }
+  });
+  // 点击 × → 取消
+  x.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setResourcesMode(false);
+  });
+})();
 
 // ─── 启动 ───
 checkHealth();
