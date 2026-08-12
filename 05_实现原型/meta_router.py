@@ -363,6 +363,17 @@ def route_intent(text: str, llm=None, use_cache: bool = True, mode: str = None) 
     t = (text or "").strip()
     if not t:
         return {"intent": "chat", "confidence": 0.0, "reason": "empty"}
+    # v6.0 ⭐ Magic 口令优先：特定口令（"你是谁/你能做什么/你学过什么"）是
+    # 比模式选择更强的确定性信号——即使前端选了 knowledge，问"你是谁"也应答身份模板。
+    # 模糊变体（"你是谁呀"）不命中，留给 LLM 判断（INTENT_PROMPT 已补示例）。
+    try:
+        from magic_intent import match_magic
+        _magic = match_magic(t)
+        if _magic:
+            return {"intent": _magic["intent"], "confidence": 0.98,
+                    "reason": _magic["reason"]}
+    except Exception:
+        pass
     # v0.41.6 ⭐ 模式短路：前端 mode 是用户显式选择，是最强确定性信号
     _MODE_TO_INTENT = {
         "teach": "teach", "chat": "chat", "answer": "answer",
@@ -419,6 +430,17 @@ def rule_fallback_intent(text: str) -> dict:
         pass
     if is_greeting(t):
         return {"intent": "greeting", "confidence": 0.85, "reason": "rule:greeting"}
+    # v6.0 ⭐ Magic 口令层：精确匹配"你是谁/你能做什么/你学过什么" → 固定模板（零 LLM）
+    # 用户指示：特定口令精确匹配不走 LLM；模糊变体由 LLM 判断（更上游 route_intent）。
+    # 命中则直接分流（interface→身份/能力模板，knowledge→库清点）。
+    try:
+        from magic_intent import match_magic
+        _magic = match_magic(t)
+        if _magic:
+            return {"intent": _magic["intent"], "confidence": 0.95,
+                    "reason": _magic["reason"]}
+    except Exception:
+        pass
     # v0.41.5 ⭐ 顺序修正：interface（功能/使用/界面）优先于 meta（纯身份）
     # —— "你有什么功能/怎么用"是 interface（确定性模板回答），"你是谁"才是 meta。
     # 此前 meta 在 interface 之前 → LLM 不可用时"你有什么功能"走错 meta 分支（自由发挥）。
