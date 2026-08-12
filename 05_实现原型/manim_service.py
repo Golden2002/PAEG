@@ -9,6 +9,8 @@ import os, re, ast, subprocess, tempfile, uuid, sys, io
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
+from manim_speed import _SPEED_STANDARD_TEXT  # v0.64 ⭐ 速度规范固定化
+
 # 隔离环境路径（可移植：相对项目根）
 _BASE = os.path.dirname(os.path.abspath(__file__))
 _PROJ = os.path.dirname(_BASE)
@@ -121,10 +123,9 @@ _MANIM_SYSTEM = """你是 Manim 数学动画代码生成助手。为教学问题
 1. from manim import *
 2. Scene 类实现 construct(self)
 3. 数学曲线用 axes.plot()，几何用 Circle/Square 等
-4. 总时长 90-150 秒（v0.63.1 ⭐ 教学慢速：run_time 不得低于 3s，wait 不得低于 2s，
-   每个元素单独 Create（不并行），创建后 wait 观察，标题展示后停留 3s，结尾停留 4s）
+4. 总时长 60-100 秒
 5. 纯几何动画（不用 Text/MathTex 避免依赖问题）
-6. 输出完整可运行 Python 代码"""
+6. 输出完整可运行 Python 代码""" + _SPEED_STANDARD_TEXT
 
 
 def generate_manim_video(topic: str, subject: str = 'math',
