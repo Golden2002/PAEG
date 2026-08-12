@@ -2412,6 +2412,8 @@ def teach_video():
     """v0.45 ⭐ 授课视频生成：PPT 大纲 → 教学视频（画面 + 语音讲解）。
 
     请求：{topic, outline, learner_id} —— outline 为 "## 章节 + - 要点" 结构
+
+    请求：{topic, outline, learner_id} —— outline 为 "## 章节 + - 要点" 结构
     （可与 /api/resources 的 ppt_outline 或 LLM 生成的大纲直接复用）。
     响应：{ok, url, slides, duration} —— url 可下载播放 mp4。
     """
@@ -2429,6 +2431,29 @@ def teach_video():
         return jsonify({"ok": False, "error": result.get("error") or "视频生成失败"}), 500
     except Exception as e:
         return jsonify({"ok": False, "error": f"授课视频生成异常: {e}"}), 500
+
+
+@app.route("/api/manim/generate", methods=["POST"])
+def manim_generate():
+    """v6.1 数学动画生成：LLM/模板生成 Manim 代码 -> 隔离渲染 -> 数学动画视频。
+    请求：{topic, subject, learner_id}。响应：{ok, url, error}。
+    独立模块：不影响 /api/teach/video（现有视频流程）。
+    """
+    data = request.get_json(force=True) or {}
+    topic = (data.get("topic") or "").strip()
+    subject = data.get("subject") or "math"
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
+    if not topic:
+        return jsonify({"ok": False, "error": "topic is required"}), 400
+    try:
+        from manim_service import generate_manim_video
+        result = generate_manim_video(topic, subject, learner_id)
+        if result.get("ok"):
+            return jsonify(result)
+        return jsonify({"ok": False, "error": result.get("error") or "数学动画生成失败"}), 500
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"数学动画生成异常: {e}"}), 500
+
 
 @app.route("/api/voice/stt", methods=["POST"])
 @require_module("voice")
