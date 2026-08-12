@@ -1605,6 +1605,9 @@ body {
       <select class="subject-select" id="subfield-select" disabled title="三级学科：按学段与一级学科过滤" aria-label="二级学科">
         <option value="">不限</option>
       </select>
+      <!-- v6.1 ⭐ 数学动画/授课视频触发按钮（像查资料一样点击激活）-->
+      <button class="cmd-trigger" id="cmd-trigger-manim" title="启用数学动画：说'画个图/演示/可视化'时生成 Manim 动画" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)">📐 数学动画</button>
+      <button class="cmd-trigger" id="cmd-trigger-video" title="启用授课视频：说'讲一课/生成视频'时生成教学视频" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)">🎬 授课视频</button>
       <!-- v0.41.9 ⭐ 修复：input→textarea（input 无法换行，长文字只能横向滚动；
            现支持自动换行 + 自适应高度，用户输入长问题也能看到全部内容） -->
       <!-- v0.44 ⭐ 指令标签栏：ChatGPT 式悬浮选项——点"查资料"激活为指令标签，输入后发送走检索 -->
@@ -1612,6 +1615,14 @@ body {
         <span class="cmd-tag" id="cmd-tag-resource" data-cmd="resource" style="display:inline-flex;align-items:center;gap:5px;background:var(--accent);color:#fff;font-size:12px;padding:3px 10px;border-radius:12px">
           <img class="link-icon" src="assets/icons/search.svg" alt="" style="width:12px;height:12px"/>查资料
           <b style="cursor:pointer;margin-left:2px" title="取消查资料模式" id="cmd-tag-resource-x">×</b>
+        </span>
+        <span class="cmd-tag" id="cmd-tag-manim" data-cmd="manim" style="display:none;align-items:center;gap:5px;background:var(--accent-2);color:#fff;font-size:12px;padding:3px 10px;border-radius:12px">
+          <img class="link-icon" src="assets/icons/paeg-logo.png" alt="" style="width:12px;height:12px"/>数学动画
+          <b style="cursor:pointer;margin-left:2px" title="关闭数学动画" id="cmd-tag-manim-x">×</b>
+        </span>
+        <span class="cmd-tag" id="cmd-tag-video" data-cmd="video" style="display:none;align-items:center;gap:5px;background:var(--accent);color:#fff;font-size:12px;padding:3px 10px;border-radius:12px">
+          <img class="link-icon" src="assets/icons/video.svg" alt="" style="width:12px;height:12px"/>授课视频
+          <b style="cursor:pointer;margin-left:2px" title="关闭授课视频" id="cmd-tag-video-x">×</b>
         </span>
       </div>
       <textarea class="question-input" id="question-input" rows="1" placeholder="输入你想学习的内容…" autocomplete="off" aria-label="输入你想学习的内容"></textarea>
@@ -2691,6 +2702,9 @@ async function teach(question, subject, subtopic) {
         subject: subject,
         subtopic: subtopic || '',
         concept: question,
+        // v6.1 ⭐ 数学动画/授课视频：仅启用且命中关键词才触发（不默认生成）
+        enable_manim: (window._manimModeActive && window._manimModeActive() && window._shouldTriggerManim(question)) || false,
+        enable_video: (window._videoModeActive && window._videoModeActive() && window._shouldTriggerVideo(question)) || false,
       }),
       signal: controller.signal,
     });
@@ -3757,6 +3771,15 @@ askBtn.addEventListener('click', () => {
   if (!q) return;
   addMsg('user', q);
   questionInput.value = '';
+  // v6.1 ⭐ 数学动画/授课视频：启用且命中关键词 → 走独立生成（不进普通教学流）
+  if (window._manimModeActive && window._manimModeActive() && window._shouldTriggerManim(q)) {
+    fetchManimVideo(q);
+    return;
+  }
+  if (window._videoModeActive && window._videoModeActive() && window._shouldTriggerVideo(q)) {
+    fetchTeachVideoByTopic(q);
+    return;
+  }
   if (currentMode === 'chat') {
     generalChat(q);
   } else if (currentMode === 'answer') {
@@ -4657,6 +4680,142 @@ window._resourcesModeActive = () => {
   const bar = document.getElementById('cmd-tag-bar');
   return !!bar && bar.style.display === 'flex';
 };
+
+// v6.1 数学动画 / 授课视频：持久化能力（localStorage）+ 关键词闸门
+// 用户点击按钮启用 → 对话中命中关键词才生成动画/视频（不默认触发）
+const PAEG_FEATURES_KEY = 'paeg-features-v61';
+const MANIM_TRIGGERS = /画[一]?[个张幅]?(图|动画)|演示|动图|可视化|manim|animate|visualize/i;
+const VIDEO_TRIGGERS = /生成.*视频|讲[一堂]?课|授课|录制|录视频|video/i;
+
+function loadFeatures() {
+  try {
+    const s = JSON.parse(localStorage.getItem(PAEG_FEATURES_KEY) || '{}');
+    return { manim: !!s.manim, video: !!s.video };
+  } catch (e) { return { manim: false, video: false }; }
+}
+function persistFeatures(f) {
+  localStorage.setItem(PAEG_FEATURES_KEY, JSON.stringify(f));
+}
+
+// 启用/关闭数学动画标签（持久化）
+function setManimMode(active) {
+  const tag = document.getElementById('cmd-tag-manim');
+  if (!tag) return;
+  tag.style.display = active ? 'inline-flex' : 'none';
+  const f = loadFeatures(); f.manim = active; persistFeatures(f);
+  if (active) { const vt = document.getElementById('cmd-tag-video'); if (vt) vt.style.display = 'none'; const vf = loadFeatures(); vf.video = false; persistFeatures(vf); }
+}
+// 启用/关闭授课视频标签（持久化）
+function setVideoMode(active) {
+  const tag = document.getElementById('cmd-tag-video');
+  if (!tag) return;
+  tag.style.display = active ? 'inline-flex' : 'none';
+  const f = loadFeatures(); f.video = active; persistFeatures(f);
+  if (active) { const mt = document.getElementById('cmd-tag-manim'); if (mt) mt.style.display = 'none'; const mf = loadFeatures(); mf.manim = false; persistFeatures(mf); }
+}
+window._manimModeActive = () => loadFeatures().manim;
+window._videoModeActive = () => loadFeatures().video;
+window._shouldTriggerManim = (t) => MANIM_TRIGGERS.test(t || '');
+window._shouldTriggerVideo = (t) => VIDEO_TRIGGERS.test(t || '');
+
+// 页面加载恢复持久化状态
+(function restoreFeatures() {
+  const f = loadFeatures();
+  if (f.manim) { const t = document.getElementById('cmd-tag-manim'); if (t) t.style.display = 'inline-flex'; }
+  if (f.video) { const t = document.getElementById('cmd-tag-video'); if (t) t.style.display = 'inline-flex'; }
+})();
+
+// 标签关闭按钮
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.id === 'cmd-tag-manim-x') { setManimMode(false); }
+  if (e.target && e.target.id === 'cmd-tag-video-x') { setVideoMode(false); }
+  // 触发按钮：激活对应标签
+  if (e.target && e.target.id === 'cmd-trigger-manim') {
+    const active = window._manimModeActive && window._manimModeActive();
+    setManimMode(!active);
+    if (!active) addMsg('paeg', '<b>数学动画已启用</b>：当你说"画个图/演示/可视化"时，我会生成 Manim 数学动画。再点一次按钮可关闭。');
+  }
+  if (e.target && e.target.id === 'cmd-trigger-video') {
+    const active = window._videoModeActive && window._videoModeActive();
+    setVideoMode(!active);
+    if (!active) addMsg('paeg', '<b>授课视频已启用</b>：当你说"讲一课/生成视频"时，我会生成教学视频。再点一次按钮可关闭。');
+  }
+});
+
+// 数学动画进度悬浮框（复用 resource 模式）
+function addManimProgress(topic) {
+  const box = document.createElement('div');
+  box.className = 'resource-progress';
+  box.id = 'manim-progress';
+  box.innerHTML = '<b>数学动画生成中</b>：' + (topic || '').slice(0, 20) + '… <span class="spinner" style="display:inline-block;width:12px;height:12px;border:2px solid #888;border-top-color:#333;border-radius:50%;animation:spin 0.8s linear infinite"></span>';
+  const chatWin = document.getElementById('chat-window');
+  if (chatWin) chatWin.insertBefore(box, chatWin.firstChild);
+  return box;
+}
+function removeManimProgress() {
+  const el = document.getElementById('manim-progress');
+  if (el) el.remove();
+}
+// 授课视频进度悬浮框
+function addVideoProgress(topic) {
+  const box = document.createElement('div');
+  box.className = 'resource-progress';
+  box.id = 'video-progress';
+  box.innerHTML = '<b>授课视频生成中</b>：' + (topic || '').slice(0, 20) + '… <span class="spinner" style="display:inline-block;width:12px;height:12px;border:2px solid #888;border-top-color:#333;border-radius:50%;animation:spin 0.8s linear infinite"></span>';
+  const chatWin = document.getElementById('chat-window');
+  if (chatWin) chatWin.insertBefore(box, chatWin.firstChild);
+  return box;
+}
+function removeVideoProgress() {
+  const el = document.getElementById('video-progress');
+  if (el) el.remove();
+}
+
+// v6.1 ⭐ 数学动画生成（用户点"数学动画"按钮启用后触发）
+async function fetchManimVideo(topic) {
+  const progress = addManimProgress(topic);
+  try {
+    const resp = await fetch(API_BASE + '/api/manim/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, subject: subjectSelect ? subjectSelect.value : 'math', learner_id: STATE.learnerId }),
+    });
+    const data = await resp.json();
+    removeManimProgress();
+    if (data.ok && data.url) {
+      const videoUrl = data.url.startsWith('http') ? data.url : API_BASE + data.url;
+      addMsg('paeg', '<b>📐 数学动画已生成</b><br><video controls style="max-width:100%;max-height:320px;border-radius:8px" src="' + videoUrl + '"></video>');
+    } else {
+      addMsg('paeg', '<b>数学动画生成失败</b>：' + (data.error || '未知错误') + '。可尝试说"画个图"或"演示"更明确。');
+    }
+  } catch (e) {
+    removeManimProgress();
+    addMsg('paeg', '<b>数学动画生成异常</b>：' + e.message);
+  }
+}
+
+// v6.1 ⭐ 授课视频生成（用户点"授课视频"按钮启用后触发）
+async function fetchTeachVideoByTopic(topic) {
+  const progress = addVideoProgress(topic);
+  try {
+    const resp = await fetch(API_BASE + '/api/teach/video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, outline: '## ' + topic + '\n- 概念讲解', learner_id: STATE.learnerId }),
+    });
+    const data = await resp.json();
+    removeVideoProgress();
+    if (data.ok && data.url) {
+      const videoUrl = data.url.startsWith('http') ? data.url : API_BASE + data.url;
+      addMsg('paeg', '<b>🎬 授课视频已生成</b><br><video controls style="max-width:100%;max-height:320px;border-radius:8px" src="' + videoUrl + '"></video>');
+    } else {
+      addMsg('paeg', '<b>授课视频生成失败</b>：' + (data.error || '未知错误'));
+    }
+  } catch (e) {
+    removeVideoProgress();
+    addMsg('paeg', '<b>授课视频生成异常</b>：' + e.message);
+  }
+}
 
 async function fetchResources() {
   const question = (questionInput.value || '').trim();
