@@ -5111,3 +5111,33 @@ Layer 3:  规则兜底（rule_fallback_intent）
 **2026-08-12 结果**：204 轮 6 模式 0 错误，平均 13.7s，模式切换 100%。
 
 **方法论**：见元能力 §6.41；维护手册 §18.13/18.14。
+
+
+### 12.6 Manim 数学动画模块（v6.1 规划 ⭐）
+
+**定位**：接入 3Blue1Brown 的 ManimCE（v0.21.0）作为视频生成的**上游可视化工具**——LLM 生成数学动画代码 → Docker 沙箱渲染 → 与讲稿/配音合并成教学视频。
+
+**架构**（Oracle 咨询 + Manim 调研结论）：
+```
+用户提问（数学概念）
+  → 对话路由：数学/几何类 + 动画收益高 → 触发 Manim
+  → LLM 生成 Manim Scene 代码（few-shot Prompt + Self-Healing 循环）
+  → 独立 worker 异步渲染（Docker 沙箱，资源/超时限制）
+  → 输出 mp4 → video_service 合并讲稿/配音 → 教学视频
+```
+
+**关键决策**：
+1. **ManimCE v0.21.0**（非 ManimGL）——稳定、MIT 许可、中文支持（Text+Noto Sans CJK / Tex+ctex）
+2. **Docker 隔离**——LLM 生成代码可能恶意，必须沙箱（非 root/无网络/资源限制）
+3. **异步任务**——渲染慢（30-60s/场景），请求只提交 job_id
+4. **Self-Healing**——LLM 代码首次成功率 50-70%，归一化错误反馈 → 重试（最多 2 次）
+5. **渐进降级**——Manim 失败 → 回退现有 ffmpeg 静态视频
+6. **DSL 优先**——首期仅 5 类模板（函数曲线/坐标轴/导数切线/面积积分/简单变换），不开放任意代码
+
+**与现有模块连通**：
+- video_service.py：Manim 产物作为 visual_asset 输入（合并音频）
+- 知识库：数学概念资料注入 LLM（公式/变量域有来源）
+- PPT 生成：抽取 Manim 关键帧作为配图
+- 对话路由：数学+图形类问题触发
+
+**需求表**：`audit/manim_requirements_v061.md`
