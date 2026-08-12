@@ -16,10 +16,11 @@ from __future__ import annotations
 
 # 通用教学叙事要求（所有场景 prompt 追加）
 _NARRATIVE_TAIL = """
-教学叙事要求：
+教学叙事要求（v0.63.1 ⭐ 慢速教学节奏，用户明确要求）：
 - 用"标题 → 逐步创建 → 观察停留 → 关键结论标注"的结构
-- 每个元素 Create 后至少 wait(1.5) 让用户看清
-- run_time 2-4s 慢速演示（教学节奏，不是快闪）
+- 每个元素单独 Create（不并行），创建后 wait 至少 2s 让用户看清
+- run_time 3-6s 慢速演示（绝不用 1s 以下快闪）
+- 标题 Write 后 wait 3s；结尾 wait 4s
 - 涉及图形变换时展示"过程"而非一步到位（如切线沿曲线移动、扇形重组）
 - 纯几何动画（避免 Text/MathTex 依赖；标题可用 Text 中文需 pango 支持，
   不稳定则改用纯几何 + 英文短标题）

@@ -121,8 +121,8 @@ _MANIM_SYSTEM = """你是 Manim 数学动画代码生成助手。为教学问题
 1. from manim import *
 2. Scene 类实现 construct(self)
 3. 数学曲线用 axes.plot()，几何用 Circle/Square 等
-4. 总时长 60-120 秒（v0.63 ⭐ 教学节奏：动画降速——run_time 至少 2s，
-   wait 至少 2s，演示曲线/图形时逐步创建，给学生留足观察时间）
+4. 总时长 90-150 秒（v0.63.1 ⭐ 教学慢速：run_time 不得低于 3s，wait 不得低于 2s，
+   每个元素单独 Create（不并行），创建后 wait 观察，标题展示后停留 3s，结尾停留 4s）
 5. 纯几何动画（不用 Text/MathTex 避免依赖问题）
 6. 输出完整可运行 Python 代码"""
 
