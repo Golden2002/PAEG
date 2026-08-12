@@ -1,3 +1,23 @@
+### v0.62 融合视频管线 + 制作功能工具条 + 深度思考按钮（2026-08-12）
+
+**本版定位**：视频制作从"PPT 讲解视频"升级为**融合视频**——把 manim 动画和 Library 资源剪辑进时间轴；前端 5 个制作功能按钮（无 emoji SVG）；深度思考 per-turn 按钮。
+
+**融合视频管线（Oracle 方案 + 用户学科分派）**：
+- outline_ir.py：`[[manim: 主题]]` / `[[asset: 类型: 路径]]` 占位标记解析 → 结构化 IR
+- asset_loader.py：Library/usr_knowledge 用户物料加载（realpath 防穿越）+ PPT 模板主色
+- video_service.compose_with_slots：PPT 帧 + TTS + manim 片段 + 资源叠图 → ffmpeg concat（同规格归一化）
+- services/production_pipeline.py：编排器（IR→manim 预渲染→资源解析→视频合成→PPT 同步）
+- **学科类型分派**：数学/物理/几何等可视化类才插 manim；语文/历史等自动忽略占位降级纯讲解（is_manim_subject 门控，11/11 验证）
+
+**前端制作工具条**（无 emoji，Lucide SVG）：
+- 5 按钮：讲义 / PPT / 授课视频 / 数学动画 / 深度思考（cmd-trigger + cmd-tag 悬浮标签模式）
+- 深度思考 per-turn：点一次仅下一条消息启用（payload deep_think=true，发送后自动重置，后端请求级 env 恢复）
+- emoji 清理：📐🎬📝🔊🔒 → SVG/文字（TTS 用 volume-2.svg，PPT 新建 presentation.svg）
+
+**实测**：二次函数融合视频 30.7s（PPT 3 页 + manim 抛物线动画剪辑，27s 生成）；语文主题降级验证（manim_count=0 正常出片）
+
+**文档**：维护手册 §18.20 + 元能力 §6.46 待追加
+
 ### v0.55.0 深度思考模式接入（DeepSeek V4 thinking + 能力分级矩阵）（2026-08-12）
 
 **本版定位**：接入 DeepSeek V4 深度思考（thinking 模式），按"任务分型"分级启用——生成型深度思考、混合型轻引导、分类型不思考。调研（librarian）+ 架构（Oracle）+ 用户分级原则。

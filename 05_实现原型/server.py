@@ -2917,6 +2917,12 @@ def general_chat_stream():
     """
     data = request.get_json(force=True)
     text = (data.get("text") or "").strip()
+    # v0.62 ⭐ 深度思考（per-turn）：前端按钮 → 本条消息临时启用 reasoner，
+    # 生成器结束自动恢复默认（不污染后续对话）。
+    _dt_requested = bool(data.get("deep_think"))
+    _dt_prev_env = os.environ.get("PAEG_REASONING")
+    if _dt_requested:
+        os.environ["PAEG_REASONING"] = "on"
     if not text:
         # v0.40.5 ⭐ 修复：空输入返回 200 + 友好提示（此前 400，混沌测试要求 200）
         def gen_empty_chat():
@@ -3387,6 +3393,15 @@ def general_chat_stream():
                 pass
 
         yield f"event: done\ndata: {json.dumps({'ok': True}, ensure_ascii=False)}\n\n"
+        # v0.62 ⭐ 深度思考 per-turn：生成结束恢复 env（不污染后续对话）
+        if _dt_requested:
+            try:
+                if _dt_prev_env is None:
+                    os.environ.pop("PAEG_REASONING", None)
+                else:
+                    os.environ["PAEG_REASONING"] = _dt_prev_env
+            except Exception:
+                pass
 
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

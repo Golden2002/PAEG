@@ -348,6 +348,232 @@ def generate_teaching_video(topic: str, outline: str,
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ══════════════════════════════════════════════════════════════════════
+# v1.0 ⭐ 融合视频：PPT 帧 + TTS + Manim 片段 + 资源叠图
+# （用户需求：视频要能把 manim 演示动画和 Library 资源剪辑进来，
+#   而不是简单的"PPT 讲解视频"。新增 compose_with_slots，旧函数保留。）
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _probe_duration(ffmpeg: str, path: str) -> float:
+    """用 ffprobe 测媒体时长（秒）。失败返回 4.0。"""
+    try:
+        r = subprocess.run([ffmpeg, "-i", str(path)], capture_output=True,
+                           text=True, errors="replace")
+        m = re.search(r"Duration:\s*(\d+):(\d+):([\d.]+)", r.stderr)
+        if m:
+            return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
+    except Exception:
+        pass
+    return 4.0
+
+
+def _normalize_video(ffmpeg: str, src: str, dst: Path, target_dur: float) -> None:
+    """把 manim 段统一转码为 1280x720 30fps yuv420p（concat 同规格硬约束）。"""
+    subprocess.run(
+        [ffmpeg, "-y", "-i", str(src),
+         "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,"
+                "pad=1280:720:(ow-iw)/2:(oh-ih)/2:black,"
+                "fps=30,format=yuv420p",
+         "-t", f"{target_dur:.2f}",
+         "-c:v", "libx264", "-preset", "fast",
+         "-c:a", "aac", "-b:a", "128k",
+         "-movflags", "+faststart",
+         str(dst)],
+        capture_output=True, text=True, errors="replace")
+
+
+def _render_frame_with_overlay(seg, out_png: str) -> None:
+    """绘制 PPT 帧（标题+要点），叠加 bg_image 作背景、inline_asset 角落。
+
+    seg 为 dict（build_timeline 产物）或含同名属性的对象。
+    """
+    if not _PIL_OK:
+        return
+    seg_bg = seg["bg_image"] if isinstance(seg, dict) else getattr(seg, "bg_image", None)
+    seg_inline = seg["inline_asset"] if isinstance(seg, dict) else getattr(seg, "inline_asset", None)
+    seg_title = seg["title"] if isinstance(seg, dict) else getattr(seg, "title", "")
+    seg_points = seg["points"] if isinstance(seg, dict) else getattr(seg, "points", [])
+    base = Image.new("RGB", (1280, 720), (250, 250, 250))
+    if seg_bg and os.path.isfile(seg_bg):
+        try:
+            bg = Image.open(seg_bg).convert("RGB").resize((1280, 720))
+            from PIL import ImageEnhance
+            base = ImageEnhance.Brightness(bg).enhance(0.7)
+        except Exception:
+            pass
+    d = ImageDraw.Draw(base)
+    # 标题条
+    try:
+        font_big = ImageFont.truetype("msyhbd.ttc", 42)
+        font_pt = ImageFont.truetype("msyh.ttc", 30)
+    except Exception:
+        font_big = ImageFont.load_default()
+        font_pt = font_big
+    d.rectangle([0, 0, 1280, 96], fill=(59, 91, 219))
+    d.text((48, 24), str(seg_title or "未命名"), font=font_big, fill=(255, 255, 255))
+    y = 140
+    for pt in (seg_points or [])[:6]:
+        d.text((56, y), "· " + str(pt)[:50], font=font_pt, fill=(40, 40, 40))
+        y += 46
+    # 角落叠图
+    if seg_inline and os.path.isfile(seg_inline):
+        try:
+            ic = Image.open(seg_inline).convert("RGBA")
+            ic.thumbnail((280, 200))
+            base.paste(ic, (970, 480), ic if ic.mode == "RGBA" else None)
+        except Exception:
+            pass
+    base.save(out_png)
+
+
+def _encode_frame_segment(ffmpeg: str, seg, out: Path) -> None:
+    """静态帧段：循环帧 + 音频 → 段 mp4。seg 为 dict 或含同名属性对象。"""
+    seg_dur = seg["duration"] if isinstance(seg, dict) else getattr(seg, "duration", 4.0)
+    seg_frame = seg["frame_path"] if isinstance(seg, dict) else getattr(seg, "frame_path", None)
+    seg_audio = seg["audio_path"] if isinstance(seg, dict) else getattr(seg, "audio_path", None)
+    cmd = [ffmpeg, "-y", "-loop", "1", "-i", str(seg_frame),
+           "-t", f"{seg_dur:.2f}"]
+    if seg_audio and os.path.isfile(seg_audio):
+        cmd += ["-i", str(seg_audio), "-c:v", "libx264", "-tune", "stillimage",
+                "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p",
+                "-r", "30", "-shortest"]
+    else:
+        cmd += ["-c:v", "libx264", "-tune", "stillimage",
+                "-pix_fmt", "yuv420p", "-r", "30", "-an"]
+    cmd.append(str(out))
+    subprocess.run(cmd, capture_output=True, text=True, errors="replace")
+
+
+def build_timeline(pages: list, manim_results: dict, asset_results: dict) -> list:
+    """把 pages（含 slots）转为时间轴片段序列。
+
+    - manim 占位 → 独立 TimelineSegment(kind="manim")；manim 渲染失败 → 降级静态帧
+    - asset 占位 → 合并进所属页的 bg_image / inline_asset
+    """
+    segs = []
+    for i, p in enumerate(pages):
+        bg = asset_results.get(f"{i}:bg")
+        inline = asset_results.get(f"{i}:inline")
+        narration = (p.get("narration") or "").strip() or \
+            (f"{p.get('title', '')}。{'，'.join((p.get('points') or [])[:4])}"
+             if p.get("points") else f"{p.get('title', '')}。")
+        segs.append({
+            "kind": "ppt_frame",
+            "title": p.get("title") or "未命名",
+            "points": p.get("points") or [],
+            "bg_image": bg,
+            "inline_asset": inline,
+            "narration": narration,
+            "frame_path": None,
+            "audio_path": None,
+            "duration": 0.0,
+            "video_path": None,
+        })
+        for slot in p.get("slots") or []:
+            if slot.get("kind") == "manim":
+                vp = manim_results.get(slot.get("topic"))
+                segs.append({
+                    "kind": "manim" if vp else "ppt_frame",
+                    "title": f"动画演示：{slot.get('topic', '')}",
+                    "points": [slot.get("description") or "（动态演示）"],
+                    "bg_image": None, "inline_asset": None,
+                    "narration": "", "frame_path": None, "audio_path": None,
+                    "duration": 0.0, "video_path": vp,
+                })
+    return segs
+
+
+def compose_with_slots(topic: str, ir: dict, manim_segments: dict,
+                       asset_segments: dict, learner_id: str = "anon") -> dict:
+    """v1.0 ⭐ 融合视频：PPT 帧 + TTS + Manim 片段 + 资源叠图。
+
+    输入 ir = {"pages": [...], "topic": str}（outline_ir.parse_outline_with_slots 输出）。
+    manim_segments = {slot_topic: mp4_path}（预渲染结果，缺失 → 降级静态帧）。
+    asset_segments = {"<i>:bg"/"<i>:inline": path}（可选）。
+    返回 {ok, path, url, slides, duration, manim_count, error}。
+    """
+    if not _PIL_OK or not _EDGE_OK:
+        return {"ok": False, "error": "依赖缺失：pillow + edge-tts"}
+    ffmpeg = _get_ffmpeg()
+    if not ffmpeg:
+        return {"ok": False, "error": "ffmpeg 不可用"}
+
+    timeline = build_timeline(ir.get("pages") or [], manim_segments, asset_segments)
+    if not timeline:
+        return {"ok": False, "error": "时间轴为空"}
+
+    _VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+    _h = hashlib.sha1((topic + str(time.time())).encode("utf-8")).hexdigest()[:10]
+    _out_dir = _VIDEO_DIR / str(learner_id)
+    _out_dir.mkdir(parents=True, exist_ok=True)
+    _out_mp4 = _out_dir / f"{_h}.mp4"
+    tmp = Path(tempfile.mkdtemp(prefix="paeg_fuse_"))
+    try:
+        import asyncio
+        segment_paths = []
+        for idx, seg in enumerate(timeline):
+            if seg["kind"] == "manim" and seg.get("video_path"):
+                # ── manim 段：归一化 + 按时长截取 ──
+                seg["duration"] = _probe_duration(ffmpeg, seg["video_path"])
+                out = tmp / f"seg_{idx:03d}_manim.mp4"
+                _normalize_video(ffmpeg, seg["video_path"], out, seg["duration"])
+                if os.path.isfile(out) and os.path.getsize(out) > 0:
+                    segment_paths.append(str(out))
+                    continue
+            # ── ppt_frame 段（含 manim 失败降级）──
+            fp = tmp / f"frame_{idx:03d}.png"
+            _render_frame_with_overlay(seg, str(fp))
+            seg["frame_path"] = str(fp)
+            ap = tmp / f"audio_{idx:03d}.mp3"
+            ok = asyncio.run(_tts_to_file(seg["narration"], str(ap))) \
+                if seg["narration"] else False
+            if ok:
+                seg["audio_path"] = str(ap)
+                seg["duration"] = max(3.0, _probe_duration(ffmpeg, ap) + 1.0)
+            else:
+                seg["duration"] = 4.0
+            out = tmp / f"seg_{idx:03d}_frame.mp4"
+            _encode_frame_segment(ffmpeg, seg, out)
+            if os.path.isfile(out) and os.path.getsize(out) > 0:
+                segment_paths.append(str(out))
+
+        if not segment_paths:
+            return {"ok": False, "error": "视频段生成失败"}
+
+        # ── concat 合成（同规格 copy；失败回退转码）──
+        concat_list = tmp / "concat.txt"
+        with open(concat_list, "w", encoding="utf-8") as fh:
+            for s in segment_paths:
+                fh.write(f"file '{s.replace(chr(92), '/')}'\n")
+        r = subprocess.run(
+            [ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list),
+             "-c", "copy", str(_out_mp4)],
+            capture_output=True, text=True, errors="replace")
+        if not os.path.isfile(_out_mp4) or os.path.getsize(_out_mp4) == 0:
+            r = subprocess.run(
+                [ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list),
+                 "-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p",
+                 str(_out_mp4)],
+                capture_output=True, text=True, errors="replace")
+            if not os.path.isfile(_out_mp4) or os.path.getsize(_out_mp4) == 0:
+                return {"ok": False, "error": "视频拼接失败: " + r.stderr[-300:]}
+
+        manim_count = sum(1 for t in timeline if t["kind"] == "manim")
+        return {
+            "ok": True,
+            "path": str(_out_mp4),
+            "url": f"/api/download/video/{_h}.mp4",
+            "slides": len([t for t in timeline if t["kind"] != "manim"]),
+            "duration": round(sum(t["duration"] for t in timeline), 1),
+            "manim_count": manim_count,
+            "error": "",
+        }
+    finally:
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     import sys, io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")

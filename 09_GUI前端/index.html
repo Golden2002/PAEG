@@ -1508,7 +1508,7 @@ body {
       <!-- OMIT-5/OMIT-13：问卷状态 + 入口（登录后由 JS 填充；初始隐藏） -->
       <div class="questionnaire-status" id="questionnaire-status" style="display:none">
         <div class="questionnaire-status-row">
-          <span class="questionnaire-status-icon" aria-hidden="true">📝</span>
+          <span class="questionnaire-status-icon" aria-hidden="true">问卷</span>
           <span class="questionnaire-status-text" id="questionnaire-status-text">加载中…</span>
         </div>
         <button class="questionnaire-status-btn" id="questionnaire-status-btn" type="button">查看/修改</button>
@@ -1605,9 +1605,12 @@ body {
       <select class="subject-select" id="subfield-select" disabled title="三级学科：按学段与一级学科过滤" aria-label="二级学科">
         <option value="">不限</option>
       </select>
-      <!-- v6.1 ⭐ 数学动画/授课视频触发按钮（像查资料一样点击激活）-->
-      <button class="cmd-trigger" id="cmd-trigger-manim" title="启用数学动画：说'画个图/演示/可视化'时生成 Manim 动画" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)">📐 数学动画</button>
-      <button class="cmd-trigger" id="cmd-trigger-video" title="启用授课视频：说'讲一课/生成视频'时生成教学视频" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)">🎬 授课视频</button>
+      <!-- v6.1/v0.62 ⭐ 制作功能触发按钮（无 emoji，SVG 图标；像查资料一样点击激活）-->
+      <button class="cmd-trigger" id="cmd-trigger-handout" title="启用讲义制作：说'讲义/要点/笔记'时生成讲义文档" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>讲义</button>
+      <button class="cmd-trigger" id="cmd-trigger-ppt" title="启用 PPT 制作：说'做 PPT/演示文稿'时生成 PPT" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 12v3"/><path d="M14 12v3"/><path d="M8 15h8"/><path d="M12 9v1"/></svg>PPT</button>
+      <button class="cmd-trigger" id="cmd-trigger-video" title="启用授课视频：说'讲一课/生成视频'时生成教学视频" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>授课视频</button>
+      <button class="cmd-trigger" id="cmd-trigger-manim" title="启用数学动画：说'画个图/演示/可视化'时生成 Manim 动画" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M16 8.9V7H8l4 5-4 5h8v-1.9"/></svg>数学动画</button>
+      <button class="cmd-trigger" id="cmd-trigger-deepthink" title="深度思考：下一条消息启用深度推理" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>深度思考</button>
       <!-- v0.41.9 ⭐ 修复：input→textarea（input 无法换行，长文字只能横向滚动；
            现支持自动换行 + 自适应高度，用户输入长问题也能看到全部内容） -->
       <!-- v0.44 ⭐ 指令标签栏：ChatGPT 式悬浮选项——点"查资料"激活为指令标签，输入后发送走检索 -->
@@ -1623,6 +1626,18 @@ body {
         <span class="cmd-tag" id="cmd-tag-video" data-cmd="video" style="display:none;align-items:center;gap:5px;background:var(--accent);color:#fff;font-size:12px;padding:3px 10px;border-radius:12px">
           <img class="link-icon" src="assets/icons/video.svg" alt="" style="width:12px;height:12px"/>授课视频
           <b style="cursor:pointer;margin-left:2px" title="关闭授课视频" id="cmd-tag-video-x">×</b>
+        </span>
+        <span class="cmd-tag" id="cmd-tag-handout" data-cmd="handout" style="display:none;align-items:center;gap:5px;background:var(--accent-2);color:#fff;font-size:12px;padding:3px 10px;border-radius:12px">
+          <img class="link-icon" src="assets/icons/file-text.svg" alt="" style="width:12px;height:12px"/>讲义
+          <b style="cursor:pointer;margin-left:2px" title="关闭讲义" id="cmd-tag-handout-x">×</b>
+        </span>
+        <span class="cmd-tag" id="cmd-tag-ppt" data-cmd="ppt" style="display:none;align-items:center;gap:5px;background:var(--accent);color:#fff;font-size:12px;padding:3px 10px;border-radius:12px">
+          <img class="link-icon" src="assets/icons/presentation.svg" alt="" style="width:12px;height:12px"/>PPT
+          <b style="cursor:pointer;margin-left:2px" title="关闭 PPT" id="cmd-tag-ppt-x">×</b>
+        </span>
+        <span class="cmd-tag" id="cmd-tag-deepthink" data-cmd="deepthink" style="display:none;align-items:center;gap:5px;background:var(--accent);color:#fff;font-size:12px;padding:3px 10px;border-radius:12px">
+          <img class="link-icon" src="assets/icons/sparkles.svg" alt="" style="width:12px;height:12px"/>深度思考（下一条）
+          <b style="cursor:pointer;margin-left:2px" title="关闭深度思考" id="cmd-tag-deepthink-x">×</b>
         </span>
       </div>
       <textarea class="question-input" id="question-input" rows="1" placeholder="输入你想学习的内容…" autocomplete="off" aria-label="输入你想学习的内容"></textarea>
@@ -2125,7 +2140,7 @@ function addMsg(role, html, tone, intent, preHtml) {
     ? `<button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button>` : '';
   // v0.36 ⭐ 语音播放按钮（调后端 /api/voice/tts 朗读回复）
   const speakBtn = role === 'paeg'
-    ? `<button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button>` : '';
+    ? `<button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)"><img class="link-icon" src="assets/icons/volume-2.svg" alt="朗读" style="width:13px;height:13px;vertical-align:middle"/></button>` : '';
   const checkBox = role === 'paeg'
     ? `<input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" />` : '';
   div.innerHTML = `
@@ -2773,7 +2788,7 @@ async function teach(question, subject, subtopic) {
             mainBubble = document.createElement('div');
             mainBubble.className = 'msg paeg';
             mainBubble.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><div class="md-content"></div>
-              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div></div>`;
+              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)"><img class="link-icon" src="assets/icons/volume-2.svg" alt="朗读" style="width:13px;height:13px;vertical-align:middle"/></button></div></div>`;
             chatWin.appendChild(mainBubble);
           }
           // v0.36.1 ⭐ 修复：实时渲染累积内容——此前只追加字符串、最后一次性渲染
@@ -2793,7 +2808,7 @@ async function teach(question, subject, subtopic) {
             mainBubble = document.createElement('div');
             mainBubble.className = 'msg paeg';
             mainBubble.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><div class="md-content"></div>
-              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div></div>`;
+              <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)"><img class="link-icon" src="assets/icons/volume-2.svg" alt="朗读" style="width:13px;height:13px;vertical-align:middle"/></button></div></div>`;
             chatWin.appendChild(mainBubble);
           }
           insertRetrievalBadge(mainBubble, obj.done);
@@ -2895,7 +2910,7 @@ function makeStepBubble(idx) {
   const div = document.createElement('div');
   div.className = 'msg paeg';
   div.innerHTML = `<div class="msg-avatar">É</div><div class="msg-bubble"><span class="step-tag">讲解</span><div class="md-content"></div>
-    <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div>
+    <div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)"><img class="link-icon" src="assets/icons/volume-2.svg" alt="朗读" style="width:13px;height:13px;vertical-align:middle"/></button></div>
   </div>`;
   chatWin.appendChild(div);
   chatWin.scrollTop = chatWin.scrollHeight;
@@ -2963,9 +2978,17 @@ async function generalChat(text) {
         grade_level: document.getElementById('grade-select').value,
         mode: currentMode,
         text: text,
+        // v0.62 ⭐ 深度思考：per-turn 临时态（发送后自动重置）
+        deep_think: !!(STATE && STATE.deepThinkNext),
       }),
       signal: controller.signal,
     });
+    // 发送后重置深度思考（无论成功失败，只对下一条生效）
+    if (STATE && STATE.deepThinkNext) {
+      STATE.deepThinkNext = false;
+      const dtag = document.getElementById('cmd-tag-deepthink');
+      if (dtag) dtag.style.display = 'none';
+    }
     if (!resp.ok) throw new Error(`API ${resp.status}`);
     const reader = resp.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -3043,7 +3066,7 @@ async function generalChat(text) {
         const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(textParts)));
         bubbleBody.innerHTML = toolCards.map(c => c.outerHTML).join('') +
           '<div class="md-content">' + (typeof marked !== 'undefined' ? marked.parse(fixedText) : escapeHtml(textParts)) + '</div>' +
-          '<div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div>';
+          '<div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)"><img class="link-icon" src="assets/icons/volume-2.svg" alt="朗读" style="width:13px;height:13px;vertical-align:middle"/></button></div>';
         // 保存原始文本（复制/文档用）
         bubble._rawText = textParts;
         renderMath(bubbleBody);
@@ -3051,7 +3074,7 @@ async function generalChat(text) {
       } catch (e) {
         // v0.19.18：渲染失败不阻塞——至少显示纯文本
         bubbleBody.innerHTML = '<div class="md-content">' + escapeHtml(textParts) + '</div>' +
-          '<div class="msg-actions"><input type="checkbox" class="msg-select" /><button class="msg-copy" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)">🔊</button></div>';
+          '<div class="msg-actions"><input type="checkbox" class="msg-select" /><button class="msg-copy" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)"><img class="link-icon" src="assets/icons/volume-2.svg" alt="朗读" style="width:13px;height:13px;vertical-align:middle"/></button></div>';
         bubble._rawText = textParts;
       }
     } else {
@@ -3935,7 +3958,7 @@ askBtn.addEventListener('click', () => {
       return;
     }
     if (err === 'not-allowed' || err === 'service-not-allowed') {
-      addMsg('paeg', '<small> 麦克风权限被拒绝。请在浏览器地址栏左侧的🔒图标 → 网站设置中允许麦克风，然后重试。</small>');
+      addMsg('paeg', '<small> 麦克风权限被拒绝。请在浏览器地址栏左侧的锁形图标 → 网站设置中允许麦克风，然后重试。</small>');
     } else if (err === 'network') {
       addMsg('paeg', '<small> 语音识别网络错误（Chrome 语音服务需要联网）。</small>');
     } else if (err === 'no-speech') {
@@ -4050,7 +4073,7 @@ askBtn.addEventListener('click', () => {
           } catch (e) { reject(e); }
         }).catch(err => {
           if (err && err.name === 'NotAllowedError') {
-            addMsg('paeg', '<small> 麦克风权限被拒绝。请点击地址栏🔒图标允许麦克风后重试。</small>');
+            addMsg('paeg', '<small> 麦克风权限被拒绝。请点击地址栏锁形图标允许麦克风后重试。</small>');
           } else {
             addMsg('paeg', '<small> 无法获取麦克风：' + (err && err.message ? err.message : err) + '</small>');
           }
@@ -4256,7 +4279,7 @@ async function playMsgTTS(btn) {
         p.catch((e) => {
           if (e && e.name === 'AbortError') return; // 主动取消，不提示
           console.error('[TTS] play rejected:', e);
-          addMsg('paeg', '<small>🔊 播放被浏览器拦截（自动播放限制）。请点击页面任意位置后，再点一次 🔊 重试。</small>');
+          addMsg('paeg', '<small>播放被浏览器拦截（自动播放限制）。请点击页面任意位置后，再点一次朗读按钮重试。</small>');
         });
       }
     } else {
@@ -4700,23 +4723,27 @@ window._resourcesModeActive = () => {
   return !!bar && bar.style.display === 'flex';
 };
 
-// v6.1 数学动画 / 授课视频：持久化能力（localStorage）+ 关键词闸门
-// 用户点击按钮启用 → 对话中命中关键词才生成动画/视频（不默认触发）
-const PAEG_FEATURES_KEY = 'paeg-features-v61';
+// v6.1/v0.62 制作功能：持久化能力（localStorage）+ 关键词闸门
+// 数学动画/授课视频：启用 + 命中关键词才生成（不默认触发）
+// 讲义/PPT：启用后对话中带"讲义/PPT"关键词即生成
+// 深度思考：per-turn 临时态（下一条消息生效，不持久化）
+const PAEG_FEATURES_KEY = 'paeg-features-v62';
 const MANIM_TRIGGERS = /画[一]?[个张幅]?(图|动画)|演示|动图|可视化|manim|animate|visualize/i;
 const VIDEO_TRIGGERS = /生成.*视频|讲[一堂]?课|授课|录制|录视频|video/i;
+const HANDOUT_TRIGGERS = /讲义|笔记|要点|整理成文|学习资料/i;
+const PPT_TRIGGERS = /ppt|演示文稿|做.*课件|幻灯片|slide/i;
 
 function loadFeatures() {
   try {
     const s = JSON.parse(localStorage.getItem(PAEG_FEATURES_KEY) || '{}');
-    return { manim: !!s.manim, video: !!s.video };
-  } catch (e) { return { manim: false, video: false }; }
+    return { manim: !!s.manim, video: !!s.video, handout: !!s.handout, ppt: !!s.ppt };
+  } catch (e) { return { manim: false, video: false, handout: false, ppt: false }; }
 }
 function persistFeatures(f) {
   localStorage.setItem(PAEG_FEATURES_KEY, JSON.stringify(f));
 }
 
-// 启用/关闭数学动画标签（持久化）
+// 启用/关闭数学动画标签（持久化，与视频互斥）
 function setManimMode(active) {
   const tag = document.getElementById('cmd-tag-manim');
   if (!tag) return;
@@ -4724,7 +4751,7 @@ function setManimMode(active) {
   const f = loadFeatures(); f.manim = active; persistFeatures(f);
   if (active) { const vt = document.getElementById('cmd-tag-video'); if (vt) vt.style.display = 'none'; const vf = loadFeatures(); vf.video = false; persistFeatures(vf); }
 }
-// 启用/关闭授课视频标签（持久化）
+// 启用/关闭授课视频标签（持久化，与动画互斥）
 function setVideoMode(active) {
   const tag = document.getElementById('cmd-tag-video');
   if (!tag) return;
@@ -4732,22 +4759,53 @@ function setVideoMode(active) {
   const f = loadFeatures(); f.video = active; persistFeatures(f);
   if (active) { const mt = document.getElementById('cmd-tag-manim'); if (mt) mt.style.display = 'none'; const mf = loadFeatures(); mf.manim = false; persistFeatures(mf); }
 }
+// v0.62 启用/关闭讲义标签（持久化）
+function setHandoutMode(active) {
+  const tag = document.getElementById('cmd-tag-handout');
+  if (!tag) return;
+  tag.style.display = active ? 'inline-flex' : 'none';
+  const f = loadFeatures(); f.handout = active; persistFeatures(f);
+}
+// v0.62 启用/关闭 PPT 标签（持久化）
+function setPptMode(active) {
+  const tag = document.getElementById('cmd-tag-ppt');
+  if (!tag) return;
+  tag.style.display = active ? 'inline-flex' : 'none';
+  const f = loadFeatures(); f.ppt = active; persistFeatures(f);
+}
+// v0.62 深度思考：per-turn 临时态（不持久化）
+function setDeepThink(active) {
+  const tag = document.getElementById('cmd-tag-deepthink');
+  if (tag) tag.style.display = active ? 'inline-flex' : 'none';
+  STATE.deepThinkNext = !!active;
+  if (active) addMsg('paeg', '<b>深度思考已启用</b>：下一条消息将进行深度推理（Reasoner 模式）。发送后自动关闭。');
+}
 window._manimModeActive = () => loadFeatures().manim;
 window._videoModeActive = () => loadFeatures().video;
+window._handoutModeActive = () => loadFeatures().handout;
+window._pptModeActive = () => loadFeatures().ppt;
+window._deepThinkActive = () => !!(STATE && STATE.deepThinkNext);
 window._shouldTriggerManim = (t) => MANIM_TRIGGERS.test(t || '');
 window._shouldTriggerVideo = (t) => VIDEO_TRIGGERS.test(t || '');
+window._shouldTriggerHandout = (t) => HANDOUT_TRIGGERS.test(t || '');
+window._shouldTriggerPpt = (t) => PPT_TRIGGERS.test(t || '');
 
 // 页面加载恢复持久化状态
 (function restoreFeatures() {
   const f = loadFeatures();
   if (f.manim) { const t = document.getElementById('cmd-tag-manim'); if (t) t.style.display = 'inline-flex'; }
   if (f.video) { const t = document.getElementById('cmd-tag-video'); if (t) t.style.display = 'inline-flex'; }
+  if (f.handout) { const t = document.getElementById('cmd-tag-handout'); if (t) t.style.display = 'inline-flex'; }
+  if (f.ppt) { const t = document.getElementById('cmd-tag-ppt'); if (t) t.style.display = 'inline-flex'; }
 })();
 
-// 标签关闭按钮
+// 标签关闭按钮 + 触发按钮
 document.addEventListener('click', (e) => {
   if (e.target && e.target.id === 'cmd-tag-manim-x') { setManimMode(false); }
   if (e.target && e.target.id === 'cmd-tag-video-x') { setVideoMode(false); }
+  if (e.target && e.target.id === 'cmd-tag-handout-x') { setHandoutMode(false); }
+  if (e.target && e.target.id === 'cmd-tag-ppt-x') { setPptMode(false); }
+  if (e.target && e.target.id === 'cmd-tag-deepthink-x') { setDeepThink(false); }
   // 触发按钮：激活对应标签
   if (e.target && e.target.id === 'cmd-trigger-manim') {
     const active = window._manimModeActive && window._manimModeActive();
@@ -4758,6 +4816,20 @@ document.addEventListener('click', (e) => {
     const active = window._videoModeActive && window._videoModeActive();
     setVideoMode(!active);
     if (!active) addMsg('paeg', '<b>授课视频已启用</b>：当你说"讲一课/生成视频"时，我会生成教学视频。再点一次按钮可关闭。');
+  }
+  if (e.target && e.target.id === 'cmd-trigger-handout') {
+    const active = window._handoutModeActive && window._handoutModeActive();
+    setHandoutMode(!active);
+    if (!active) addMsg('paeg', '<b>讲义制作已启用</b>：当你说"讲义/要点/笔记"时，我会生成讲义文档。');
+  }
+  if (e.target && e.target.id === 'cmd-trigger-ppt') {
+    const active = window._pptModeActive && window._pptModeActive();
+    setPptMode(!active);
+    if (!active) addMsg('paeg', '<b>PPT 制作已启用</b>：当你说"做 PPT/演示文稿"时，我会生成 PPT。');
+  }
+  if (e.target && e.target.id === 'cmd-trigger-deepthink') {
+    const active = window._deepThinkActive && window._deepThinkActive();
+    setDeepThink(!active);
   }
 });
 
@@ -4803,7 +4875,7 @@ async function fetchManimVideo(topic) {
     removeManimProgress();
     if (data.ok && data.url) {
       const videoUrl = data.url.startsWith('http') ? data.url : API_BASE + data.url;
-      addMsg('paeg', '<b>📐 数学动画已生成</b><br><video controls style="max-width:100%;max-height:320px;border-radius:8px" src="' + videoUrl + '"></video>');
+      addMsg('paeg', '<b>数学动画已生成</b><br><video controls style="max-width:100%;max-height:320px;border-radius:8px" src="' + videoUrl + '"></video>');
     } else {
       addMsg('paeg', '<b>数学动画生成失败</b>：' + (data.error || '未知错误') + '。可尝试说"画个图"或"演示"更明确。');
     }
@@ -4826,7 +4898,7 @@ async function fetchTeachVideoByTopic(topic) {
     removeVideoProgress();
     if (data.ok && data.url) {
       const videoUrl = data.url.startsWith('http') ? data.url : API_BASE + data.url;
-      addMsg('paeg', '<b>🎬 授课视频已生成</b><br><video controls style="max-width:100%;max-height:320px;border-radius:8px" src="' + videoUrl + '"></video>');
+      addMsg('paeg', '<b>授课视频已生成</b><br><video controls style="max-width:100%;max-height:320px;border-radius:8px" src="' + videoUrl + '"></video>');
     } else {
       addMsg('paeg', '<b>授课视频生成失败</b>：' + (data.error || '未知错误'));
     }
