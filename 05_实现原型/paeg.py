@@ -42,6 +42,12 @@ class LearnerProfile:
     # 兼容旧 _crisis_opt_out(bool)：读取时优先 _crisis_state，缺失则迁移旧值
     _crisis_state: Optional[dict] = field(default=None)
 
+    # v0.47 ⭐ 掌握度别名（Oracle 审查）：前端/调用方用 learner.masteries 恒可读，
+    # 后端字段名切换（subjects_mastery）不破坏调用方。
+    @property
+    def masteries(self) -> dict:
+        return getattr(self, "subjects_mastery", {}) or {}
+
 
 @dataclass
 class SessionContext:

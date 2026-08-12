@@ -1817,12 +1817,37 @@ def teach_stream():
         # v0.37.1 ⭐ Oracle P1-2 修复：共享一个 _FakeSession（此前构造 3 次，
         # summary 基于空 evaluations → avg_score 恒 0 → 触发噪声"提示词自进化"）
         _fs_shared = _FakeSession(learner, concept, subject, plan, [])
-        # 用真实教学步数估算掌握度（无 Evaluator 时的合理兜底，避免恒 0）
+        # v0.47 ⭐ 掌握度真实化：旧公式 `0.6 + 0.08 * 讲解段数` 是"AI 输出长度"伪信号
+        # （3 段讲解恒 = 0.84 → EMA 收敛 → 侧边栏永远 0.84，与学生真实掌握零相关）。
+        # 新信号：从 chat_hist 取最近学生消息，用 Evaluator._student_signal 做浅层语义分析
+        # （理解词/困惑词/参与度）→ 分数随真实学习状态波动："懂了"涨、"太难了"降。
         try:
             if _assistant_parts:
+                _std_text = ""
+                try:
+                    _hist_chat = SESSIONS.get(f"chat_hist_{learner_id}", []) or []
+                    for _hh in reversed(_hist_chat[-10:]):
+                        if isinstance(_hh, dict) and _hh.get("role") == "user":
+                            _cc = _hh.get("content")
+                            if isinstance(_cc, str) and _cc.strip():
+                                _std_text = _cc.strip()
+                                break
+                except Exception:
+                    pass
+                try:
+                    if _std_text:
+                        _sig = paeg.evaluator._student_signal(_std_text)
+                        _est = 0.5 + 0.3 * _sig["understanding"] \
+                            - 0.2 * _sig["confusion"] + 0.1 * _sig["engagement"]
+                    else:
+                        # 无学生反馈：中性保守（不虚高 0.84）
+                        _est = 0.55
+                except Exception:
+                    _est = 0.55
                 _fs_shared.evaluations.append({
-                    "score": min(0.95, 0.6 + 0.08 * len(_assistant_parts)),
+                    "score": round(min(0.95, max(0.2, _est)), 3),
                     "step": "summary_estimate",
+                    "signal_source": "student_reply" if _std_text else "no_student_data",
                 })
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
@@ -2412,6 +2437,8 @@ def teach_video():
     """v0.45 ⭐ 授课视频生成：PPT 大纲 → 教学视频（画面 + 语音讲解）。
 
     请求：{topic, outline, learner_id} —— outline 为 "## 章节 + - 要点" 结构
+
+    请求：{topic, outline, learner_id} —— outline 为 "## 章节 + - 要点" 结构
     （可与 /api/resources 的 ppt_outline 或 LLM 生成的大纲直接复用）。
     响应：{ok, url, slides, duration} —— url 可下载播放 mp4。
     """
@@ -2429,6 +2456,29 @@ def teach_video():
         return jsonify({"ok": False, "error": result.get("error") or "视频生成失败"}), 500
     except Exception as e:
         return jsonify({"ok": False, "error": f"授课视频生成异常: {e}"}), 500
+
+
+@app.route("/api/manim/generate", methods=["POST"])
+def manim_generate():
+    """v6.1 数学动画生成：LLM/模板生成 Manim 代码 -> 隔离渲染 -> 数学动画视频。
+    请求：{topic, subject, learner_id}。响应：{ok, url, error}。
+    独立模块：不影响 /api/teach/video（现有视频流程）。
+    """
+    data = request.get_json(force=True) or {}
+    topic = (data.get("topic") or "").strip()
+    subject = data.get("subject") or "math"
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
+    if not topic:
+        return jsonify({"ok": False, "error": "topic is required"}), 400
+    try:
+        from manim_service import generate_manim_video
+        result = generate_manim_video(topic, subject, learner_id)
+        if result.get("ok"):
+            return jsonify(result)
+        return jsonify({"ok": False, "error": result.get("error") or "数学动画生成失败"}), 500
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"数学动画生成异常: {e}"}), 500
+
 
 @app.route("/api/voice/stt", methods=["POST"])
 @require_module("voice")
@@ -3949,6 +3999,35 @@ def knowledge_query():
                 return _correct
     except Exception as _e:
         print(f"[PAEG][server.py] knowledge_query 异常忽略: {_e}")
+        pass
+    # v6.0 ⭐ P0 修复：知识库模式下自我指涉问题（"你有哪些功能/你是谁"）应走
+    # 确定性模板而非库清点——与 teach/chat 端点对齐（Cascade 规则优先）
+    try:
+        from self_referential import is_interface_query, handle_interface_query
+        if _q and is_interface_query(_q):
+            _ui_reply = handle_interface_query(_q, learner)
+            return jsonify({
+                "presentations": [{"step_id": 1, "content": _ui_reply, "step_type": "interface"}],
+                "mode": "knowledge",
+                "ok": True,
+            })
+    except Exception as _e:
+        print(f"[PAEG][server.py] knowledge interface 拦截异常忽略: {_e}")
+        pass
+    # v6.0 ⭐ 乱码/无意义输入快速兜底（测试发现 zzz 触发 78s LLM 推理）
+    try:
+        from utils.gibberish import is_gibberish
+        if _q and is_gibberish(_q):
+            _gib_reply = ("好的，我收到你的输入了。刚才那串内容我没能识别成具体的问题——"
+                          "可能是手滑或乱码。你可以重新说一遍想问的，比如「查一下什么是导数」"
+                          "或者「你的知识库里有什么」。我会一直在这儿。")
+            return jsonify({
+                "presentations": [{"step_id": 1, "content": _gib_reply, "step_type": "chat"}],
+                "mode": "knowledge",
+                "ok": True,
+            })
+    except Exception as _e:
+        print(f"[PAEG][server.py] knowledge gibberish 兜底异常忽略: {_e}")
         pass
     result = _handle_knowledge_query(learner, subject)
     # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）

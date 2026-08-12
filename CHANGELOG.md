@@ -1,3 +1,49 @@
+### v0.55.0 深度思考模式接入（DeepSeek V4 thinking + 能力分级矩阵）（2026-08-12）
+
+**本版定位**：接入 DeepSeek V4 深度思考（thinking 模式），按"任务分型"分级启用——生成型深度思考、混合型轻引导、分类型不思考。调研（librarian）+ 架构（Oracle）+ 用户分级原则。
+
+**能力分级矩阵**（SUBAGENT_THINKING_LEVELS）：
+- **A 路径**（reasoner 真思考链）：Presenter 教学讲解、AnswerSolver 复杂解答——开放式长文本，受益最大
+- **B 路径**（_THINK_PREFIX prompt 引导，零成本）：Diagnostor 诊断、SelfUpdate 反思、Individuality 建模——混合型，防 JSON 污染
+- **OFF**（纯普通调用）：meta_router 意图路由、Adapter 选项选择、retrieval_scope——分类/识别型，思考干扰决策 + 延迟敏感
+- **用户原则**：思考接口可留但不连接前端；分类/选择型任务不需要深度思考
+
+**技术实现**：
+- llm_api.py：新增 ReasonerModelAPI（`thinking:{"type":"enabled"}` + `reasoning_effort` + `reasoning_content` 提取 + reasoning_tokens 统计）；chat() 保持原契约（返回 content 字符串）零破坏
+- 模型名迁移：deepseek-chat/deepseek-reasoner（2026-07-24 下线别名）→ deepseek-v4-flash 自动迁移
+- subagents.py：_safe_reason_chat（A 双阶段：reasoner 思考→flash 落地；B prompt 引导；OFF 纯调用）+ 三态 enable_reasoning（None=查矩阵/True=强制A/False=强制OFF）+ _summarize_thinking 思考摘要（防 token 爆）
+- 门控：PAEG_REASONING=on 总开关（默认 off 零影响）；PAEG_REASONING_FORCE=on 强制全 A；PAEG_THINK_MAX_CHARS 思考注入上限
+- reasoner 不支持 tools → 有工具需求的调用自动降级 B 路径
+
+**验证**（直接调用，未跑 pytest）：
+- 能力矩阵 9/9 通过；ReasonerModelAPI 3/3（解析/兼容/tools 拒绝）；全文件 py_compile 通过
+- 思考链注入带 `<<UNTRUSTED trust=internal>>` 标记 + 泄漏检测（防思考内容外泄/注入污染）
+
+**文档**：维护手册 §18.19 + 元能力 §6.45 待追加
+
+### v0.54.0 掌握度真实化 + Affection 判读层 + SSE 重构工具（2026-08-12）
+
+**本版定位**：修复"掌握度恒定 0.84"根因（讲解段数伪信号）→ 改用学生真实回复信号；Affection 模块引入 Oracle 方案 A 结构化判读层；SSE 重构 P0 基线工具就绪。
+
+**掌握度真实化（Oracle 审查）**：
+- 根因：teach_stream 兜底评分 `score = 0.6 + 0.08 × 讲解段数`（3 段恒 0.84，与学习零相关）
+- 修复：从 chat_hist 取最近学生消息 → Evaluator._student_signal 浅层语义分析（理解/困惑/参与度）→ 真实信号评分（"懂了"涨、"太难了"降；无数据中性 0.55）
+- 前端：修复 STATE.masteries 从未赋值 bug（stat-avg 恒"-"）；stat-avg 透明化"N科·均值"+hover 各科明细；完成播报语义化（理解反馈良好/一般/偏弱）
+- 收尾：LearnerProfile.masteries 别名属性 + 清理 _student_signal 冗余 isinstance
+
+**Affection 判读层（Oracle 方案 A）**：
+- 新增 `_analyze_turn()` 结构化判读层（subagents.py）：危机硬规则 → 情绪词典 → 反问密度 → 决策映射，输出 emotion/intensity/need/stage/response_mode/confidence
+- 6 种回应模式（acknowledge/reframe/ground/anchor/explore/clarify）注入 system prompt（confidence≥0.5 硬约束，<0.5 软引导）
+- 与 RiskClassifier 正交：判读层只决定回应模式，风险等级仍由安全分类器负责，不破坏危机协议
+- 实测 6/6 case：危机→acknowledge+0.85、拒绝→anchor、反问→clarify、挫败→reframe、正反馈→explore、普通烦躁→acknowledge 软引导
+
+**SSE 重构 P0（Oracle 方案）**：
+- tests/baselines/record_teach_stream.py 基线录制脚本（5 场景）
+- tests/baselines/test_sse_regression.py 字节级回归断言（事件顺序/JSON 契约）
+- P1-P4（协议层/阶段处理器/编排器）按计划后续推进
+
+**文档**：维护手册 + 元能力 + 技术全景 §10 待追加
+
 ### v0.53.0 视频生成升级 + 8 层约束确认 + 路演 PPT v3（2026-08-11）
 
 **本版定位**：视频生成从"标题+要点拼接"升级为"演讲稿驱动"（Oracle pipeline）+ 8 层约束实现确认 + 路演 PPT 详实版。
@@ -1999,3 +2045,15 @@ SECRET_KEY 生产强制；ResourceLibrarian 全局持有；文件操作能力扩
 | Python 综合测试 | 114+ 全过，无回归 |
 
 > **元能力沉淀**：本次按"能力维度"切审计（语言/记忆/检索/停止/架构）而非按模式逐个看——发现了 3 个"读而不写"的隐性 bug（affection/method/knowledge 续问丢上文）。详见 [元能力 §6.31](./元能力文档.md) 的三条新教训。
+
+### v6.0.0 Magic 口令层 + 高压测试（2026-08-12）
+**定位**：意图路由 Magic 口令架构 + 204 轮高压测试 + 乱码快速兜底。
+**意图路由**：
+- Magic 口令层（magic_intent.py）：身份/能力/知识口令精确匹配 → 固定模板（零 LLM）
+- 复合输入修复："帮我分析这段话"不走 interface，走 material
+- ambiguous 输入（你学过什么）由 LLM 判断（INTENT_PROMPT 补示例）
+**测试**：
+- 高压测试 204 轮 6 模式 0 错误，平均 13.7s，模式切换 100%
+- 乱码快速兜底（utils/gibberish.py）：78s → 0.2s
+- 测试框架资产化（stress_parallel.py 可复用）
+**文档**：技术全景 12.4/12.5 + 维护手册 18.13/18.14 + 元能力 6.41
