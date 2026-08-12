@@ -1,0 +1,195 @@
+# -*- coding: utf-8 -*-
+"""v6.1 ⭐ Manim 模板库（LLM 失败时的兜底 + 演示）
+v0.63 ⭐ 动画降速：run_time 提高 / wait 加长 / 增加慢速分段——
+用户反馈动画太快，数学演示需要留足观察时间（教学节奏）。
+首期 5 类数学动画模板（Oracle 建议）：函数曲线/坐标轴/导数切线/面积积分/几何变换
+"""
+import re
+
+_TEMPLATES = {
+    'derivative': '''from manim import *
+import numpy as np
+
+class DerivativeVisual(Scene):
+    def construct(self):
+        self.wait(1)
+        title = Text("导数：切线的斜率", font_size=40, color=WHITE)
+        title.to_edge(UP)
+        self.play(Write(title), run_time=2)
+        axes = Axes(x_range=[-3, 3, 1], y_range=[-1, 9, 2],
+                    x_length=8, y_length=5, axis_config={"color": WHITE})
+        graph = axes.plot(lambda x: x**2, x_range=[-3, 3], color=GOLD)
+        self.play(Create(axes), run_time=3)
+        self.play(Create(graph), run_time=3)
+        dot = Dot(color=BLUE).move_to(axes.c2p(0, 0))
+        self.play(Create(dot), run_time=1.5)
+        def tangent_at(x0):
+            slope = 2 * x0
+            return axes.plot(lambda x: slope*(x-x0)+x0**2,
+                             x_range=[x0-1.5, x0+1.5], color=BLUE)
+        tangent = tangent_at(0)
+        self.play(Create(tangent), run_time=2)
+        for x0 in np.linspace(-2, 2, 12):
+            dot.move_to(axes.c2p(x0, x0**2))
+            self.play(Transform(tangent, tangent_at(x0)), run_time=0.9)
+            self.wait(0.6)
+        self.wait(3)
+''',
+    'quadratic': '''from manim import *
+
+class QuadraticGraph(Scene):
+    def construct(self):
+        self.wait(1)
+        title = Text("二次函数 y = x² - 2", font_size=40, color=WHITE)
+        title.to_edge(UP)
+        self.play(Write(title), run_time=2)
+        axes = Axes(x_range=[-4, 4, 1], y_range=[-5, 5, 1],
+                    x_length=9, y_length=5, axis_config={"color": WHITE})
+        graph = axes.plot(lambda x: x**2 - 2, x_range=[-3.5, 3.5], color=GOLD)
+        self.play(Create(axes), run_time=3)
+        self.play(Create(graph), run_time=4)
+        vertex = Dot(axes.c2p(0, -2), color=RED)
+        self.play(Create(vertex), run_time=2)
+        vline = DashedLine(axes.c2p(0, -5), axes.c2p(0, 5), color=RED)
+        self.play(Create(vline), run_time=2)
+        self.wait(3)
+''',
+    'circle_area': '''from manim import *
+import numpy as np
+
+class CircleArea(Scene):
+    """圆的面积：扇形切分 → 重组为近似长方形（教学推导动画，v0.63 用心版）
+
+    教学叙事：
+    1. 画一个圆，标注半径 r
+    2. 切成 8 个扇形（像披萨）
+    3. 扇形交错重组成"锯齿长方形"——高=r，底=半周长=πr
+    4. 展示面积 = 底 × 高 = πr²（切分越细越接近完美长方形）
+    """
+    def construct(self):
+        self.wait(1)
+        title = Text("圆的面积：切分与重组", font_size=44, color=WHITE)
+        title.to_edge(UP)
+        self.play(Write(title), run_time=2)
+
+        # 1. 画圆 + 半径
+        circle = Circle(radius=2.2, color=BLUE, fill_opacity=0.2)
+        radius = Line(circle.get_center(), circle.get_right(), color=RED, stroke_width=3)
+        r_label = Text("r", font_size=32, color=RED).move_to(radius.get_center() + UP*0.3)
+        self.play(Create(circle), run_time=3)
+        self.play(Create(radius), run_time=1.5)
+        self.play(Write(r_label), run_time=1)
+
+        # 2. 切成 8 个扇形（沿直径切 4 刀 → 8 片）
+        sectors = []
+        n = 8
+        for i in range(n):
+            start_ang = i * TAU / n
+            end_ang = (i + 1) * TAU / n
+            sector = Sector(
+                arc_center=circle.get_center(), radius=2.2,
+                start_angle=start_ang, angle=TAU/n,
+                color=BLUE if i % 2 == 0 else GOLD,
+                fill_opacity=0.8, stroke_width=1.5,
+            )
+            sectors.append(sector)
+        self.play(*[FadeIn(s, shift=OUT*0.3) for s in sectors[:4]], run_time=3)
+        self.play(*[FadeIn(s, shift=OUT*0.3) for s in sectors[4:]], run_time=3)
+        self.wait(1.5)
+
+        # 3. 扇形交错重组成近似长方形（重建移动，避免 Sector.animate 兼容问题）
+        # 目标：一半尖朝上、一半尖朝下，拼成锯齿形
+        half = n // 2
+        center = circle.get_center()
+        target_positions = []
+        for i in range(n):
+            if i < half:
+                x = center[0] - 2.8 + i * 1.55
+                y = center[1] + 0.0
+            else:
+                x = center[0] - 2.8 + (i - half) * 1.55
+                y = center[1] - 0.45
+            target_positions.append((x, y))
+        # 分两批：先淡出原扇形，再在新位置逐个显现（等效重组，规避 animate 限制）
+        self.play(*[FadeOut(s) for s in sectors], run_time=1.5)
+        new_sectors = []
+        for sec, tgt in zip(sectors, target_positions):
+            ns = Sector(
+                arc_center=np.array([tgt[0], tgt[1], 0.0]), radius=2.2,
+                start_angle=0.0, angle=TAU/n,
+                color=sec.color, fill_opacity=0.8, stroke_width=1.5,
+            )
+            new_sectors.append(ns)
+        self.play(*[FadeIn(s, shift=DOWN*0.2) for s in new_sectors[:4]], run_time=3)
+        self.play(*[FadeIn(s, shift=DOWN*0.2) for s in new_sectors[4:]], run_time=3)
+        self.wait(1.5)
+
+        # 4. 标注"底 = 半周长 ≈ πr" 与 "高 = r"
+        base_line = Line(
+            np.array([center[0] - 3.0, center[1] - 0.2, 0]),
+            np.array([center[0] + 3.0, center[1] - 0.2, 0]),
+            color=GREEN, stroke_width=3,
+        )
+        self.play(Create(base_line), run_time=1.5)
+        self.wait(3)
+''',
+    'vector_add': '''from manim import *
+
+class VectorAdd(Scene):
+    def construct(self):
+        self.wait(1)
+        title = Text("向量加法：首尾相连", font_size=40, color=WHITE)
+        title.to_edge(UP)
+        self.play(Write(title), run_time=2)
+        plane = NumberPlane(x_range=[-4, 4], y_range=[-4, 4],
+                            background_line_style={"stroke_opacity": 0.3})
+        v1 = Arrow(plane.c2p(0,0), plane.c2p(2,1), color=BLUE)
+        v2 = Arrow(plane.c2p(0,0), plane.c2p(1,3), color=GREEN)
+        vsum = Arrow(plane.c2p(0,0), plane.c2p(3,4), color=GOLD)
+        self.play(Create(plane), run_time=3)
+        self.play(Create(v1), run_time=2)
+        self.play(Create(v2), run_time=2)
+        self.play(Create(vsum), run_time=3)
+        self.wait(3)
+''',
+    'transform': '''from manim import *
+
+class ShapeTransform(Scene):
+    def construct(self):
+        self.wait(1)
+        title = Text("几何变换：正方形到圆", font_size=40, color=WHITE)
+        title.to_edge(UP)
+        self.play(Write(title), run_time=2)
+        square = Square(color=BLUE, fill_opacity=0.5)
+        circle = Circle(color=GOLD, fill_opacity=0.5)
+        self.play(Create(square), run_time=3)
+        self.play(Transform(square, circle), run_time=4)
+        self.wait(3)
+''',
+}
+
+# 关键词 → 模板
+_KEYWORDS = {
+    'derivative': ['导数', '切线', '斜率', 'derivative', 'tangent', 'slope'],
+    'quadratic': ['二次', '抛物线', 'quadratic', 'parabola'],
+    'circle_area': ['圆面积', '圆的面积', 'circle area'],
+    'vector_add': ['向量', '矢量', 'vector'],
+    'transform': ['变换', '几何变换', 'transform', '旋转'],
+}
+
+
+def template_for(topic: str, subject: str = 'math') -> str:
+    """根据主题关键词选模板（LLM 失败时兜底）"""
+    t = (topic or '').lower()
+    for name, kws in _KEYWORDS.items():
+        if any(k in t for k in kws):
+            return _TEMPLATES[name]
+    # 默认：几何变换（最通用）
+    return _TEMPLATES['transform']
+
+
+def template_by_key(key: str, topic: str = '') -> str:
+    """v0.63 ⭐ 按意图 key 直接选模板（manim_prompts 场景匹配后兜底）。"""
+    if key in _TEMPLATES:
+        return _TEMPLATES[key]
+    return template_for(topic)

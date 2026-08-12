@@ -121,27 +121,45 @@ _MANIM_SYSTEM = """你是 Manim 数学动画代码生成助手。为教学问题
 1. from manim import *
 2. Scene 类实现 construct(self)
 3. 数学曲线用 axes.plot()，几何用 Circle/Square 等
-4. 总时长 30-60 秒
+4. 总时长 60-120 秒（v0.63 ⭐ 教学节奏：动画降速——run_time 至少 2s，
+   wait 至少 2s，演示曲线/图形时逐步创建，给学生留足观察时间）
 5. 纯几何动画（不用 Text/MathTex 避免依赖问题）
 6. 输出完整可运行 Python 代码"""
 
 
 def generate_manim_video(topic: str, subject: str = 'math',
                          learner_id: str = 'anon') -> dict:
-    """LLM 生成 Manim 代码 → 渲染视频。返回 {ok, path, url, error}"""
-    # 1. LLM 生成代码（用现有 llm 接口）
+    """LLM 生成 Manim 代码 → 渲染视频。返回 {ok, path, url, error}
+
+    v0.63 ⭐ 意图层：match_manim_intent 把简单话（"画个抛物线"）映射为
+    场景专属 prompt（含教学叙事）+ 对应模板 key，LLM 按精确指令生成。
+    """
+    # v0.63 ⭐ 意图匹配：简单话 → 场景 prompt + 模板 key
+    intent = None
+    try:
+        from manim_prompts import match_manim_intent
+        intent = match_manim_intent(topic)
+    except Exception:
+        intent = None
+    _scene_prompt = (intent or {}).get("prompt", "")
+    _template_key = (intent or {}).get("template_key", "")
+
+    # 1. LLM 生成代码（场景 prompt 优先；失败用通用）
     code = None
     try:
         from subagents import _safe_chat
-        code = _safe_chat(_MANIM_SYSTEM, f"教学问题：{topic}\n学科：{subject}\n生成 Manim 动画代码")
+        _sys = _MANIM_SYSTEM
+        if _scene_prompt:
+            _sys = _sys + "\n\n## 本次动画要求（场景专属）\n" + _scene_prompt
+        code = _safe_chat(_sys, f"教学问题：{topic}\n学科：{subject}\n生成 Manim 动画代码")
     except Exception as e:
         code = None
         last_err = f"LLM 调用失败: {e}"
 
-    # LLM 失败则用模板兜底
+    # LLM 失败则用模板兜底（按意图 key 选择，非通用）
     if not code or 'class ' not in code:
-        from manim_templates import template_for
-        code = template_for(topic, subject)
+        from manim_templates import template_for, template_by_key
+        code = template_by_key(_template_key, topic) if _template_key else template_for(topic, subject)
 
     # 2. AST 校验
     ok, err = validate_manim_code(code)
