@@ -99,3 +99,41 @@
 - 实时交互预览
 - GPU/多 worker 优化
 - 逐句精确音画同步（先做整段动画作主画面）
+
+
+---
+
+## 六、调研案例补充（2026-08-12 第二轮调研）
+
+### 6.1 权威参考（LLM→Manim 生态）
+| 项目 | 亮点 | PAEG 借鉴 |
+|---|---|---|
+| TheoremExplainAgent（ACL 2025）| Planner→Coding 两阶段 + 5 次重试（93.8%）| 两阶段架构 + RAG 设计 |
+| LLM2Manim（2026-04）| 教学法引导（segmentation/signaling/dual coding）+ HITL | 教育场景必须教师审核 |
+| ManimAgent（RITL）| 错误日志最后 10 行反馈 → 90%+ 成功率 | 自纠错循环 |
+| manimator（生产级）| BullMQ + Docker + S3 + DeepSeek-V3 | 生产架构 + 性价比 LLM |
+
+### 6.2 四层安全防护（必做）
+```
+Layer 1: AST 静态校验（拒绝 os/sys/subprocess/eval/open；验证 Scene+construct）
+Layer 2: subprocess.run（shell=False + timeout + cwd 隔离）
+Layer 3: Docker 沙箱（--memory=2g --cpus=2 --network=none --pids-limit=100）
+Layer 4: 全局并发 Semaphore(N-1) + 临时目录清理
+```
+⚠️ 历史漏洞：ManimCE extract_scene.py 曾用 exec()（HIGH severity）——任何信任代码路径必须沙箱。
+
+### 6.3 错误恢复策略
+```
+Layer A 预防：RAG 注入 Manim 文档 + few-shot + 低 temperature
+Layer B 检测：AST 校验 + qual-manim 静态分析
+Layer C 重试：N=3~5 次，反馈错误日志最后 10 行（RITL）
+Layer D 降级：简化场景 → 静态图（matplotlib）→ 标记人工审核
+```
+
+### 6.4 关键设计决策
+1. **HITL**：AI 生成 + 教师审核（subject-matter/teaching/engineering 三关）
+2. **DSL 优先**：首期 5 类模板（Oracle 建议），代码模式 P2
+3. **DeepSeek-V3** 默认 LLM（性价比最优）
+4. **缓存**：partial movie cache 省 50%+ 渲染时间
+5. **Build manifest**：模型/prompt/Manim 版本/seed 必录（可复现）
+6. **双指标评估**：code 指标 + 视觉质量（相关性弱，必须分开）
