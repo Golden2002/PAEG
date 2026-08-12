@@ -5080,3 +5080,34 @@ Step 5 QA：结构/音频/字幕/转帧
 - 视频内容源自 PPT 页面（每页 = 一帧画面）
 - 视频旁白源自讲稿（narration 驱动 TTS）
 - 讲稿生成（v0.53）：先写演讲稿 → 再生成视频，保证音画同步
+
+
+### 12.4 意图路由 Magic 口令架构（2026-08-12 ⭐）
+
+**分层路由**（确定性信号 > Magic 口令 > 模式短路 > LLM > 规则）：
+```
+Layer 0:  安全过滤（self_harm → emotion）
+Layer 0.5: Magic 口令（magic_intent.py：精确匹配身份/能力/知识口令 → 固定模板，零 LLM）
+Layer 1:  模式短路（前端 mode 选择）
+Layer 2:  LLM 判断（route_intent，14 意图，含 interface/knowledge 区分）
+Layer 3:  规则兜底（rule_fallback_intent）
+```
+
+**Magic 口令**（卷首语 identity 桶能力词）：
+- 身份：你是谁/你叫什么/你的名字 → interface（identity 模板）
+- 能力：你能做什么/你有什么功能/你能帮我学知识 → interface
+- 知识：你学过什么/你会什么/你的知识库 → knowledge（库清点）
+- 界面：怎么使用/这个网站怎么用 → interface
+
+**复合输入**："帮我分析这段话"不走 interface（已移除），走 material/复合输入处理。
+
+### 12.5 高压测试资产（2026-08-12 ⭐）
+
+**测试脚本**（可复用，下次只改语料）：
+- `05_实现原型/stress_parallel.py`：6 模式并行/顺序测试框架
+- `05_实现原型/stress_teach_retry.py`：teach 防挂死版（socket 超时 + 重试）
+- `05_实现原型/utils/gibberish.py`：乱码快速兜底
+
+**2026-08-12 结果**：204 轮 6 模式 0 错误，平均 13.7s，模式切换 100%。
+
+**方法论**：见元能力 §6.41；维护手册 §18.13/18.14。
