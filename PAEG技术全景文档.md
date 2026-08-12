@@ -10026,3 +10026,38 @@ def detect_constraint_flags(user_message: str, history: list) -> dict:
 
 > **配套文档**：[CHANGELOG v0.43](../CHANGELOG.md)（变更明细·3 位掩码条目）/ [维护手册 §十三](../维护手册.md)（新约束归组说明）/ [元能力 §6.33](../元能力文档.md)（元能力方法论 + agent 使用注意事项）
 >>>>>>> 659b6721117947cc8839b1cde4b864ac95f3ea4b
+
+
+## 9.8 Manim 教学动画速度规范（v0.65 ⭐ 三档分级固定标准）
+
+**背景**：用户要求速度调整方案固定化——不同模块速度不同（重复动作快、关键部分慢），统一速度不符合教学要求，且用户不需要自己思考调速度。
+
+**数据来源**：Manim 社区 pacing 最佳实践联网调研（browser-use/video-use、rohitg00/manim-video-generator、adithya-s-k/manim_skill、Manim 官方 `DEFAULT_ANIMATION_RUN_TIME=1.0`）。
+
+### 9.8.1 三档分级常量（manim_speed.py）
+
+| 档位 | run_time | wait | 适用场景 | rate_func |
+|------|----------|------|----------|-----------|
+| 快速 QUICK | 1.2s（0.8-1.5） | 0.4s | 重复动作/循环移动/逐步演示 | linear/smooth |
+| 中速 NORMAL | 1.8s（1.5-2.0） | 0.8s | 普通 Transform/写公式/过渡 | smooth |
+| 慢速 KEY | 3.0s（2.5-4.0） | 2.0s | 标题/结论/推导核心 | smooth/cubic |
+| Aha 时刻 | 2.5s | 3.0s | 关键洞察揭示 | smooth |
+
+### 9.8.2 黄金法则与节奏变化
+
+1. **黄金法则**：每个 `self.play()` 后必须跟 `self.wait()`——观众需要"读→联系→预期"三步
+2. **节奏变化**：同一场景内快慢交替（铺垫慢、辅助细节快、结论最慢），**禁止全程同一速度**
+3. **上下限**：run_time 禁止 <0.5s（快闪看不清）与 >4.0s（拖沓）
+
+### 9.8.3 固定化机制
+
+- `manim_speed.py`：集中定义常量 + `_SPEED_STANDARD_TEXT`（给 LLM 的速度规范文本）
+- `manim_templates.py`：模板用 `__CREATE_RUN__` 等占位符 → 模块加载时替换为常量值（单一数据源）
+- `manim_prompts.py` / `manim_service.py`：LLM 生成路径注入 `_SPEED_STANDARD_TEXT`（三档数值约束）
+- 效果：模板渲染与 LLM 生成速度一致；用户改速度只需改 manim_speed.py 一处
+
+### 9.8.4 实测
+
+- 圆面积动画：29.5s（快闪档 0.3-2s）→ 100s（慢速档 3-6s）→ **53.6s（三档分级，适中）**
+- 融合视频：136.2s（讲解 5 页 + 动画 53.6s）
+
