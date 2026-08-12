@@ -88,9 +88,9 @@ def main():
             if cur.get("sha"): body["sha"] = cur["sha"]
             r = api(f"https://api.github.com/repos/{REPO}/contents/{path}", method="PUT", body=body)
             print(f"  {'OK' if 'error' not in r else 'FAIL'} {gpath}")
-    rel = api(f"https://api.github.com/repos/{REPO}/releases/tags/v0.60")
+    rel = api(f"https://api.github.com/repos/{REPO}/releases/tags/v6.1")
     if "error" not in rel:
-        print(f"=== Release: {rel['name']} (tag v0.60) ===")
+        print(f"=== Release: {rel['name']} (tag v6.1) ===")
         print(f"  更新: {rel['published_at']}")
     else:
         print("[WARN] Release 查询失败")
