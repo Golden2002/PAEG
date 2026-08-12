@@ -242,7 +242,6 @@ def _shorten_query(query: str) -> str:
     except Exception:
         _parts = [p for p in _re.split(r'[\s，。、,；;：:？?！!]+', q) if p]
     kept = [p for p in _parts if p not in stop and len(p) >= 2]
-<<<<<<< HEAD
     # v0.45 ⭐ 修复：jieba 可能把学科核心词切丢（如"熵"单字被滤），且泛化词
     # （物理/意义）先出现会挤掉后面的核心词（热力学/定律）。策略：
     #   1) 若存在非泛化核心词 → 优先用核心词（如"热力学 定律"）
@@ -255,10 +254,6 @@ def _shorten_query(query: str) -> str:
         return " ".join(_core[:2])
     if kept:
         return q  # 全泛化词 → 用原始整句
-=======
-    if len(kept) >= 2:
-        return " ".join(kept[:2])
->>>>>>> 659b6721117947cc8839b1cde4b864ac95f3ea4b
     return ""
 
 
@@ -412,7 +407,6 @@ def expand_queries(question: str, llm=None, n: int = 5, subject: str = "") -> li
     if llm is not None:
         try:
             from subagents import _safe_chat
-<<<<<<< HEAD
             # v0.45 ⭐ 短长结合：把 单字词 → 短语 → 整句 全量提供给 LLM 编辑，
             # LLM 从中挑选/重组出最佳查询词（比规则"取前2词"质量高得多）。
             try:
@@ -454,18 +448,6 @@ def expand_queries(question: str, llm=None, n: int = 5, subject: str = "") -> li
                 "[注意] 你是关键词规划师：请直接输出关键词 JSON，这是中间过程，无需向用户解释。"
             )
             _r = _safe_chat(llm, _sys, _user, max_tokens=300)
-=======
-            _sys = (
-                "你是 PAEG 的检索查询联想器。根据学生的提问，从不同角度联想 "
-                f"{n} 个多样化、可能符合学生期望的网络检索查询词。\n"
-                "要求：\n"
-                "- 每个查询词 2-8 个词，独立完整，能直接提交给搜索引擎\n"
-                "- 覆盖不同角度：概念定义、应用案例、历史背景、最新进展、常见误区、学习方法（按问题性质取舍）\n"
-                "- 若学科已知（" + _subj + "），融入学科术语\n"
-                "- 输出 JSON 数组，如 [\"词1\", \"词2\"]，只输出 JSON"
-            )
-            _r = _safe_chat(llm, _sys, _q[:300], max_tokens=200)
->>>>>>> 659b6721117947cc8839b1cde4b864ac95f3ea4b
             if _r:
                 import json as _json
                 _clean = _r.strip()
@@ -478,13 +460,10 @@ def expand_queries(question: str, llm=None, n: int = 5, subject: str = "") -> li
                     _parsed = _json.loads(_clean)
                     if isinstance(_parsed, list):
                         _qs = [str(x).strip() for x in _parsed if str(x).strip()]
-<<<<<<< HEAD
                         # v0.45 ⭐ 修复：过滤纯拉丁/符号查询（"F=ma"在 Bing 中文
                         # 语境返回"f 字母符号"等污染）；保留含中文的混合查询
                         _qs = [x for x in _qs
                                if re.search(r'[\u4e00-\u9fff]', x) or len(x) > 6]
-=======
->>>>>>> 659b6721117947cc8839b1cde4b864ac95f3ea4b
                         if _qs:
                             _uniq = []
                             for _x in _qs:
@@ -541,7 +520,6 @@ def _normalize_url(url: str) -> str:
 
 
 def _jaccard_relevance(question: str, item: dict) -> float:
-<<<<<<< HEAD
     """相关性打分（v0.53 ⭐ 修复：jieba 核心词，去噪音）。
 
     v0.45 版逐字符取词（中文单字 len<2 全滤 → 判分失效 → 噪音混入）。
@@ -558,12 +536,6 @@ def _jaccard_relevance(question: str, item: dict) -> float:
     _stop = {"什么是", "是什么", "什么", "如何", "怎样", "为什么", "的", "了", "在", "与", "和",
              "推荐", "方法", "技巧", "介绍", "请", "一下", "帮我", "哪些"}
     _toks = [w for w in _toks if w not in _stop][:5]
-=======
-    """相关性打分（v0.45 ⭐ 调研落地）：核心词命中 + 标题匹配 + 内容长度。"""
-    import re as _re2
-    _q = _re2.sub(r"[\s，。；、？?！!：:]+", "", str(question or ""))
-    _toks = [w for w in _q if len(w) >= 2]
->>>>>>> 659b6721117947cc8839b1cde4b864ac95f3ea4b
     if not _toks:
         return 0.5
     _title = str(item.get("title", ""))
@@ -572,13 +544,8 @@ def _jaccard_relevance(question: str, item: dict) -> float:
     _hits = sum(1 for w in _toks if w in _hay)
     if _hits == 0:
         return 0.0
-<<<<<<< HEAD
     _score = min(1.0, _hits / 2.0)  # 2 个核心词全中 = 1.0
     # 标题直接含核心词 = 强相关
-=======
-    _score = min(1.0, _hits / 3.0)  # 3 个核心词全中 = 1.0
-    # 标题直接含问题词 = 强相关
->>>>>>> 659b6721117947cc8839b1cde4b864ac95f3ea4b
     if any(w in _title for w in _toks[:3]):
         _score = max(_score, 0.8)
     # 内容太短 = 质量差
@@ -610,7 +577,6 @@ def web_search_multi(question: str, llm=None, subject: str = "", n_queries: int 
     _docmap = {}                 # url -> item
 
     def _fetch_one(_q):
-<<<<<<< HEAD
         # v0.53 ⭐ 多轮变体：每查询尝试 2-3 个变体（原词 + shorten + 学科组合），
         # 合并去重（5 主题 × 3 轮 = 15 次请求 → 可达 20+ 条）
         _variants = [_q]
@@ -643,30 +609,6 @@ def web_search_multi(question: str, llm=None, subject: str = "", n_queries: int 
                 })
                 if len(_items) >= per_query * 2:
                     break
-=======
-        try:
-            # Bing 对连续中文分词差 → 先 _shorten_query 切出空格分隔短词
-            _sq = _shorten_query(_q)
-            _query = _sq if _sq else _q
-            _res = web_search(_query, max_results=per_query)
-        except Exception:
-            return []
-        if not _res or "未返回" in str(_res) or "未找到" in str(_res):
-            return []
-        _items = []
-        for _blk in str(_res).split("\n\n"):
-            _m = _re.search(r"URL:\s*(\S+)", _blk)
-            if not _m:
-                continue
-            _url = _m.group(1)[:300]
-            _t = _re.match(r"\[来源 \d+\]\s*(.+)", _blk.strip())
-            _snippet = _blk.split("URL:", 1)[-1].split("\n", 1)[-1].strip()
-            _items.append({
-                "title": (_t.group(1).strip() if _t else "")[:200],
-                "url": _url,
-                "content": (_snippet or "")[:500],
-            })
->>>>>>> 659b6721117947cc8839b1cde4b864ac95f3ea4b
         return _items
 
     # v0.44 ⭐ 并行检索（最多 4 线程），整体受硬超时保护
