@@ -1,0 +1,50 @@
+{
+  "id": "teach_concept",
+  "description": "概念讲解工作流：诊断 → 讲解 → 例题 → 评估（含可选讲义建议）",
+  "steps": [
+    {
+      "id": "diagnose",
+      "type": "subagent",
+      "agent": "diagnostor",
+      "config": {
+        "input": "{concept}"
+      }
+    },
+    {
+      "id": "present",
+      "type": "subagent",
+      "agent": "presenter",
+      "depends_on": ["diagnose"],
+      "config": {
+        "input": "{concept}"
+      }
+    },
+    {
+      "id": "example",
+      "type": "subagent",
+      "agent": "presenter",
+      "depends_on": ["present"],
+      "config": {
+        "input": "给一个关于{concept}的典型例题，完整解答并讲解解题思路"
+      }
+    },
+    {
+      "id": "evaluate",
+      "type": "subagent",
+      "agent": "evaluator",
+      "depends_on": ["example"],
+      "config": {
+        "input": "{concept}"
+      }
+    },
+    {
+      "id": "handout_suggest",
+      "type": "llm",
+      "depends_on": ["evaluate"],
+      "config": {
+        "system": "判断这个概念讲解是否值得整理成讲义文档（概念复杂/步骤多/学生可能需要复习 → 是）。只回复 YES 或 NO。",
+        "user": "概念：{concept}。评估分已记录。需要生成讲义吗？"
+      }
+    }
+  ]
+}
