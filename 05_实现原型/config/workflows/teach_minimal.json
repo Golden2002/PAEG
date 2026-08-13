@@ -1,0 +1,41 @@
+{
+  "id": "teach_minimal",
+  "description": "最小教学流水线：诊断 → 计划 → 呈现 → 评估（可声明、可观测、可重放）",
+  "steps": [
+    {
+      "id": "diagnose",
+      "type": "subagent",
+      "agent": "diagnostor",
+      "config": {
+        "input": "{concept}"
+      }
+    },
+    {
+      "id": "plan",
+      "type": "subagent",
+      "agent": "planner",
+      "depends_on": ["diagnose"],
+      "config": {
+        "input": "{concept}"
+      }
+    },
+    {
+      "id": "present",
+      "type": "subagent",
+      "agent": "presenter",
+      "depends_on": ["plan"],
+      "config": {
+        "input": "{concept}"
+      }
+    },
+    {
+      "id": "evaluate",
+      "type": "subagent",
+      "agent": "evaluator",
+      "depends_on": ["present"],
+      "config": {
+        "input": "{concept}"
+      }
+    }
+  ]
+}

@@ -16,7 +16,15 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
+
+# PyYAML 可选：装了就用真 YAML（支持多行 description / 列表 / 嵌套），没装就回退旧 split 解析。
+try:
+    import yaml as _yaml  # type: ignore
+    _HAS_YAML = True
+except Exception:  # ImportError / 环境受限
+    _yaml = None
+    _HAS_YAML = False
 
 
 class Skill:
@@ -25,32 +33,59 @@ class Skill:
     def __init__(self, name: str, path: str):
         self.name = name
         self.path = path
-        self.frontmatter: Dict[str, str] = {}
+        self.frontmatter: Dict[str, Any] = {}
         self.body: str = ""
         self._load()
 
     def _load(self):
+        """读取 SKILL.md，解析 YAML frontmatter（--- 之间）+ markdown body。
+
+        优先用 yaml.safe_load（支持多行 description / 列表 / 嵌套结构）；
+        PyYAML 不可用时回退到冒号 split 解析（保持向后兼容）。
+        """
         md_path = os.path.join(self.path, "SKILL.md")
         try:
             with open(md_path, encoding="utf-8") as f:
                 raw = f.read()
         except Exception:
             raw = ""
-        # 解析 YAML frontmatter（--- 之间）
+
+        # 找 frontmatter 边界：开头必须是 --- 起头
         parts = raw.split("---", 2)
-        if len(parts) >= 3:
-            fm = parts[1]
-            for line in fm.splitlines():
-                if ":" in line:
-                    k, v = line.split(":", 1)
-                    self.frontmatter[k.strip()] = v.strip()
-            self.body = parts[2].strip()
-        else:
+        if len(parts) < 3:
             self.body = raw.strip()
+            return
+
+        fm_text = parts[1]
+        self.body = parts[2].strip()
+
+        if _HAS_YAML:
+            # yaml.safe_load：支持多行 / 列表 / 嵌套
+            try:
+                parsed = _yaml.safe_load(fm_text) or {}
+                if isinstance(parsed, dict):
+                    # 统一 key 为 str（YAML 1.1 下 "on/off" 会变 bool 等异常值已 safe_load 屏蔽）
+                    self.frontmatter = {str(k): v for k, v in parsed.items()}
+                    return
+            except Exception:
+                # YAML 解析失败：兜底走旧 split 逻辑
+                pass
+
+        # 兜底：旧 split 解析（处理简单 key: value）
+        for line in fm_text.splitlines():
+            if ":" in line:
+                k, v = line.split(":", 1)
+                self.frontmatter[k.strip()] = v.strip()
 
     @property
     def description(self) -> str:
-        return self.frontmatter.get("description", "")
+        """frontmatter.description：多行/列表都安全序列化为单行字符串。"""
+        v = self.frontmatter.get("description", "")
+        if isinstance(v, str):
+            return v
+        if isinstance(v, list):
+            return " / ".join(str(x) for x in v)
+        return str(v) if v is not None else ""
 
     def to_tool_def(self) -> dict:
         """把技能暴露为可调用工具（让 LLM 决定是否加载）。"""

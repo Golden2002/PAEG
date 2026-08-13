@@ -42,6 +42,14 @@
 - 教训：**先查端口进程 PID+启动时间，用 PID 杀残留，确认端口释放再启动**；函数级 vs HTTP 差异 = 进程版本差异；DEBUG 打印终极诊断
 - `Get-Process python | Stop-Process` 可能漏杀 cmd start 子进程——用端口反查 PID 最可靠
 
+**DeepSeek Harness 借鉴 + 架构优化（v0.68+ ⭐）**：
+- **参考项目研究**：DeepSeek_Harness经验文档.md（patch 层/事件模型/workflow DSL/preset/权限 九章节）+ 技术 §10.15 + 教材附录 C
+- **Oracle 架构检视**：PAEG架构优化需求清单.md（P0-6 优先级）
+- **P0-2 mcp_client session 复用**：缓存 transport（npx 进程复用），MCP 调用延迟 -80%（此前每次新建）
+- **P0-1 workflows_hub MVP**：教学流水线声明化（diagnose→plan→present→evaluate DAG）+ run_workflow__ 接入 config_hub
+- **P1-7 hooks timeout**：ThreadPoolExecutor 实现，超时跳过不卡主流程（4 测试全过）
+- **P1-6 skill frontmatter PyYAML**：支持多行/列表/嵌套 frontmatter，PyYAML 兜底（7 测试全过）
+
 ### v0.67 交互教学选择题 + 定时主动问候（2026-08-13 ⭐）
 
 **本版定位**：主动提问 question 功能（教学选择题推动教学）+ 定时主动问候（老师式关心）+ 倾诉语病修复。

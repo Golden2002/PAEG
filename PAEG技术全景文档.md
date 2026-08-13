@@ -5349,3 +5349,67 @@ payload = {
 
 **教训**：**思考型模型的"空 content"是配置/参数问题不是网络问题**——排查顺序：原始 HTTP 响应 → 检查 reasoning_content/finish_reason → 显式 thinking 开关。
 
+### 10.15 DeepSeek Harness 参考项目（2026-08-13 ⭐ 借鉴学习的第 N 个新项目）
+
+**项目**：DeepSeek Harness（github.com/deepseek-ai/deepseek-harness，npm `@deepseek-ai/dsh`）
+**定位**：Agent harness 架构（Claude Code / Codex 的替代增强），基于 Cordis 插件框架。
+**意义**：PAEG 独立配置体系（config_hub/阶段2 hooks/阶段3 workflows）的重要参考——它的 patch 层、事件模型、workflow DSL、预设系统可直接借鉴。
+
+#### 10.15.1 核心架构（可借鉴点）
+
+**1. "Everything is a Plugin" + Patch Layer（YAML 叠合）**：
+- 组合顺序：bundle 层 → profile 层 → 用户层 → 命令行 overlay
+- **Patch 替换整行 config（不做深度合并）**，后层覆盖前层
+- Bundle = npm 包 + `dsh.bundle` manifest 声明 patch 路径
+
+**2. `!!js` JS 表达式条件**：
+- **只在 plugin config 内求值**（mount 时按 ctx 注入变量）
+- **disabled/元数据不求值**（postmortem 0002 教训——条件用 overlay 叠加而非塞 disabled）
+- 可用变量：process.* / service injections / 自定义函数
+
+**3. 事件 4 种 dispatch 模式**：
+| 模式 | 等待 | 顺序 | 返回值 | 用途 |
+|---|---|---|---|---|
+| emit | 否 | 注册序 | 无 | 观察 |
+| waterfall | 否 | 注册序 | 有 | 中间件链（listener 必须 next() 让出）|
+| parallel | 是 | 并发 | 无 | 通知 |
+| serial | 是 | 顺序 | 有 | 串行处理 |
+
+**4. Capability 三角色**：Service Definition（接口）/ Service Provider（实现）/ Consumer（model-facing 工具）——能力必须三合一才完整。
+
+**5. Workflow = plain JS 脚本 + worker thread**（对应 PAEG 阶段 3）：
+- 全局 DSL：`agent(prompt, opts)` / `parallel(thunks)` / `pipeline(items, ...stages)` / `phase(title)` / `log(msg)`
+- 顶层 await 可用，脚本以 return 结束；隔离线程执行
+- Meta 数据（name/description/whenToUse/phases）是 plain JSON，脚本不求值它（防注入）
+- Parent Agent 必需，子 agent 自动归属（cwd/lineage/depth 继承）
+
+**6. 4-Preset 模式系统**：
+- standard（全功能）/ code=PTC（+tool-presentation 一行，工具暴露为 TS SDK，run_code 一次多步）/ minimal（bash+str_replace_editor 两工具）/ cordis（+自修改工具）
+- 自定义 preset = 一个目录 + agent.cordis.yml；只影响该 session（isolate realm）
+
+**7. 权限三层**：Sandbox（文件/进程边界）→ Approval（用户审批）→ Permission presets（read-only/workspace-write/full）
+- 子 agent 继承父 sandbox，approval 强制 never（captureDelegatedPolicyOverrides）
+- 运行时只能改 sandbox/approval，不能 mount/unmount 文件系统
+
+**8. Subagent Provider Registry**：spawn/fork/acp/codex/claude-code/dsh-sdk 多 provider 共存；Codex/Claude 是 one-shot（无 resume）
+
+#### 10.15.2 PAEG 借鉴映射（升级需求表）
+
+| PAEG 模块 | 借鉴 deepseek-harness | 优先级 |
+|---|---|---|
+| config_hub | Patch Layer YAML 叠合 + !!js 条件（仅 config 求值）| P0 |
+| hooks（阶段2）| waterfall+next() 中间件 / matcher DSL / most-restrictive 合并（deny>ask>allow）| P0 |
+| workflows（阶段3）| plain JS DSL（agent/parallel/pipeline/phase/log）+ parent 归属 | P0 |
+| config_hub 模式 | 4-Preset（标准/PTC/极简/创造）→ PAEG 教学预设 | P1 |
+| 权限 | Sandbox/Approval/Permission 三层 + 子 agent approval=never | P1 |
+| 子 agent | Provider Registry（spawn/fork/外部 agent）| P1 |
+
+#### 10.15.3 关键教训（避免踩坑）
+
+1. **JS 表达式只在 config 求值**——不要在 disabled/元数据里用（postmortem 0002）
+2. **Patch 替换整行而非合并**——避免配置漂移
+3. **Hook runHook 永远不抛**——执行器拒绝退化为非阻塞错误
+4. **Workflow Meta 是 plain JSON**——脚本不求值它（防注入）
+5. **子 agent 权限冻结**——approval 强制 never，sandbox 升级拒绝
+6. **Preset 用 isolate realm**——不污染其他 session
+

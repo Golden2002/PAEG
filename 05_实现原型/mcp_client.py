@@ -70,6 +70,7 @@ class MCPClientManager:
     def __init__(self, config: Optional[Dict[str, dict]] = None):
         self.config = config or _load_config()
         self._clients: Dict[str, Any] = {}       # server_name -> fastmcp Client
+        self._transports: Dict[str, Any] = {}    # v0.68+ ⭐ P0-2: server_name -> StdioTransport（复用）
         self._tools: Dict[str, dict] = {}        # "mcp__server__tool" -> {"server", "name", "schema"}
         self._session_ctxs: Dict[str, Any] = {}  # server_name -> session ctx
         self._lock = threading.Lock()
@@ -104,11 +105,14 @@ class MCPClientManager:
                 continue
             try:
                 transport = StdioTransport(command=cmd[0], args=cmd[1:])
+                # v0.68+ ⭐ P0-2：async with 建立连接获取工具清单（fastmcp 需 async with 握手），
+                # 同时缓存 transport 供后续快速重连（进程复用，避免每次新建 npx）
                 async with Client(transport) as client:
                     tools_result = await client.list_tools()
                     tool_list = getattr(tools_result, 'tools', None) or tools_result or []
                     with self._lock:
-                        self._clients[name] = client
+                        self._clients[name] = client  # 工具清单来源（连接结束后引用仍可用）
+                        self._transports[name] = transport  # 缓存 transport 复用
                         for t in tool_list:
                             tname = getattr(t, 'name', '') or ''
                             if not tname:
@@ -177,25 +181,39 @@ class MCPClientManager:
     async def _call_tool_async(self, full_name: str, arguments: Dict[str, Any], info: dict) -> str:
         server = info["server"]
         tool = info["name"]
-        # 每次调用新建 session（client 在 async with 结束后自动关闭）
+        # v0.68+ ⭐ P0-2 优化：复用缓存 transport（npx 进程复用），避免每次新建
+        _transport = self._transports.get(server)
+        if _transport is not None:
+            try:
+                from fastmcp import Client
+                async with Client(_transport) as _c:
+                    result = await _c.call_tool(tool, arguments or {})
+                return _result_to_str(result)
+            except Exception as e:
+                print(f"[PAEG][mcp-client] transport 调用失败（回退）: {str(e)[:80]}")
+        # 回退：新建 transport + client（原逻辑）
         try:
             from fastmcp import Client
             from fastmcp.client.transports import StdioTransport
             cmd = self.config.get(server, {}).get("command")
             if not cmd:
                 return f"MCP server {server} 未配置"
-            transport = StdioTransport(command=cmd[0], args=cmd[1:])
-            async with Client(transport) as client:
+            _t2 = StdioTransport(command=cmd[0], args=cmd[1:])
+            async with Client(_t2) as client:
                 result = await client.call_tool(tool, arguments or {})
-            # 解析结果
-            structured = getattr(result, 'structuredContent', None)
-            if structured:
-                return json.dumps(structured, ensure_ascii=False)
-            content = getattr(result, 'content', None) or []
-            texts = [c.text for c in content if getattr(c, 'text', None)]
-            return "\n".join(texts) if texts else str(result)[:1000]
+            return _result_to_str(result)
         except Exception as e:
             return f"MCP 工具调用失败（{server}/{tool}）: {str(e)[:120]}"
+
+
+def _result_to_str(result) -> str:
+    """解析 MCP 工具调用结果 → 字符串。"""
+    structured = getattr(result, 'structuredContent', None)
+    if structured:
+        return json.dumps(structured, ensure_ascii=False)
+    content = getattr(result, 'content', None) or []
+    texts = [c.text for c in content if getattr(c, 'text', None)]
+    return "\n".join(texts) if texts else str(result)[:1000]
 
     # ─── 状态 ───
     def stats(self) -> dict:
