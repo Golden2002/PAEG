@@ -361,10 +361,10 @@
 |---|---|---|
 | NEW-1 | **记忆系统强化**：独立 memory 模块（短期对话/长期画像/语义知识分层），参考 MemGPT 分层 | runoob 文档强调"记忆是三大组成之一"，当前记忆散落 SESSIONS/profile |
 | NEW-2 | **上下文工程优化** | ✅ 基本满足（context_bundle.py 6 函数统一入口，server 3 处+subagents 6 处引用；全量统一为后续）|
-| NEW-3 | **工具链闭环验证**：web_search/verify_math/manim/PPT 在 teach/chat/answer 主流程端到端可用性测试 | 智能化 P0-3 已透传 tools，需验证 LLM 真能调 |
-| NEW-4 | **输出质量评估体系**：LLM-as-judge 对对话/讲义/PPT/视频四类产出评分，接入评估反馈 | 实施质量维度（Step1 第 3 点）需量化 |
-| NEW-5 | **错误处理审计**：全项目 bare except 扫描 + 语义化日志（区分限流/超时/网络/预算）| 踩坑（v4-flash 空响应吞错）教训 |
-| NEW-6 | **知识库可扩展性**：35 学科 → 支持新学科动态创建（结合 SEL-4 学科需求）| 领域配置扩展（乡村教育等）前置 |
+| NEW-3 | **工具链闭环验证** | ✅ 已完成（v0.69+ 工具集 45 端到端回归：agent 模式 9 阶段/teach/chat 全通过，MCP/skills/workflows 可见可调）|
+| NEW-4 | **输出质量评估体系** | ✅ 核心已实现（quality_gate L3 LLM 多维评分：factuality/safety/pedagogy 阈值；对话/知识蒸馏评估已接，PPT/视频评估为后续）|
+| NEW-5 | **错误处理审计** | ✅ 已实现（audit_check.py 27.9KB 全项目检查 + hooks_hub timeout 语义日志 + G4 判定信号词）|
+| NEW-6 | **知识库可扩展性** | ✅ 基础已实现（subjects_ext.py 48 扩展节点 + evolved_*.json 动态注入 + G3 热加载；新学科动态创建为后续）|
 | NEW-7 | **安全工程补强**：工具级 Permission Preset（考试模式锁定写工具）| Oracle 检视 P0-4，教育场景硬卖点 |
 | NEW-8 | **教材同步**：将自我更新/记忆/上下文工程的新实现写入《用智能体开发智能体》| 教材是活文档 |
 | **NEW-9** | **⭐ 防幻觉底层约束（用户最高优先）✅ 已完成**：TRUTH_GROUNDING 常量（10 条底线：不编造/信源为绝对命令/先证据后结论/允许说不知道）+ 注入 build_presenter_system + build_general_chat_system + _safe_chat 兜底（幂等）| 对应 runoob 防幻觉五策略；用户"最底层不可放弃" |
