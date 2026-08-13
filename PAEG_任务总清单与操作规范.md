@@ -360,7 +360,7 @@
 | ID | 需求 | 理由 |
 |---|---|---|
 | NEW-1 | **记忆系统强化**：独立 memory 模块（短期对话/长期画像/语义知识分层），参考 MemGPT 分层 | runoob 文档强调"记忆是三大组成之一"，当前记忆散落 SESSIONS/profile |
-| NEW-2 | **上下文工程优化**：按 runoob 上下文工程文档，统一 context_bundle 打包（历史/画像/模式/学科/学段）为唯一入口 | 当前 30+ 处 system 拼接，prompt_template 未全覆盖 |
+| NEW-2 | **上下文工程优化** | ✅ 基本满足（context_bundle.py 6 函数统一入口，server 3 处+subagents 6 处引用；全量统一为后续）|
 | NEW-3 | **工具链闭环验证**：web_search/verify_math/manim/PPT 在 teach/chat/answer 主流程端到端可用性测试 | 智能化 P0-3 已透传 tools，需验证 LLM 真能调 |
 | NEW-4 | **输出质量评估体系**：LLM-as-judge 对对话/讲义/PPT/视频四类产出评分，接入评估反馈 | 实施质量维度（Step1 第 3 点）需量化 |
 | NEW-5 | **错误处理审计**：全项目 bare except 扫描 + 语义化日志（区分限流/超时/网络/预算）| 踩坑（v4-flash 空响应吞错）教训 |
