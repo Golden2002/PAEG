@@ -416,7 +416,7 @@
 - **P0-3**：workflows 最后一公里断裂（meta_router.INTENT_TO_CAPABILITY_HINT.auto_tools 无消费者，LLM 看不见 run_workflow__*）→ 修复：teach 端点消费 capability_hint
 - **P0-4**：config_hub.reload_all 无调用 → **✅ 已修复**（v0.68+ /api/admin/reload 端点，返回 hooks 加载状态）
 - **P1-1~6 全部 ✅ 清零（v0.69+）**：hooks.json 5 hook / mcp 副本删除 / skill 注入统一 inject_catalog / 工具集 44 覆盖 / 工具提示动态生成 / answer skill 注入
-- **P2-1~2**：transport 复用仅同 async 块 / tool_registry 与 config_hub 双路径行为不一致
+- **P2-1~2**：transport 复用仅同 async 块（P2-1 待优化）/ tool_registry 与 config_hub 双路径行为不一致（✅ P2-2 已统一：mcp__ 优先走 config_hub 触发 hooks，回退直连）
 - **优先级**：P0-1 → P0-2 → P0-3 → P0-4（修复后跑 smoke_test + 端到端）
 
 ### 3.14 v0.69.0 Release（2026-08-14 ✅ 已发布）

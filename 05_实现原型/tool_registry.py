@@ -374,7 +374,15 @@ def execute_tool(name: str, arguments: Dict[str, Any]) -> str:
     handler = _HANDLERS.get(name)
     if not handler:
         # v0.19.25：fallback 到外部 MCP 工具（mcp__server__tool 形式）
+        # v0.69+ P2-2 统一：优先走 config_hub（触发 hooks/repeat_guard），回退直连
         if name.startswith("mcp__"):
+            try:
+                from config_hub import get_hub
+                _h = get_hub()
+                if _h is not None and getattr(_h, "mcp", None) is not None:
+                    return _h.execute_tool(name, arguments or {})
+            except Exception:
+                pass
             try:
                 from mcp_client import get_mcp_client
                 return get_mcp_client().call_tool(name, arguments or {})
