@@ -104,8 +104,8 @@ CORS(app, resources={r"/api/*": {"origins": CORS_ORIGINS}})
 try:
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-except Exception:
-    pass
+except Exception as _e:
+    print(f"[PAEG][server.py] ProxyFix 不可用（生产环境 HTTPS 反代受影响）: {_e}")
 if PAEG_ENV == "production":
     app.config["SESSION_COOKIE_SECURE"] = True
     app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -154,7 +154,8 @@ def _assign_request_id():
     try:
         from infra.sessions import session_cleanup
         session_cleanup()
-    except Exception:
+    except Exception as _e:
+        print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
         pass
     # v0.51 ⭐ P0-3（Oracle）：全局滑动窗口限流（防 LLM 资源耗尽）
     if not _rate_limit_allow(request):
@@ -987,7 +988,8 @@ def teach_stream():
             _ri = route_intent(concept, llm=llm, use_cache=True)
             if not (_crisis or _emotion_only) and (_ri or {}).get("intent") == "emotion":
                 _emotion_only = True
-        except Exception:
+        except Exception as _e:
+            print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
             pass
         if _crisis or _emotion_only:
             print(f"[PAEG] teach_stream 情绪支持钩子触发（crisis={_crisis}, emotion_only={_emotion_only}）")
@@ -1033,7 +1035,8 @@ def teach_stream():
                 try:
                     from services.polish import _polish_text
                     _gb_content = _polish_text(_gb_content, context="teach:grade_blocked")
-                except Exception:
+                except Exception as _e:
+                    print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
                     pass
                     pass
 
@@ -1053,7 +1056,8 @@ def teach_stream():
             try:
                 from services.polish import _polish_text
                 _unk_content = _polish_text(_unk_content, context="teach:unknown")
-            except Exception:
+            except Exception as _e:
+                print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
                 pass
 
             def gen_unknown():
@@ -1296,7 +1300,8 @@ def teach_stream():
             try:
                 from services.polish import _polish_text
                 _ppt_reply = _polish_text(_ppt_reply, context="teach:ppt")
-            except Exception:
+            except Exception as _e:
+                print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
                 pass
 
             def gen_ppt():
@@ -1734,6 +1739,15 @@ def teach_stream():
             _steps_this_round = _steps_all
         for i, step in enumerate(_steps_this_round):
             yield f"event: step\ndata: {json.dumps({'step_id': i + 1, 'status': 'presenting'})}\n\n"
+            # v0.66 ⭐ 统一资源门面：教学每步注入 KB+facts+用户物料+联网 完整资源块
+            try:
+                from services.library import collect_all_resources
+                _res_all = collect_all_resources(learner_id, concept, llm=llm,
+                                                 subject=subject, include_web=False)
+                if _res_all.get("has_any"):
+                    learner._teach_res_block = _res_all["block"]  # type: ignore[attr-defined]
+            except Exception:
+                pass
             presentation = paeg.presenter.run(
                 step=step,
                 learner=learner,
@@ -1762,7 +1776,8 @@ def teach_stream():
                     _polished_t = _polish_text(_teach_text, context=f"teach:{concept[:30]}")
                     if _polished_t and _polished_t != _teach_text:
                         presentation["content"] = _polished_t
-            except Exception:
+            except Exception as _e:
+                print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
                 pass
             _assistant_parts.append(presentation.get("content") or "")  # v0.21.3
             _prev_presentations.append(presentation)  # v0.21.8：累积讲解供下一轮参考
@@ -1832,7 +1847,8 @@ def teach_stream():
                             if isinstance(_cc, str) and _cc.strip():
                                 _std_text = _cc.strip()
                                 break
-                except Exception:
+                except Exception as _e:
+                    print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
                     pass
                 try:
                     if _std_text:
@@ -3400,7 +3416,8 @@ def general_chat_stream():
                     os.environ.pop("PAEG_REASONING", None)
                 else:
                     os.environ["PAEG_REASONING"] = _dt_prev_env
-            except Exception:
+            except Exception as _e:
+                print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
                 pass
 
     return Response(generate(), mimetype="text/event-stream",

@@ -105,6 +105,106 @@ class FileGenerator:
         filename = f"文章_{_safe_filename(subject)}_{_safe_filename(topic)}_{datetime.now().strftime('%Y%m%d%H%M')}.md"
         return content, filename
 
+    # v0.66 ⭐ 完整教学讲义（Oracle 设计：6 段教学过程，用户核心需求）
+    def generate_handout(self, learner, subject: str, topic: str,
+                         outline: Optional[str] = None,
+                         length: str = "medium") -> tuple:
+        """生成完整教学讲义（markdown，授课式完整教学过程）。
+
+        Args:
+            learner: 学生画像（学段/风格/薄弱点，注入针对性）
+            subject/topic: 学科与主题
+            outline: 可选——已存在大纲（有则按大纲扩展，否则 LLM 自构）
+            length: short(~800字) / medium(~1500字) / long(~2500字)
+        Returns:
+            (markdown_content, filename, structured_dict)
+        """
+        grade = getattr(learner, 'grade_level', 'high_school')
+        grade_cn = {'high_school': '高中', 'undergraduate': '本科',
+                    'graduate_exam': '考研', 'middle_school': '初中'}.get(grade, grade)
+        desc = getattr(learner, 'self_description', '') or ''
+        style = getattr(learner, 'cognitive_style', '') or ''
+        len_guide = {'short': '约 800 字', 'medium': '约 1500 字',
+                     'long': '约 2500 字'}.get(length, '约 1500 字')
+
+        system = (
+            f"你是{grade_cn}{subject}老师，正在为一名{grade_cn}学生写一份**完整教学讲义**。\n\n"
+            "【硬性结构】（必须严格按以下 6 段输出，缺一不可）：\n"
+            "1. 教学目标（知识/能力/素养目标）\n"
+            "2. 导入（一个具体情境或提问，联系旧知或生活，必须有'过桥句'过渡到新课）\n"
+            "3. 新课讲授（分 3.1/3.2/3.3 小节，每节含：定义 + 直觉解释 + 例子 + 例题带解）\n"
+            "4. 巩固练习（2-3 题由浅入深，每题附答案与解析——解析讲清'为什么'而非只给答案）\n"
+            "5. 课堂小结（3-5 条核心要点 + 文字版知识结构）\n"
+            "6. 作业与拓展（课后练习 2 题 + 拓展思考 1 题 + 学习方法提示）\n\n"
+            "【语言要求】\n"
+            "- 像真人老师在写教案/讲义：朴素、准确、有温度\n"
+            "- 公式用 $...$ 包裹，不堆砌术语\n"
+            "- 定义后必须跟直觉解释（不跳步）\n"
+            f"- 长度：{len_guide}\n\n"
+            "【语言风格（L1 规范，必须内化）】\n"
+            "- 说具体的话，不说空话；句子短，一句一个意思\n"
+            "- 不用生僻词、翻译腔、公文腔\n"
+            "- 避免 AI 腔：不用'首先/其次/最后'三段式、不用'总之'总结句、"
+            "不用破折号堆砌\n"
+            "- 用准确的名词承担重量，不用形容词堆感受\n\n"
+            "【禁止】\n"
+            "- 不要'讲解文章'式平铺直叙（缺导入/小结/作业）\n"
+            "- 不要只给定义不给例子\n"
+            "- 不要只列练习题不给解析\n\n"
+            "【输出】纯 markdown，标题层级清晰（# 主题，# 一级段，### 小节）。"
+        )
+        user = (
+            f"学生：{grade_cn}，{('学习风格：' + style + '。') if style else ''}"
+            f"（学科：{subject}，主题：{topic}）\n"
+            + (f"学生情况：{desc}\n" if desc else "")
+            + (f"参考大纲：\n{outline}\n" if outline else "")
+        )
+        # v0.66 ⭐ 统一资源门面：讲义基于 KB/用户物料/网络事实（不凭空写）
+        try:
+            from services.library import collect_all_resources
+            _res = collect_all_resources(
+                str(getattr(learner, "id", "") or ""), topic, llm=self.llm,
+                subject=subject, include_web=False)
+            if _res.get("has_any"):
+                user += "\n\n【可用资料（讲义应基于这些事实）】\n" + _res["block"] + "\n"
+        except Exception:
+            pass
+        user += "请输出完整教学讲义。"
+        content = _safe_chat(self.llm, system, user, max_tokens=2000)
+        # v0.66 ⭐ L0+L2 语言规范：讲义全文过语言守门（AI 味/省略句/动宾搭配修正）
+        try:
+            from services.lang_gate import lang_gate_content
+            content = lang_gate_content(content, context=f"handout:{subject}-{topic}")
+        except Exception:
+            pass
+        if not content or len(content.strip()) < 100:
+            # 兜底：结构化模板（保证 6 段存在）
+            content = (
+                f"# {topic} 讲义\n\n"
+                f"> 学习对象：{grade_cn}{subject} 学生\n\n"
+                f"## 一、教学目标\n- 知识目标：理解 {topic} 的核心概念\n"
+                f"- 能力目标：能应用 {topic} 解决基础问题\n"
+                f"- 素养目标：建立对 {subject} 的学习兴趣\n\n"
+                f"## 二、导入\n**情境**：请先想一想，你在生活中哪里会遇到 {topic}？\n"
+                f"**过渡**：带着这个问题，我们正式学习 {topic}。\n\n"
+                f"## 三、新课讲授\n### 3.1 {topic} 的定义\n"
+                f"- 定义：{topic} 是{subject}中的一个重要概念。\n"
+                f"- 直觉解释：（此处应补充直觉理解）\n"
+                f"- 例题：（此处应补充例题与解）\n\n"
+                f"## 四、巩固练习\n1. **基础**：…（答案：… 解析：…）\n"
+                f"2. **进阶**：…（答案：… 解析：…）\n\n"
+                f"## 五、课堂小结\n- 核心要点 1\n- 核心要点 2\n\n"
+                f"## 六、作业与拓展\n- 课后练习\n- 拓展思考\n"
+            )
+
+        # 结构化返回（供下游讲稿/PPT/视频复用）
+        structured = {
+            "content": content,
+            "filename": f"讲义_{_safe_filename(subject)}_{_safe_filename(topic)}_{datetime.now().strftime('%Y%m%d%H%M')}.md",
+            "sections": _parse_handout_sections(content),
+        }
+        return content, structured["filename"], structured
+
     def save(self, content: str, filename: str) -> str:
         """把内容保存到 downloads/ 目录，返回文件路径。"""
         path = os.path.join(self.download_dir, filename)
@@ -175,3 +275,34 @@ window.MathJax = {{ tex: {{ inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displa
              for f in os.listdir(self.download_dir)],
             key=lambda x: -x['size']
         )[:50]
+
+def _parse_handout_sections(md: str) -> list:
+    """从讲义 markdown 解析 6 段结构（供下游讲稿/PPT/视频复用）。"""
+    import re as _re
+    sections = []
+    cur = None
+    for line in md.split('\n'):
+        s = line.strip()
+        m = _re.match(r'^(#{2,3})\s+(.+)', s)
+        if m and ('目标' in m.group(2) or '导入' in m.group(2) or '新课' in m.group(2)
+                  or '练习' in m.group(2) or '小结' in m.group(2) or '作业' in m.group(2)
+                  or '拓展' in m.group(2)):
+            if cur:
+                sections.append(cur)
+            cur = {'title': m.group(2), 'body': [], 'subsections': []}
+        elif m and cur and m.group(1) == '###':
+            cur['subsections'].append({'title': m.group(2), 'body': []})
+            cur['subsections'][-1]['_active'] = True
+            if len(cur['subsections']) > 1:
+                cur['subsections'][-2]['_active'] = False
+        elif s and cur:
+            if cur.get('subsections') and cur['subsections'][-1].get('_active'):
+                cur['subsections'][-1]['body'].append(s)
+            else:
+                cur['body'].append(s)
+    if cur:
+        sections.append(cur)
+    for sec in sections:
+        for sub in sec.get('subsections', []):
+            sub.pop('_active', None)
+    return sections

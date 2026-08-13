@@ -1603,6 +1603,8 @@ body {
       <button class="cmd-trigger" id="cmd-trigger-video" title="启用授课视频：说'讲一课/生成视频'时生成教学视频" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>授课视频</button>
       <button class="cmd-trigger" id="cmd-trigger-manim" title="启用数学动画：说'画个图/演示/可视化'时生成 Manim 动画" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M16 8.9V7H8l4 5-4 5h8v-1.9"/></svg>数学动画</button>
       <button class="cmd-trigger" id="cmd-trigger-deepthink" title="深度思考：下一条消息启用深度推理" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>深度思考</button>
+      <!-- v0.66 ⭐ B2: 思维导图按钮（用户需求：对用户可见）-->
+      <button class="cmd-trigger" id="cmd-trigger-kmap" title="思维导图：说'思维导图/知识框架/知识结构'时生成知识导图" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:14px;font-size:12px;cursor:pointer;color:var(--text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7 6h10"/><path d="M6 8l5 8"/><path d="M18 8l-5 8"/></svg>思维导图</button>
       <!-- v0.41.9 ⭐ 修复：input→textarea（input 无法换行，长文字只能横向滚动；
            现支持自动换行 + 自适应高度，用户输入长问题也能看到全部内容） -->
       <!-- v0.44 ⭐ 指令标签栏：ChatGPT 式悬浮选项——点"查资料"激活为指令标签，输入后发送走检索 -->
@@ -3824,6 +3826,14 @@ askBtn.addEventListener('click', () => {
       '<span style="font-size:12.5px;color:var(--text-dim)">想让我记住你的情况，点左侧栏「告诉老师你是谁」。</span>');
     return;
   }
+  // v0.66 ⭐ B2: 思维导图按钮激活 → 下一条消息走知识导图
+  if (window._kmapNext) {
+    window._kmapNext = false;
+    const kmapBtn = document.getElementById('cmd-trigger-kmap');
+    if (kmapBtn) kmapBtn.style.borderColor = '';
+    kmapChat(q);
+    return;
+  }
   // v6.1 ⭐ 数学动画/授课视频：启用且命中关键词 → 走独立生成（不进普通教学流）
   if (window._manimModeActive && window._manimModeActive() && window._shouldTriggerManim(q)) {
     fetchManimVideo(q);
@@ -4842,6 +4852,16 @@ document.addEventListener('click', (e) => {
     const active = window._deepThinkActive && window._deepThinkActive();
     setDeepThink(!active);
   }
+  // v0.66 ⭐ B2: 思维导图按钮——激活后下一条消息走知识导图
+  if (e.target && e.target.id === 'cmd-trigger-kmap') {
+    const active = !!window._kmapNext;
+    window._kmapNext = !active;
+    const btn = document.getElementById('cmd-trigger-kmap');
+    if (btn) btn.style.borderColor = window._kmapNext ? 'var(--accent)' : '';
+    if (!window._kmapNext) {
+      addMsg('paeg', '<b>思维导图已启用</b>：下一条消息将生成知识导图。再点一次按钮可关闭。');
+    }
+  }
 });
 
 // 数学动画进度悬浮框（复用 resource 模式）
@@ -4897,13 +4917,37 @@ async function fetchManimVideo(topic) {
 }
 
 // v6.1 ⭐ 授课视频生成（用户点"授课视频"按钮启用后触发）
+async // v0.66 ⭐ B2: 思维导图按钮触发（走 /api/teach 知识导图入口）
+async function kmapChat(topic) {
+  try {
+    const resp = await fetch(API_BASE + '/api/teach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        learner_id: STATE.learnerId,
+        concept: '画一下' + topic + '的知识导图',
+        subject: subjectSelect.value || '',
+        grade_level: document.getElementById('grade-select').value,
+      }),
+    });
+    if (!resp.ok) throw new Error('API ' + resp.status);
+    const data = await resp.json();
+    const pres = (data.presentations || [])[0] || {};
+    const content = pres.content || '（思维导图生成失败，请重试）';
+    addMsg('paeg', content);
+  } catch (e) {
+    addMsg('paeg', '<b>思维导图生成失败</b>：' + e.message);
+  }
+}
+
 async function fetchTeachVideoByTopic(topic) {
   const progress = addVideoProgress(topic);
   try {
     const resp = await fetch(API_BASE + '/api/teach/video', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, outline: '## ' + topic + '\n- 概念讲解', learner_id: STATE.learnerId }),
+      // v0.66 ⭐ 不传 outline → 后端自动生成完整教学大纲 + 按学科插入 manim 动画占位
+      body: JSON.stringify({ topic, subject: subjectSelect.value || '', learner_id: STATE.learnerId }),
     });
     const data = await resp.json();
     removeVideoProgress();

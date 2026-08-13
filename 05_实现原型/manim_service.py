@@ -50,6 +50,39 @@ def is_manim_subject(subject: str) -> bool:
     return any(k.lower() in s for k in _MANIM_SUBJECTS)
 
 
+# v0.66 ⭐ 主题内容推断：不依赖用户显式选学科，从主题关键词判断是否适合 manim
+# 可视化主题关键词（数学/物理/几何图形语义）
+_MANIM_TOPIC_KEYWORDS = (
+    # 数学核心概念
+    '行列式', '矩阵', '特征值', '特征向量', '导数', '积分', '极限', '微积分',
+    '函数', '抛物线', '正弦', '余弦', '三角函数', '向量', '几何', '面积',
+    '方程', '线性代数', '概率', '统计', '分布', '曲线', '图像', '图形',
+    '斜率', '切线', '圆周率', '圆', '三角形', '多边形', '对称',
+    # 物理可视化
+    '力', '速度', '加速度', '运动', '波形', '电场', '磁场', '光学', '振动',
+    '机械波', '电磁', '轨迹', '场', '能量', '动能', '势能',
+    # 化学
+    '分子结构', '晶体', '化学键', '反应速率', '轨道',
+    # 英文
+    'determinant', 'matrix', 'eigenvalue', 'eigenvector', 'derivative',
+    'integral', 'limit', 'function', 'sine', 'cosine', 'vector', 'geometry',
+    'area', 'probability', 'statistics', 'graph', 'curve', 'slope', 'tangent',
+    'circle', 'triangle', 'polygon', 'velocity', 'acceleration', 'wave',
+)
+
+
+def infer_manim_suitability(topic: str, subject: str = "") -> bool:
+    """v0.66 ⭐ 判断主题是否适合 manim 动画（显式学科 + 主题内容推断取并集）。
+
+    修复：用户不选学科（subject=''）时，仅凭主题关键词（如"行列式"）也能
+    识别为可视化主题并插入 manim 动画。
+    """
+    if is_manim_subject(subject):
+        return True
+    t = (topic or "").lower()
+    return any(k in t for k in _MANIM_TOPIC_KEYWORDS)
+
+
 def validate_manim_code(code: str):
     """AST 校验：拒绝危险 import/调用，必须有 Scene 子类 + construct"""
     try:
@@ -145,14 +178,28 @@ def generate_manim_video(topic: str, subject: str = 'math',
     _scene_prompt = (intent or {}).get("prompt", "")
     _template_key = (intent or {}).get("template_key", "")
 
-    # 1. LLM 生成代码（场景 prompt 优先；失败用通用）
+    # 1. LLM 生成代码（场景 prompt 优先；失败用通用）——v0.66 重试 2 次防 API 波动
     code = None
     try:
         from subagents import _safe_chat
         _sys = _MANIM_SYSTEM
+        # v0.66 ⭐ 统一资源门面：注入 KB/用户物料/网络检索（动画主题有事实依据）
+        try:
+            from services.library import collect_all_resources
+            _res = collect_all_resources(learner_id, topic, llm=_safe_chat,
+                                         subject=subject, include_web=False)
+            if _res.get("has_any"):
+                _sys += "\n\n## 可用资源（动画应基于这些事实）\n" + _res["block"]
+        except Exception:
+            pass
         if _scene_prompt:
             _sys = _sys + "\n\n## 本次动画要求（场景专属）\n" + _scene_prompt
-        code = _safe_chat(_sys, f"教学问题：{topic}\n学科：{subject}\n生成 Manim 动画代码")
+        for _attempt in range(3):
+            code = _safe_chat(_sys, f"教学问题：{topic}\n学科：{subject}\n生成 Manim 动画代码")
+            if code and 'class ' in code:
+                break
+            import time as _t
+            _t.sleep(1.0)
     except Exception as e:
         code = None
         last_err = f"LLM 调用失败: {e}"
@@ -172,7 +219,13 @@ def generate_manim_video(topic: str, subject: str = 'math',
     if not path:
         return {"ok": False, "path": "", "url": "", "error": f"渲染失败: {rerr}"}
 
-    return {"ok": True, "path": path, "url": f"/api/download/manim/{os.path.basename(path)}",
+    # v0.66 ⭐ 修复：URL 需含 jobs/<job>/videos/scene/<q>/ 完整路径（否则下载 404）
+    try:
+        _rel = os.path.relpath(path, _MEDIA_DIR).replace('\\', '/')
+        _url = f"/api/download/manim/{_rel}"
+    except Exception:
+        _url = f"/api/download/manim/{os.path.basename(path)}"
+    return {"ok": True, "path": path, "url": _url,
             "error": ""}
 
 

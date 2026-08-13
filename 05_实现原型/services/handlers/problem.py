@@ -61,6 +61,16 @@ def _handle_problem_request(learner, concept, subject):
             system = f"{_build_constraint_layers(_cf)}\n\n" + system
     except Exception:
         pass
+    # v0.66 ⭐ B7 连通性：找答案注入统一资源门面（知识库+Library+联网）
+    try:
+        from services.library import collect_all_resources
+        _uid = str(getattr(learner, "id", "") or "")
+        _res = collect_all_resources(_uid, concept, llm=llm, subject=subject,
+                                     include_web=True)
+        if _res.get("has_any"):
+            system += "\n\n【可用资料（解答应基于这些事实）】\n" + _res["block"] + "\n"
+    except Exception:
+        pass
 
     user = (
         f"请给我一道{grade_cn}{subject_cn}经典题目。\n"
