@@ -255,6 +255,18 @@ class SelfEvolution:
 
     def _append_tool_lesson(self, lesson: str):
         fpath = os.path.join(self.memory_dir, 'tool_lessons.md')
+        # v0.69+ G8：限制无限增长——超过阈值时截断，保留最近 30 条经验（防老经验沉没）
+        try:
+            if os.path.isfile(fpath) and os.path.getsize(fpath) > 40_000:
+                with open(fpath, encoding='utf-8') as f:
+                    _lines = f.readlines()
+                _head = [l for l in _lines if not l.startswith('- [')]
+                _tail = [l for l in _lines if l.startswith('- [')][-30:]
+                if len(_tail) < len([l for l in _lines if l.startswith('- [')]):
+                    with open(fpath, 'w', encoding='utf-8') as f:
+                        f.writelines(_head + _tail)
+        except Exception:
+            pass
         with open(fpath, 'a', encoding='utf-8') as f:
             f.write(f"\n- [{datetime.now().strftime('%Y-%m-%d')}] {lesson}\n")
 

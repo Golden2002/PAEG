@@ -339,7 +339,7 @@
 | G5 | 教学路径（Presenter/teach_stream）不注入 tool_lessons/subject_patches | 高 → ✅ 已修复（Presenter 注入教学记忆）|
 | G6 | _compose_lesson 无 LLM 提炼 | **✅ 已修复**（v0.68+ LLM 提炼工具经验：适用场景/要点/误区/替代方案，模板兜底；无 LLM 或提炼失败回退模板）|
 | G7 | 蒸馏节点无去重/版本化 | **✅ 核实已满足**（_append_evolved_node 用 dict——同 id 自然覆盖去重；知识蒸馏覆盖=版本更新，合理）|
-| G8 | tool_lessons.md 无限增长 + 读取 limit=1000 老经验沉没 | 中 |
+| G8 | tool_lessons.md 无限增长 + 老经验沉没 | **✅ 已修复**（v0.69+ 超 40KB 截断保留最近 30 条，防无限增长+防老经验沉没）|
 | G9 | SelfUpdateAgent 建议无自动派发回 SelfEvolution | 中 |
 | G10 | reflection_store(SQLite) 与 self_evolution(md/json) 数据隔离 | 低 |
 | G11 | suggestions.jsonl 堆积但 periodic_self_update 不消费 | 低 |
