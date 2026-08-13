@@ -368,6 +368,30 @@ class PeriodicSelfUpdater:
         except Exception as e:
             self._log(f"[PAEG][periodic] 建议回流失败: {e}")
 
+        # v0.69+ SEL-7：知识文件老化归档——evolved 日文件超 90 天移入 Archive（保留历史不删）
+        try:
+            _kb_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   "..", "Library", "KnowledgeBase", "subjects")
+            _arch_dir = os.path.join(_kb_dir, "Archive")
+            if os.path.isdir(_kb_dir):
+                _now = time.time()
+                _archived = 0
+                for _f in os.listdir(_kb_dir):
+                    if not _f.startswith("evolved_") or not _f.endswith(".json"):
+                        continue
+                    _fp = os.path.join(_kb_dir, _f)
+                    try:
+                        if _now - os.path.getmtime(_fp) > 90 * 86400:
+                            os.makedirs(_arch_dir, exist_ok=True)
+                            os.replace(_fp, os.path.join(_arch_dir, _f))
+                            _archived += 1
+                    except Exception:
+                        pass
+                if _archived:
+                    self._log(f"[PAEG][periodic] 知识老化归档 {_archived} 个 evolved 日文件（>90 天）→ Archive/")
+        except Exception as _ae:
+            self._log(f"[PAEG][periodic] 知识归档失败: {_ae}")
+
         results["summary"] = (f"洞察+{results['insights']} 批处理:{bool(results['batch'])} "
                               f"改进+{results['improvements']} 学科需求+{results.get('subject_requests', 0)} "
                               f"建议回流+{results.get('su_suggestions', 0)}")
