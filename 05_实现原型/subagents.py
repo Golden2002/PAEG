@@ -1053,6 +1053,16 @@ class Presenter:
             except Exception as _e:
                 print(f"[PAEG][subagents.py] 能力清单注入异常: {_e}")
                 pass
+            # v0.68+ ⭐ G5 教学记忆注入（闭环修复）：教学路径也注入工具经验/学科补丁
+            # 此前仅 general_chat_stream 注入，Presenter.run 教学时看不到沉淀的经验
+            try:
+                from teaching_memory import load_teaching_memory
+                _tm = load_teaching_memory()
+                if _tm:
+                    system = system + "\n\n## 教学记忆（自动沉淀，供参考）\n" + str(_tm)[:1500]
+            except Exception as _e:
+                print(f"[PAEG][subagents.py] 教学记忆注入异常: {_e}")
+                pass
             # v0.36.1 ⭐ 网络检索补充材料（teach_stream 知识库无匹配时自动联网，注入让 LLM 参考）
             try:
                 _web_ctx = getattr(learner, "_teach_web_ctx", "") or ""
