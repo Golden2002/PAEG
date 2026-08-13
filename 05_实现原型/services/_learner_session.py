@@ -115,6 +115,32 @@ def ensure_learner_session(
             kwargs["subjects_mastery"] = src.get("subjects_mastery") or {}
         learner = LearnerProfile(**kwargs)
         SESSIONS[cache_key] = learner
+    elif from_persistent_dict is not None:
+        # v0.68+ ⭐ Bug1 修复：持久化字典源覆盖缓存（保证最新落盘数据生效）
+        # 根因：teach/chat 先以空 mastery 缓存 learner，后续 /api/profile GET
+        # 命中缓存不重新水合 → 画像显示"暂无学习记录"。此处强制刷新持久数据。
+        try:
+            if with_subjects_mastery:
+                _pm = from_persistent_dict.get("subjects_mastery") or {}
+                if learner.subjects_mastery != _pm:
+                    learner.subjects_mastery = _pm
+            if with_target_exam:
+                learner.target_exam = from_persistent_dict.get("target_exam")
+                learner.specialty_target = from_persistent_dict.get("specialty_target")
+            _nick2 = from_persistent_dict.get("nickname") or ""
+            if _nick2 and learner.nickname != _nick2:
+                learner.nickname = _nick2
+            _gd = from_persistent_dict.get("grade_level")
+            if _gd and learner.grade_level != _gd:
+                learner.grade_level = _gd
+            _sd = from_persistent_dict.get("self_description")
+            if _sd is not None and learner.self_description != _sd:
+                learner.self_description = _sd
+            _qa = from_persistent_dict.get("questionnaire_answers")
+            if _qa and learner.questionnaire_answers != _qa:
+                learner.questionnaire_answers = _qa
+        except Exception as _e:
+            print(f"[PAEG][_learner_session] 持久化水合失败: {_e}")
     elif update_self_description_if_present:
         # 对应 L738 / L2821 / L3324 三处的 elif 分支。
         if data.get("self_description") is not None:
