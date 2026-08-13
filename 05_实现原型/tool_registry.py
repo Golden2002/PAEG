@@ -177,7 +177,73 @@ def get_tool_defs() -> List[dict]:
              "subject": {"type": "string", "description": "学科（可选）"}},
             ["title", "content"],
         ),
-    ]
+    ] + _extended_tool_defs()
+
+
+_ext_defs_cache = None      # v0.68+ 缓存（避免重复初始化 config_hub）
+_ext_defs_loading = False   # 递归守卫（ConfigHub 初始化链中重入时返回空）
+
+
+def _extended_tool_defs() -> list:
+    """v0.68+ P0-3 修复（Step4）：合并 config_hub 的扩展工具（skills/MCP/workflows），
+    使 LLM 在 run_agent_loop 中真正看到 load_skill__*/mcp__*/run_workflow__*。
+    失败/重入时降级为仅内置（不阻断）。"""
+    global _ext_defs_cache, _ext_defs_loading
+    if _ext_defs_cache is not None:
+        return _ext_defs_cache
+    if _ext_defs_loading:
+        return []  # 递归守卫：get_hub() 初始化链重入时返回空
+    _ext_defs_loading = True
+    try:
+        from config_hub import get_hub
+        _hub = get_hub()
+        _ext = list(_hub.get_all_tool_defs()) if _hub is not None else []
+        # 去重：跳过内置 7 工具（get_tool_defs 已含）
+        _BUILTIN_NAMES = {"web_search", "verify_math", "fetch_page",
+                          "daily_quote", "get_time", "solve_problem", "save_document"}
+        _ext = [d for d in _ext
+                if isinstance(d, dict)
+                and d.get("function", {}).get("name") not in _BUILTIN_NAMES]
+        _seen = {d.get("function", {}).get("name") for d in _ext if isinstance(d, dict)}
+        # 补上 workflows 工具声明（若 config_hub 未含）
+        try:
+            from workflows_hub import get_workflows_hub
+            _wf = get_workflows_hub()
+            _wf_items = []
+            try:
+                _wf_dict = _wf.list() if hasattr(_wf, "list") else {}
+                if isinstance(_wf_dict, dict):
+                    _wf_items = _wf_dict.get("workflows", []) or []
+                elif isinstance(_wf_dict, list):
+                    _wf_items = _wf_dict
+            except Exception:
+                _wf_items = []
+            for _wfd in _wf_items:
+                _wn = _wfd.get("id") if isinstance(_wfd, dict) else str(_wfd)
+                if not _wn:
+                    continue
+                _n = f"run_workflow__{_wn}"
+                if _n not in _seen:
+                    _ext.append({
+                        "type": "function",
+                        "function": {
+                            "name": _n,
+                            "description": f"执行教学工作流 {_wn}（DAG：诊断→计划→实施→评估）",
+                            "parameters": {"type": "object",
+                                           "properties": {"concept": {"type": "string"},
+                                                          "subject": {"type": "string"}},
+                                           "required": ["concept"]},
+                        },
+                    })
+                    _seen.add(_n)
+        except Exception:
+            pass
+        _ext_defs_cache = _ext
+        return _ext
+    except Exception:
+        return []
+    finally:
+        _ext_defs_loading = False
 
 
 # ─────────────────────────────────────
@@ -498,7 +564,13 @@ def run_agent_loop(model, system: str, user_input: str,
                 if name.startswith("load_skill__"):
                     result = _exec_skill_load(name.replace("load_skill__", ""))
                 else:
-                    result = execute_tool(name, args)
+                    # v0.68+ P0-1 修复（Step4）：统一走 config_hub 路由——解锁 hooks(tool.before/after)
+                    # + repeat-tool-reminder Guard + run_workflow__* 路由；失败回退旧路径
+                    try:
+                        from config_hub import get_hub as _get_hub
+                        result = _get_hub().execute_tool(name, args)
+                    except Exception:
+                        result = execute_tool(name, args)
                 calls_log.append({"name": name, "arguments": args, "result": result[:200]})
                 messages.append({"role": "tool", "tool_call_id": tc.get("id", ""),
                                  "content": result})
