@@ -5114,3 +5114,49 @@ Step 5 QA：结构/音频/字幕/转帧
 - 圆面积动画：29.5s（快闪档 0.3-2s）→ 100s（慢速档 3-6s）→ **53.6s（三档分级，适中）**
 - 融合视频：136.2s（讲解 5 页 + 动画 53.6s）
 
+
+
+## 10.9 架构连通性重构（v0.66 ⭐ 2026-08-13）
+
+**背景**：用户强调"本项目架构必须连通"——PPT 生成与讲稿/讲义连通、视频与 PPT/讲稿/manim 连通、思维导图/知识库/网络检索全连通。Oracle 诊断出 B1-B10 断裂点。
+
+### 10.9.1 修复的断裂点
+
+| ID | 断裂点 | 修复 |
+|----|--------|------|
+| B1 | /api/teach/video 带 outline 走旧路径（跳过讲稿/manim/融合） | 统一走 produce_lesson_video 融合管线 |
+| B2 | 思维导图无前端按钮、无显式端点 | 第 6 功能按钮 + kmapChat + LLM 重试 |
+| B3 | PPT 与讲稿内容无数据共享 | PPT 注入 script key_points（同一事实源） |
+| B4 | 思维导图不连通资源池 | 注入用户物料 + KB + 网络三路 |
+| B7 | 找答案模式不联网 | 注入统一资源门面 |
+
+### 10.9.2 统一资源门面
+
+`services/library.py collect_all_resources(uid, topic, llm, subject)`：
+- 四路聚合：用户物料（usr_knowledge）+ 知识库（KB.search）+ 事实资料（facts）+ 联网检索
+- 接入：manim / 讲义 / 讲稿 / 找答案 / 教学每步（Presenter 注入）
+- 原则：单入口多消费、注入即事实、失败静默
+
+### 10.9.3 授课式讲义+讲稿 + 短指令补全
+
+- `file_generator.generate_handout`：完整教学讲义（6 段：目标/导入/新授/巩固/小结/作业）
+- `script_service` 授课式讲稿：称呼/引导提问/过桥句/互动标记，废弃要点拼接兜底
+- `services/intent_inference.py`：短输入（"极限"）→ 自动推断学段/学科/深度/时长 + 假设清单
+- 端到端：输入"极限"两字 → 72s 完整融合视频（讲义→讲稿→manim→视频）
+
+### 10.9.4 情绪+学习双轨
+
+- teach_stream 混合输入（情绪+学习）→ 先情绪回应 + 学习衔接语（不截断）
+- AffectionSupportor 提示词新增"情绪+学习并存"衔接指令
+
+### 10.9.5 语言规范 L0-L3 接入生成链路
+
+- `services/lang_gate.py`：统一守门（L0 polish + L2 refiner 薇依语料）
+- 讲义/讲稿/manim 讲稿全部过语言规范；L1 提示词约束注入生成 system
+
+### 10.9.6 验证
+
+- `tests/test_chain_integration.py` 6/6 通过
+- audit_check 36/39（P0 静默异常已修；pyright 环境 + server.py 4442 行结构性）
+- 实测：短指令视频生成、教学/倾诉/双轨、思维导图按钮
+
