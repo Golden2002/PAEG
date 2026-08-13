@@ -100,6 +100,27 @@ flowchart TB
 
 ## 快速开始
 
+### Docker 方式（v0.67 ⭐ 推荐，Python 3.12 统一环境）
+
+```bash
+# 1. 配置环境变量（.env：DEEPSEEK_API_KEY 等）
+cp .env.example .env
+
+# 2. 构建 + 启动
+docker compose up -d --build
+
+# 3. 访问
+#    http://localhost:5000
+
+# 4. 查看日志 / 停止
+docker compose logs -f
+docker compose down
+```
+
+> 单容器含：主服务 + manim 动画 + ffmpeg + 语音（TTS/STT）。数据卷持久化 users_data/downloads/Library。详见 [Dockerfile](./Dockerfile) 与 [docker-compose.yml](./docker-compose.yml)。
+
+### 源码方式（本机开发）
+
 ```bash
 # 1. 安装依赖
 pip install flask flask-cors fastmcp pypdf sympy requests

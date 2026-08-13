@@ -5160,3 +5160,41 @@ Step 5 QA：结构/音频/字幕/转帧
 - audit_check 36/39（P0 静默异常已修；pyright 环境 + server.py 4442 行结构性）
 - 实测：短指令视频生成、教学/倾诉/双轨、思维导图按钮
 
+
+
+## 10.11 Docker 化部署（v0.67 ⭐ 2026-08-13）
+
+**方案**：单容器最小可行版——Python 3.12 统一环境（用户方案：manim 0.19 兼容 3.12，无需隔离 venv）。
+
+### 10.11.1 文件清单
+
+| 文件 | 职责 |
+|------|------|
+| Dockerfile | python:3.12-slim + ffmpeg + pip manim 0.19 + 主依赖 + 源码 |
+| docker-compose.yml | 单服务 + 数据卷（users_data/downloads/Library）+ 环境变量 |
+| .dockerignore | 排除 manim_env/venv/数据/密钥（减体积） |
+| .env.example | 环境变量示例（DeepSeek key/语音/安全） |
+
+### 10.11.2 关键决策
+
+- **Python 3.12-slim**：manim 0.19 兼容最稳（moderngl 编译需 build-essential）
+- **manim pip 直接装**：放弃隔离 venv（容器内统一环境更简）
+- **manim_service 容器兼容**：检测 manim_env 不存在 → `shutil.which('manim')` 用系统命令
+- **数据卷持久化**：users_data/downloads/Library 挂载主机路径
+- **系统 ffmpeg**：apt 装（manim + 音视频通用）
+
+### 10.11.3 使用
+
+```bash
+cp .env.example .env   # 填 DEEPSEEK_API_KEY
+docker compose up -d --build
+# http://localhost:5000
+```
+
+### 10.11.4 边界与坑
+
+- whisper 模型首次下载 ~150MB（环境变量 WHISPER_MODEL）
+- manim LaTeX 渲染需 texlive（MVP 省略，报错时再装）
+- Windows 中文文件名挂载 → Docker Desktop File Sharing 或命名卷
+- MCP 三 server 跑同容器（fastmcp 进程内），完整版可拆
+

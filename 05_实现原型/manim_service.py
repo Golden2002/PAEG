@@ -19,6 +19,15 @@ _MANIM_PY = os.path.join(_MANIM_ENV, 'python.exe')
 _MANIM_CLI = os.path.join(_MANIM_ENV, 'manim.exe')
 _MEDIA_DIR = os.path.join(_PROJ, 'downloads', 'manim')
 
+# v0.67 ⭐ Docker 兼容：容器内统一 Python 3.12（pip manim），无 manim_env/venv
+# 检测 Windows venv 不存在 → 用系统 manim 命令（Linux 容器：shutil.which('manim')）
+if not os.path.exists(_MANIM_CLI):
+    import shutil as _shutil
+    _SYS_MANIM = _shutil.which('manim')
+    if _SYS_MANIM:
+        _MANIM_CLI = _SYS_MANIM
+        _MANIM_PY = _SYS_MANIM
+
 # 安全校验：禁用的 import / 调用
 _BLOCKED_IMPORTS = {'os', 'sys', 'subprocess', 'socket', 'shutil', 'ctypes',
                     'multiprocessing', 'signal', 'importlib', 'pathlib', 'requests'}
