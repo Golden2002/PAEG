@@ -324,7 +324,7 @@
 | SEL-5 | 反思闭环（反思→优化→验证→再反思）| ⏳ |
 | SEL-6 | 记忆分层模块（episodic/semantic/procedural）| ⏳ |
 | SEL-7 | 知识老化/淘汰/权重衰减 | ⏳ |
-| SEL-8 | 用户反馈学习（点赞/👎→画像/策略）| ⏳ |
+| SEL-8 | 用户反馈学习（点赞/👎→画像/策略）| ✅ 后端接口已实现（v0.69+ /api/feedback → memory/feedback_log.jsonl + 画像侧轻量累计；前端 UI 为后续）|
 | SEL-9 | Library 更新：用户上传 → 公共/学科目录转移 | ⏳ |
 | SEL-10 | 自我更新完整链路验证 | ⏳ |
 

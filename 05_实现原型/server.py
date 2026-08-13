@@ -2539,6 +2539,45 @@ def admin_reload():
         return jsonify({"ok": False, "error": str(_re_e)}), 500
 
 
+@app.route("/api/feedback", methods=["POST"])
+def submit_feedback():
+    """v0.69+ SEL-8：用户反馈收集（点赞/👎）——写入 memory/feedback_log.jsonl 供自我更新消费。
+
+    请求：{"learner_id", "rating": "good|bad|neutral", "message"?  , "context"?}
+    """
+    try:
+        _data = request.get_json(force=True) or {}
+        _lid = str(_data.get("learner_id") or "anon")
+        _rating = str(_data.get("rating") or "")
+        if _rating not in ("good", "bad", "neutral"):
+            return jsonify({"ok": False, "error": "rating 需为 good/bad/neutral"}), 400
+        _msg = str(_data.get("message") or "")[:500]
+        _ctx = str(_data.get("context") or "")[:200]
+        _mem = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")
+        os.makedirs(_mem, exist_ok=True)
+        _log_path = os.path.join(_mem, "feedback_log.jsonl")
+        with open(_log_path, "a", encoding="utf-8") as _f:
+            _f.write(json.dumps({
+                "ts": datetime.now().isoformat(),
+                "learner_id": _lid, "rating": _rating,
+                "message": _msg, "context": _ctx,
+            }, ensure_ascii=False) + "\n")
+        # 画像侧轻量累计（不扩展 dataclass——反馈先沉淀日志，自我更新按需消费）
+        try:
+            _lr = SESSIONS.get(f"learner_{_lid}")
+            if _lr is not None and hasattr(_lr, "self_description"):
+                _stats = getattr(_lr, "_feedback_stats", None)
+                if _stats is None:
+                    _stats = {"good": 0, "bad": 0, "neutral": 0}
+                    _lr._feedback_stats = _stats  # type: ignore[attr-defined]
+                _stats[_rating] = _stats.get(_rating, 0) + 1
+        except Exception:
+            pass
+        return jsonify({"ok": True, "recorded": True, "rating": _rating})
+    except Exception as _fb_e:
+        return jsonify({"ok": False, "error": str(_fb_e)}), 500
+
+
 @app.route("/api/upload", methods=["POST"])
 def upload_file():
     """v0.19 P2-10：图片/文件上传 + v0.19.11 资料上传。
