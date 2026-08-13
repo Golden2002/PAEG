@@ -229,7 +229,7 @@
 
 - **实施记录（v0.68+）**：①SUBJECT_STYLES[philosophy] 新增 method_guide（文献论证结构分析 A 六步 + 概念分析 B 六步，含反教条可偏离句式）+ worked_example（柏拉图洞穴寓言完整论证解构）②SUBJECT_GRADES 解锁 graduate_exam 考研档 ③SUBFIELD_TREE 新增 philosophy 三学段二级学科（高中 2/本科 6/考研 4）。验证：py_compile OK + build_presenter_system(philosophy) 真实注入（论证结构段/洞穴寓言/概念分析均 True）
 
-### 3.11 教学能力结构化：教育知识与能力体系纳入教学 subagent（2026-08-14 用户新需求 · 待实现）
+### 3.11 教学能力结构化：教育知识与能力体系纳入教学 subagent（2026-08-14 用户新需求 · ✅ 核心已实现 v0.69+）
 - **需求**：教学模式更专业——联网检索教育知识与能力（教师资格证考试体系），将**教学能力结构化**，纳入教学 subagent（Presenter）
 - **关键探索**：**系统提示词 vs skill 两种方式哪种更合适**（需评估：注入时机/上下文成本/可维护性/可复用性/学习者适配）
 - **目标**：教师专业能力结构化进入教学流程（教学设计/教学实施/教学评价/学科教学法/学情分析/教育心理学应用等）
@@ -397,6 +397,8 @@
 8. **进程管理**（规范 §11）：改代码后按技术 §10.16 重启流程
 9. 重大改动后：回归验证（学习计划/核心功能）→ 更新技术状态快照（§五）
 6. 重大改动后：语法验证 → 重启（按 §10.16 进程 SOP）→ 回归
+- **实施记录（v0.69+）**：①新建 skills/teaching-capability/SKILL.md——教学专业能力判断库（能力地图 6 领域/学情诊断何时做/目标-活动-评价一致性/节奏调控/三层评价/教育心理学边界/因材施教/TPACK 检查/防刻板元规则），反教条句式（判断工具不是执行清单允许偏离因材施教不作免责声明）②注册验证：11 技能，L2 激活 1991 字符，目录可见 ③承载方式按 Oracle 推荐：skill 化为主（按需加载防僵化）；L1 能力地图轻量注入 build_presenter_system 列为后续增强
+
 ### 3.12 Step4 九模块底座评估结果：诊断→计划闭环 + 画像驱动（2026-08-14 Oracle 评估 · 待实施）
 - **九模块成熟度（Oracle 对照评估）**：Interaction 中 / Profile 中 / **Diagnosis 弱** / Plan 中 / Action 强 / Evaluation 中 / Adaptation 中 / Knowledge 强 / Output 强
 - **诊断→计划闭环：✅ 已实现（修正 Oracle 误判）**——paeg.teach 已串联 Diagnostor.run → planner.run(diagnosis=session.diagnosis) → choose_strategy(learner, diagnosis, subject) 差异化步骤；Oracle 评估基于简化输入，实际闭环已通
