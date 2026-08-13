@@ -76,7 +76,7 @@ class OpenAICompatModelAPI(ModelAPI):
             return self._base_url + "/chat/completions"
         return self._base_url + "/v1/chat/completions"
 
-    def chat(self, system: str, messages: list, max_tokens: int = 2000,
+    def chat(self, system: str, messages: list, max_tokens: int = 4000,
              temperature: float = 0.7, tools: Optional[list] = None,
              tool_choice: Optional[str] = None) -> str:
         payload = {
@@ -85,6 +85,11 @@ class OpenAICompatModelAPI(ModelAPI):
             "max_tokens": max_tokens,
             "temperature": temperature,
             "stream": False,
+            # v0.68 修复：v4-flash 是思考型模型——普通 chat 必须显式关思考，
+            # 否则 content 被思考链占满返回空（OFF/B 路径被污染）。
+            # 只有 ReasonerModelAPI（A 路径）才开启 thinking。
+            # max_tokens 放开到 4000：思考型模型需要 token 空间（用户要求不限制）。
+            "thinking": {"type": "disabled"},
         }
         if tools:
             payload["tools"] = tools
@@ -114,7 +119,16 @@ class OpenAICompatModelAPI(ModelAPI):
                         for tc in msg["tool_calls"]
                     ],
                 }, ensure_ascii=False)
-            return msg.get("content") or ""
+            # v0.68 修复：deepseek-v4-flash 是思考型模型——即使不请求 thinking，
+            # API 也先输出 reasoning_content。content 为空时降级取 reasoning_content 尾部
+            # （避免空响应导致调用方走兜底/报错）。
+            _content = msg.get("content") or ""
+            if not _content.strip():
+                _rc = msg.get("reasoning_content") or ""
+                if _rc.strip():
+                    # 取思考链最后一句作为可用内容（去掉思考前缀，保留结论性文字）
+                    _content = _rc.strip().split("\n")[-1][:500]
+            return _content
         except error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")[:300]
             raise ModelError(f"[{self.name}] HTTP {e.code}: {detail}") from e

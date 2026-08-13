@@ -628,7 +628,7 @@ def health():
 
     return jsonify({
         "status": "ok",
-        "version": "0.46.0",
+        "version": "0.68.0",
         "llm_provider": LLM_PROVIDER,
         "llm_model": LLM_MODEL,
         "llm_ok": llm_ok,
@@ -841,9 +841,10 @@ def teach():
         pass  # 元问题路由失败不影响正常教学
 
     # v0.19.7：学习方法咨询拦截——"如何学习线性代数"不应被当概念教学或出题
+    # v0.68 ⭐ 学习计划：is_study_plan_intent 命中也拦截（用户"想系统学X"）
     try:
-        from meta_router import is_method_advice
-        if is_method_advice(concept):
+        from meta_router import is_method_advice, is_study_plan_intent
+        if is_study_plan_intent(concept, learner) or is_method_advice(concept):
             return _handle_method_advice(learner, concept, subject)
     except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
@@ -1537,9 +1538,10 @@ def teach_stream():
         pass
 
     # v0.19.7：学习方法咨询拦截（流式版本）——v0.35 ⭐ LLM 优先
+    # v0.68 ⭐ 学习计划：_llm_intent == "study_plan" 也拦截（LM 判断"用户要学习计划"）
     try:
         from meta_router import is_method_advice
-        if _llm_intent == "method" or (_llm_intent is None and is_method_advice(concept)):
+        if _llm_intent in ("method", "study_plan") or (_llm_intent is None and is_method_advice(concept)):
             _ma = _handle_method_advice(learner, concept, subject)
             _ma_content = _ma.get_json().get("presentations", [{}])[0].get("content", "")
 
@@ -4083,14 +4085,15 @@ def _handle_knowledge_query(learner, subject):
     from services.handlers.knowledge import _handle_knowledge_query as _hkq
     return _hkq(learner, subject)
 
-def _handle_method_advice(learner, concept, subject):
+def _handle_method_advice(learner, concept, subject, deadline=""):
     """v0.19.7：学习方法咨询（v0.41.8 迁至 services/handlers/method.py）。
 
     "如何学习X/怎么复习"走学习指导而非教学/出题——结合学段/学科/用户画像，
     给出针对性的学习方法建议（像一位有经验的老师在谈怎么学这门课）。
+    v0.68 ⭐ 新增 deadline 透传（学习计划周期计算）。
     """
     from services.handlers.method import _handle_method_advice as _hma
-    return _hma(learner, concept, subject)
+    return _hma(learner, concept, subject, deadline=deadline)
 
 # ─────────────────────────────────────
 # v0.19.25：独立对话类型端点——学习方法 / 知识库
@@ -4114,6 +4117,8 @@ def method_advice():
     _set_constraint_flags(learner, data.get("concept") or data.get("text") or "", "method")
     concept = data.get("concept") or data.get("text") or ""
     subject = data.get("subject", "general")
+    # v0.68 ⭐ 学习计划：可选 deadline（"3个月内"），传给 handler 供计划周期计算
+    deadline = data.get("deadline") or ""
     if not concept:
         return jsonify({"error": "concept is required"}), 400
     # v0.20.3：模式自动纠正——选错模式时后端兜底
@@ -4124,7 +4129,7 @@ def method_advice():
     except Exception as _e:
         print(f"[PAEG][server.py] method_advice 异常忽略: {_e}")
         pass
-    result = _handle_method_advice(learner, concept, subject)
+    result = _handle_method_advice(learner, concept, subject, deadline=deadline)
     # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
     # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
     try:

@@ -9,16 +9,50 @@
 from __future__ import annotations
 
 
-def _handle_method_advice(learner, concept, subject):
+def _handle_method_advice(learner, concept, subject, deadline=""):
     """v0.19.7：学习方法咨询。
 
     依赖全部函数体内 import（避免循环）；llm 从 infra.runtime 懒加载。
+    v0.68 ⭐：新增学习计划子意图——is_study_plan_intent 命中时走计划工作流。
     """
     from flask import jsonify
     from prompts import build_general_chat_system, build_general_chat_user
     from subagents import _safe_chat
     from infra.runtime import get_llm
     from utils import _build_learner_ctx_str
+
+    # v0.68 ⭐ 学习计划子意图：用户"对某领域感兴趣/想系统学"→ 生成学习计划
+    try:
+        from meta_router import is_study_plan_intent
+        if is_study_plan_intent(concept, learner):
+            from services.handlers.study_plan import _handle_study_plan_request
+            _plan = _handle_study_plan_request(
+                learner, concept, subject=subject, deadline=deadline)
+            return jsonify({
+                "session_id": f"method_{learner.id}",
+                "summary": {"avg_score": 0},
+                "worldview_used": "weil",
+                "tone_ratio": 0,
+                "presentations": [{
+                    "step_id": 1,
+                    "step_type": "study_plan",
+                    "content": _plan["summary_md"],
+                    "study_plan": _plan,          # 结构化数据（前端卡片渲染）
+                    "actions": _plan["actions"],  # 前端按钮
+                }],
+                "evaluations": [],
+                "diagnosis": {},
+                "plan": {"steps": [{"type": "study_plan"}]},
+                "reflections": [],
+                "learner": {
+                    "id": learner.id,
+                    "nickname": learner.nickname,
+                    "grade_level": learner.grade_level,
+                    "subjects_mastery": learner.subjects_mastery,
+                },
+            })
+    except Exception as _e:
+        print(f"[PAEG][method.py] 学习计划分流异常，走普通方法咨询: {_e}")
 
     llm = get_llm()
     grade = getattr(learner, "grade_level", "high_school")

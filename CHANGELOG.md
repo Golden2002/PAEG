@@ -1,3 +1,28 @@
+### v0.68 学习计划工作流 + v4-flash 思考修复（2026-08-13 ⭐）
+
+**本版定位**：学习方法模式集成"制定学习计划"功能（Oracle 架构：method 子意图 + LM 优先）——用户对某领域感兴趣时生成分阶段+资源+时长的学习计划；同时修复 deepseek-v4-flash 思考型模型的空响应 bug。
+
+**学习计划工作流（Oracle 设计）**：
+- 意图路由：study_plan 作为第 15 个意图加入 meta_router VALID_INTENTS + INTENT_PROMPT（LLM 判断），is_study_plan_intent 正则兜底
+- services/planner.py：StudyPlan/Phase/Milestone/Resource 数据类 + 5 阶段工作流（提取参数→聚合资源→阶段划分→个性化→结构化输出）
+- 阶段骨架确定性（阶段数/模板/周数：基础→强化→实战），里程碑内容 LLM 个性化（LM 优先）
+- services/handlers/study_plan.py：端点处理器（复用 services.polish 语言规范）
+- method.py 分流：is_study_plan_intent 命中 → study_plan 子流程（teach 拦截同步）
+- 资源连通：复用 collect_all_resources（用户物料/知识库/facts/联网 4 路）
+- 前端 renderStudyPlan 卡片渲染（阶段折叠+里程碑+检验+teach 跳转按钮）+ 快速开始文案
+- 版本号 v0.46.0 → v0.68.0
+
+**v4-flash 思考模型空响应修复（重要根因）**：
+- **现象**：普通 chat 调用返回空（content=""），学习计划走兜底、部分模式输出异常
+- **根因**：deepseek-v4-flash 是思考型模型——即使普通 chat 不带 thinking 参数，API 也先输出 reasoning_content；max_tokens 被思考链占满 → content 为空（finish_reason=length）
+- **修复1**：OpenAICompatModelAPI.chat 显式 `thinking: {"type": "disabled"}`（普通/OFF/B 路径），只有 ReasonerModelAPI（A 路径）开 thinking——严格匹配 SUBAGENT_THINKING_LEVELS 矩阵设计
+- **修复2**：max_tokens 默认 2000 → 4000（思考模型需 token 空间，用户要求放开）
+- **验证**：连续 5 次 _safe_chat 全返回（此前全空）；3 个学习计划测试全部 LLM 高质量生成
+
+**测试**：POST /api/method「我想学习生命现象学，该怎么样入门」→ step_type=study_plan + 3 阶段 LLM 生成（悬置/意向性/知觉现象学/身体图式等专业内容）+ teach 跳转按钮
+
+**文档**：技术 §10.13（v4-flash 修复）+ 维护 §18.26（学习计划 + 空响应根因）+ 元能力 §6.54
+
 ### v0.67 交互教学选择题 + 定时主动问候（2026-08-13 ⭐）
 
 **本版定位**：主动提问 question 功能（教学选择题推动教学）+ 定时主动问候（老师式关心）+ 倾诉语病修复。

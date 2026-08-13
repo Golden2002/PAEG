@@ -3197,6 +3197,11 @@ async function methodChat(question, subject) {
     removeThinking(thinking);
     const pres = (result.presentations && result.presentations[0]) || {};
     const content = pres.content || '';
+    // v0.68 ⭐ 学习计划：step_type=study_plan → 结构化卡片渲染 + teach 衔接按钮
+    if (pres.step_type === 'study_plan' && pres.study_plan) {
+      renderStudyPlan(pres.study_plan, pres.actions || [], subject);
+      return;
+    }
     if (content) {
       addMsg('paeg', `<div class="mode-tag">学习方法 · ${escapeHtml(result.learner && result.learner.nickname ? '' : '')}${escapeHtml(subjectLabel(subject))}</div>` + content);
     } else if (result.error) {
@@ -3215,6 +3220,64 @@ async function methodChat(question, subject) {
     // v0.x ⭐ 统一收尾（answer/method/knowledge/affection 4 个模式以前漏调 _hideStopBtn → 停止键卡死）
     window._finalizeGeneration();
   }
+}
+
+// v0.68 ⭐ 学习计划卡片渲染（study_plan 结构化数据 → 前端友好卡片）
+function renderStudyPlan(plan, actions, subject) {
+  const topic = plan.topic || '学习计划';
+  const totalWeeks = plan.total_weeks || '';
+  const weeklyH = plan.weekly_hours || '';
+  const deadline = plan.deadline || '';
+  let html = `<div class="mode-tag">学习计划 · ${escapeHtml(topic)}</div>`;
+  html += `<div class="study-plan-card" style="border:1px solid var(--border);border-radius:12px;padding:12px;margin:6px 0;background:var(--surface);">`;
+  html += `<div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">`;
+  html += `约 ${escapeHtml(String(totalWeeks))} 周 · 每周约 ${escapeHtml(String(weeklyH))} 小时`;
+  if (deadline) html += ` · 截止 ${escapeHtml(String(deadline))}`;
+  html += `</div>`;
+  (plan.phases || []).forEach((ph, pi) => {
+    html += `<details style="margin-bottom:6px;border:1px solid var(--border);border-radius:8px;padding:6px 10px;">`;
+    html += `<summary style="cursor:pointer;font-weight:600;font-size:14px;">阶段 ${pi + 1}：${escapeHtml(ph.name || '')} · ${escapeHtml(String(ph.duration_days || ''))} 天</summary>`;
+    html += `<div style="margin:6px 0;font-size:13px;color:var(--text);"><b>目标：</b>${escapeHtml(ph.goal || '')}</div>`;
+    (ph.milestones || []).forEach(m => {
+      html += `<div style="margin:4px 0 2px;font-size:13px;"><b>• ${escapeHtml(m.title || '')}</b></div>`;
+      (m.deliverables || []).forEach(d => {
+        html += `<div style="margin-left:14px;font-size:12px;color:var(--text-dim);">- ${escapeHtml(d)}</div>`;
+      });
+      html += `<div style="margin-left:14px;font-size:12px;color:var(--accent);">检验：${escapeHtml(m.checkpoint || '')}</div>`;
+    });
+    html += `</details>`;
+  });
+  // 个性化备注
+  (plan.personalization_notes || []).forEach(n => {
+    html += `<div style="font-size:12px;color:var(--text-dim);margin-top:4px;">💡 ${escapeHtml(n)}</div>`;
+  });
+  // actions 按钮（teach 跳转 / 保存）
+  (actions || []).forEach(act => {
+    const kind = act.kind || '';
+    const label = act.label || '';
+    if (kind === 'teach') {
+      html += `<button class="teach-trigger action-btn" data-concept="${escapeHtml(act.payload && act.payload.concept || '')}" data-subject="${escapeHtml(subject)}" style="margin:6px 6px 0 0;">${escapeHtml(label)}</button>`;
+    } else {
+      html += `<button class="action-btn" style="margin:6px 6px 0 0;" onclick="alert('学习计划已生成，可通过对话继续调整。')">${escapeHtml(label)}</button>`;
+    }
+  });
+  html += `</div>`;
+  addMsg('paeg', html);
+  // teach 衔接：点击按钮 → 切到 teach 模式 + 预填概念
+  document.querySelectorAll('.teach-trigger').forEach(btn => {
+    btn.onclick = () => {
+      const concept = btn.dataset.concept;
+      const subj = btn.dataset.subject || 'general';
+      currentMode = 'teach';
+      const teachBtn = document.querySelector('[data-mode="teach"]');
+      if (teachBtn) teachBtn.click();
+      const qInput = document.getElementById('question-input');
+      if (qInput) {
+        qInput.value = concept;
+        qInput.focus();
+      }
+    };
+  });
 }
 
 // v0.19.25：知识库模式——独立对话类型（清点 Library）
@@ -3961,6 +4024,8 @@ askBtn.addEventListener('click', () => {
     addMsg('paeg', '<b>Émile 使用指南</b><br><br>' +
       '· <b>学知识</b> —— 直接输入学科主题（如「什么是熵」），进入教学：诊断→讲解→评估→调整<br>' +
       '· <b>做题目</b> —— 说「给我一道经典题」，我给你出题并讲解<br>' +
+      '· <b>制定学习计划</b> —— 在「学习方法」模式说「我对X感兴趣，想系统学Y」，我给你分阶段+资源+时长的学习计划<br>' +
+      '&nbsp;&nbsp;&nbsp;· 例：「我对量子力学感兴趣，想系统学习」「帮我制定考研数学计划，3个月」<br>' +
       '· <b>聊想法</b> —— 困惑、焦虑、好奇，都可以跟我说（倾诉模式）<br>' +
       '· <b>查资料</b> —— 点输入框旁的「查资料」按钮，整理知识库+网上的资料成卡片<br>' +
       '· <b>画知识导图</b> —— 说「思维导图」「知识框架」<br>' +

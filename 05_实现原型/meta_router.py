@@ -95,6 +95,46 @@ def is_method_advice(text: str) -> bool:
     return any(p.search(t) for p in METHOD_COMPILED)
 
 
+# v0.68 ⭐ 学习计划意图检测（method 模式子意图）——
+# 用户"对某领域感兴趣/想系统学某科/要一份学习计划"时触发学习计划工作流。
+# 与 METHOD_ADVICE 的区别：method 是"怎么学"的一般建议，plan 是"完整学习计划
+# （阶段+资源+时长）"。plan 是 method 的更具体子集——命中 plan 优先走计划工作流。
+STUDY_PLAN_PATTERNS = [
+    r"(想|要|准备|打算|计划).{0,8}(系统|从头|入门|深入).{0,6}(学|了解|研究)",
+    r"(制定|给|做|出一?份).{0,4}(学习|复习|备考)?计划",
+    r"学习(路径|路线|规划|计划|地图)",
+    r"(感兴趣|喜欢|想学).{0,12}(怎么|如何).{0,4}(学|入门|开始)",
+    r"从.{0,6}(零基础|入门|基础).{0,6}(学|开始)",
+    r"(学|掌握).{0,12}(要(多久|多长时间|几周|几个月))",
+    r"(学|学(好|会)).{0,8}(要(多久|多长时间|几周|几个月)|多久|多长时间)",
+    r"(长期|系统).{0,4}(学习|规划)",
+    r"(制定|安排|规划).{0,4}(学习|复习|备考)",
+    r"给.{0,6}(我|自己).{0,4}(一个|一份|套).{0,2}(学习|复习)?(计划|方案)",
+]
+STUDY_PLAN_COMPILED = [re.compile(p, re.IGNORECASE) for p in STUDY_PLAN_PATTERNS]
+
+
+def is_study_plan_intent(text: str, learner=None) -> bool:
+    """判断用户是否在请求"制定学习计划"（method 的子意图）。
+
+    命中特征：
+    1. 关键词：制定计划/学习路径/系统学习/从零开始学/学多久
+    2. 兜底：method 触发 + 画像 interests 命中（用户兴趣领域）
+    """
+    t = (text or "").strip()
+    if not t or len(t) > 80:
+        return False
+    if any(p.search(t) for p in STUDY_PLAN_COMPILED):
+        return True
+    # 兜底：画像兴趣命中（用户说"我对量子力学感兴趣"且画像记过量子力学）
+    if learner and getattr(learner, "interests", None):
+        _its = list(learner.interests)[:5]
+        for _it in _its:
+            if _it and isinstance(_it, str) and _it in t:
+                return True
+    return False
+
+
 # v0.19.15：知识库查询检测——用户问"你学过什么/你的知识库/你懂哪些"
 # 固定关键词"知识库"，查询 Library 汇报已收录知识 + 提示可上传资料
 KNOWLEDGE_QUERY_PATTERNS = [
@@ -285,11 +325,12 @@ VALID_INTENTS = {
     "material",       # is_intent_with_material  (用户上传文件/复合指令+资料)
     "interface",      # is_interface_query       (界面操作) — server.py
     "ppt",            # is_ppt_request           (PPT/演示文稿生成) — 本文件新增
+    "study_plan",     # is_study_plan_intent     (制定学习计划) — v0.68 新增
     "answer",         # 知识问答/直接回答（无规则函数，纯 LLM 判断）
     "chat",           # 闲聊（无规则函数，纯 LLM 判断）
 }
 
-INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务：阅读用户输入，判断它属于下面 14 个意图中的哪一类，**只返回该意图的变量名**（如 "teach" / "interface"），不要做其他任何事。
+INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务：阅读用户输入，判断它属于下面 15 个意图中的哪一类，**只返回该意图的变量名**（如 "teach" / "interface"），不要做其他任何事。
 
 【意图类型定义（每个类型是什么、边界在哪）】
 - teach: 教学请求——用户要开始学习/继续学习/讲解某个学科概念（"教我法语""什么是导数""继续""下一题""讲解这个语法"）。注意：问"概念是什么"但目的是理解 → teach；只是要一句话结论 → answer。
@@ -298,7 +339,8 @@ INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务�
 - knowledge: 清点/查询知识库——用户问"我学过什么/知识库有什么/你收藏了什么资料"（清点已有内容，非新教学）。
 - knowledge_map: 生成/查看知识地图/思维导图（"画个思维导图""知识框架""结构图"）。
 - recommend: 工具/软件/书/资源推荐——用户要"推荐/用什么好"（"学法语用什么软件""推荐几本英语书"）。
-- method: 学习方法论/认知策略（"怎么记单词""如何高效学习""怎么复习"）。
+- method: 学习方法论/认知策略（"怎么记单词""如何高效学习""怎么复习"）。注意：method 是**单次**方法建议；若用户要的是**完整学习计划**（分阶段+资源+时长），应归 study_plan。
+- study_plan: 制定学习计划——用户对某领域感兴趣，想要一份**系统的学习计划**（"我对量子力学感兴趣想系统学习""帮我制定学习计划""想从零学英语该怎么做规划""三个月学会Python""给我一份考研复习计划"）。特征：明确表达**长期/系统/分阶段/规划**的意图。与 method 的区别：method 是"怎么学"的一次性建议，study_plan 是"完整的阶段+资源+时间安排"。
 - emotion: 情绪表达/倾诉/心理支持（"学不下去了""太难了想放弃""我很焦虑"）。
 - problem: 出题/测验/练习（"出10道题""考考我""来道练习"）。
 - meta: 纯身份问题——关于"我是谁"（"你是谁""你叫什么""你是什么"）。注意：**"你能做什么/有什么功能/怎么用"不是 meta**，是 interface（问能力/功能/使用）。
@@ -316,6 +358,10 @@ INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务�
 - "教我法语" → teach（要开始教学），不是 recommend
 - "法语难吗" → answer（知识问答），不是 method
 - "怎么学法语" → method（学习方法），不是 teach
+- "我对量子力学感兴趣，想系统学习" → study_plan（制定学习计划），不是 teach
+- "帮我制定一份考研数学学习计划" → study_plan（制定学习计划），不是 method
+- "想从零基础学英语，给我做个规划" → study_plan（学习规划），不是 method
+- "怎么高效背单词" → method（单次方法建议），不是 study_plan
 - "我学过什么" → knowledge（清点知识库），不是 teach
 - "画个知识框架图" → knowledge_map（思维导图），不是 teach
 - "把这些资料做成PPT" → ppt（生成演示文稿），不是 teach
@@ -327,7 +373,7 @@ INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务�
 {text}
 
 【输出要求】只输出严格 JSON（不要 markdown 代码块、不要任何其他文字）：
-{"intent": "上面 14 个变量名之一", "confidence": 0.0-1.0, "reason": "简短中文原因"}
+{"intent": "上面 15 个变量名之一", "confidence": 0.0-1.0, "reason": "简短中文原因"}
 """
 
 _INTENT_CACHE_V2 = {}
@@ -449,6 +495,12 @@ def rule_fallback_intent(text: str) -> dict:
         pass
     if is_knowledge_query(t):
         return {"intent": "knowledge", "confidence": 0.5, "reason": "rule:knowledge_low"}
+    # v0.68 ⭐ 学习计划兜底：plan 是 method 的更具体子集，先判 plan 再判 method
+    try:
+        if is_study_plan_intent(t):
+            return {"intent": "study_plan", "confidence": 0.75, "reason": "rule:study_plan"}
+    except Exception:
+        pass
     if is_method_advice(t):
         return {"intent": "method", "confidence": 0.7, "reason": "rule:method"}
     try:

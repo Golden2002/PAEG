@@ -5298,3 +5298,54 @@ git pull modelscope master    # 若 ModelScope 有他人更新
 4. 移动端（≤768px）textarea 仍撑满，按钮不独占整行（保持紧凑）
 5. UI 修复必须 Playwright 实测三档视口（桌面/平板/手机）+ 横向溢出检查
 
+### 10.14 学习计划工作流 + v4-flash 思考修复（v0.68 ⭐ 2026-08-13）
+
+#### 10.14.1 学习计划功能（method 子意图，Oracle 架构）
+
+**定位**：学习方法模式（method）的"制定学习计划"子流程——用户"对某领域感兴趣/想系统学X"时生成分阶段+资源+时长的学习计划。
+
+**意图路由（LM 优先）**：
+- `study_plan` 作为第 15 个意图加入 `meta_router.VALID_INTENTS` + `INTENT_PROMPT`（LLM 在多选项中判断）
+- `is_study_plan_intent()` 正则兜底（LLM 失败时）
+- 模式短路：method 模式 + 命中 plan 意图 → 分流到学习计划工作流
+
+**工作流（services/planner.py）**：
+1. `extract_plan_inputs`：提取 topic/deadline/每周小时（从输入 + LearnerProfile 画像）
+2. `aggregate_resources`：复用 `collect_all_resources`（用户物料/知识库/facts/联网 4 路，只调一次）
+3. `design_phases`：**阶段骨架确定性**（阶段数 2-4/模板：基础→强化→实战 + 语言/备考特化）+ **里程碑内容 LLM 个性化**
+4. `build_study_plan`：汇总为 StudyPlan JSON（phases[].milestones[].resources[] + summary_md + actions）
+
+**数据结构**：StudyPlan/Phase/Milestone/Resource dataclass（阶段数/周数/每周小时/截止日期/个性化备注）
+
+**前后端**：
+- `services/handlers/study_plan.py`：端点处理器（语言规范收口）
+- `method.py`：is_study_plan_intent 分流（teach 拦截同步支持）
+- 前端 `renderStudyPlan()`：阶段折叠卡片 + 里程碑 + 检验 + teach 跳转按钮
+- 快速开始文案新增"制定学习计划"示例
+
+#### 10.14.2 v4-flash 思考模型空响应修复（重要根因，需长期记住）
+
+**现象**：普通 chat 调用返回空字符串（content=""），导致学习计划走兜底、部分模式输出异常。
+
+**根因**（排查链）：
+1. `_safe_chat` 返回空 → 先疑 API 故障 → 直接调底层 `api.chat` 也空 → 发原始 HTTP 请求看完整响应
+2. **发现**：响应 `{"message": {"content": "", "reasoning_content": "...", "finish_reason": "length"}}`
+3. **结论**：`deepseek-v4-flash` 是思考型模型——即使不带 thinking 参数，API 也先输出 reasoning_content；max_tokens 太小时 content 被思考链占满 → 空
+4. **测试确认**：显式 `thinking: {"type": "disabled"}` 后 content 正常返回
+
+**修复**：
+```python
+# llm_api.py OpenAICompatModelAPI.chat
+payload = {
+    ...
+    "thinking": {"type": "disabled"},   # 普通/OFF/B 路径显式关思考
+}
+# max_tokens 默认 2000 → 4000（思考模型需 token 空间）
+```
+
+**设计对齐**：与 SUBAGENT_THINKING_LEVELS 矩阵一致——只有 A 路径（presenter/answer_solver 用 ReasonerModelAPI）开 thinking；B/OFF 路径用普通 chat（thinking: disabled）。
+
+**验证**：连续 5 次 _safe_chat 全返回；3 个学习计划测试全 LLM 高质量生成。
+
+**教训**：**思考型模型的"空 content"是配置/参数问题不是网络问题**——排查顺序：原始 HTTP 响应 → 检查 reasoning_content/finish_reason → 显式 thinking 开关。
+
