@@ -405,7 +405,7 @@
 - **画像驱动：✅ 已补（v0.69+）**——choose_strategy 此前接收 learner 但未用画像维度；已增加画像分支（学段 graduate_exam→socratic / 初高中技能→mastery / 目标考试→socratic / 认知风格具体偏好→scaffolded），诊断/学科规则优先、画像兜底 default 场景
 - **次痛点：17 维画像 + BDI 仅声明未被下游消费**——Planner/Presenter 不读画像（个性化是文案而非机制）
   - 改动：Planner 入参增 LearnerProfile（按先验/动机分支）；Presenter 读 learning_style；画像陈旧触发轻量诊断
-- **其他薄弱点核实（v0.69+）**：交互式教学缺失（提问-等待-追问循环——架构级改造，后续）；评估缺学习效果侧（学生复述/答题率——后续）；**知识依赖图 ✅ 已存在**（knowledge_base.py 33 处 prerequisites+leads_to 双向图，Diagnostor 已用于前置状态——Oracle 误判）；实时自适应（卡顿→降阶 ✅ 提示词基础已有——_build_capability_manifest看不懂→换例子重讲）
+- **其他薄弱点核实（v0.69+ 全部完成）**：**交互式教学**（提问-等待-追问循环——唯一真实架构级缺口，后续改造 Presenter 循环）；**效果评估 ✅ 已覆盖**（Evaluator learner_state 0.4 权重 + _student_signal 理解度/困惑/参与信号——Oracle 误判）；**知识依赖图 ✅ 已存在**（33 处 prerequisites+leads_to，Diagnostor 已用）；**实时自适应 ✅ 基础已有**（能力清单看不懂→换例子重讲）
 - **优先级**：诊断闭环 > 画像驱动（影响所有学习者 vs 老用户更显著）
 
 ### 3.13 Step4 接口完整性检查：12 处断链（2026-08-14 explore 全链路核对 · P0 待修）
