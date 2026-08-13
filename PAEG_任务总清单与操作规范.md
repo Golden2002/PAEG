@@ -399,8 +399,8 @@
 6. 重大改动后：语法验证 → 重启（按 §10.16 进程 SOP）→ 回归
 ### 3.12 Step4 九模块底座评估结果：诊断→计划闭环 + 画像驱动（2026-08-14 Oracle 评估 · 待实施）
 - **九模块成熟度（Oracle 对照评估）**：Interaction 中 / Profile 中 / **Diagnosis 弱** / Plan 中 / Action 强 / Evaluation 中 / Adaptation 中 / Knowledge 强 / Output 强
-- **最痛点：Diagnosis→Plan 闭环未通**——Diagnostor 输出未回灌 Planner，教学计划无法基于真实薄弱点定制（通用聊天机器人与个性化教学智能体的分水岭）
-  - 改动：Diagnostor.paeg_teach 输出 schema 增 weak_knowledge_points+suggested_strategy；Planner 入参增 diagnosis_report；	each_stream 编排改 [Diagnosis→Plan→Action]
+- **诊断→计划闭环：✅ 已实现（修正 Oracle 误判）**——paeg.teach 已串联 Diagnostor.run → planner.run(diagnosis=session.diagnosis) → choose_strategy(learner, diagnosis, subject) 差异化步骤；Oracle 评估基于简化输入，实际闭环已通
+- **画像驱动：✅ 已补（v0.69+）**——choose_strategy 此前接收 learner 但未用画像维度；已增加画像分支（学段 graduate_exam→socratic / 初高中技能→mastery / 目标考试→socratic / 认知风格具体偏好→scaffolded），诊断/学科规则优先、画像兜底 default 场景
 - **次痛点：17 维画像 + BDI 仅声明未被下游消费**——Planner/Presenter 不读画像（个性化是文案而非机制）
   - 改动：Planner 入参增 LearnerProfile（按先验/动机分支）；Presenter 读 learning_style；画像陈旧触发轻量诊断
 - **其他薄弱点**：交互式教学缺失（提问-等待-追问循环）；评估缺学习效果侧（学生是否真掌握）；缺知识点依赖图（prerequisite_graph）；实时自适应（卡顿→降阶）缺失
@@ -413,7 +413,7 @@
 - **P0-2**：hooks 7 事件全无触发点 → **✅ 已修复**（v0.68+ 内置 log_hook + config/hooks.json 5 个 log hook + teach_stream 入口触发 session.start/message.before_user、done 后 message.after_assistant；日志验证 learner=hook_final 触发；reload 响应验证 loaded:true）
 - **P0-3**：workflows 最后一公里断裂（meta_router.INTENT_TO_CAPABILITY_HINT.auto_tools 无消费者，LLM 看不见 run_workflow__*）→ 修复：teach 端点消费 capability_hint
 - **P0-4**：config_hub.reload_all 无调用 → **✅ 已修复**（v0.68+ /api/admin/reload 端点，返回 hooks 加载状态）
-- **P1-1~6**：hooks.json 空 / mcp_servers.json 双份 / _inject_skill_catalog 重复实现 / teach+answer 端点无完整工具集 / 手工工具列表与 FC schema 不一致 / answer+method+knowledge 无 skill 注入
+- **P1-1~6**：hooks.json 空（✅ 已填 5 hook）/ mcp_servers.json 双份（✅ 已删根目录副本）/ _inject_skill_catalog 重复实现（P1-3 待统一）/ teach+answer 工具集（✅ P0-3 已覆盖 44 工具）/ 手工工具列表（P1-5 待清）/ answer skill 注入（✅ P1-6 已补）
 - **P2-1~2**：transport 复用仅同 async 块 / tool_registry 与 config_hub 双路径行为不一致
 - **优先级**：P0-1 → P0-2 → P0-3 → P0-4（修复后跑 smoke_test + 端到端）
 

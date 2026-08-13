@@ -1862,6 +1862,11 @@ class AnswerSolver:
             "6. 语言准确、完整（主谓宾齐全），像一份标准答案，而不是课堂对话。\n"
             "7. 不确定的地方注明（如'按常规解法'），不编造。"
         )
+        # v0.69+ P1-6：注入 skill L1 目录（与其他端点一致，LLM 可见可用技能）
+        try:
+            system = _inject_skill_catalog(system)
+        except Exception:
+            pass
         user = f"学生的问题：{question}\n{desc_line}请直接给出完整答案。"
         # v0.22.1：回答前强制检索知识库 + 暴露工具（web_search/verify_math）
         try:
