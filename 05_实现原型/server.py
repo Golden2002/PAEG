@@ -3803,14 +3803,19 @@ def general_chat():
     _use_agent_engine = bool(data.get("mode") == "agent") or bool(data.get("agent_engine"))
     try:
         from tool_registry import run_agent_loop
-        _agent_sys = (
-            system
-            + "\n\n## 工具使用\n"
-            + "你可以调用以下工具来辅助回答：web_search（联网查资料）、verify_math（验证数学表达式）、"
-            + "fetch_page（抓网页全文）、daily_quote（每日一句）、get_time（当前时间）。\n"
-            + "规则：需要最新/外部信息时用 web_search；数学答案可先用 verify_math 验证再回答；"
-            + "其余情况直接回答，不要滥用工具。"
-        )
+        # v0.69+ P1-5：动态生成工具提示（不再硬编码 5 工具——FC schema 已含 mcp/skills/workflows 44 工具）
+        _tool_hint = ""
+        try:
+            from tool_registry import get_tool_defs
+            _tnames = [d.get("function", {}).get("name", "") for d in get_tool_defs()]
+            _builtin = [n for n in _tnames if not n.startswith(("mcp__", "load_skill__", "run_workflow__"))]
+            _tool_hint = ("\n\n## 工具使用\n"
+                          + "你可以调用以下工具辅助回答：" + "、".join(_builtin[:6]) + "。\n"
+                          + "另有联网检索（mcp__*）、技能（load_skill__*）、工作流（run_workflow__*）等扩展工具——"
+                          + "按需调用，不要滥用；数学答案可先用 verify_math 验证再回答。")
+        except Exception:
+            pass
+        _agent_sys = system + _tool_hint
         if _use_agent_engine and AGENT_ENGINE is not None:
             # Plan→Act→Observe→Reflect 显式循环（最多 3 次迭代 + 2 次 replan）
             try:
