@@ -72,7 +72,8 @@ class SelfEvolution:
         if not knowledge:
             return {"distilled": 0, "rejected": ["LLM 提炼失败"]}
 
-        # 质量门禁（avg>=0.7 即"环境验证"通过 → skip_sandbox 直接入库）
+        # 质量门禁（v0.68+ G2 澄清：avg>=0.7 是"教学效果"信号，事实正确性由 L3 LLM factuality 评分把关）
+        # skip_sandbox 仅跳过 L4 证据累积（知识蒸馏走"教学评分 + L3 事实评分"双信号直接入库）
         verdict = self.gate.evaluate({
             "content": knowledge.get("content", ""),
             "entry_type": "knowledge",
@@ -232,11 +233,25 @@ class SelfEvolution:
         return {"learned": 1, "lesson": lesson, "rejected": []}
 
     def _compose_lesson(self, tool_name: str, question: str, success: bool, note: str) -> str:
-        if success:
-            return (f"工具 {tool_name} 对这类问题有效（示例问题：{question[:60]}）"
-                    f"{('——' + note[:80]) if note else ''}")
-        return (f"工具 {tool_name} 在处理这类问题时失败（示例问题：{question[:60]}），"
-                f"下次应改用其他方式{('——' + note[:80]) if note else ''}")
+        # v0.68+ G6 ⭐ LLM 提炼工具经验（适用场景/要点/误区/替代方案），模板兜底
+        _fallback = (f"工具 {tool_name} 对这类问题有效（示例问题：{question[:60]}）"
+                     f"{('——' + note[:80]) if note else ''}") if success else \
+                    (f"工具 {tool_name} 在处理这类问题时失败（示例问题：{question[:60]}），"
+                     f"下次应改用其他方式{('——' + note[:80]) if note else ''}")
+        if self.llm is not None:
+            try:
+                from subagents import _safe_chat
+                _sys = ("你是工具使用经验提炼器。从一次工具调用中提炼**可复用的工具使用经验**，"
+                        "输出 2-3 句中文，含：适用场景、使用要点、常见误区（若失败则给替代方案）。"
+                        "不要编造；输出纯文本。")
+                _usr = (f"工具：{tool_name}\n问题：{question[:100]}\n"
+                        f"结果：{'成功' if success else '失败'}\n备注：{note[:100]}")
+                _r = _safe_chat(self.llm, _sys, _usr, max_tokens=200)
+                if _r and len(_r.strip()) >= 10:
+                    return _r.strip()[:200]
+            except Exception:
+                pass
+        return _fallback
 
     def _append_tool_lesson(self, lesson: str):
         fpath = os.path.join(self.memory_dir, 'tool_lessons.md')

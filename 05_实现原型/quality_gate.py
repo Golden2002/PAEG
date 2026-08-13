@@ -219,10 +219,12 @@ class QualityGate:
             result["scores"] = {"factuality": 5, "novelty": 4, "safety": 5, "pedagogy": 4}
 
         # L4 进入沙盒（等待实证证据）——除非 skip_sandbox（直接入库）
+        # v0.68+ G2 澄清：skip_sandbox 仅跳过"证据累积等待"——L1-L3（含 L3 LLM factuality
+        # 事实正确性评分）已全部执行通过；调用方另提供"教学效果"类环境信号（如 avg_score>=0.7）。
         if skip_sandbox:
             result["pass"] = True
             result["level"] = "L3"
-            result["reasons"].append("L1-L3 通过，直接入库（调用方已提供环境验证）")
+            result["reasons"].append("L1-L3 通过（含 L3 LLM 事实评分），跳过 L4 证据累积直接入库（调用方已提供环境验证信号）")
             return result
         entry = {
             "content": content,
