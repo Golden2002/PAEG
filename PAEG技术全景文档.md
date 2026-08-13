@@ -195,6 +195,10 @@ flowchart TB
 | **35 个学科** | 每个学科有专属 persona/language/structure/emphasis（v0.25 新增语言学/大气科学/量子场论）| `SUBJECT_STYLES`（35 个，各 4 字段）|
 
 > **v0.68+ 学科专项增强机制（2026-08-14）**：同一教学 subagent（Presenter）下，学科能力通过 `SUBJECT_STYLES[subject]` 字段**分别增强**——扩展字段按学科条件渲染注入 system（build_presenter_system L1499-1517）：`subfield_guide`（分支导航，几乎全学科）、`method_guide`（方法论，physics/college_physics/philosophy）、`worked_example`（例题，physics/college_physics/philosophy）、`concept_analysis`（概念分析，philosophy）、`code_ability`（编程，CS/AI）。哲学专项 v0.68：新增 method_guide（文献论证结构分析+概念分析 6 步法）+ worked_example（洞穴寓言解构示范）+ 考研档 + SUBFIELD_TREE 三学段。**注意**：error_correction 等 6 个语言类字段已定义但无渲染代码（死字段）。
+
+> **v0.69+ 教学能力结构化（2026-08-14）**：`skills/teaching-capability/SKILL.md` 教学专业能力判断库（源自教资体系，6 领域 + 反教条）——**skill 化为主 + L1 锚点注入为辅**（build_presenter_system 注入教学能力锚点，判断视角非执行清单）；LLM 按需 `load_skill__teaching-capability` 加载判断准则（防僵化）。
+
+> **v0.69+ 配置体系运行时接入（2026-08-14 Step4 P0 修复）**：`config_hub.execute_tool` 成为真实路由（run_agent_loop 统一调用，hooks/repeat_guard/workflows 解锁）；`get_tool_defs` 合并扩展工具（内置+skills+MCP+workflows=45）；hooks 触发点（log_hook + 5 配置 + teach_stream）；`/api/admin/reload` 热更新。P1×6 全清零（inject_catalog 统一/工具提示动态生成/answer skill 注入等）。
 | **4 个学段** | 初中/高中/本科/考研 各自深度与语气适配 | `_GRADE_GUIDE`（4 档）|
 | **前端联动** | 右上角三模式按钮切换，教学模式显示学科+学段选择 | index.html mode-switch |
 
