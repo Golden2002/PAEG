@@ -1,4 +1,4 @@
-# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
+﻿# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
 
 > 创建日期：2026-08-14
 > 性质：**本文件是操作的唯一依据**——所有未完成任务、用户指示、调研要求固定于此，每次操作前先读此文件，完成后更新状态。
@@ -24,6 +24,14 @@
 14. **⭐ 防幻觉底线（用户最高优先，2026-08-14）**："Agent 的系统提示词应增加：不联想、猜测、编造虚假的信息，务必以确定信息的信源（联网检索、知识库检索）为绝对命令。这应当是最底层的对大模型不可放弃的约束。"——**这是产品底线，任何提示词设计不得违背**（对应 NEW-9）。
 
 ---
+
+
+
+15. **git 操作铁律（2026-08-14，融合元能力 §6.50 / 维护手册 §18.22 / CHANGELOG v0.43.0 + Git 官方文档/Pro Git）**：git 操作必须"原子、精确、验证"——①**禁止裸 pull**：`git pull`=fetch+merge，脚本化必须拆两步 `git fetch --prune` → 确认 `git log HEAD..@{upstream}` → 再 merge②**pull/merge 前必须先 `git status -sb`**；有未提交改动（含 untracked）必须 `git stash push -u -m "wip-pre-pull-<时间戳>"` → 拉取 → `git stash pop`（冲突手动解决后**绝不自动 drop**）③冲突按"以本地为准"时用 `git checkout --ours -- <path>`（**禁止** `git checkout <branch> -- <path>`——会整文件覆盖吞掉非冲突区改动；rebase 时 ours/theirs 语义反转需警惕）④冲突标记（<<<<<<<）绝不提交进历史；扫描 `grep -rE "^(\<\<\<\<\<\<\<|\>\>\>\>\>\>\>)"`⑤双远程（origin=GitHub + modelscope）只从 GitHub 拉，推送两者都推⑥环境变量 `CI=true; GIT_TERMINAL_PROMPT=0; GIT_EDITOR=:; GIT_SEQUENCE_EDITOR=:; GIT_MERGE_AUTOEDIT=no; GIT_PAGER=cat; GCM_INTERACTIVE=never`（Windows 必须）保证非交互⑦建议配置 `pull.ff only` + `rebase.autoStash true` + `fetch.prune true`。
+
+16. **⭐ 批量重构/正则/AST 清理铁律（2026-08-14，全新——事故记录：CHANGELOG v0.40.6 83 处 NameError + AffectionSupportor 危机块被批量脚本破坏 + 双 pass 正则清理致 subagents.py 语法错误；依据 PEP 8/PEP 760/ast-grep 官方）**：**禁止用正则/sed/PowerShell -replace 批量改写代码结构**——①`except: pass` 是**合法优雅降级模式**（如 `try: import ujson except ImportError: pass`），删除会改变控制流；bare except 会吞 KeyboardInterrupt（Pylint W0702/PEP 760 已承认其脆弱性）②批量改前先提交快照（git commit 或 stash）+ dry-run 预览范围③跨文件批量修改**必须用 AST 工具（ast-grep）**，按 AST 节点（except_clause/try_statement）过滤，禁止按文本匹配 except 关键字④改完立刻 `python -m py_compile` + 跑相关测试⑤小步提交，每步验证，发现破坏用 `git reset --hard HEAD~N` 回滚（前提已提交）。
+
+17. **⭐ git checkout/restore 前必须备份未提交改动 + 禁止 reset --hard（2026-08-14，全新——事故：git checkout 恢复文件时丢失未提交的 TRUTH_GROUNDING/能力清单，已重新注入+提交 a112575 固化；依据 Pro Git 第 2.4 章 "dangerous command" 警告）**：`git checkout -- <file>` / `git checkout <commit> -- <file>` / `git restore` 会**静默丢弃工作区未提交内容**（Pro Git 原话："Any local changes you made to that file are gone"）；`git reset --hard` 是终极大杀器（未提交改动 Git 无法恢复）。恢复前必须：①`git status` 列出未提交文件②未提交改动先 `git stash` 或 cp 备份（<file>.bak）③确认要恢复的确实是"出错的改动"而非"未提交的新工作"④恢复后重新验证语法+功能⑤**禁止在 PAEG 工作区用 `git reset --hard`**，除非已确认所有改动都已 commit/stash。
 
 ## 一、ULW Loop 大任务（进行中，5 步）
 
@@ -194,12 +202,12 @@
 - 缺口：subject_patches（反思补丁）是否作为动态槽注入？是否有专门的"拼接 tool"暴露给 LLM？
 - 目标：新增 `compose_dynamic_prompt` tool（config_hub 注册），LLM 可调用，把反思补丁 + 固定段合并
 
-### 3.9 AffectionSupportor 引入 WEIL_CORE（2026-08-14 用户新需求 · 待实现）
+### 3.9 AffectionSupportor 引入 WEIL_CORE（2026-08-14 用户新需求 · ✅ 已完成）
 - **需求**：倾诉模式（AffectionSupportor）的 system prompt 目前**没有引入 WEIL_CORE**（薇依人格）——用户明确"affection supporter 也应该引入 weil_core"
-- **现状**：subagents.py 中 AffectionSupportor 有独立的人格（约纳斯克制笔法），但不含 WEIL_CORE 的完整人格（三层身份/能力提示/薇依精神来源）
-- **目标**：在 AffectionSupportor 的 system 构造中注入 WEIL_CORE（与 build_presenter_system / build_general_chat_system 一致），保持倾诉的克制风格不被破坏
-- **注意**：需检查 TRUTH_GROUNDING 是否也注入（防幻觉底线应覆盖倾诉模式）；倾诉特殊性（先回应情绪）不能因注入 WEIL_CORE 而模板化
-- **优先级**：P0（用户明确要求，人格一致性）
+- **现状（修复前）**：subagents.py 中 AffectionSupportor 有独立的人格（Émile Novis + 手写薇依世界观 5 条 + 约纳斯克制笔法），**不含 WEIL_CORE 完整常量**；且 **TRUTH_GROUNDING 防幻觉底线也未覆盖倾诉模式**
+- **实施（v0.68+，commit d840eb7）**：三处注入——①`from prompts import WEIL_CORE, TRUTH_GROUNDING`（run 方法局部导入）②身份声明后注入完整 WEIL_CORE（身份三层/薇依底色/核心信念，2461 字符）③system 收尾注入 TRUTH_GROUNDING（防幻觉底线 3206 字符）
+- **验证**：语法 OK + 静态注入确认 + 真实端到端 /api/affection 调用（回复正常，薇依人格风格，无伪共情动词）
+- **注意**：WEIL_CORE 与现有手写"底层世界观"互补不冲突（场景定位 vs 人格内核）；倾诉"不教不答不解决"约束不受影响
 
 ---
 
@@ -228,6 +236,36 @@
 | DONE-17 | 画像缓存 bug 修复（_learner_session 重新水合）| ✅ |
 | DONE-18 | 学习计划附录修复（去 emoji + refiner 保留结构 + polish 后拼回）| ✅ |
 | DONE-19 | 进程管理 SOP（技术§10.16 + 元能力§6.56）| ✅ |
+
+### D. 历史 bug report 档案（2026-08-14 用户要求重点记录，4 份完整报告）
+
+
+> 用户报告 → 根因 → 修复 → 验证，全部可追溯。对应 DONE-12/15/16/17。
+
+**Bug-Report-1：画像暂无学习记录（DONE-17）**
+- 用户报告：web 端学习者画像显示暂无学习记录，但实际已有教学记录
+- 根因：_learner_session 缓存未重新水合——服务器重启后画像读旧缓存，新会话记录不写回
+- 修复：画像读取时用最新 session 数据重新水合缓存
+- 验证：画像正确显示学习记录
+
+**Bug-Report-2：教学效果不满意 / 学习体验差（DONE-15）**
+- 用户报告：教学效果不满意，学习体验差
+- 根因：多因素叠加——习题册正文未接通（read_user_corpus 缺失）；输出 300 字过短；max_tokens 不足；college_physics 未拆键；缺 method_guide/worked_example；teach 未走 deep_think
+- 修复：接通习题册正文 read_user_corpus + 300→1500 字 + max_tokens 2000 + college_physics 拆键 + method_guide/worked_example + teach deep_think
+- 验证：教学输出显著改善
+
+**Bug-Report-3：倾诉语言生硬（DONE-16）**
+- 用户报告：倾诉（AffectionSupportor）语言生硬
+- 根因：很重歧义（分量/担子被 LLM 理解偏差）+ 回复模板化（开头单一、词汇重复）
+- 修复：分量/担子替换 + 随机开头 + 词汇多样 + _check_word_repetition 查重
+- 验证：倾诉回复自然多样
+
+**Bug-Report-4：Agent 不够智能 / 不知道自己有哪些能力（DONE-12）**
+- 用户报告：agent 不够智能——用户不点按钮/不说关键词时，agent 不会主动按指令完成工作（如做视频/动画/PPT）；agent 自己不知道自身能力清单
+- 根因：系统提示词未注入能力清单；意图→能力映射缺失；Presenter 工具未透传
+- 修复：_build_capability_manifest 能力清单注入 + INTENT_TO_CAPABILITY_HINT 意图→能力映射 + Presenter tools 透传
+- 验证：agent 能主动识别意图并调用对应能力/工具
+
 
 ### B. 进行中需求（ULW 主任务）
 
@@ -261,7 +299,7 @@
 
 | 缺口 | 描述 | 优先级 |
 |---|---|---|
-| G1 | distill_knowledge 仅同步 /api/teach 触发，stream 教学（主路径）不触发 | 高 |
+| G1 | distill_knowledge 仅同步 /api/teach 触发 | 高 · **2026-08-14 用户澄清：自我更新与流式无关**——蒸馏/反思模块从**完整对话历史**抓取内容，无需流式触发（解法：对话完成后抓 chat_hist 蒸馏，不碰 teach_stream）|
 | G2 | skip_sandbox 绕过 L4 实证，avg_score 启发式分≠事实正确性 | 高 |
 | G3 | evolved_*.json 写入后无热加载，KB 重启才可见 | **最高 → ✅ 已修复**（reload_library）|
 | G4 | 工具经验 success 判定过粗（result 非空即 success）| 中 |
