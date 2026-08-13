@@ -193,6 +193,8 @@ flowchart TB
 |---|---|---|
 | **三种模式** | 教学（5 子代理链）/ 闲聊（general_chat 无子代理）/ 找答案（AnswerSolver）各自独立 system prompt | `build_presenter_system` / `build_general_chat_system` / AnswerSolver 三套不同指令 |
 | **35 个学科** | 每个学科有专属 persona/language/structure/emphasis（v0.25 新增语言学/大气科学/量子场论）| `SUBJECT_STYLES`（35 个，各 4 字段）|
+
+> **v0.68+ 学科专项增强机制（2026-08-14）**：同一教学 subagent（Presenter）下，学科能力通过 `SUBJECT_STYLES[subject]` 字段**分别增强**——扩展字段按学科条件渲染注入 system（build_presenter_system L1499-1517）：`subfield_guide`（分支导航，几乎全学科）、`method_guide`（方法论，physics/college_physics/philosophy）、`worked_example`（例题，physics/college_physics/philosophy）、`concept_analysis`（概念分析，philosophy）、`code_ability`（编程，CS/AI）。哲学专项 v0.68：新增 method_guide（文献论证结构分析+概念分析 6 步法）+ worked_example（洞穴寓言解构示范）+ 考研档 + SUBFIELD_TREE 三学段。**注意**：error_correction 等 6 个语言类字段已定义但无渲染代码（死字段）。
 | **4 个学段** | 初中/高中/本科/考研 各自深度与语气适配 | `_GRADE_GUIDE`（4 档）|
 | **前端联动** | 右上角三模式按钮切换，教学模式显示学科+学段选择 | index.html mode-switch |
 
@@ -5412,4 +5414,48 @@ payload = {
 4. **Workflow Meta 是 plain JSON**——脚本不求值它（防注入）
 5. **子 agent 权限冻结**——approval 强制 never，sandbox 升级拒绝
 6. **Preset 用 isolate realm**——不污染其他 session
+
+### 10.16 进程管理 SOP（v0.68+ ⭐ 2026-08-14 第 N 次同类问题根治）
+
+**背景**：Windows 下"改代码后重启服务但行为仍旧"反复出现（残留进程占端口，新进程静默失败）。已发生 N 次，每次浪费大量时间。本 SOP 是根治方案。
+
+**核心原则**：**"重启成功" ≠ "新代码生效"——必须看进程启动时间，不能看 health 版本号**。
+
+#### 10.16.1 完整 SOP（每次改代码后必执行）
+
+```powershell
+# 1. 查端口进程 PID + 启动时间
+$conn = Get-NetTCPConnection -LocalPort 5000 -State Listen | Select -First 1
+(Get-Process -Id $conn.OwningProcess).StartTime   # 与"我最后启动时间"对比
+
+# 2. PID 精确杀（不要只靠 Get-Process python——cmd start 子进程会漏）
+Stop-Process -Id $conn.OwningProcess -Force
+
+# 3. 确认端口释放
+Get-NetTCPConnection -LocalPort 5000 -State Listen   # 应为空
+
+# 4. 清 pyc + touch + 启动
+Get-ChildItem -Recurse -Filter '__pycache__' | Remove-Item -Recurse -Force
+(Get-Item server.py).LastWriteTime = Get-Date
+Start-Process cmd -ArgumentList '/c','start /b python server.py > server_run.log 2>&1' -WindowStyle Hidden
+
+# 5. 8 秒后验证端口进程启动时间 = 本次
+```
+
+#### 10.16.2 诊断技巧
+
+- **函数级 vs HTTP 差异 = 进程版本差异**：函数级（新 python 进程）新、HTTP（服务器进程）旧 → 残留进程
+- **DEBUG 打印终极诊断**：加到怀疑函数体第一行，日志无输出 = 服务器加载旧版
+- **`os.path.realpath` 会骗人**：路径正确 ≠ 进程加载正确
+- **`Start-Process -RedirectStandardOutput` 会卡命令**——避免使用
+
+#### 10.16.3 常见陷阱
+
+| 陷阱 | 后果 | 正确做法 |
+|---|---|---|
+| 只看 health 版本号 | 以为更新了，实际旧进程 | 看进程启动时间 |
+| `Get-Process python \| Stop-Process` | cmd start 子进程漏杀 | 端口反查 PID |
+| 删 pyc 不确认端口 | 新进程没起来 | 先确认端口释放 |
+| `cmd start` 启动 | PID 归属混乱 | 端口反查 + 启动时间验证 |
+| 跳过 Step 3 | 残留进程继续响应 | 必须确认端口空闲 |
 
