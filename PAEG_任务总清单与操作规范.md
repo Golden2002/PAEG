@@ -415,7 +415,7 @@
 - **P0-2**：hooks 7 事件全无触发点 → **✅ 已修复**（v0.68+ 内置 log_hook + config/hooks.json 5 个 log hook + teach_stream 入口触发 session.start/message.before_user、done 后 message.after_assistant；日志验证 learner=hook_final 触发；reload 响应验证 loaded:true）
 - **P0-3**：workflows 最后一公里断裂（meta_router.INTENT_TO_CAPABILITY_HINT.auto_tools 无消费者，LLM 看不见 run_workflow__*）→ 修复：teach 端点消费 capability_hint
 - **P0-4**：config_hub.reload_all 无调用 → **✅ 已修复**（v0.68+ /api/admin/reload 端点，返回 hooks 加载状态）
-- **P1-1~6**：hooks.json 空（✅ 已填 5 hook）/ mcp_servers.json 双份（✅ 已删根目录副本）/ _inject_skill_catalog 重复实现（P1-3 待统一）/ teach+answer 工具集（✅ P0-3 已覆盖 44 工具）/ 手工工具列表（P1-5 待清）/ answer skill 注入（✅ P1-6 已补）
+- **P1-1~6 全部 ✅ 清零（v0.69+）**：hooks.json 5 hook / mcp 副本删除 / skill 注入统一 inject_catalog / 工具集 44 覆盖 / 工具提示动态生成 / answer skill 注入
 - **P2-1~2**：transport 复用仅同 async 块 / tool_registry 与 config_hub 双路径行为不一致
 - **优先级**：P0-1 → P0-2 → P0-3 → P0-4（修复后跑 smoke_test + 端到端）
 
