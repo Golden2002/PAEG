@@ -30,6 +30,8 @@ snapshots/*.zip
 
 # v0.69: 运行时产物（防误提交——自我更新/测试/虚拟环境）
 downloads/
+evidence/
+manim_env/
 05_实现原型/transcripts/
 05_实现原型/evidence/
 05_实现原型/manim_env/
