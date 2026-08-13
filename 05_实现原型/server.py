@@ -469,6 +469,47 @@ def thread_action(student_id, tid):
 # v0.43 ⭐ _mode_auto_correct 已迁出至 services/routing.py。
 # `from services.routing import _mode_auto_correct` 见 L61。
 
+@app.route("/api/intent/infer", methods=["POST"])
+def intent_infer():
+    """v0.66 ⭐ 需求7：短指令模糊检测——前端弹选择题细化。
+
+    请求：{text, grade?, subject?}
+    响应：{ambiguous: bool, topic, subject, grade, depth, options: [...]}
+    模糊时 options 提供可选主题/学科，前端弹选择题。
+    """
+    data = request.get_json(force=True) or {}
+    text = (data.get("text") or "").strip()
+    grade = data.get("grade") or ""
+    subject = data.get("subject") or ""
+    if not text:
+        return jsonify({"ambiguous": True, "topic": "", "options": [],
+                        "error": "empty input"}), 200
+    try:
+        from services.intent_inference import infer_context
+        ctx = infer_context(text, explicit_grade=grade, explicit_subject=subject)
+        options = []
+        if ctx.get("ambiguous"):
+            # 提供常见主题+学科组合让用户选
+            options = [
+                {"label": "数学：极限入门", "topic": "极限", "subject": "数学"},
+                {"label": "数学：行列式与线性代数", "topic": "行列式", "subject": "数学"},
+                {"label": "物理：牛顿运动定律", "topic": "牛顿运动定律", "subject": "物理"},
+                {"label": "语文：文言文实词", "topic": "文言文实词", "subject": "语文"},
+                {"label": "英语：现在完成时", "topic": "现在完成时", "subject": "英语"},
+            ]
+        return jsonify({
+            "ambiguous": bool(ctx.get("ambiguous")),
+            "topic": ctx.get("topic", ""),
+            "subject": ctx.get("subject", ""),
+            "grade": ctx.get("grade", ""),
+            "depth": ctx.get("depth", ""),
+            "options": options,
+            "assumptions": ctx.get("assumptions", []),
+        })
+    except Exception as e:
+        return jsonify({"ambiguous": False, "error": str(e)[:100]}), 200
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
     """健康检查（v0.24 修复 3 ⭐）：增加 mcp_connected / skill_count / agent_engine 字段。"""

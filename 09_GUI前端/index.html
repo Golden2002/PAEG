@@ -3834,6 +3834,25 @@ askBtn.addEventListener('click', () => {
     kmapChat(q);
     return;
   }
+  // v0.66 ⭐ 需求7: 模糊指令 → 弹选择题细化（像 opencode question）
+  if (q.length <= 8 && !window._intentConfirmed) {
+    try {
+      fetch(API_BASE + '/api/intent/infer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: q, grade: document.getElementById('grade-select').value, subject: subjectSelect.value || '' }),
+      }).then(r => r.json()).then(data => {
+        if (data.ambiguous && data.options && data.options.length) {
+          showIntentChoices(q, data.options);
+        } else {
+          window._intentConfirmed = true;
+          sendNow(q);
+        }
+      }).catch(() => { window._intentConfirmed = true; sendNow(q); });
+      return;
+    } catch (e) { /* 走正常发送 */ }
+  }
+  window._intentConfirmed = false;
   // v6.1 ⭐ 数学动画/授课视频：启用且命中关键词 → 走独立生成（不进普通教学流）
   if (window._manimModeActive && window._manimModeActive() && window._shouldTriggerManim(q)) {
     fetchManimVideo(q);
@@ -3843,20 +3862,60 @@ askBtn.addEventListener('click', () => {
     fetchTeachVideoByTopic(q);
     return;
   }
-  if (currentMode === 'chat') {
-    generalChat(q);
-  } else if (currentMode === 'answer') {
-    answerChat(q, subjectSelect.value);
-  } else if (currentMode === 'method') {
-    methodChat(q, subjectSelect.value);
-  } else if (currentMode === 'knowledge') {
-    knowledgeChat(q);
-  } else if (currentMode === 'affection') {
-    affectionChat(q);
-  } else {
-    teach(q, subjectSelect.value, subfieldSelect.value);
+  // v0.66 ⭐ 需求7: sendNow——发送模式分发（被模糊选择题调用）
+  function sendNow(q) {
+    if (currentMode === 'chat') {
+      generalChat(q);
+    } else if (currentMode === 'answer') {
+      answerChat(q, subjectSelect.value);
+    } else if (currentMode === 'method') {
+      methodChat(q, subjectSelect.value);
+    } else if (currentMode === 'knowledge') {
+      knowledgeChat(q);
+    } else if (currentMode === 'affection') {
+      affectionChat(q);
+    } else {
+      teach(q, subjectSelect.value, subfieldSelect.value);
+    }
   }
+  window.sendNow = sendNow;
+  sendNow(q);
 });
+
+// v0.66 ⭐ 需求7: 模糊指令选择题弹窗（像 opencode question）
+function showIntentChoices(originalText, options) {
+  // 复用 questionnaire-modal 样式建一个轻量选择框
+  const overlay = document.createElement('div');
+  overlay.id = 'intent-choice-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = `
+    <div style="background:var(--bg,#fff);border-radius:14px;padding:24px;max-width:420px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,.3)">
+      <h3 style="margin:0 0 8px;font-size:16px">你想学什么？</h3>
+      <p style="margin:0 0 16px;font-size:13px;color:var(--text-dim)">你的问题「${escapeHtml(originalText)}」有点简短，我猜你想学这些，选一个或直接输入更具体的内容：</p>
+      <div id="intent-options" style="display:flex;flex-direction:column;gap:8px">
+        ${options.map((o, i) => `<button class="intent-opt" data-topic="${escapeHtml(o.topic)}" data-subject="${escapeHtml(o.subject)}" style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-soft);cursor:pointer;text-align:left;font-size:13px">${escapeHtml(o.label)}</button>`).join('')}
+        <button class="intent-cancel" style="padding:8px;border:none;background:transparent;cursor:pointer;color:var(--text-dim);font-size:12px">还是算了，我自己输入</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelectorAll('.intent-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const topic = btn.dataset.topic;
+      const subject = btn.dataset.subject;
+      if (subject && subjectSelect) {
+        try { subjectSelect.value = subject; } catch (e) {}
+      }
+      overlay.remove();
+      window._intentConfirmed = true;
+      sendNow(topic);
+    });
+  });
+  overlay.querySelector('.intent-cancel').addEventListener('click', () => {
+    overlay.remove();
+    window._intentConfirmed = false;
+    document.getElementById('question-input') && document.getElementById('question-input').focus();
+  });
+}
 
 // ─── v0.36 ⭐ 语音模块：Web Speech API 录音转文本 → 复用现有发送管线 ───
 // v0.36.2 ⭐ 修复：提示精准化——区分"浏览器不支持"与"非安全环境"；诚实告知能力边界

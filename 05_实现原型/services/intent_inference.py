@@ -100,16 +100,30 @@ def infer_context(query: str, explicit_grade: str = "",
 
     # 5. 清理主题（去掉"做个/画一下/生成/讲解/的讲义"等指令词）
     for w in ["做个", "画一下", "生成", "讲解", "讲讲", "的讲义", "的大纲",
-              "的讲稿", "的视频", "的PPT", "思维导图", "知识导图", "提纲"]:
+              "的讲稿", "的视频", "的PPT", "思维导图", "知识导图", "提纲",
+              "怎么学", "怎么复习", "如何学", "如何复习", "想学", "我要学",
+              "从最基础的开始", "基础", "入门"]:
         topic = topic.replace(w, "").strip()
     if not topic:
         topic = q
 
     assumptions = [_g_assumption, _s_assumption, _d_assumption,
                    f"目标产出：{depth}深度、约{duration}分钟课堂内容"]
+    # v0.66 ⭐ 需求7 模糊检测：输入无实质主题（纯功能词/泛词/过短）→ ambiguous
+    # 供前端弹选择题细化（opencode question 式）
+    _func_words = ("ppt", "视频", "动画", "讲义", "讲稿", "大纲", "思维导图",
+                   "随便", "随便什么", "来一个", "做个", "画一下", "生成")
+    _topic_lower = topic.lower()
+    ambiguous = (
+        not topic.strip()
+        or len(topic.strip()) < 2
+        or _topic_lower in _func_words
+        or (len(topic) <= 3 and _topic_lower in ("极限" if False else _func_words))
+    )
     return {
         "topic": topic, "grade": grade, "subject": subject,
         "depth": depth, "duration_min": duration, "assumptions": assumptions,
+        "ambiguous": ambiguous,
     }
 
 
