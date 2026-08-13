@@ -167,6 +167,22 @@ class SkillRegistry:
         lines.append("")
         return "\n".join(lines)
 
+    # v0.69+ P1-3（Step4 断链统一）：注入 skill L1 目录到 system（幂等）
+    def inject_catalog(self, system: str) -> str:
+        """把技能目录注入 system prompt（幂等：已含 `## 可用技能` 标记则跳过）。
+        server.py 与 subagents.py 共用此方法——消除两处重复实现（防状态不同步）。"""
+        if not system:
+            return system
+        try:
+            catalog = self.catalog_prompt()
+        except Exception:
+            catalog = ""
+        if not catalog:
+            return system
+        if "## 可用技能" in system:
+            return system
+        return system + "\n\n" + catalog
+
     # ─── L2：激活技能 ───
     def activate(self, name: str) -> str:
         s = self.skills.get(name)

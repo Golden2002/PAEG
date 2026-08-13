@@ -41,6 +41,7 @@ def _inject_skill_catalog(system: str) -> str:
     - 现在 Presenter.run 在送出 system 给 LLM 前一次性追加（与 chat_stream 行为一致）
     - 容错：SKILL_REGISTRY 未初始化或扫描结果为空 → 原样返回
     - 幂等性：已含 `## 可用技能` 标记时跳过重复注入
+    - v0.69+ P1-3：统一走 SkillRegistry.inject_catalog（与 server.py 共享实现，防状态不同步）
     """
     if not system:
         return system
@@ -55,15 +56,9 @@ def _inject_skill_catalog(system: str) -> str:
         if reg is None:
             reg = SkillRegistry()
             _SHARED_SKILL_REGISTRY = reg
-        catalog = reg.catalog_prompt()
+        return reg.inject_catalog(system)
     except Exception:
         return system
-    if not catalog:
-        return system
-    # 幂等性：避免 Presenter.run 被同流程多次调用时重复注入
-    if "## 可用技能" in system:
-        return system
-    return system + "\n\n" + catalog
 
 
 # v0.46 ⭐ P0：LLM 成本上限（对照调研失败模式 #9 成本失控）

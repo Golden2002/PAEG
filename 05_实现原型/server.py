@@ -220,22 +220,17 @@ def _inject_skill_catalog(system: str) -> str:
 
     - SKILL_REGISTRY 未初始化（None）或扫描结果为空 → 原样返回（容错）
     - 已有 system 含相同 catalog_prompt 标记时跳过重复注入
+    - v0.69+ P1-3：统一走 SkillRegistry.inject_catalog（与 subagents 共享实现）
     """
     if not system:
         return system
     if SKILL_REGISTRY is None:
         return system
     try:
-        catalog = SKILL_REGISTRY.catalog_prompt()
+        return SKILL_REGISTRY.inject_catalog(system)
     except Exception as _e:
-        logger.warning("skill catalog 读取失败: %s", _e)
-        catalog = ""
-    if not catalog:
+        logger.warning("skill catalog 注入失败: %s", _e)
         return system
-    # 幂等性：避免 stream 多次进入 generate 时重复注入
-    if "## 可用技能" in system:
-        return system
-    return system + "\n\n" + catalog
 
 def _append_chat_hist(learner_id: str, user_content: str, assistant_content: str = "") -> None:
     """v0.42.3 ⭐ P0 修复：统一对话历史写回（method/knowledge/affection 三端点共用）。
