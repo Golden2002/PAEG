@@ -324,7 +324,7 @@
 | SEL-5 | 反思闭环（反思→优化→验证→再反思）| ✅ 核实（_safe_chat 反思 + 建议回流）|
 | SEL-6 | 记忆分层 | ✅ 核实已实现（MemorySystem 短期/中期/长期 + 摘要压缩；episodic 等语义分类为可选增强）|
 | SEL-7 | 知识老化/淘汰 | ✅ 已实现（v0.69+ evolved 日文件 >90 天归档 Archive/，保留历史不删）|
-| SEL-8 | 用户反馈学习（点赞/👎→画像/策略）| ✅ 后端接口已实现（v0.69+ /api/feedback → memory/feedback_log.jsonl + 画像侧轻量累计；前端 UI 为后续）|
+| SEL-8 | 用户反馈学习（点赞/👎→画像/策略）| ✅ 完整实现（v0.69+ /api/feedback + 前端消息气泡 👍/👎 按钮 → feedback_log.jsonl，端到端可用）|
 | SEL-9 | Library 更新：用户上传 → 公共/学科目录转移 | ✅ 核实（/api/upload purpose=library）|
 | SEL-10 | 自我更新完整链路验证 | ✅ **真实端到端验证通过**（v0.69+ 真实 LLM：教学会话→distill 蒸馏→evolved_20260814 写入→G3 热加载→KB 检索命中；牛顿第一定律节点定义准确）|
 

@@ -2171,10 +2171,15 @@ function addMsg(role, html, tone, intent, preHtml) {
     ? `<button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)"><img class="link-icon" src="assets/icons/volume-2.svg" alt="朗读" style="width:13px;height:13px;vertical-align:middle"/></button>` : '';
   const checkBox = role === 'paeg'
     ? `<input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" />` : '';
+  // v0.69+ SEL-8：用户反馈按钮（👍/👎 → /api/feedback，反馈→自我更新）
+  const fbGood = role === 'paeg'
+    ? `<button class="msg-copy" title="教学有帮助" aria-label="教学有帮助" onclick="sendFeedback(this,'good')">👍</button>` : '';
+  const fbBad = role === 'paeg'
+    ? `<button class="msg-copy" title="需要改进" aria-label="需要改进" onclick="sendFeedback(this,'bad')">👎</button>` : '';
   div.innerHTML = `
     <div class="msg-avatar">${avatar}</div>
     <div class="msg-bubble">${pre}${contentHtml}${intentTag}${toneTag}
-      <div class="msg-actions">${checkBox}${copyBtn}${speakBtn}</div>
+      <div class="msg-actions">${checkBox}${copyBtn}${speakBtn}${fbGood}${fbBad}</div>
     </div>`;
   // 保存原始文本（复制用）
   div._rawText = fixed || html;
@@ -2196,6 +2201,22 @@ function copyMsg(btn) {
     }).catch(() => fallbackCopy(text, btn));
   } else fallbackCopy(text, btn);
 }
+// v0.69+ SEL-8：用户反馈（👍/👎 → /api/feedback，供自我更新消费）
+function sendFeedback(btn, rating) {
+  try {
+    const msgDiv = btn.closest('.msg');
+    const text = (msgDiv && msgDiv._rawText ? msgDiv._rawText : (msgDiv ? msgDiv.textContent : '')).slice(0, 300);
+    const learnerId = (typeof STATE !== 'undefined' && STATE.learnerId) ? STATE.learnerId : 'web';
+    fetch((typeof API_BASE !== 'undefined' ? API_BASE : '') + '/api/feedback', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({learner_id: learnerId, rating: rating, message: text})
+    }).then(r => r.json()).then(d => {
+      if (d && d.ok) { btn.textContent = '✓'; btn.disabled = true; }
+    }).catch(() => {});
+  } catch (e) {}
+}
+
 function fallbackCopy(text, btn) {
   const ta = document.createElement('textarea');
   ta.value = text; document.body.appendChild(ta); ta.select();
