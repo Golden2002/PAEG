@@ -199,11 +199,13 @@
 | 知识老化（拓展）| evolved 无限增长 | 知识时效/淘汰/权重衰减 | ⏳ |
 | 用户反馈学习（拓展）| 点赞/👎未接入 | 反馈→画像/教学策略调整 | ⏳ |
 
-### 3.8 动态提示词拼接 tool（用户核心设想，需实现）
+### 3.8 动态提示词拼接 tool（用户核心设想 · ✅ 已实现 v0.69+）
 - 设想：agent 自动调一个 tool，该 tool 拼接系统提示词——动态反思的被隔离提示词，每次发送时与固定系统提示词合并
 - 现状：prompt_template.py 有 STATIC_TEMPLATES（固定）+ DYNAMIC_SLOTS（动态槽）机制
 - 缺口：subject_patches（反思补丁）是否作为动态槽注入？是否有专门的"拼接 tool"暴露给 LLM？
 - 目标：新增 `compose_dynamic_prompt` tool（config_hub 注册），LLM 可调用，把反思补丁 + 固定段合并
+
+- **实施记录（v0.69+）**：tool_registry 新增内置 compose_dynamic_prompt——LLM 可主动调用，返回 self_evolution 的动态反思补丁（subject_patches 学科补丁/tool_lessons 工具经验/teacher_notes 教师笔记/方法论，经 teaching_memory.load_teaching_memory 聚合），供 LLM 与固定 system 合并。验证：工具集 45 个含该工具，执行返回动态补丁。
 
 ### 3.9 AffectionSupportor 引入 WEIL_CORE（2026-08-14 用户新需求 · ✅ 已完成）
 - **需求**：倾诉模式（AffectionSupportor）的 system prompt 目前**没有引入 WEIL_CORE**（薇依人格）——用户明确"affection supporter 也应该引入 weil_core"

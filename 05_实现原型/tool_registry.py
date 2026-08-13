@@ -177,6 +177,13 @@ def get_tool_defs() -> List[dict]:
              "subject": {"type": "string", "description": "学科（可选）"}},
             ["title", "content"],
         ),
+        _make_tool(
+            "compose_dynamic_prompt",
+            "获取自我更新的动态提示词补丁（学科教学改进/工具经验/教师笔记）。"
+            "当你需要最新自我改进建议来调整教学时调用——将返回的动态段与当前 system 合并参考。",
+            {},
+            [],
+        ),
     ] + _extended_tool_defs()
 
 
@@ -353,6 +360,20 @@ def _exec_save_document(title: str, content: str, subject: str = "通用") -> st
         return f"文档保存失败: {str(e)[:100]}"
 
 
+def _exec_compose_dynamic_prompt(*args, **kwargs) -> str:
+    """v0.69+ §3.8：动态提示词拼接 tool——返回当前自我更新的动态反思补丁
+    （subject_patches 学科补丁 / tool_lessons 工具经验 / teacher_notes 教师笔记 / 方法论）。
+    LLM 调用后可将动态段与固定 system prompt 合并（每次发送时动态刷新）。"""
+    try:
+        from teaching_memory import load_teaching_memory
+        _mem = load_teaching_memory()
+        if _mem and _mem.strip():
+            return f"[动态提示词补丁（自进化，供合并参考）]\n{_mem[:1800]}"
+        return "[动态提示词补丁] 当前无动态补丁"
+    except Exception as e:
+        return f"[动态提示词补丁] 读取失败: {str(e)[:100]}"
+
+
 _HANDLERS: Dict[str, Callable[..., str]] = {
     "web_search": _wrap("web_search", _exec_web_search, retries=2),
     "verify_math": _wrap("verify_math", _exec_verify_math, retries=1),
@@ -362,6 +383,8 @@ _HANDLERS: Dict[str, Callable[..., str]] = {
     # v0.19.25：MCP-only 工具同步到 FC 端
     "solve_problem": _exec_solve_problem,
     "save_document": _exec_save_document,
+    # v0.69+ §3.8 ⭐ 动态提示词拼接（用户核心设想）：LLM 主动调取自我更新的动态反思补丁
+    "compose_dynamic_prompt": _exec_compose_dynamic_prompt,
 }
 
 
