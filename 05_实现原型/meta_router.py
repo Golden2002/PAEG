@@ -330,6 +330,29 @@ VALID_INTENTS = {
     "chat",           # 闲聊（无规则函数，纯 LLM 判断）
 }
 
+# v0.68+ ⭐ 意图→能力 hint（智能化 P0-2，Oracle 设计）：
+# route_intent 返回 capability_hint，下游据此选择"该用哪些能力/工具/workflow"
+INTENT_TO_CAPABILITY_HINT = {
+    "teach":       {"plan_default": "explain_with_example",
+                    "auto_tools": ["verify_math", "mcp__filesystem__web_search"]},
+    "problem":     {"plan_default": "step_by_step_with_verify",
+                    "auto_tools": ["verify_math", "mcp__filesystem__web_search"]},
+    "study_plan":  {"plan_default": "study_plan_workflow",
+                    "auto_tools": ["run_workflow__teach_minimal"]},
+    "knowledge_map": {"plan_default": "generate_map",
+                      "auto_tools": ["load_skill__knowledge-map"]},
+    "ppt":         {"plan_default": "ppt_workflow",
+                    "auto_tools": ["mcp__pptx__generate_presentation"]},
+    "answer":      {"plan_default": "direct_answer",
+                    "auto_tools": ["verify_math"]},
+    "chat":        {"plan_default": "casual_chat", "auto_tools": []},
+    "method":      {"plan_default": "method_advice", "auto_tools": []},
+    "knowledge":   {"plan_default": "kb_query", "auto_tools": []},
+    "emotion":     {"plan_default": "affection", "auto_tools": []},
+    "recommend":   {"plan_default": "recommend_flow",
+                    "auto_tools": ["mcp__filesystem__web_search"]},
+}
+
 INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务：阅读用户输入，判断它属于下面 15 个意图中的哪一类，**只返回该意图的变量名**（如 "teach" / "interface"），不要做其他任何事。
 
 【意图类型定义（每个类型是什么、边界在哪）】
@@ -426,7 +449,8 @@ def route_intent(text: str, llm=None, use_cache: bool = True, mode: str = None) 
             intent = "chat"
         conf = float(data.get("confidence", 0.5))
         result = {"intent": intent, "confidence": max(0.0, min(1.0, conf)),
-                  "reason": str(data.get("reason", ""))[:100]}
+                  "reason": str(data.get("reason", ""))[:100],
+                  "capability_hint": INTENT_TO_CAPABILITY_HINT.get(intent, {})}
         if use_cache:
             _INTENT_CACHE_V2[t] = (result, now)
         return result
