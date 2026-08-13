@@ -628,7 +628,7 @@ def health():
 
     return jsonify({
         "status": "ok",
-        "version": "0.68.0",
+        "version": "0.69.0",
         "llm_provider": LLM_PROVIDER,
         "llm_model": LLM_MODEL,
         "llm_ok": llm_ok,

@@ -1,3 +1,46 @@
+### v0.69 自我更新闭环 + 配置体系运行时接入 + 哲学专项 + 防幻觉（2026-08-14 ⭐）
+
+**本版定位**：①自我更新闭环全链路修复（G1 流式蒸馏/G2 门禁澄清/G3 热加载/G5 教学记忆/G6 工具经验 LLM 提炼）②独立配置体系（config_hub/hooks/workflows）真正接入运行时（Step4 P0 断链修复）③哲学学科专项教学能力 ④防幻觉底线（TRUTH_GROUNDING）覆盖全模式 ⑤10 条执行纪律固化。
+
+**防幻觉底线（NEW-9，用户最高优先）**：
+- prompts.py 新增 TRUTH_GROUNDING（10 条：绝不编造/信源为绝对命令/先证据后结论/允许说不知道/区分确定与推测）
+- 注入 build_presenter_system + build_general_chat_system + AffectionSupportor（v0.69 补）——全模式幂等覆盖
+
+**AffectionSupportor 人格统一（用户要求）**：
+- 倾诉模式引入完整 WEIL_CORE（身份三层/薇依底色/核心信念，2461 字符）+ TRUTH_GROUNDING
+- 与教学/闲聊模式人格一致，倾诉不教不答不解决约束不受影响
+
+**哲学学科专项（§3.10，用户要求）**：
+- SUBJECT_STYLES[philosophy] 新增 method_guide（文献论证结构分析 A 六步 + 概念分析 B 六步，反教条句式）+ worked_example（柏拉图洞穴寓言完整论证解构）
+- SUBJECT_GRADES 解锁 graduate_exam 考研档；SUBFIELD_TREE 新增三学段二级学科（高中 2/本科 6/考研 4）
+- 端到端验证：洞穴寓言教学输出含论证结构导向 + 概念对子分析
+
+**自我更新闭环修复（Explore 审查 G1-G11）**：
+- G1 ✅ 流式蒸馏：teach_stream done 后从完整对话历史抓取 → SimpleNamespace 构造 session → distill_knowledge（用户方案：自我更新与流式无关）
+- G2 ✅ 门禁澄清：L3 LLM factuality 事实评分始终执行，skip_sandbox 仅跳过 L4 证据累积（纠正误导注释）
+- G3 ✅ 热加载：evolved_*.json 写入后 reload_library（KB 即时可见）
+- G5 ✅ 教学记忆：Presenter.run 注入 load_teaching_memory
+- G6 ✅ 工具经验 LLM 提炼（适用场景/要点/误区/替代方案，模板兜底）
+
+**配置体系运行时接入（Step4 P0 断链修复，explore 12 处断链）**：
+- P0-1 ✅ run_agent_loop 工具执行统一走 config_hub.execute_tool（hooks/repeat_guard/workflows 路由解锁）
+- P0-2 ✅ hooks 触发点：内置 log_hook + config/hooks.json 5 个 hook + teach_stream 入口触发 session.start/message.before_user + done 后 message.after_assistant
+- P0-3 ✅ get_tool_defs 合并扩展工具（内置7+skills10+MCP25+workflows2=44 无重复；修复递归守卫+list()dict 解析+内置去重）
+- P0-4 ✅ /api/admin/reload 端点（config 热更新，返回 hooks 加载状态）
+- P1-1 ✅ hooks.json 填充（5 log hook）
+
+**Step1.5 Harness 借鉴**：
+- Permission Preset 4 档（read_only/standard/exam/full——exam 锁写工具，借鉴 deepseek-harness）
+- repeat-tool-reminder Guard（连续 3 次同工具拦截提醒，借鉴 deepseek-harness）
+
+**执行纪律固化（用户执行标准）**：
+- 操作纪律 14→19 条：git 操作铁律（15）/批量重构正则 AST 铁律（16）/checkout 备份+禁 reset --hard（17）/更新及时记文档（18）/subagent 结果及时移入项目（19）
+- 历史 bug report 档案 4 份（§D：画像缓存/学习体验/倾诉语言/agent 智能化，用户报告→根因→修复→验证）
+
+**九模块底座评估（Step4 Oracle）**：Diagnosis 最弱（诊断未驱动计划）、Profile 未消费（画像未驱动下游）——§3.12 固化，后续实施诊断→计划闭环 + 画像驱动。
+
+版本号：v0.68.0 → v0.69.0。
+
 ### v0.68 学习计划工作流 + v4-flash 思考修复（2026-08-13 ⭐）
 
 **本版定位**：学习方法模式集成"制定学习计划"功能（Oracle 架构：method 子意图 + LM 优先）——用户对某领域感兴趣时生成分阶段+资源+时长的学习计划；同时修复 deepseek-v4-flash 思考型模型的空响应 bug。
