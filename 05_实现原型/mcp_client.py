@@ -126,6 +126,18 @@ class MCPClientManager:
         return len(self._clients)
 
     # ─── 工具定义（转 Function Calling schema） ───
+    def reload_all(self):
+        """v0.68+ ⭐ 动态重载：清空缓存 + 重新连接所有 MCP server。
+
+        独立配置接口：改 config/mcp_servers.json 后调用即生效（无需重启）。
+        """
+        with self._lock:
+            self._clients.clear()
+            self._tools.clear()
+            self._connected = False
+            self._last_error = ""
+        self.connect_all()
+
     def list_tool_defs(self) -> List[dict]:
         """把所有外部 MCP 工具转成 Function Calling 格式（供 LLM 选择）。"""
         if not self._connected:

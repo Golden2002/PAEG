@@ -69,24 +69,58 @@ class Skill:
 
 
 class SkillRegistry:
-    """技能注册表：扫描 skills/ 目录。"""
+    """技能注册表：扫描 skills/ 目录（支持多目录，v0.68+ ⭐ 独立配置体系）。
 
-    def __init__(self, skills_dir: Optional[str] = None):
+    目录来源（config/skills.json 的 skills_dirs，缺省 ["skills", "config/skills"]）：
+    - 默认 skills/（内置技能）
+    - config/skills/（用户私有技能，独立成套配置接口）
+    同名技能：先扫的目录优先（内置 > 用户私有，用户可覆盖同名内置）。
+    """
+
+    def __init__(self, skills_dirs: Optional[list] = None):
         base = os.path.dirname(os.path.abspath(__file__))
-        self.skills_dir = skills_dir or os.path.join(base, "skills")
+        self.skills_dirs = list(skills_dirs or self._load_dirs(base))
         self.skills: Dict[str, Skill] = {}
         self.reload()
 
-    def reload(self):
-        self.skills.clear()
-        if not os.path.isdir(self.skills_dir):
-            return
-        for name in os.listdir(self.skills_dir):
-            sdir = os.path.join(self.skills_dir, name)
-            if os.path.isdir(sdir) and os.path.isfile(os.path.join(sdir, "SKILL.md")):
-                self.skills[name] = Skill(name, sdir)
+    def _load_dirs(self, base: str) -> list:
+        """读 config/skills.json 的 skills_dirs；缺省用内置目录。"""
+        _cfg = os.path.join(base, "config", "skills.json")
+        try:
+            import json as _json
+            with open(_cfg, encoding="utf-8") as _f:
+                _d = _json.load(_f)
+            _dirs = _d.get("skills_dirs") or []
+            if isinstance(_dirs, list):
+                return [os.path.join(base, d) for d in _dirs]
+        except Exception:
+            pass
+        return [os.path.join(base, "skills")]
 
-    # ─── L1：技能目录注入 system prompt ───
+    def reload(self):
+        """遍历所有目录扫描 SKILL.md（同名先扫优先）。"""
+        self.skills.clear()
+        for _dir in self.skills_dirs:
+            if not os.path.isdir(_dir):
+                continue
+            for name in os.listdir(_dir):
+                sdir = os.path.join(_dir, name)
+                if os.path.isdir(sdir) and os.path.isfile(os.path.join(sdir, "SKILL.md")):
+                    if name not in self.skills:  # 同名先扫优先（内置 > 用户私有）
+                        self.skills[name] = Skill(name, sdir)
+
+    def add_dir(self, path: str):
+        """运行时添加扫描目录（独立配置接口：丢目录即加载）。"""
+        if path and os.path.isdir(path) and path not in self.skills_dirs:
+            self.skills_dirs.append(path)
+            self.reload()
+
+    def remove_dir(self, path: str):
+        """运行时移除扫描目录。"""
+        if path in self.skills_dirs:
+            self.skills_dirs.remove(path)
+            self.reload()
+
     def catalog_prompt(self) -> str:
         """返回技能目录（名称+描述），注入 system prompt。"""
         if not self.skills:
@@ -132,7 +166,8 @@ class SkillRegistry:
         return None
 
     def stats(self) -> dict:
-        return {"skills": list(self.skills.keys()), "count": len(self.skills)}
+        return {"skills": list(self.skills.keys()), "count": len(self.skills),
+                "dirs": self.skills_dirs}
 
 
 if __name__ == "__main__":

@@ -1,0 +1,8 @@
+{
+  "skills_dirs": [
+    "skills",
+    "config/skills"
+  ],
+  "reload_interval_sec": 0,
+  "watch_files": false
+}

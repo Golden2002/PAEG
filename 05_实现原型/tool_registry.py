@@ -358,9 +358,16 @@ def _describe_params(name: str) -> str:
 def get_all_tool_defs() -> List[dict]:
     """工具定义 + 技能加载定义 + 外部 MCP 工具（v0.19.25）。
 
-    MCP 工具通过 mcp_client.MCPClientManager 合并进来，
-    LLM 可用 mcp__server__tool 形式的工具名调用外部标准工具。
+    v0.68+ ⭐ 统一配置中心：优先走 config_hub.get_all_tool_defs()
+    （独立成套配置接口：MCP/skills/workflows 统一合并），
+    config_hub 不可用时回退原逻辑（ratchet 铁律：行为不变）。
     """
+    try:
+        from config_hub import get_hub
+        return get_hub().get_all_tool_defs()
+    except Exception:
+        pass
+    # ─── 原逻辑（fallback） ───
     defs = get_tool_defs()
     try:
         from skill_registry import SkillRegistry
@@ -368,7 +375,6 @@ def get_all_tool_defs() -> List[dict]:
         defs += reg.tool_defs()
     except Exception:
         pass
-    # v0.19.25：合并外部 MCP 工具（filesystem/memory 等标准 server）
     try:
         from mcp_client import get_mcp_client
         _mcp = get_mcp_client()
