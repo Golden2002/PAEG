@@ -43,6 +43,19 @@ VALID_EVENTS = {
     "llm.before", "llm.after",
 }
 
+
+# v0.68+ P0-2（Step4）：内置 log-only hook——演示/观测用，任何事件挂上即可打印
+def log_hook(ctx: dict) -> dict:
+    """记录钩子事件（旧签名 (ctx)->dict，_legacy_adapter 自动包装）。永不抛。"""
+    try:
+        _ev = ctx.get("event") or ctx.get("__event") or "?"
+        _learner = str(ctx.get("learner_id") or ctx.get("learner") or "-")
+        _brief = str(ctx.get("text") or ctx.get("tool") or ctx.get("system") or "")[:60]
+        print(f"[hooks][{_ev}] learner={_learner} | {_brief}", flush=True)
+    except Exception:
+        pass
+    return ctx
+
 # verdict 等级（most-restrictive）
 VERDICT_RANK = {"allow": 0, "ask": 1, "deny": 2}
 

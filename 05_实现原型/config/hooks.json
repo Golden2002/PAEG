@@ -1,3 +1,44 @@
 {
-  "hooks": []
+  "hooks": [
+    {
+      "id": "log-session-start",
+      "event": "session.start",
+      "module": "hooks_hub",
+      "function": "log_hook",
+      "priority": 100,
+      "enabled": true
+    },
+    {
+      "id": "log-message-before-user",
+      "event": "message.before_user",
+      "module": "hooks_hub",
+      "function": "log_hook",
+      "priority": 100,
+      "enabled": true
+    },
+    {
+      "id": "log-llm-before",
+      "event": "llm.before",
+      "module": "hooks_hub",
+      "function": "log_hook",
+      "priority": 100,
+      "enabled": true
+    },
+    {
+      "id": "log-llm-after",
+      "event": "llm.after",
+      "module": "hooks_hub",
+      "function": "log_hook",
+      "priority": 100,
+      "enabled": true
+    },
+    {
+      "id": "log-message-after-assistant",
+      "event": "message.after_assistant",
+      "module": "hooks_hub",
+      "function": "log_hook",
+      "priority": 100,
+      "enabled": true
+    }
+  ]
 }

@@ -410,9 +410,9 @@
 - **最严重**：config_hub.execute_tool() 与 hooks.run_hook() **全项目无调用方**——v0.68 独立配置体系未真正接入运行时，仍走 tool_registry 旧路径
 - **P0-1**：config_hub.execute_tool 零调用方 → **✅ 已修复**（v0.68+ run_agent_loop else 分支改调 get_hub().execute_tool，含回退；repeat_guard/workflows 路由解锁并验证）
 - **P0-3**：workflows 最后一公里断裂 → **✅ 已修复**（v0.68+ get_tool_defs 合并 _extended_tool_defs：内置7+skills10+MCP25+workflows2=44 无重复；修复递归守卫+list()dict 解析+内置去重）
-- **P0-2**：hooks 7 事件全无触发点（session.start/end、message.before/after_user、message.before/after_assistant、llm.before/after 均 0 触发）→ 修复：server 端点入口加触发
+- **P0-2**：hooks 7 事件全无触发点 → **✅ 已修复**（v0.68+ 内置 log_hook + config/hooks.json 5 个 log hook + teach_stream 入口触发 session.start/message.before_user、done 后 message.after_assistant；日志验证 learner=hook_final 触发；reload 响应验证 loaded:true）
 - **P0-3**：workflows 最后一公里断裂（meta_router.INTENT_TO_CAPABILITY_HINT.auto_tools 无消费者，LLM 看不见 run_workflow__*）→ 修复：teach 端点消费 capability_hint
-- **P0-4**：config_hub.reload_all 无 admin/CLI 调用（改 config 需重启）→ 修复：新增 /api/admin/reload
+- **P0-4**：config_hub.reload_all 无调用 → **✅ 已修复**（v0.68+ /api/admin/reload 端点，返回 hooks 加载状态）
 - **P1-1~6**：hooks.json 空 / mcp_servers.json 双份 / _inject_skill_catalog 重复实现 / teach+answer 端点无完整工具集 / 手工工具列表与 FC schema 不一致 / answer+method+knowledge 无 skill 注入
 - **P2-1~2**：transport 复用仅同 async 块 / tool_registry 与 config_hub 双路径行为不一致
 - **优先级**：P0-1 → P0-2 → P0-3 → P0-4（修复后跑 smoke_test + 端到端）

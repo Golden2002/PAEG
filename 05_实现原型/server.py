@@ -1086,6 +1086,16 @@ def teach_stream():
     """
     data = request.get_json(force=True)
 
+    # v0.68+ P0-2（Step4）：hooks 事件触发（session.start / message.before_user），永不阻断
+    try:
+        from hooks_hub import get_hooks_hub
+        _hh = get_hooks_hub()
+        _lid_hook = str(data.get("learner_id") or "anon")
+        _hh.run_hook("session.start", {"learner_id": _lid_hook, "ts": time.time()})
+        _hh.run_hook("message.before_user", {"learner_id": _lid_hook, "text": str(data.get("concept") or "")[:200]})
+    except Exception as _hook_e:
+        print(f"[PAEG][hooks] teach_stream 触发失败: {_hook_e}")
+
     # v0.66+ ⭐ Bug2 修复：teach_stream 加 deep_think（per-turn，模式与 chat_stream 一致）
     # 前端按钮 → 本次教学临时启用 reasoner；生成结束自动恢复默认（不污染后续对话）
     _dt_requested = bool(data.get("deep_think"))
@@ -2169,6 +2179,14 @@ def teach_stream():
         _done_payload = {"status": "completed"}
         _done_payload.update(_done_extra)
         yield f"event: done\ndata: {json.dumps(_done_payload, ensure_ascii=False)}\n\n"
+        # v0.68+ P0-2（Step4）：hooks 事件触发（message.after_assistant），永不阻断
+        try:
+            from hooks_hub import get_hooks_hub
+            _hh = get_hooks_hub()
+            _hh.run_hook("message.after_assistant", {
+                "learner_id": str(learner_id), "text": str(_done_payload.get("reply") or "")[:200]})
+        except Exception:
+            pass
         # v0.68+ ⭐ G1 修复：流式教学也从完整对话历史蒸馏知识点（2026-08-14 用户方案：
         # 自我更新与流式无关——蒸馏模块从完整输出后的对话历史抓取，不修改流式循环本体）
         try:
@@ -2500,6 +2518,31 @@ def skills_list():
                 "source": "knowledge_base.skills",
             })
     return jsonify({"skills": skills, "total": len(skills), "source": source})
+
+@app.route("/api/admin/reload", methods=["POST"])
+def admin_reload():
+    """v0.68+ P0-4（Step4）：运行时重载 config_hub（MCP/skills/hooks/workflows 配置热更新）。
+    改 config/*.json 后调用此端点即时生效，无需重启服务器。"""
+    try:
+        from config_hub import get_hub
+        _hub = get_hub()
+        if _hub is None:
+            return jsonify({"ok": False, "error": "config_hub 未初始化"}), 500
+        _hub.reload_all()
+        _extra = {}
+        try:
+            from hooks_hub import get_hooks_hub
+            _hh = get_hooks_hub()
+            _extra["hooks"] = [{"id": h.id, "event": h.event, "loaded": h._fn is not None}
+                               for h in getattr(_hh, "hooks", [])]
+        except Exception as _hx:
+            _extra["hooks_error"] = str(_hx)
+        return jsonify({"ok": True,
+                        "message": "config_hub 已重载（MCP/skills/hooks/workflows）",
+                        **_extra})
+    except Exception as _re_e:
+        return jsonify({"ok": False, "error": str(_re_e)}), 500
+
 
 @app.route("/api/upload", methods=["POST"])
 def upload_file():
