@@ -27,3 +27,12 @@ snapshots/*.zip
 05_实现原型/downloads/
 05_实现原型/data/version.txt
 .cleanup_backup_*/
+
+# v0.69: 运行时产物（防误提交——自我更新/测试/虚拟环境）
+05_实现原型/transcripts/
+05_实现原型/evidence/
+05_实现原型/manim_env/
+05_实现原型/memory/feedback_log.jsonl
+Library/KnowledgeBase/subjects/evolved_*.json
+Library/Physics/
+Library/usr_knowledge/
