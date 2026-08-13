@@ -2096,6 +2096,8 @@ class AffectionSupportor:
         v0.22.3：**无论何种情况，先基于用户说的话回复**——危机信号不直接短路成预制回复，
         而是注入危机指引让 LLM 融入生成，仅当 LLM 失败时才用预制回复兜底。
         """
+        # v0.68+ ⭐ AffectionSupportor 引入完整薇依人格 + 防幻觉底线（2026-08-14 用户需求）
+        from prompts import WEIL_CORE, TRUTH_GROUNDING
         # v0.22.2/3：危机识别（不短路，只注入指引）
         _crisis_context = None
         try:
@@ -2175,6 +2177,8 @@ class AffectionSupportor:
 
         system = (
             f"{_qq_prefix}你是 Émile Novis，一位以注意力陪伴学生的老师。学生带着情绪/心理/人生困惑来找你。\n\n"
+            # v0.68+ ⭐ 注入完整薇依人格（WEIL_CORE：身份三层/薇依底色/核心信念），与教学/闲聊模式人格统一
+            f"{WEIL_CORE}\n\n"
             f"学生情况：{('学段：' + grade_cn) if grade_cn else ''}{desc_line or ''}\n"
             f"{('【对象意识】' + learner_ctx) if learner_ctx else ''}\n\n"
             "## 你的底层世界观（v0.22.2 ⭐ 从薇依原著提炼，一切情绪支持策略之基）\n"
@@ -2283,6 +2287,8 @@ class AffectionSupportor:
             "4. need（他此刻可能需要什么）：一次只识别一个最迫切的需要。\n"
              "5. risk（风险等级自检）：本轮属于 0-5 哪一级？决定下一步。\n"
              "6. real_world_anchor（现实连接）：本次至少有一个指向真实关系/地点/行动的句子。"
+            # v0.68+ ⭐ 防幻觉底线（最底层约束，高于倾诉要求——不联想、不猜测、不编造）
+            f"\n\n{TRUTH_GROUNDING}"
         )
         # v0.48 ⭐ 判读层结果作为"软约束"注入 system prompt
         # 当 confidence >= 0.5 时，LLM 必须遵守 response_mode；

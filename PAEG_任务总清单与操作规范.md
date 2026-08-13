@@ -194,6 +194,13 @@
 - 缺口：subject_patches（反思补丁）是否作为动态槽注入？是否有专门的"拼接 tool"暴露给 LLM？
 - 目标：新增 `compose_dynamic_prompt` tool（config_hub 注册），LLM 可调用，把反思补丁 + 固定段合并
 
+### 3.9 AffectionSupportor 引入 WEIL_CORE（2026-08-14 用户新需求 · 待实现）
+- **需求**：倾诉模式（AffectionSupportor）的 system prompt 目前**没有引入 WEIL_CORE**（薇依人格）——用户明确"affection supporter 也应该引入 weil_core"
+- **现状**：subagents.py 中 AffectionSupportor 有独立的人格（约纳斯克制笔法），但不含 WEIL_CORE 的完整人格（三层身份/能力提示/薇依精神来源）
+- **目标**：在 AffectionSupportor 的 system 构造中注入 WEIL_CORE（与 build_presenter_system / build_general_chat_system 一致），保持倾诉的克制风格不被破坏
+- **注意**：需检查 TRUTH_GROUNDING 是否也注入（防幻觉底线应覆盖倾诉模式）；倾诉特殊性（先回应情绪）不能因注入 WEIL_CORE 而模板化
+- **优先级**：P0（用户明确要求，人格一致性）
+
 ---
 
 ## 四、需求清单（完整记录：已完成 / 进行中 / 新增）
