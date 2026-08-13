@@ -417,3 +417,9 @@
 - **P2-1~2**：transport 复用仅同 async 块 / tool_registry 与 config_hub 双路径行为不一致
 - **优先级**：P0-1 → P0-2 → P0-3 → P0-4（修复后跑 smoke_test + 端到端）
 
+### 3.14 v0.69.0 Release（2026-08-14 ✅ 已发布）
+- **tag**：v0.69.0（GitHub origin 推送成功：master + tag）
+- **内容**：自我更新闭环（G1/G2/G3/G5/G6）+ 配置体系运行时接入（Step4 P0-1~4）+ 哲学专项 + 防幻觉 + AffectionSupportor WEIL_CORE + 执行纪律 15-19 + bug report 档案 + CHANGELOG v0.69
+- **ModelScope 待确认**：远程有 3 个平台端 Dockerfile 提交（10c8494/c44811e/e49107c），本地未合并——未 force push（避免覆盖平台文件）；用户确认后处理
+- **后续**：P1×5（mcp_servers 双份/skill 注入重复/teach+answer 工具集/手工工具列表/answer 无 skill）+ P2×2 + §3.12 诊断闭环与画像驱动
+
