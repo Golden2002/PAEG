@@ -130,6 +130,15 @@ class ConfigHub:
                     return _ctx.get("skipped_result", "[hook 拦截]")
             except Exception:
                 pass
+        # v0.68+ ⭐ repeat-tool-reminder Guard（Step1.5：连续同工具调用超阈值 → 拦截提醒）
+        if self.hooks is not None:
+            try:
+                _lid = arguments.get("learner_id") if isinstance(arguments, dict) else "_global"
+                _rg = self.hooks.repeat_guard_check(name, learner_id=str(_lid or "_global"))
+                if _rg.get("blocked"):
+                    return _rg["message"]
+            except Exception:
+                pass
         # 路由
         _result = ""
         if name.startswith("mcp__"):

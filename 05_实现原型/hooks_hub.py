@@ -288,6 +288,36 @@ class HooksHub:
                 "tool_calls": [],
             })
 
+    # v0.68+ ⭐ repeat-tool-reminder Guard（Step1.5：借鉴 deepseek-harness guard/repeat-tool-reminder）
+    # 追踪同一工具连续调用次数，超过阈值 → 返回拦截提醒（防 LLM 陷入重复工具循环）。
+    def repeat_guard_check(self, tool_name: str, learner_id: str = "_global",
+                           max_repeat: int = 3) -> dict:
+        """检测工具连续重复调用。
+
+        返回 {"repeat": int, "blocked": bool, "message": str}：
+        - repeat < max_repeat：放行（仅计数）
+        - repeat >= max_repeat：blocked=True，message 含提醒（建议合并查询/换工具）
+        """
+        with self._lock:
+            st = self._agent_state.setdefault(str(learner_id), {"repeat_guard": {}, "tool_calls": []})
+            rg = st.setdefault("repeat_guard", {})
+            # 只追踪"连续"序列：换工具即清掉其他工具计数（保留当前工具累加）
+            for _k in [k for k in rg if k != tool_name]:
+                rg.pop(_k, None)
+            rg[tool_name] = rg.get(tool_name, 0) + 1
+            st.setdefault("tool_calls", []).append(tool_name)
+            st["tool_calls"] = st["tool_calls"][-50:]
+            _n = rg[tool_name]
+        if _n >= max_repeat:
+            return {
+                "repeat": _n, "blocked": True,
+                "message": (f"[repeat-tool-reminder] 工具 {tool_name} 已连续调用 {_n} 次——"
+                            "疑似陷入重复调用循环。请检查：①是否已有足够信息可停止检索 ②如需多次检索，"
+                            "合并为一次查询 ③或改用其他工具（如 fetch_page/知识库）。"),
+            }
+        return {"repeat": _n, "blocked": False, "message": ""}
+
+
     # ─── 动态管理 ───
     def add_hook(self, hook_def: dict):
         _event = str(hook_def.get("event") or "")
