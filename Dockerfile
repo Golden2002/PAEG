@@ -1,9 +1,6 @@
-# -*- coding: utf-8 -*-
-"""PAEG Docker 化（v0.67 ⭐ 单容器最小可行版）
-
-用户方案：Docker 统一 Python 3.12——manim 0.19 兼容 3.12，无需隔离 venv。
-覆盖：教学/闲聊/PPT/讲义/manim 动画 五大场景。
-"""
+# PAEG Docker 化（v0.67 单容器最小可行版）
+# 用户方案：Docker 统一 Python 3.12——manim 0.19 兼容 3.12，无需隔离 venv。
+# 覆盖：教学/闲聊/PPT/讲义/manim 动画 五大场景。
 # Python 3.12（manim 0.19 兼容最稳）
 FROM python:3.12-slim
 
