@@ -397,3 +397,12 @@
 8. **进程管理**（规范 §11）：改代码后按技术 §10.16 重启流程
 9. 重大改动后：回归验证（学习计划/核心功能）→ 更新技术状态快照（§五）
 6. 重大改动后：语法验证 → 重启（按 §10.16 进程 SOP）→ 回归
+### 3.12 Step4 九模块底座评估结果：诊断→计划闭环 + 画像驱动（2026-08-14 Oracle 评估 · 待实施）
+- **九模块成熟度（Oracle 对照评估）**：Interaction 中 / Profile 中 / **Diagnosis 弱** / Plan 中 / Action 强 / Evaluation 中 / Adaptation 中 / Knowledge 强 / Output 强
+- **最痛点：Diagnosis→Plan 闭环未通**——Diagnostor 输出未回灌 Planner，教学计划无法基于真实薄弱点定制（通用聊天机器人与个性化教学智能体的分水岭）
+  - 改动：Diagnostor.paeg_teach 输出 schema 增 weak_knowledge_points+suggested_strategy；Planner 入参增 diagnosis_report；	each_stream 编排改 [Diagnosis→Plan→Action]
+- **次痛点：17 维画像 + BDI 仅声明未被下游消费**——Planner/Presenter 不读画像（个性化是文案而非机制）
+  - 改动：Planner 入参增 LearnerProfile（按先验/动机分支）；Presenter 读 learning_style；画像陈旧触发轻量诊断
+- **其他薄弱点**：交互式教学缺失（提问-等待-追问循环）；评估缺学习效果侧（学生是否真掌握）；缺知识点依赖图（prerequisite_graph）；实时自适应（卡顿→降阶）缺失
+- **优先级**：诊断闭环 > 画像驱动（影响所有学习者 vs 老用户更显著）
+
