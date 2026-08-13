@@ -1,0 +1,33 @@
+# PAEG docker-compose（v0.67 ⭐ 单容器最小可行版）
+# 用法：docker compose up -d --build  → http://localhost:5000
+version: '3.8'
+
+services:
+  paeg:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: paeg-edu-agent
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      # 持久化数据（主机路径映射，避免容器重建丢数据）
+      - ./05_实现原型/users_data:/app/05_实现原型/users_data
+      - ./05_实现原型/downloads:/app/05_实现原型/downloads
+      - ./Library:/app/Library
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FLASK_ENV=production
+      - PAEG_ENV=development   # 生产改 production（需 PAEG_SECRET_KEY）
+      # whisper 模型（STT）：small/base/medium，首次自动下载
+      - WHISPER_MODEL=small
+      # TTS 中文女声
+      - EDGE_TTS_VOICE=zh-CN-XiaoxiaoNeural
+    env_file:
+      - .env
+      # 可选：PAEG_API_KEY / DEEPSEEK_API_KEY 等放 .env
+
+networks:
+  default:
+    name: paeg-net

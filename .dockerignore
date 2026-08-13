@@ -1,0 +1,28 @@
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 运行时数据（由卷挂载，不打进镜像）
+05_实现原型/users_data/
+05_实现原型/downloads/
+05_实现原型/data/
+05_实现原型/uploads/
+Library/usr_knowledge/
+
+# manim 隔离 venv（容器内用 pip manim，不需要）
+manim_env/
+
+# 环境变量（含密钥）
+.env
+*.env
+
+# 版本控制
+.git/
+.gitignore
+
+# 文档/交付物（减少镜像体积，可选）
+交付物/
+归档_废弃副本/
+*.pptx
+*.pdf
