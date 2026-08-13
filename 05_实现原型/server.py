@@ -1086,6 +1086,13 @@ def teach_stream():
     """
     data = request.get_json(force=True)
 
+    # v0.66+ ⭐ Bug2 修复：teach_stream 加 deep_think（per-turn，模式与 chat_stream 一致）
+    # 前端按钮 → 本次教学临时启用 reasoner；生成结束自动恢复默认（不污染后续对话）
+    _dt_requested = bool(data.get("deep_think"))
+    _dt_prev_env = os.environ.get("PAEG_REASONING")
+    if _dt_requested:
+        os.environ["PAEG_REASONING"] = "on"
+
     learner_id = data.get("learner_id") or _anon_learner_id(data)
     # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原 L1091 内联，无 elif / 无 target_exam）
     learner = ensure_learner_session(learner_id, data, SESSIONS)
@@ -2162,6 +2169,36 @@ def teach_stream():
         _done_payload = {"status": "completed"}
         _done_payload.update(_done_extra)
         yield f"event: done\ndata: {json.dumps(_done_payload, ensure_ascii=False)}\n\n"
+        # v0.68+ ⭐ G1 修复：流式教学也从完整对话历史蒸馏知识点（2026-08-14 用户方案：
+        # 自我更新与流式无关——蒸馏模块从完整输出后的对话历史抓取，不修改流式循环本体）
+        try:
+            _hist_now = SESSIONS.get(f"chat_hist_{learner_id}", [])[-20:]
+            _ds_history = [{"content": m.get("content", "")} for m in _hist_now
+                           if isinstance(m, dict) and m.get("content")]
+            if _ds_history and getattr(_fs_shared, "evaluations", None):
+                import types as _types_mod
+                import time as _time_mod
+                _ds_session = _types_mod.SimpleNamespace(
+                    concept=concept, subject=subject,
+                    history=_ds_history,
+                    evaluations=_fs_shared.evaluations or [],
+                    session_id=f"stream_{int(_time_mod.time() * 1000)}",
+                )
+                _ds_out = EVOLVER.distill_knowledge(_ds_session)
+                if _ds_out.get("distilled"):
+                    print(f"[PAEG][G1] 流式教学蒸馏入库: {concept} ({subject})")
+        except Exception as _dk_e:
+            print(f"[PAEG][G1] teach_stream distill_knowledge 跳过: {_dk_e}")
+        # v0.66+ ⭐ 深度思考 per-turn：生成结束恢复 env（不污染后续对话）
+        if _dt_requested:
+            try:
+                if _dt_prev_env is None:
+                    os.environ.pop("PAEG_REASONING", None)
+                else:
+                    os.environ["PAEG_REASONING"] = _dt_prev_env
+            except Exception as _e:
+                print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
+                pass
 
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
