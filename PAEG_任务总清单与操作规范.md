@@ -340,9 +340,9 @@
 | G6 | _compose_lesson 无 LLM 提炼 | **✅ 已修复**（v0.68+ LLM 提炼工具经验：适用场景/要点/误区/替代方案，模板兜底；无 LLM 或提炼失败回退模板）|
 | G7 | 蒸馏节点无去重/版本化 | **✅ 核实已满足**（_append_evolved_node 用 dict——同 id 自然覆盖去重；知识蒸馏覆盖=版本更新，合理）|
 | G8 | tool_lessons.md 无限增长 + 老经验沉没 | **✅ 已修复**（v0.69+ 超 40KB 截断保留最近 30 条，防无限增长+防老经验沉没）|
-| G9 | SelfUpdateAgent 建议无自动派发回 SelfEvolution | 中 |
-| G10 | reflection_store(SQLite) 与 self_evolution(md/json) 数据隔离 | 低 |
-| G11 | suggestions.jsonl 堆积但 periodic_self_update 不消费 | 低 |
+| G9 | SelfUpdateAgent 建议无自动派发 | **✅ 核实已实现**（periodic_self_update 建议回流：self_update_suggestions.jsonl → improvements.md）|
+| G10 | reflection_store(SQLite) 与 self_evolution(md/json) 隔离 | **✅ 核实为设计**（SQLite=反思日志 vs md/json=演化数据，隔离是刻意的）|
+| G11 | suggestions.jsonl 堆积不消费 | **✅ 核实已实现**（v0.24 建议回流 + processed.jsonl 去重标记）|
 
 **知识蒸馏最佳实践（Librarian 联网检索，Voyager/Reflexion/MemGPT/A-MEM/ExpeL/ReasoningBank/Constitutional AI）**：
 - L0：提炼 prompt 加 JSON Schema + CoT（+30% 质量）
