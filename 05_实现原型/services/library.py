@@ -89,10 +89,17 @@ def collect_all_resources(uid: str, topic: str = "", llm=None,
     if include_web and topic:
         try:
             from web_search_tool import web_search_multi
-            _wr = web_search_multi(topic, llm=llm, subject=subject, n=2)
-            _items = (_wr or {}).get("results") or (_wr or {}).get("items") or []
+            # v0.68 修复：web_search_multi 签名是 (question, llm, subject, n_queries, per_query, max_total)
+            # 此前误传 n=2 → TypeError 被吞 → web_hits 恒空。改用 max_total=2。
+            _wr = web_search_multi(topic, llm=llm, subject=subject, max_total=2)
+            _items = (_wr if isinstance(_wr, list) else (_wr or {}).get("results") or (_wr or {}).get("items") or [])
             if _items:
-                _web = str(_items[0].get("title") or _items[0].get("content") or "")[:150]
+                # v0.68+ ⭐ 改进：title + 摘要片段（此前只取 title 太单薄）
+                _first = _items[0]
+                _t = str(_first.get("title") or "")
+                _c = str(_first.get("content") or _first.get("snippet") or "")[:120]
+                _web = f"{_t}：{_c}" if _c else _t
+                _web = _web[:150]
                 _parts.append(f"【网络检索】补充：{_web}")
                 _has = True
         except Exception:

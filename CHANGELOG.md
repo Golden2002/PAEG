@@ -21,7 +21,20 @@
 
 **测试**：POST /api/method「我想学习生命现象学，该怎么样入门」→ step_type=study_plan + 3 阶段 LLM 生成（悬置/意向性/知觉现象学/身体图式等专业内容）+ teach 跳转按钮
 
-**文档**：技术 §10.13（v4-flash 修复）+ 维护 §18.26（学习计划 + 空响应根因）+ 元能力 §6.54
+**推荐学习资料附录（v0.68+）**：
+- 学习计划 summary_md 末尾追加"### 📚 推荐学习资料"（来自 collect_all_resources 4 路检索结论：用户资料库/知识库/facts/联网）
+- 全确定性渲染（不调 LLM），按 source 分组 + 200 字截断 + 空路省略 + has_any=False 兜底文案
+- 前端 renderStudyPlan 加折叠卡片（resources 字段），点击里程碑 teach 衔接
+- 修复 library.py web_search_multi 调用参数 bug（n=2 → max_total=2，此前 TypeError 被吞致 web_hits 恒空）
+
+**联网检索增强（v0.68+ Oracle 方案）**：
+- web_search_tool 降级栈升级：Brave MCP → s.jina.ai → Tavily → Serper → Bing
+- 新增 _brave_mcp_search（MCP brave 调用，需 BRAVE_API_KEY；无 key 静默返回 [] 回退）
+- 修复 s.jina.ai 未接入降级栈的历史 bug
+- 根因：原只有 Bing 可用（Tavily/Serper/Jina 无 key），Bing 中文分词差（"生命现象学"被拆成"生命"）
+- 用户填 BRAVE_API_KEY 到 mcp_servers.json 后自动启用（免改代码）
+
+**文档**：技术 §10.14（v4-flash 修复 + 学习计划）+ 维护 §18.26（学习计划 + 空响应根因）+ 元能力 §6.54
 
 ### v0.67 交互教学选择题 + 定时主动问候（2026-08-13 ⭐）
 

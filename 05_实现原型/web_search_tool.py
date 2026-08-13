@@ -260,10 +260,15 @@ def _shorten_query(query: str) -> str:
 def web_search(query: str, max_results: int = MAX_RESULTS) -> str:
     """搜索网络，返回结构化文本（标题+URL+摘要）。LLM 工具调用入口。
 
-    后端优先级：Tavily → Serper → Bing（国内直连兜底）。
-    Bing 对中文长短语分词差，命中差时自动拆短查询重试。
+    v0.68+ ⭐ 降级栈升级：Brave MCP（需 BRAVE_API_KEY，用户填后自动生效）→
+    s.jina.ai（免 key，若可连通）→ Tavily → Serper → Bing（国内直连兜底）。
+    MCP/各后端失败静默回退，任意一层失败不影响整体。
     """
-    results = _tavily_search(query, max_results)
+    results = _brave_mcp_search(query, max_results)   # v0.68+ ⭐ MCP brave
+    if not results:
+        results = _sjin_search(query, max_results)     # 修复历史 bug：原代码漏接 s.jina.ai
+    if not results:
+        results = _tavily_search(query, max_results)
     if not results:
         results = _serper_search(query, max_results)
     if not results:
@@ -288,6 +293,47 @@ def web_search(query: str, max_results: int = MAX_RESULTS) -> str:
     if not parts:
         return "搜索未返回有效结果。"
     return "\n\n".join(parts)
+
+
+def _brave_mcp_search(query: str, max_results: int = MAX_RESULTS) -> List[dict]:
+    """v0.68+ ⭐ 通过 MCP 调 brave-search（需 mcp_servers.json 配置 + BRAVE_API_KEY）。
+
+    失败/无 key/未连接时返回 []，对调用方完全透明。
+    返回 [{title, url, content}] 与 _sjin_search 同构。
+    """
+    try:
+        from mcp_client import get_mcp_client
+        mgr = get_mcp_client()
+        # MCP 工具名规则：mcp__<server>__<tool>；brave-search server 的工具名
+        full_name = "mcp__brave-search__brave_web_search"
+        _tools = getattr(mgr, "_tools", None) or {}
+        if full_name not in _tools:
+            # 兼容工具名变体（brave_search / web_search）
+            full_name = "mcp__brave-search__brave_search"
+            if full_name not in _tools:
+                return []
+        raw = mgr.call_tool(full_name, {"query": query, "count": min(max_results, 10)})
+        if not raw or str(raw).startswith("MCP") or "error" in str(raw).lower()[:50]:
+            return []
+        # brave 返回 JSON 字符串（web.results[]），解析为结构化条目
+        data = {}
+        _s = str(raw).strip()
+        if _s.startswith(("{", "[")):
+            import json as _json
+            try:
+                data = _json.loads(_s)
+            except Exception:
+                data = {}
+        items = data.get("results") if isinstance(data, dict) else []
+        if not items and isinstance(data, dict):
+            items = (data.get("web") or {}).get("results") or []
+        return [{
+            "title": (it.get("title") or "")[:150],
+            "url": (it.get("url") or "")[:300],
+            "content": (it.get("description") or it.get("content") or "")[:MAX_SNIPPET],
+        } for it in items[:max_results]]
+    except Exception:
+        return []
 
 
 # ─────────────────────────────────────
@@ -350,9 +396,11 @@ def search_and_answer(question: str, llm=None, extra_context: str = "") -> Dict:
     """搜索 → 注入上下文 → LLM 基于来源作答。
 
     返回：{"answer": str, "sources": [{"title","url"}], "searched": bool}
+    v0.68+ ⭐ 降级栈升级：Brave MCP → s.jina.ai → Tavily → Serper → Bing
     """
-    results = _tavily_search(question, 5) or _serper_search(question, 5) \
-        or _bing_search(question, 5)
+    results = (_brave_mcp_search(question, 5) or _sjin_search(question, 5)
+               or _tavily_search(question, 5) or _serper_search(question, 5)
+               or _bing_search(question, 5))
 
     if not results:
         return {"answer": None, "sources": [], "searched": False}

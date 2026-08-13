@@ -3251,6 +3251,21 @@ function renderStudyPlan(plan, actions, subject) {
   (plan.personalization_notes || []).forEach(n => {
     html += `<div style="font-size:12px;color:var(--text-dim);margin-top:4px;">💡 ${escapeHtml(n)}</div>`;
   });
+  // v0.68+ ⭐ 推荐学习资料附录（来自检索/Library 的 4 路结论）
+  if (plan.resources && plan.resources.length) {
+    html += `<details class="plan-resources" open style="margin-top:8px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;">`;
+    html += `<summary style="cursor:pointer;font-weight:600;font-size:13px;">📚 推荐学习资料（${plan.resources.length} 路检索）</summary>`;
+    (plan.resources || []).forEach(r => {
+      html += `<div style="margin:6px 0;font-size:12px;">`;
+      html += `<b>${escapeHtml(r.label || '')}</b>：`;
+      html += `<span style="color:var(--text-dim);">${escapeHtml(r.snippet || r.title || '')}</span>`;
+      html += `</div>`;
+    });
+    html += `<div style="font-size:12px;color:var(--text-dim);margin-top:4px;">💡 点击里程碑的「开始学习」，我会结合以上来源为你讲解。</div>`;
+    html += `</details>`;
+  } else {
+    html += `<div style="font-size:12px;color:var(--text-dim);margin-top:4px;">📚 暂无可推荐资料；建议从公开教材（如图书馆借阅 / 在线公开课）入门。</div>`;
+  }
   // actions 按钮（teach 跳转 / 保存）
   (actions || []).forEach(act => {
     const kind = act.kind || '';

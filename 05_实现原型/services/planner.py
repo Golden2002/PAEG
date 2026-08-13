@@ -407,6 +407,18 @@ def build_study_plan(text: str, learner, subject: str = "", llm=None) -> StudyPl
     _resources = aggregate_resources(_inputs.topic, _inputs.subject, learner, llm)
     _phases = design_phases(_inputs, _resources, learner, llm)
 
+    # v0.68+ ⭐ 推荐资料附录：单独取 collect_all_resources 原始 4 路结论
+    # （不改 aggregate_resources 签名——最小侵入；供 _render_summary_md 附录用）
+    _raw_blk = None
+    try:
+        from services.library import collect_all_resources
+        _raw_blk = collect_all_resources(
+            str(getattr(learner, "id", "")), topic=_inputs.topic,
+            llm=llm, subject=_inputs.subject, include_web=True)
+    except Exception as _e:
+        print(f"[planner] collect_all_resources(附录) 失败: {_e}")
+        _raw_blk = None
+
     _total_days = sum(p.duration_days for p in _phases)
     _weeks = max(1, round(_total_days / 7))
     _plan = StudyPlan(
@@ -432,12 +444,17 @@ def build_study_plan(text: str, learner, subject: str = "", llm=None) -> StudyPl
     if _inputs.goal == "备考":
         _notes.append("备考导向：真题与模拟在实战阶段占比提高")
     _plan.personalization_notes = _notes
-    _plan.summary_md = _render_summary_md(_plan)
+    # v0.68+ ⭐ 附录：raw_blk 以闭包传入（不进 dataclass 序列化），同时挂内部属性供 handler 取
+    _plan.summary_md = _render_summary_md(_plan, raw_blk=_raw_blk)
+    _plan._raw_blk = _raw_blk  # 内部字段：handler 读它做前端 resources 展示（不进 JSON 主序列化）
     return _plan
 
 
-def _render_summary_md(plan: StudyPlan) -> str:
-    """渲染 markdown 摘要（前端 marked 渲染）。"""
+def _render_summary_md(plan: StudyPlan, raw_blk=None) -> str:
+    """渲染 markdown 摘要（前端 marked 渲染）。
+
+    v0.68+ ⭐ 末尾追加"推荐学习资料"附录（来自 collect_all_resources 原始 4 路结论）。
+    """
     _lines = [
         f"## 学习计划：{plan.topic}",
         "",
@@ -460,7 +477,38 @@ def _render_summary_md(plan: StudyPlan) -> str:
         for _n in plan.personalization_notes:
             _lines.append(f"- {_n}")
         _lines.append("")
+    # v0.68+ ⭐ 推荐学习资料附录（确定性渲染，不调 LLM）
+    _lines.append(_render_resources_appendix(raw_blk))
     _lines.append("> 想开始某一阶段的学习？点对应里程碑的「开始学习」按钮，我会为你讲解。")
+    return "\n".join(_lines)
+
+
+def _render_resources_appendix(raw_blk) -> str:
+    """v0.68+ ⭐ 推荐学习资料附录：基于 collect_all_resources 原始 4 路结论渲染。
+
+    全确定性（不调 LLM）：仅格式化 snippet（每路 ≤200 字，snippet 空则整路省略）。
+    固定顺序：用户资料库 → 知识库 → 事实资料 → 网络检索。
+    """
+    _lines = ["", "### 📚 推荐学习资料",
+              "> 来自知识库、事实资料、用户资料库与网络检索的整合结论。", ""]
+    _blk = raw_blk or {}
+    _sections = [
+        ("📁 你的资料库", "user_assets"),
+        ("📘 知识库", "kb_hits"),
+        ("📄 事实资料", "facts"),
+        ("🌐 网络检索", "web_hits"),
+    ]
+    _shown = 0
+    for _label, _key in _sections:
+        _txt = str(_blk.get(_key) or "").strip()
+        if not _txt:
+            continue
+        _shown += 1
+        _txt = _txt[:200] + ("…" if len(_txt) > 200 else "")
+        _lines.append(f"- **{_label}**：{_txt}")
+    if _shown == 0:
+        _lines.append("- 暂无可推荐资料；建议从公开教材（如图书馆借阅 / 在线公开课）入门。")
+    _lines.append("")
     return "\n".join(_lines)
 
 

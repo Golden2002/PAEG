@@ -53,6 +53,9 @@ def _handle_study_plan_request(learner, topic: str, subject: str = "",
     _actions.append({"label": "保存到我的计划", "kind": "save_plan",
                      "payload": {"plan_id": _plan.plan_id}})
 
+    # v0.68+ ⭐ 推荐资料附录：从 _plan._raw_blk 提取 4 路（供前端卡片渲染）
+    _resources = _extract_resources(getattr(_plan, "_raw_blk", None))
+
     return {
         "plan_id": _plan.plan_id,
         "topic": _plan.topic,
@@ -62,10 +65,34 @@ def _handle_study_plan_request(learner, topic: str, subject: str = "",
         "deadline": _plan.deadline,
         "phases": [__phase_to_dict(p) for p in _plan.phases],
         "personalization_notes": _plan.personalization_notes,
+        "resources": _resources,       # v0.68+ ⭐ 推荐学习资料（4 路）
         "summary_md": _summary,
         "created_at": _plan.created_at,
         "actions": _actions,
     }
+
+
+def _extract_resources(raw_blk) -> list:
+    """从 collect_all_resources 原始块提取 4 路推荐资料（确定性，不调 LLM）。"""
+    _blk = raw_blk or {}
+    _out = []
+    _sections = [
+        ("user_library", "📁 你的资料库", "user_assets"),
+        ("kb", "📘 知识库", "kb_hits"),
+        ("facts", "📄 事实资料", "facts"),
+        ("web", "🌐 网络检索", "web_hits"),
+    ]
+    for _src, _label, _key in _sections:
+        _txt = str(_blk.get(_key) or "").strip()
+        if not _txt:
+            continue
+        _out.append({
+            "source": _src,
+            "label": _label,
+            "title": _txt[:200],
+            "snippet": _txt[:200] + ("…" if len(_txt) > 200 else ""),
+        })
+    return _out
 
 
 def __phase_to_dict(phase):
