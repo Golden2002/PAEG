@@ -424,6 +424,6 @@
 ### 3.14 v0.69.0 Release（2026-08-14 ✅ 已发布）
 - **tag**：v0.69.0（GitHub origin 推送成功：master + tag）
 - **内容**：自我更新闭环（G1/G2/G3/G5/G6）+ 配置体系运行时接入（Step4 P0-1~4）+ 哲学专项 + 防幻觉 + AffectionSupportor WEIL_CORE + 执行纪律 15-19 + bug report 档案 + CHANGELOG v0.69
-- **ModelScope 待确认**：远程有 3 个平台端 Dockerfile 提交（10c8494/c44811e/e49107c），本地未合并——未 force push（避免覆盖平台文件）；用户确认后处理
+- **ModelScope 结论（2026-08-14 最终）**：远程 3 个平台端 Dockerfile 提交（10c8494/c44811e/e49107c）——force push 被平台 pre-receive hook 拒绝（保护机制）；ModelScope 保持现状，**GitHub 为权威完整源**（v0.69.0 tag + 全部提交）；如需同步 ModelScope 需用户联系平台解除 hook 或手动 merge
 - **后续**：P1×5（mcp_servers 双份/skill 注入重复/teach+answer 工具集/手工工具列表/answer 无 skill）+ P2×2 + §3.12 诊断闭环与画像驱动
 
