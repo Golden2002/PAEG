@@ -202,8 +202,13 @@ class LanguageRefiner:
         # v0.14：省略句/语法问题也触发改写
         has_ellipsis = len(self._check_ellipsis(text)) > 0
 
-        # 无 AI 味、无省略句、且不算太长 → 直接返回
-        if ai_prob < 0.4 and not has_ellipsis and len(text) < 400 \
+        # v0.50 ⭐ Bug3 修复（affection 语言刻板）：高频词重复也触发改写——
+        # 重量/真实/看见等在 200 字内 ≥3 次即视为刻板信号。
+        rep_issues = self._check_word_repetition(text)
+        has_repetition = bool(rep_issues)
+
+        # 无 AI 味、无省略句、无重复、且不算太长 → 直接返回
+        if ai_prob < 0.4 and not has_ellipsis and not has_repetition and len(text) < 400 \
                 and not self.detect_ai_tells(text):
             return text
 
@@ -254,6 +259,13 @@ class LanguageRefiner:
         hits = self.detect_ai_tells(text)
         if hits:
             feedback_parts.append(f"检测到这些套话：{', '.join(hits[:5])}")
+        # v0.50 ⭐ Bug3：词汇重复反馈（affection 模式高频词轮换）
+        rep_issues = self._check_word_repetition(text)
+        if rep_issues:
+            feedback_parts.append(
+                "【词汇重复 v0.50】在 200 字内同一名词/形容词复用过多，"
+                "请用同义词轮换：" + "；".join(rep_issues[:4])
+            )
         return "；".join(feedback_parts) if feedback_parts else "请保持原意，用更自然、朴素的语言表达。"
 
     def _check_ellipsis(self, text: str) -> list:
@@ -415,6 +427,69 @@ class LanguageRefiner:
                     break
         return issues[:12]
 
+    # v0.50 ⭐ Bug3 修复（affection 语言刻板）：检测高频名词/形容词在短文本内重复——
+    # "重量/重要/真实/看见/听见/感受/空间/声音/陪伴" 这一类 LLM 容易复用的核心词，
+    # 在 200 字内出现 ≥3 次即触发反馈，提示用同义词轮换（参考 prompts 中的分量/担子/沉甸甸的那一块）。
+    # 纯列表常量：避免每次调用重建 + 便于单测断言。
+    _REPETITION_TRIGGER_WORDS = (
+        "重量", "重要", "真实", "看见", "听见", "感受", "感受到",
+        "空间", "声音", "陪伴", "力量", "勇气", "温暖", "沉重",
+    )
+    _REPETITION_SYNONYM_HINT = (
+        "这些词在一段回复里反复出现：" ,
+    )
+    _REPETITION_WINDOW = 200  # 滑动窗口（前 200 字）
+    _REPETITION_THRESHOLD = 3  # 触发阈值
+
+    def _check_word_repetition(self, text: str, threshold: int = 3) -> list:
+        """v0.50 ⭐ 检测 LLM 高频词重复（affection Bug3 修复）。
+
+        Args:
+            text: 待检查文本。
+            threshold: 同一触发词在窗口内出现次数阈值（默认 3）。
+
+        Returns:
+            list[str]：每条形如「"重量" 出现 4 次（窗口 200 字）→ 建议换用 分量/担子/沉甸甸的那一块」。
+            空列表表示未触发。
+        """
+        if not text:
+            return []
+        window = text[:self._REPETITION_WINDOW]
+        issues = []
+        for w in self._REPETITION_TRIGGER_WORDS:
+            # 用简单 count 计数；中文无词边界，单字 substring count 已足够
+            count = window.count(w)
+            if count >= threshold:
+                # 为不同词给出不同建议（synonym 池来自 prompts 中的词汇多样指令）
+                if w in ("重量", "沉重"):
+                    hint = "建议换用：分量/担子/沉甸甸的那一块"
+                elif w in ("听见", "听见你", "听见了"):
+                    hint = "建议换用：在/在这儿/听着你说"
+                elif w in ("看见",):
+                    hint = "建议换用：注意到/你说的事"
+                elif w in ("感受", "感受到"):
+                    hint = "建议换用：体察到/我心里"
+                elif w in ("空间",):
+                    hint = "建议换用：余地/位置/口子"
+                elif w in ("声音",):
+                    hint = "建议换用：语气/话/那句话"
+                elif w in ("陪伴",):
+                    hint = "建议换用：在/在这儿陪着"
+                elif w in ("力量",):
+                    hint = "建议换用：靠得住的东西/撑得住的那一点"
+                elif w in ("勇气",):
+                    hint = "建议换用：敢/迈出这一步"
+                elif w in ("温暖",):
+                    hint = "建议换用：不冷/实在/具体"
+                elif w in ("重要",):
+                    hint = "建议换用：要紧/不能省/关键"
+                elif w in ("真实",):
+                    hint = "建议换用：实打实的/不算虚/这回事"
+                else:
+                    hint = "建议换用同义词"
+                issues.append(f"'{w}' 在前 {self._REPETITION_WINDOW} 字内出现 {count} 次——{hint}")
+        return issues
+
     def _build_user(self, text: str, context: str = "", feedback: str = "") -> str:
         fb = f"\n【改写方向】{feedback}" if feedback else ""
         return f"""请改写下面的文本为薇依式的语言：{fb}
@@ -497,4 +572,5 @@ class LanguageRefiner:
 8. **补充修饰成分与连接词（v0.21.8）**：主动补充宾语补足语、双宾语、状语等修饰成分，并用连接词（因为/所以/但是/同时/然后）标明逻辑关系——"我来把这个结论告诉你"（双宾语）；"因为这道题需要先化简，所以我们从通分开始"（因果连接）
 9. 消除重复：若文本内部有重复说明同一观点的句子，合并或删去冗余
 10. **不改变语气和人格**：保留原文本的温度和亲切感，只修正语法问题——不要改成生硬的书面语
-11. 直接输出改写后的文本，不要解释，不要加"改写如下"之类的话"""
+11. 直接输出改写后的文本，不要解释，不要加"改写如下"之类的话
+12. **保留 markdown 结构（v0.68+ ⭐）**：文本可能含 `### 标题`、`- 列表项`、`> 引用`、`**加粗**` 等 markdown 结构（如"### 推荐学习资料"、"### 阶段 1"）。这些结构是刻意设计的内容骨架，**必须原样保留**——只修正措辞/语法，绝不删除任何 `###`/`-`/`>` 开头的段落或列表项。"""

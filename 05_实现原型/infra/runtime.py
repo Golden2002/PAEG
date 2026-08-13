@@ -211,3 +211,32 @@ def get_periodic_updater() -> Any:
 
         _periodic_updater = PeriodicSelfUpdater(llm=get_llm(), paeg=get_paeg(), verbose=True)
     return _periodic_updater
+
+
+def reload_library() -> int:
+    """v0.68+ ⭐ G3 热加载修复：重扫 Library 增量注册 evolved_*.json 到 KnowledgeBase。
+
+    根因：evolved_*.json（知识蒸馏产物）写入后，KB 内存不更新，需重启才可见。
+    本函数重扫 subjects/*.json，把新增节点注册进 KB（不重复注册已存在的）。
+    由 self_evolution._append_evolved_node 成功后调用。
+    """
+    global _library
+    try:
+        _kb = get_kb()
+        if _library is None:
+            _library = _load_library_instance()
+        _added = _library.register(_kb)
+        if _added:
+            print(f"[PAEG][runtime] Library 热加载: 新增 {_added} 个节点")
+        return _added
+    except Exception as e:
+        print(f"[PAEG][runtime] Library 热加载失败: {e}")
+        return 0
+
+
+def _load_library_instance():
+    """构造 KnowledgeLibrary 实例并注册到 KB（供 reload_library 复用）。"""
+    from library_loader import KnowledgeLibrary
+    _lib = KnowledgeLibrary()
+    _lib.register(get_kb())
+    return _lib

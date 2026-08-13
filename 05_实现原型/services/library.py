@@ -41,6 +41,9 @@ def collect_all_resources(uid: str, topic: str = "", llm=None,
     _has = False
 
     # ① 用户物料（Library/usr_knowledge/<uid>/）
+    # v0.66+ ⭐ Bug2 修复：除列文件名外，必须读入正文片段（max_files=3, per_file=800），
+    # 否则 LLM 看不到习题册内容，讲不出基于用户资料的例题。
+    # 保留原文件名摘要做兜底；append 上 read_user_corpus 抽出的正文片段。
     _ua = ""
     try:
         from asset_loader import list_user_assets
@@ -50,6 +53,14 @@ def collect_all_resources(uid: str, topic: str = "", llm=None,
             _ua = f"用户资料库有 {len(_assets)} 个文件（如：{_names}）。"
             _parts.append("【用户资料库】" + _ua)
             _has = True
+            # Bug2 修复：接通习题册正文（读前 3 个文件 × 每文件 800 字）
+            try:
+                from lib.library_store import read_user_corpus
+                _ua_corpus = read_user_corpus(uid, max_files=3, per_file=800)
+                if _ua_corpus:
+                    _parts.append("【用户资料库正文片段（用于讲解基于用户上传资料）】\n" + _ua_corpus)
+            except Exception:
+                pass
     except Exception:
         pass
 

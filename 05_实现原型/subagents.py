@@ -114,6 +114,13 @@ def _safe_chat(model, system: str, user: str = None, messages: list = None,
     """
     if not _is_real_llm(model):
         return None
+    # v0.68+ ⭐ 防幻觉底层约束（NEW-9 · 用户最高优先）：注入 TRUTH_GROUNDING 到 system 最前
+    try:
+        from prompts import TRUTH_GROUNDING
+        if TRUTH_GROUNDING and system and TRUTH_GROUNDING[:20] not in system:
+            system = TRUTH_GROUNDING + "\n\n" + system
+    except Exception:
+        pass
     if messages is None and user is not None:
         messages = [{"role": "user", "content": user}]
     if not messages:
@@ -543,6 +550,31 @@ SUBAGENT_THINKING_LEVELS: dict = {
     "adapter": "OFF",       # switch_style/reinforce——前端已给信号，纯枚举
     "retrieval_scope": "OFF",  # 检索范围选择——封闭输出
 }
+
+
+def _build_capability_manifest() -> str:
+    """v0.68+ ⭐ 能力自知清单（智能化 P0-1，Oracle 设计）。
+
+    注入 Presenter system prompt，让 LLM 知道"我有什么能力、何时该主动用"。
+    """
+    return """
+
+## ⭐ 你的主动能力清单（v0.68+）
+
+你（Émile）除文字讲解外还有多种能力。**遇到对应场景必须主动调用，不要等用户要求**：
+
+| 触发场景 | 主动调用 | 说明 |
+|---|---|---|
+| 概念含几何/运动/函数图像（如抛体运动、简谐振动、函数变换）| 建议生成数学动画 | 说"我可以为你画个动画演示"并继续讲解 |
+| 讲解含复杂步骤/公式链（学生可能记不住）| 建议生成讲义文档 | 说"要不要我把这部分整理成讲义" |
+| 涉及真实事件/数据/最新研究 | 联网核实 | 主动检索后再讲，标注来源 |
+| 学生说"看不懂"或评估分低 | 换类比/生活例子重讲 | 不重复原讲法 |
+| 学生情绪低落/疲惫 | 暂停教学，转情绪陪伴 | 先回应情绪再谈学习 |
+| 概念关联多知识点（如力学+能量）| 建议画知识导图 | 说"我可以用思维导图帮你串起来" |
+| 学生提到"考试/重点" | 建议整理成 PPT/复习要点 | 说"我可以帮你做一份复习 PPT" |
+
+**主动原则**：当提问含学科概念时，默认"讲 + 例 + 图（如适用）"三件套；讲解中自然插入能力建议，不要只输出干巴巴文字。
+"""
 
 
 def _thinking_level(subagent: str) -> str:
@@ -1014,6 +1046,12 @@ class Presenter:
             except Exception as _e:
                 print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
                 pass
+                pass
+            # v0.68+ ⭐ 能力自知注入（智能化 P0-1）：让 LLM 知道"我有什么能力、何时主动用"
+            try:
+                system = system + _build_capability_manifest()
+            except Exception as _e:
+                print(f"[PAEG][subagents.py] 能力清单注入异常: {_e}")
                 pass
             # v0.36.1 ⭐ 网络检索补充材料（teach_stream 知识库无匹配时自动联网，注入让 LLM 参考）
             try:

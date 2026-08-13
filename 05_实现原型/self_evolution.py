@@ -139,6 +139,12 @@ class SelfEvolution:
         with open(tmp, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         os.replace(tmp, fpath)
+        # v0.68+ ⭐ G3 热加载闭环：写入后立即刷新 KB，无需重启即可被检索
+        try:
+            from infra.runtime import reload_library
+            reload_library()
+        except Exception as _e:
+            print(f"[self_evolution] 知识热加载失败: {_e}")
 
     # ─────────────────────────────────────
     # 2. 学科提示词更新（SCOPE 双流：战术/战略）

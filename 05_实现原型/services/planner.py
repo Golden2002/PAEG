@@ -489,14 +489,14 @@ def _render_resources_appendix(raw_blk) -> str:
     全确定性（不调 LLM）：仅格式化 snippet（每路 ≤200 字，snippet 空则整路省略）。
     固定顺序：用户资料库 → 知识库 → 事实资料 → 网络检索。
     """
-    _lines = ["", "### 📚 推荐学习资料",
+    _lines = ["", "### 推荐学习资料",
               "> 来自知识库、事实资料、用户资料库与网络检索的整合结论。", ""]
     _blk = raw_blk or {}
     _sections = [
-        ("📁 你的资料库", "user_assets"),
-        ("📘 知识库", "kb_hits"),
-        ("📄 事实资料", "facts"),
-        ("🌐 网络检索", "web_hits"),
+        ("你的资料库", "user_assets"),
+        ("知识库", "kb_hits"),
+        ("事实资料", "facts"),
+        ("网络检索", "web_hits"),
     ]
     _shown = 0
     for _label, _key in _sections:

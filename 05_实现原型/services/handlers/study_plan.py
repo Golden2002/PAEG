@@ -32,12 +32,24 @@ def _handle_study_plan_request(learner, topic: str, subject: str = "",
     _plan = build_study_plan(_text, learner, subject=subject, llm=_llm)
 
     # 语言规范收口（复用现有 L2/L3）
-    _summary = _plan.summary_md
+    # v0.68+ ⭐ 根治：附录段（### 推荐学习资料）是确定性渲染的元数据，
+    # polish 的 refiner LLM 改写可能误删——先提取附录，polish 正文，再拼回附录。
+    _summary_full = _plan.summary_md
+    _appendix = ""
+    _marker = "### 推荐学习资料"
+    if _marker in _summary_full:
+        _idx = _summary_full.find(_marker)
+        _appendix = _summary_full[_idx:]          # 提取附录段（含标题）
+        _summary_body = _summary_full[:_idx].rstrip()  # 正文（阶段内容）
+    else:
+        _summary_body = _summary_full
     try:
         from services.polish import _polish_text
-        _summary = _polish_text(_summary, context=f"study_plan:{_plan.topic[:30]}")
+        _summary = _polish_text(_summary_body, context=f"study_plan:{_plan.topic[:30]}")
     except Exception:
-        pass
+        _summary = _summary_body
+    if _appendix:
+        _summary = _summary.rstrip() + "\n\n" + _appendix  # 拼回附录（永不被 polish 误删）
 
     # actions：前端可点按钮（开始学习 → teach 模式）
     _actions = []
