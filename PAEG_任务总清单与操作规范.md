@@ -256,9 +256,9 @@
 |---|---|---|
 | G1 | distill_knowledge 仅同步 /api/teach 触发，stream 教学（主路径）不触发 | 高 |
 | G2 | skip_sandbox 绕过 L4 实证，avg_score 启发式分≠事实正确性 | 高 |
-| G3 | evolved_*.json 写入后无热加载，KB 重启才可见 | **最高** |
+| G3 | evolved_*.json 写入后无热加载，KB 重启才可见 | **最高 → ✅ 已修复**（reload_library）|
 | G4 | 工具经验 success 判定过粗（result 非空即 success）| 中 |
-| G5 | 教学路径（Presenter/teach_stream）不注入 tool_lessons/subject_patches | 高 |
+| G5 | 教学路径（Presenter/teach_stream）不注入 tool_lessons/subject_patches | 高 → ✅ 已修复（Presenter 注入教学记忆）|
 | G6 | _compose_lesson 无 LLM 提炼（纯模板拼接）| 中 |
 | G7 | 蒸馏节点无去重/版本化（同 subject+concept 覆盖）| 中 |
 | G8 | tool_lessons.md 无限增长 + 读取 limit=1000 老经验沉没 | 中 |

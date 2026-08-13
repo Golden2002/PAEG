@@ -79,6 +79,48 @@ def is_tool_allowed(name: str, action: str = "auto") -> bool:
     return action == "manual_confirm"
 
 
+# v0.68+ ⭐ 权限预设（Step1.5：借鉴 deepseek-harness Permission Presets）
+# 4 档预设：read-only（只读）/ standard（标准，教学默认）/ exam（考试模式，禁写）/ full（全量）
+# 借鉴来源：deepseek-harness packages/bundle/base/cordis.patch.yml permission-presets
+PERMISSION_PRESETS = {
+    "read_only": {"desc": "只读：仅检索/查询类工具，禁止任何写操作",
+                  "allow_write": False, "allow_web": True},
+    "standard": {"desc": "标准：教学默认（读 + 联网 + 文档生成）",
+                 "allow_write": True, "allow_web": True},
+    "exam": {"desc": "考试模式：锁定写工具（禁讲义/PPT/视频/动画生成）",
+             "allow_write": False, "allow_web": True},
+    "full": {"desc": "全量：所有工具开放",
+             "allow_write": True, "allow_web": True},
+}
+
+# 写类工具黑名单（exam/read_only 模式禁用）
+_WRITE_TOOLS = {"save_document", "generate_handout", "generate_ppt", "generate_video",
+                "generate_animation", "mcp__pptx__generate_presentation"}
+
+_active_preset = "standard"  # 当前权限档（运行时可切换）
+
+
+def set_permission_preset(preset: str) -> bool:
+    """v0.68+ ⭐ 运行时切换权限档（如教师切"考试模式"）。"""
+    global _active_preset
+    if preset not in PERMISSION_PRESETS:
+        return False
+    _active_preset = preset
+    return True
+
+
+def get_permission_preset() -> str:
+    return _active_preset
+
+
+def is_tool_allowed_by_preset(name: str) -> bool:
+    """v0.68+ ⭐ 按当前权限档判定工具是否允许（exam 模式锁写工具）。"""
+    _cfg = PERMISSION_PRESETS.get(_active_preset, PERMISSION_PRESETS["standard"])
+    if not _cfg["allow_write"] and name in _WRITE_TOOLS:
+        return False
+    return True
+
+
 def get_tool_defs() -> List[dict]:
     """返回全部工具的 Function Calling 定义。"""
     return [
