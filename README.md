@@ -236,9 +236,24 @@ PAEG 有 **10 个技能**（skill_registry.py 注册，经 tool_registry 暴露�
 
 MIT
 
-## ⭐ 三处一致原则（本地目录 ↔ GitHub ↔ Release）
+## ⭐ 多端一致原则（本地目录 ↔ GitHub ↔ ModelScope ↔ Release）
 
-**项目维护铁律**：本地项目目录、GitHub 仓库（Golden2002/PAEG main 分支）、Release 三者内容必须完全一致、互为备份。
+**项目维护铁律**：本地项目目录、GitHub 仓库（Golden2002/PAEG）、ModelScope（Golden2002/Emile_Novis）、Release 四者内容必须完全一致、互为备份。
+
+### 双远程同步（v0.67 ⭐）
+
+```bash
+# 日常：一次 commit 推两个仓库
+git add .
+git commit -m "改动"
+git push origin master        # GitHub
+git push modelscope master    # ModelScope
+
+# 或一键推送（已配别名）
+git pushall
+```
+
+> 拉取建议只从 GitHub（`git pull origin master`），避免两仓分歧。
 
 ### 校验脚本
 

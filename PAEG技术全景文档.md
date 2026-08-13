@@ -5198,3 +5198,52 @@ docker compose up -d --build
 - Windows 中文文件名挂载 → Docker Desktop File Sharing 或命名卷
 - MCP 三 server 跑同容器（fastmcp 进程内），完整版可拆
 
+
+
+## 10.12 双远程仓库同步（GitHub + ModelScope）（v0.67 ⭐ 2026-08-13）
+
+**背景**：项目同时托管于 GitHub（Golden2002/PAEG）与 ModelScope（Golden2002/Emile_Novis），需保持两仓库内容一致。
+
+### 10.12.1 远程配置
+
+```bash
+# 查看远程
+git remote -v
+# origin    → https://github.com/Golden2002/PAEG.git
+# modelscope → https://www.modelscope.cn/studios/Golden2002/Emile_Novis.git
+```
+
+### 10.12.2 日常同步流程
+
+```bash
+git add .
+git commit -m "描述本次改动"
+git push origin master        # 推 GitHub
+git push modelscope master    # 推 ModelScope
+```
+
+### 10.12.3 一键推送（别名）
+
+```bash
+git config --global alias.pushall '!git push origin master && git push modelscope master'
+git pushall   # 一次推两个仓库
+```
+
+### 10.12.4 拉取更新
+
+```bash
+git pull origin master        # 建议只从 GitHub 拉（避免分歧）
+git pull modelscope master    # 若 ModelScope 有他人更新
+```
+
+### 10.12.5 注意事项
+
+1. **保持一致**：两个仓库内容应完全一致——建议只从 GitHub 拉取，再推两个
+2. **分支**：master 为默认；新分支（dev）推送需 `git push origin dev`
+3. **冲突**：若 ModelScope 有他人改动 → `git pull modelscope master` → 解决冲突 → 再推两个
+4. **token 安全**：remote URL 含 token（oauth2:xxx）——勿提交到公开处
+
+### 10.12.6 三处一致扩展
+
+原"本地 ↔ GitHub ↔ Release"三处一致原则扩展为"本地 ↔ GitHub ↔ ModelScope ↔ Release"四端一致——本地为权威源，改完推两仓 + 更新 Release。
+
