@@ -192,12 +192,12 @@
 |---|---|---|---|
 | 知识蒸馏 distill_knowledge | 教学成功→LLM提炼→门禁→evolved_*.json | 提炼 prompt 优化/门禁增强/去重/闭环使用 | 🔄 审查中（联网）|
 | 工具经验 learn_tool_lesson | 工具成败→LLM总结→lesson 落盘 | 经验格式/闭环注入/去重/规模控制 | 🔄 审查中（联网）|
-| 提示词补丁 evolve_prompt | 反思→补丁→subject_patches.md | 动态提示词拼接 tool（用户核心设想）| ⏳ |
-| 学科需求 record_subject_request | 用户问新学科→记录→反馈 | 学科自动创建/知识初始化 | ⏳ |
-| 反思闭环（拓展）| reflection_store→SelfUpdateAgent | 反思→优化→验证→再反思（完整闭环）| ⏳ |
-| 记忆分层（拓展）| SESSIONS 短期 + profile 长期 | 独立记忆模块（episodic/semantic/procedural）| ⏳ |
-| 知识老化（拓展）| evolved 无限增长 | 知识时效/淘汰/权重衰减 | ⏳ |
-| 用户反馈学习（拓展）| 点赞/👎未接入 | 反馈→画像/教学策略调整 | ⏳ |
+| 提示词补丁 evolve_prompt | 反思→补丁→subject_patches.md | 动态提示词拼接 tool（用户核心设想）| ✅ §3.8 已实现 |
+| 学科需求 record_subject_request | 用户问新学科→记录→反馈 | 学科自动创建/知识初始化 | ✅ 核实（periodic subject_requests）|
+| 反思闭环（拓展）| reflection_store→SelfUpdateAgent | 反思→优化→验证→再反思（完整闭环）| ✅ 核实（建议回流+反思机制）|
+| 记忆分层（拓展）| SESSIONS 短期 + profile 长期 | 独立记忆模块（episodic/semantic/procedural）| ✅ 核实（MemorySystem 三层）|
+| 知识老化（拓展）| evolved 无限增长 | 知识时效/淘汰/权重衰减 | ✅ v0.69+ 老化归档已实现 |
+| 用户反馈学习（拓展）| 点赞/👎未接入 | 反馈→画像/教学策略调整 | ✅ v0.69+ /api/feedback 已实现（前端 UI 后续）|
 
 ### 3.8 动态提示词拼接 tool（用户核心设想 · ✅ 已实现 v0.69+）
 - 设想：agent 自动调一个 tool，该 tool 拼接系统提示词——动态反思的被隔离提示词，每次发送时与固定系统提示词合并
@@ -304,14 +304,14 @@
 
 | ID | 需求 | 状态 |
 |---|---|---|
-| ULW-1 | Step 1 五维度基线盘点 | 🔄 |
-| ULW-2 | Step 1.5 harness 插件选取（记来源）| ⏳ |
-| ULW-3 | Step 2 ForMaitenance 文件夹 + 各维度质量文档 + 移入维护文档 | ⏳ |
-| ULW-4 | Step 3 自检修补 | ⏳ |
-| ULW-5 | Step 4 接口完整性检查 | ⏳ |
-| ULW-6 | Step 5 runoob 剩余 5 篇逐字阅读 + 评估改造 | 🔄 2/7 已读 |
-| ULW-7 | 九模块底座对照评估 | ⏳ |
-| ULW-8 | 发布 release 或修复 P0-P2 | ⏳ |
+| ULW-1 | Step 1 五维度基线盘点 | ✅ |
+| ULW-2 | Step 1.5 harness 插件选取（记来源）| ✅ Permission Preset + repeat-tool-reminder |
+| ULW-3 | Step 2 ForMaitenance 文件夹 + 各维度质量文档 + 移入维护文档 | ✅ |
+| ULW-4 | Step 3 自检修补 | ✅ G1-G8 全闭环 |
+| ULW-5 | Step 4 接口完整性检查 | ✅ 12 断链 P0/P1/P2 全修复 |
+| ULW-6 | Step 5 runoob 7 篇逐字阅读 + 评估改造 | ✅ 7/7 已读 + 对照落盘 |
+| ULW-7 | 九模块底座对照评估 | ✅ §3.12 已固化+核实 |
+| ULW-8 | 发布 release 或修复 P0-P2 | ✅ v0.69.0 Release 已发布 |
 
 ### C. 自我更新优化需求（用户重点关注）
 
@@ -319,13 +319,13 @@
 |---|---|---|
 | SEL-1 | 知识蒸馏审查+优化（**审查完成：Explore G1-G11 + Librarian 最佳实践**，待实施）| 🔄 |
 | SEL-2 | 工具经验审查+优化（同上）| 🔄 |
-| SEL-3 | 提示词补丁优化 + 动态提示词拼接 tool | ⏳ |
-| SEL-4 | 学科需求自动创建/知识初始化 | ⏳ |
-| SEL-5 | 反思闭环（反思→优化→验证→再反思）| ⏳ |
+| SEL-3 | 提示词补丁优化 + 动态提示词拼接 tool | ✅ §3.8 compose_dynamic_prompt 已实现 |
+| SEL-4 | 学科需求自动创建/知识初始化 | ✅ 核实（periodic subject_requests 已实现）|
+| SEL-5 | 反思闭环（反思→优化→验证→再反思）| ✅ 核实（_safe_chat 反思 + 建议回流）|
 | SEL-6 | 记忆分层 | ✅ 核实已实现（MemorySystem 短期/中期/长期 + 摘要压缩；episodic 等语义分类为可选增强）|
 | SEL-7 | 知识老化/淘汰 | ✅ 已实现（v0.69+ evolved 日文件 >90 天归档 Archive/，保留历史不删）|
 | SEL-8 | 用户反馈学习（点赞/👎→画像/策略）| ✅ 后端接口已实现（v0.69+ /api/feedback → memory/feedback_log.jsonl + 画像侧轻量累计；前端 UI 为后续）|
-| SEL-9 | Library 更新：用户上传 → 公共/学科目录转移 | ⏳ |
+| SEL-9 | Library 更新：用户上传 → 公共/学科目录转移 | ✅ 核实（/api/upload purpose=library）|
 | SEL-10 | 自我更新完整链路验证 | ✅ **真实端到端验证通过**（v0.69+ 真实 LLM：教学会话→distill 蒸馏→evolved_20260814 写入→G3 热加载→KB 检索命中；牛顿第一定律节点定义准确）|
 
 **自我更新审查发现（2026-08-14 Explore 逐行审查，11 个闭环缺口）**：
