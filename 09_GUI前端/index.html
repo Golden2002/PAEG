@@ -3296,8 +3296,123 @@ const ACTIONS = {
   'act-example': '请给我一个类似的例子，让我通过例子来理解。',
 };
 
+// v0.67 ⭐ 交互式教学选择题（Oracle 设计）
+async function fetchQuiz(concept) {
+  try {
+    const resp = await fetch(API_BASE + '/api/teach/quiz/next', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        learner_id: STATE.learnerId,
+        concept: concept || '',
+        subject: subjectSelect.value || '',
+        difficulty: 1,
+      }),
+    });
+    const data = await resp.json();
+    if (!data.quiz_id || !data.options || !data.options.length) throw new Error('出题失败');
+    showQuizCard(data);
+  } catch (e) {
+    addMsg('paeg', '<b>出题失败</b>：' + e.message);
+  }
+}
+
+function showQuizCard(quiz) {
+  // 复用 intent-choice 弹窗样式
+  const overlay = document.createElement('div');
+  overlay.id = 'quiz-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = `
+    <div style="background:var(--bg,#fff);border-radius:14px;padding:24px;max-width:440px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,.3)">
+      <h3 style="margin:0 0 10px;font-size:16px">小测一下（${escapeHtml(quiz.concept || '')}）</h3>
+      <p style="margin:0 0 16px;font-size:14px;line-height:1.6">${escapeHtml(quiz.stem || '')}</p>
+      <div id="quiz-options" style="display:flex;flex-direction:column;gap:8px">
+        ${(quiz.options || []).map((o, i) => `<button class="quiz-opt" data-idx="${i}" style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-soft);cursor:pointer;text-align:left;font-size:13px">${String.fromCharCode(65+i)}. ${escapeHtml(o)}</button>`).join('')}
+      </div>
+      <div id="quiz-feedback" style="display:none;margin-top:14px;font-size:13px;line-height:1.6"></div>
+      <div id="quiz-actions" style="display:none;margin-top:14px;gap:8px">
+        <button class="quiz-more" style="padding:8px 14px;border:1px solid var(--accent);border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-size:13px">再来一题</button>
+        <button class="quiz-back" style="padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-size:13px">回到教学</button>
+      
+      <!-- v0.67 ⭐ 自定义回答入口 -->
+      <div id="quiz-custom" style="display:flex;gap:8px;margin-top:14px;align-items:center">
+        <input id="quiz-custom-input" placeholder="或者直接输入你的想法/回答…" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-soft);font-size:13px;color:var(--text)" />
+        <button class="quiz-custom-send" style="padding:8px 14px;border:1px solid var(--accent);border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-size:13px">发送</button>
+      </div></div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.querySelectorAll('.quiz-opt').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = btn.dataset.idx;
+      // 提交答案
+      try {
+        const resp = await fetch(API_BASE + '/api/teach/quiz/answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ learner_id: STATE.learnerId, quiz_id: quiz.quiz_id, selected_idx: idx }),
+        });
+        const res = await resp.json();
+        const fb = overlay.querySelector('#quiz-feedback');
+        const act = overlay.querySelector('#quiz-actions');
+        const color = res.correct ? 'var(--success,#5cd6a4)' : '#e5484d';
+        fb.style.display = 'block';
+        fb.style.color = color;
+        fb.innerHTML = '<b>' + (res.correct ? '回答正确！' : '回答错误') + '</b> ' + escapeHtml(res.feedback_zh || '') +
+          '<br><span style="color:var(--text-dim)">' + escapeHtml(res.explanation || '') + '</span>' +
+          (res.new_mastery ? '<br><small>掌握度：' + res.new_mastery + '</small>' : '');
+        act.style.display = 'flex';
+        overlay.querySelectorAll('.quiz-opt').forEach(b => { b.disabled = true; b.style.opacity = '.6'; });
+      } catch (e) {
+        fb.style.display = 'block';
+        fb.textContent = '判题失败：' + e.message;
+      }
+    });
+  });
+  overlay.querySelector('.quiz-more').addEventListener('click', () => {
+    overlay.remove();
+    fetchQuiz(quiz.concept);
+  });
+  overlay.querySelector('.quiz-back').addEventListener('click', () => {
+    overlay.remove();
+  });
+
+  overlay.querySelector('.quiz-custom-send').addEventListener('click', () => {
+    const input = overlay.querySelector('#quiz-custom-input');
+    const text = (input && input.value || '').trim();
+    if (!text) return;
+    overlay.remove();
+    // 自定义回答作为普通教学消息发送（推进教学）
+    addMsg('user', text);
+    if (currentMode === 'teach') {
+      teach(text, subjectSelect.value, subfieldSelect.value);
+    } else {
+      generalChat(text);
+    }
+  });
+  overlay.querySelector('#quiz-custom-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const btn = overlay.querySelector('.quiz-custom-send');
+      if (btn) btn.click();
+    }
+  });
+
+}
+
+// "测试我一下" → 交互选择题（替代纯文本"请考考我"）
+function actTestQuiz() {
+  const lastConcept = STATE.lastConcept || '';
+  fetchQuiz(lastConcept);
+}
+
+
 document.querySelectorAll('.action-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    // v0.67 ⭐ act-test 走交互选择题（教学/聊天都可用）
+    if (btn.id === 'act-test') {
+      actTestQuiz();
+      return;
+    }
     const prompt = ACTIONS[btn.id];
     if (!prompt) return;
     // 教学模式下走教学对话（带学科），一般对话模式走 /api/chat
@@ -3921,6 +4036,66 @@ function showIntentChoices(originalText, options) {
 // v0.36.2 ⭐ 修复：提示精准化——区分"浏览器不支持"与"非安全环境"；诚实告知能力边界
 // v0.40 ⭐ 完整重构（Oracle 排查）：①secureCtx 严格判断（修复 Chrome 局域网 IP 静默失败）
 // ②录音立即视觉反馈+动画 ③start 3秒兜底提示 ④空结果/超时明确提示 ⑤长按输入框触发（豆包式）
+
+// ─── v0.67 ⭐ 定时主动问候（Oracle 设计）────────────
+// 用户 idle 5-10 分钟无操作 → 智能体主动发一句关心
+(function initProactiveGreet() {
+  const ACTIVITY_EVENTS = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+  let lastActivity = Date.now();
+  let idleTimer = null;
+  const IDLE_MIN = 5 * 60 * 1000;
+  const IDLE_MAX = 10 * 60 * 1000;
+  const SESSION_FLAG = 'paeg_greeted';
+
+  function bumpActivity() { lastActivity = Date.now(); }
+  ACTIVITY_EVENTS.forEach(ev => document.addEventListener(ev, bumpActivity, { passive: true }));
+  // 切回前台时避免立即被问候
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) bumpActivity(); });
+
+  function dailyCount() {
+    const today = new Date().toDateString();
+    const k = 'paeg_greet_' + today;
+    return parseInt(localStorage.getItem(k) || '0', 10) || 0;
+  }
+  function bumpDaily() {
+    const today = new Date().toDateString();
+    const k = 'paeg_greet_' + today;
+    localStorage.setItem(k, String(dailyCount() + 1));
+  }
+
+  function triggerProactive() {
+    if (sessionStorage.getItem(SESSION_FLAG)) return;
+    if (dailyCount() >= 3) return;
+    sessionStorage.setItem(SESSION_FLAG, '1');
+    fetch(API_BASE + '/agent/proactive_greet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ learner_id: STATE.learnerId, session_id: STATE.learnerId || 'anon', idle_ms: Date.now() - lastActivity }),
+    }).then(r => r.json()).then(d => {
+      if (d.ok && d.content) {
+        bumpDaily();
+        addMsg('paeg', '<small style="color:var(--accent)">（老师主动问候）</small><br>' + d.content);
+      }
+    }).catch(() => {});
+  }
+
+  // 单一 timer，每 30s 检查一次
+  idleTimer = setInterval(() => {
+    const idle = Date.now() - lastActivity;
+    if (idle < IDLE_MIN) return;
+    if (sessionStorage.getItem(SESSION_FLAG)) return;
+    if (dailyCount() >= 3) return;
+    // v0.67.1 ⭐ 概率分布延迟：非固定时间——指数分布（λ=1/(7.5min)，
+    // 期望 7.5min，但具体时刻随机；同时用缓增阈值让长时间 idle 更可能触发）
+    const lam = 1 / (7.5 * 60 * 1000);
+    const sample = -Math.log(1 - Math.random()) / lam;   // 指数分布采样
+    const delay = Math.min(IDLE_MAX, Math.max(IDLE_MIN, sample));
+    // 若用户已 idle 超过采样时刻 → 触发；否则下次再检查
+    if (idle >= delay) triggerProactive();
+  }, 30 * 1000);
+  window._bumpActivity = bumpActivity;
+})();
+
 (function initVoice() {
   const voiceBtn = document.getElementById('voice-btn');
   if (!voiceBtn) return;

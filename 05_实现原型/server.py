@@ -510,6 +510,74 @@ def intent_infer():
         return jsonify({"ambiguous": False, "error": str(e)[:100]}), 200
 
 
+@app.route("/agent/proactive_greet", methods=["POST"])
+def proactive_greet():
+    """v0.67 ⭐ 定时主动问候：前端 idle 5-10min 无操作时触发。
+    频率限制：每会话 1 次 + 每日 3 次 + 最短间隔 30min。
+    返回 {ok, content, proactive: True}——前端 addMsg 渲染（老师主动开口）。
+    """
+    data = request.get_json(force=True) or {}
+    uid = data.get("uid") or data.get("learner_id") or _anon_learner_id(data)
+    session_id = data.get("session_id") or uid
+    idle_ms = int(data.get("idle_ms", 0) or 0)
+
+    # 1) 频率限制（SESSIONS 内存计数）
+    try:
+        meta = SESSIONS.setdefault("proactive_meta", {})
+        today = datetime.now().strftime("%Y%m%d")
+        u_meta = meta.setdefault(uid, {"count": 0, "date": today, "last_at": 0})
+        if u_meta.get("date") != today:
+            u_meta["count"] = 0
+            u_meta["date"] = today
+        if u_meta.get("count", 0) >= 3:
+            return jsonify({"ok": False, "error": "daily_limit"}), 429
+        import time as _t
+        if time.time() - u_meta.get("last_at", 0) < 30 * 60:
+            return jsonify({"ok": False, "error": "too_frequent"}), 429
+    except Exception:
+        pass
+
+    # 2) 学科推断（从最近 chat_hist 提取）
+    subject = "通用"
+    try:
+        hist = SESSIONS.get(f"chat_hist_{uid}", [])
+        if hist:
+            _last = ""
+            for h in reversed(hist[-5:]):
+                if isinstance(h, dict) and h.get("role") == "user":
+                    _last = str(h.get("content", ""))
+                    break
+            for _s in ("数学", "物理", "语文", "英语", "化学", "生物", "历史"):
+                if _s in _last:
+                    subject = _s
+                    break
+    except Exception:
+        pass
+
+    # 3) 选模板 + 写 chat_hist + 计数
+    try:
+        from proactive_templates import pick_template
+        content = pick_template(subject, idle_ms, session_id=session_id)
+    except Exception:
+        content = "在忙什么呀？有问题随时告诉我。"
+    try:
+        hist = SESSIONS.setdefault(f"chat_hist_{uid}", [])
+        hist.append({"role": "assistant", "content": content, "proactive": True})
+        if len(hist) > 60:
+            SESSIONS[f"chat_hist_{uid}"] = hist[-60:]
+    except Exception:
+        pass
+    try:
+        meta = SESSIONS.setdefault("proactive_meta", {})
+        u_meta = meta.setdefault(uid, {"count": 0, "date": datetime.now().strftime("%Y%m%d"), "last_at": 0})
+        u_meta["count"] = u_meta.get("count", 0) + 1
+        u_meta["last_at"] = time.time()
+    except Exception:
+        pass
+
+    return jsonify({"ok": True, "content": content, "proactive": True, "subject": subject})
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
     """健康检查（v0.24 修复 3 ⭐）：增加 mcp_connected / skill_count / agent_engine 字段。"""
@@ -972,6 +1040,41 @@ def teach():
         return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/api/teach/quiz/next", methods=["POST"])
+def teach_quiz_next():
+    """v0.67 交互式教学选择题：出题。{learner_id, concept, subject, difficulty}"""
+    data = request.get_json(force=True) or {}
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
+    learner = ensure_learner_session(learner_id, data, SESSIONS)
+    concept = (data.get("concept") or "").strip() or "当前知识点"
+    subject = data.get("subject") or ""
+    difficulty = int(data.get("difficulty", 1) or 1)
+    try:
+        from services.quiz_service import generate_choice
+        result = generate_choice(learner, subject, concept, difficulty)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": "出题失败: %s" % e}), 500
+
+
+@app.route("/api/teach/quiz/answer", methods=["POST"])
+def teach_quiz_answer():
+    """v0.67 交互式教学选择题：判题 + 掌握度更新。{learner_id, quiz_id, selected_idx}"""
+    data = request.get_json(force=True) or {}
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
+    learner = ensure_learner_session(learner_id, data, SESSIONS)
+    quiz_id = (data.get("quiz_id") or "").strip()
+    selected_idx = data.get("selected_idx")
+    if not quiz_id or selected_idx is None:
+        return jsonify({"error": "quiz_id and selected_idx required"}), 400
+    try:
+        from services.quiz_service import grade_answer
+        result = grade_answer(learner, quiz_id, int(selected_idx))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": "判题失败: %s" % e}), 500
+
 
 @app.route("/api/teach/stream", methods=["POST"])
 @require_module("teach")
