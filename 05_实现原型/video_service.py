@@ -21,6 +21,7 @@ import re
 import subprocess
 import tempfile
 import time
+import urllib.parse  # v0.66 ⭐ 视频 URL 含 learner_id 需 quote
 from pathlib import Path
 from typing import List, Optional
 
@@ -338,7 +339,9 @@ def generate_teaching_video(topic: str, outline: str,
         return {
             "ok": True,
             "path": str(_out_mp4),
-            "url": f"/api/download/video/{_h}.mp4",
+            # v0.66 ⭐ 修复：URL 缺 learner_id 目录（文件在 video/<uid>/<hash>.mp4，
+            # 此前只返回 video/<hash>.mp4 → 下载 404）。用 quote 处理 uid 特殊字符。
+            "url": f"/api/download/video/{urllib.parse.quote(str(learner_id))}/{_h}.mp4",
             "slides": len(slides),
             "duration": round(total_dur, 1),
             "error": "",
@@ -445,19 +448,35 @@ def _encode_frame_segment(ffmpeg: str, seg, out: Path) -> None:
     subprocess.run(cmd, capture_output=True, text=True, errors="replace")
 
 
-def build_timeline(pages: list, manim_results: dict, asset_results: dict) -> list:
+def build_timeline(pages: list, manim_results: dict, asset_results: dict,
+                   script=None) -> list:
     """把 pages（含 slots）转为时间轴片段序列。
 
     - manim 占位 → 独立 TimelineSegment(kind="manim")；manim 渲染失败 → 降级静态帧
     - asset 占位 → 合并进所属页的 bg_image / inline_asset
+    - v0.66 ⭐ script 参数：讲稿驱动——按顺序为每段注入真 narration
+      （PPT 页讲稿 + manim 段讲稿），替代"标题+要点拼接"兜底
     """
+    # 讲稿索引：script.sections 按顺序匹配
+    _script_secs = list(script.sections) if script is not None else []
+    _si = 0
+
+    def _next_narration(fallback: str) -> str:
+        nonlocal _si
+        if _si < len(_script_secs):
+            _n = _script_secs[_si].narration
+            _si += 1
+            return _n if _n and _n.strip() else fallback
+        return fallback
+
     segs = []
     for i, p in enumerate(pages):
         bg = asset_results.get(f"{i}:bg")
         inline = asset_results.get(f"{i}:inline")
-        narration = (p.get("narration") or "").strip() or \
+        fallback_narration = (p.get("narration") or "").strip() or \
             (f"{p.get('title', '')}。{'，'.join((p.get('points') or [])[:4])}"
              if p.get("points") else f"{p.get('title', '')}。")
+        narration = _next_narration(fallback_narration)
         segs.append({
             "kind": "ppt_frame",
             "title": p.get("title") or "未命名",
@@ -473,24 +492,29 @@ def build_timeline(pages: list, manim_results: dict, asset_results: dict) -> lis
         for slot in p.get("slots") or []:
             if slot.get("kind") == "manim":
                 vp = manim_results.get(slot.get("topic"))
+                # v0.66 ⭐ manim 段讲稿（跟随讲解）：优先取 script narration
+                _manim_narration = _next_narration("") if vp else ""
                 segs.append({
                     "kind": "manim" if vp else "ppt_frame",
                     "title": f"动画演示：{slot.get('topic', '')}",
                     "points": [slot.get("description") or "（动态演示）"],
                     "bg_image": None, "inline_asset": None,
-                    "narration": "", "frame_path": None, "audio_path": None,
+                    "narration": _manim_narration, "frame_path": None,
+                    "audio_path": None,
                     "duration": 0.0, "video_path": vp,
                 })
     return segs
 
 
 def compose_with_slots(topic: str, ir: dict, manim_segments: dict,
-                       asset_segments: dict, learner_id: str = "anon") -> dict:
+                       asset_segments: dict, learner_id: str = "anon",
+                       script=None) -> dict:
     """v1.0 ⭐ 融合视频：PPT 帧 + TTS + Manim 片段 + 资源叠图。
 
     输入 ir = {"pages": [...], "topic": str}（outline_ir.parse_outline_with_slots 输出）。
     manim_segments = {slot_topic: mp4_path}（预渲染结果，缺失 → 降级静态帧）。
     asset_segments = {"<i>:bg"/"<i>:inline": path}（可选）。
+    script（可选）：讲稿驱动——每段（PPT 页 + manim 段）用真 narration 配音。
     返回 {ok, path, url, slides, duration, manim_count, error}。
     """
     if not _PIL_OK or not _EDGE_OK:
@@ -499,7 +523,8 @@ def compose_with_slots(topic: str, ir: dict, manim_segments: dict,
     if not ffmpeg:
         return {"ok": False, "error": "ffmpeg 不可用"}
 
-    timeline = build_timeline(ir.get("pages") or [], manim_segments, asset_segments)
+    timeline = build_timeline(ir.get("pages") or [], manim_segments,
+                              asset_segments, script=script)
     if not timeline:
         return {"ok": False, "error": "时间轴为空"}
 
@@ -514,11 +539,26 @@ def compose_with_slots(topic: str, ir: dict, manim_segments: dict,
         segment_paths = []
         for idx, seg in enumerate(timeline):
             if seg["kind"] == "manim" and seg.get("video_path"):
-                # ── manim 段：归一化 + 按时长截取 ──
+                # ── manim 段：归一化 + 配音（v0.66 跟随讲解）──
                 seg["duration"] = _probe_duration(ffmpeg, seg["video_path"])
+                # manim 段讲稿 TTS（若 script 提供了 narration）
+                if seg.get("narration"):
+                    _map = tmp / f"audio_{idx:03d}.mp3"
+                    if asyncio.run(_tts_to_file(seg["narration"], str(_map))):
+                        seg["audio_path"] = str(_map)
                 out = tmp / f"seg_{idx:03d}_manim.mp4"
                 _normalize_video(ffmpeg, seg["video_path"], out, seg["duration"])
                 if os.path.isfile(out) and os.path.getsize(out) > 0:
+                    # 配音与动画合成（-shortest 对齐：配音短则动画截断，配音长则保留）
+                    if seg.get("audio_path") and os.path.isfile(seg["audio_path"]):
+                        _out_av = tmp / f"seg_{idx:03d}_manim_av.mp4"
+                        subprocess.run(
+                            [ffmpeg, "-y", "-i", str(out), "-i", str(seg["audio_path"]),
+                             "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
+                             "-shortest", str(_out_av)],
+                            capture_output=True, text=True, errors="replace")
+                        if os.path.isfile(_out_av) and os.path.getsize(_out_av) > 0:
+                            out = _out_av
                     segment_paths.append(str(out))
                     continue
             # ── ppt_frame 段（含 manim 失败降级）──
@@ -563,7 +603,8 @@ def compose_with_slots(topic: str, ir: dict, manim_segments: dict,
         return {
             "ok": True,
             "path": str(_out_mp4),
-            "url": f"/api/download/video/{_h}.mp4",
+            # v0.66 ⭐ 修复：URL 加 learner_id 目录（否则下载 404）
+            "url": f"/api/download/video/{urllib.parse.quote(str(learner_id))}/{_h}.mp4",
             "slides": len([t for t in timeline if t["kind"] != "manim"]),
             "duration": round(sum(t["duration"] for t in timeline), 1),
             "manim_count": manim_count,

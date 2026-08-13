@@ -1,10 +1,11 @@
 # PAEG Docker 化（v0.67 单容器最小可行版）
 # 用户方案：Docker 统一 Python 3.12——manim 0.19 兼容 3.12，无需隔离 venv。
 # 覆盖：教学/闲聊/PPT/讲义/manim 动画 五大场景。
+
 # Python 3.12（manim 0.19 兼容最稳）
 FROM python:3.12-slim
 
-# 系统依赖：ffmpeg（manim/音视频）+ build tools（moderngl 备用编译）
+# 系统依赖：ffmpeg（manim/音视频）+ build tools + Pango/Cairo/GLib（manimpango 必需）
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         libgl1 \
@@ -12,6 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         pkg-config \
         libcairo2-dev \
+        libpango1.0-dev \
+        libglib2.0-dev \
+        libgirepository1.0-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

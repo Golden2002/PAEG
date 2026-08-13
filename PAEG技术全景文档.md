@@ -5247,3 +5247,54 @@ git pull modelscope master    # 若 ModelScope 有他人更新
 
 原"本地 ↔ GitHub ↔ Release"三处一致原则扩展为"本地 ↔ GitHub ↔ ModelScope ↔ Release"四端一致——本地为权威源，改完推两仓 + 更新 Release。
 
+### 10.13 前端输入区布局修复（v0.67.1 ⭐ 2026-08-13 对话框被按钮挤没）
+
+**问题**：聊天输入区 `.input-bar`（单 flex-wrap 容器）含 3 下拉框 + 6 制作按钮 + textarea + 上传/语音/发送。窄视口下按钮换行后与 textarea 混行，输入框被挤压至 140px。
+
+**根因（flexbox 规范级缺陷）**：MDN 官方——"each flex line acts like a new flex container"，`flex-wrap + order` 下换行补位不可预测（W3C #5399）。
+
+#### 10.13.1 修复方案：flex-direction: column + 嵌套 toolbar
+
+采用 lobe-chat / MUI X / OpenSearch / vercel ai-chatbot 共识：
+
+```html
+<div class="input-bar">          <!-- flex-direction: column; align-items: stretch -->
+  <div class="input-toolbar">    <!-- 工具行：selects + 6 制作按钮，内部 flex-wrap -->
+    <select id="grade-select">...</select>
+    <button class="cmd-trigger">讲义</button> ... 6 个
+  </div>
+  <div class="input-composer">   <!-- 输入行：textarea 撑满 + 上传/语音/发送 -->
+    <textarea id="question-input">...</textarea>
+    <button id="ask-btn">发送</button>
+  </div>
+</div>
+```
+
+**HTML 改动**：`.input-bar` 内包 2 个容器 div（`.input-toolbar` 包 selects+6 按钮；`.input-composer` 包 textarea+按钮）。JS 无影响（全部 `getElementById` 引用）。
+
+**关键 CSS**：
+```css
+.input-bar { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.input-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.input-composer { display: flex; align-items: center; gap: 8px; width: 100%; }
+.input-composer .question-input { flex: 1 1 auto; min-width: 0; }  /* min-width:0 关键 */
+.input-composer .upload-btn, .input-composer .ask-btn { flex: 0 0 auto; }
+```
+
+#### 10.13.2 实测验证（Playwright）
+
+| 视口 | 对话框宽度 | 按钮混入输入行 | 横向溢出 |
+|------|-----------|--------------|---------|
+| 1280px | 665px | 0 | 无 |
+| 1036px | 421px（原 140px） | 0 | 无 |
+| 900px | 605px | 0 | 无 |
+| 700px | 395px | 0 | 无 |
+
+#### 10.13.3 前端布局经验（可复用）
+
+1. 聊天输入区**绝不用单 flex-wrap 容器**——必须 column + 嵌套（工具行/输入行物理分离）
+2. textarea 用 `flex: 1 1 auto; min-width: 0`（不是 `flex:1`），min-width:0 允许收缩
+3. 断点层（≤1024px）只调 toolbar 内部 select 比例，不动输入行
+4. 移动端（≤768px）textarea 仍撑满，按钮不独占整行（保持紧凑）
+5. UI 修复必须 Playwright 实测三档视口（桌面/平板/手机）+ 横向溢出检查
+
