@@ -3609,10 +3609,16 @@ def general_chat_stream():
             try:
                 for tc in (tool_log or [])[:5]:
                     if isinstance(tc, dict) and tc.get("name"):
+                        # v0.69+ G4：success 判定增强（失败信号词集，不止"错误"）
+                        _r60 = str(tc.get("result", ""))[:80]
+                        _ok = bool(tc.get("result")) and not any(
+                            _k in _r60 for _k in
+                            ("错误", "失败", "无法", "不存在", "未找到", "异常",
+                             "error", "failed", "not found", "unable", "超时", "timeout"))
                         EVOLVER.learn_tool_lesson(
                             tool_name=tc.get("name", ""),
                             question=text,
-                            success=bool(tc.get("result")) and "错误" not in str(tc.get("result", ""))[:60],
+                            success=_ok,
                             note=str(tc.get("result", ""))[:100],
                         )
             except Exception as _e:

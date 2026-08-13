@@ -333,10 +333,10 @@
 | G1 | distill_knowledge 仅同步 /api/teach 触发 | **✅ 已修复**（v0.68+ 2026-08-14 用户方案：自我更新与流式无关——teach_stream done 后从完整对话历史抓取 → SimpleNamespace 构造 session → EVOLVER.distill_knowledge；SSE 端到端验证通过，avg>=0.7 门槛静默拒绝属正常）|
 | G2 | skip_sandbox 绕过 L4 实证 | **✅ 已修复**（v0.68+ 澄清：L3 LLM factuality 事实评分始终执行；skip_sandbox 仅跳过 L4 证据累积；双信号=教学评分+L3 事实评分；注释纠正误导）|
 | G3 | evolved_*.json 写入后无热加载，KB 重启才可见 | **最高 → ✅ 已修复**（reload_library）|
-| G4 | 工具经验 success 判定过粗（result 非空即 success）| 中 |
+| G4 | 工具经验 success 判定过粗 | **✅ 已修复**（v0.69+ 失败信号词集：错误/失败/无法/不存在/未找到/异常/error/failed/not found/unable/超时/timeout，判定逻辑验证通过）|
 | G5 | 教学路径（Presenter/teach_stream）不注入 tool_lessons/subject_patches | 高 → ✅ 已修复（Presenter 注入教学记忆）|
 | G6 | _compose_lesson 无 LLM 提炼 | **✅ 已修复**（v0.68+ LLM 提炼工具经验：适用场景/要点/误区/替代方案，模板兜底；无 LLM 或提炼失败回退模板）|
-| G7 | 蒸馏节点无去重/版本化（同 subject+concept 覆盖）| 中 |
+| G7 | 蒸馏节点无去重/版本化 | **✅ 核实已满足**（_append_evolved_node 用 dict——同 id 自然覆盖去重；知识蒸馏覆盖=版本更新，合理）|
 | G8 | tool_lessons.md 无限增长 + 读取 limit=1000 老经验沉没 | 中 |
 | G9 | SelfUpdateAgent 建议无自动派发回 SelfEvolution | 中 |
 | G10 | reflection_store(SQLite) 与 self_evolution(md/json) 数据隔离 | 低 |
