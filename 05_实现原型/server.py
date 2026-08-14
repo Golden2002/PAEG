@@ -1950,6 +1950,17 @@ def teach_stream():
             else:
                 yield f"event: presentation\ndata: {json.dumps(presentation, ensure_ascii=False)}\n\n"
 
+            # v0.69+ U3 ⭐ 交互式检查点：每步教学完成后发理解检查问题（前端可答可忽略，不挂起流）
+            try:
+                _cp_q = (f"刚才讲的「{concept}」这部分，你能用自己的话复述一下核心要点吗？"
+                         f"（如果还没跟上，也可以告诉我哪一步不太清楚，我换个方式讲）")
+                _cp_payload = json.dumps({'step_id': presentation.get('step_id', i + 1),
+                                          'question': _cp_q, 'concept': concept,
+                                          'timeout_seconds': 60}, ensure_ascii=False)
+                yield "event: checkpoint\ndata: " + _cp_payload + "\n\n"
+            except Exception:
+                pass
+
             # 评估
             evaluation = paeg.evaluator.run(step, learner, presentation)
             yield f"event: evaluation\ndata: {json.dumps(evaluation, ensure_ascii=False)}\n\n"
