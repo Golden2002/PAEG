@@ -490,6 +490,20 @@ flowchart TD
 ```
 
 
+
+### 数学可视化脚本生成器（v0.70+ §3.26 开发中）
+
+**流程**：对话+轮询（选择题/填空题收集主题/学段/时长/风格/核心直觉/前置概念）→ **生成 script.json**（单一真相源）→ 校验修补（7 铁律，最多 2 轮）→ **5 资产联动**（Manim 视频 + 讲稿 + PPT + 讲义 + 思维导图，全部可下载）。
+
+**方法来源**：3Blue1Brown 8 大原则（直觉先于形式化/单一聚焦/空间承载含义/慢而稳/停顿/文字最小化/回看锚点）+ manim_skill 社区库（scenes.md 模板/ManimCE 颜色语义与节奏规范）+ Oracle 设计。
+
+**script.json 结构**：meta（标题/受众/时长/风格）+ narrative_arc（hook/直觉先行/进阶路径）+ visual_system（调色板/语义绑定）+ scenes[]（concept/duration/narration/mobjects/animations/keyframes/prerequisites）+ qa_self_check。
+
+**核心模块**：visual_script_generator.py（系统提示词+生成）+ visual_script_validator.py（7 铁律校验+自动修补）+ manim_renderer（模板渲染，P1）+ 资产联动（P1-P2）。
+
+**可靠性**：脚本→确定性模板渲染（非 LLM 直出代码），LLM 只补 lambda/文案/keyframes；三级降级（自动修复→简化场景→静态分镜卡片）。
+
+
 ## 第 4 章 关键流程
 
 ### 4.1 教学生命周期（序列图要点）
