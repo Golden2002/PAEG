@@ -69,20 +69,40 @@ class PAEG:
     """PAEG 主类。"""
 
     def __init__(self, model_api, knowledge_base: KnowledgeBase, enable_self_update=True,
-                 verbose: bool = False, enable_refiner: bool = True):
+                 verbose: bool = False, enable_refiner: bool = True,
+                 agents_config: Optional[dict] = None, use_agents_config: bool = True):
+        """PAEG 主类。
+
+        v0.71 §3.32 ⭐ sub agent 模型配置化：
+        - agents_config: 合并后配置（load_agents_config() 结果）；None 时若 use_agents_config=True 自动加载
+        - use_agents_config: 是否启用 config/agents.json per-subagent 模型分配（默认 True）
+        - 各 LLM subagent 按配置创建独立 LLM（provider/model 可不同）；配置缺失/失败回退 model_api
+        """
         self.model = model_api
         self.kb = knowledge_base
+        # v0.71 §3.32：per-subagent 模型注入（配置驱动；失败静默回退主 model_api）
+        self._agents_cfg = None
+        if use_agents_config:
+            try:
+                from config_loader import load_agents_config, create_llm_for
+                self._agents_cfg = agents_config if agents_config is not None else load_agents_config()
+                self._llm_for = lambda name: create_llm_for(name, self._agents_cfg, fallback=model_api)
+            except Exception:
+                self._llm_for = lambda name: model_api
+        else:
+            self._llm_for = lambda name: model_api
+
         # v0.24 ⭐ 持有全部 9 个 subagent
         # 1. 诊断
-        self.diagnostor = Diagnostor(model_api, knowledge_base)
+        self.diagnostor = Diagnostor(self._llm_for("diagnostor"), knowledge_base)
         # 2. 计划
-        self.planner = Planner(model_api, knowledge_base)
+        self.planner = Planner(self._llm_for("planner"), knowledge_base)
         # 3. 呈现
-        self.presenter = Presenter(model_api, knowledge_base)
+        self.presenter = Presenter(self._llm_for("presenter"), knowledge_base)
         # 4. 评估（v0.24：区分 presentation_quality 与 learner_state）
-        self.evaluator = Evaluator(model_api, knowledge_base)
+        self.evaluator = Evaluator(self._llm_for("evaluator"), knowledge_base)
         # 5. 调整（v0.24：决策携带可执行 override_system_line）
-        self.adapter = Adapter(model_api, knowledge_base)
+        self.adapter = Adapter(self._llm_for("adapter"), knowledge_base)
         # 6. 答案（找答案模式）
         self.answer_solver = AnswerSolver()
         # 7. 情绪支持（危机信号时走这条而非教学）
@@ -99,7 +119,8 @@ class PAEG:
         # 10. 资料检索员（v0.43 ⭐ P0-C 提升：从"按请求构造"升级为全局持有）
         # ResourceLibrarian 构造无状态（仅绑定 model/kb），用户隔离靠 run(learner=...) 参数，
         # 因此全局持有完全安全——真正实现"9+1 全持有"，不再每请求 new 实例。
-        self.resource_librarian = ResourceLibrarian(model=model_api, kb=knowledge_base)
+        self.resource_librarian = ResourceLibrarian(model=self._llm_for("resource_librarian"),
+                                                    kb=knowledge_base)
         self.self_updater = SelfUpdater(knowledge_base) if enable_self_update else None
         # v0.12：语言优化 Agent（薇依语料矫正，去除 AI 痕迹）
         self.refiner = None

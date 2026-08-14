@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "_comment": "PAEG sub agent 配置化定制（v0.71 §3.32）——每个 subagent 可独立配置模型/提供方/温度/输出上限/思考级别。用户无需改代码即可定制。缺失键自动继承内置默认（config_loader.DEFAULTS）。",
+  "global": {
+    "default_provider": "auto",
+    "default_model": null
+  },
+  "agents": {
+    "diagnostor": {
+      "provider": "auto",
+      "model": null,
+      "temperature": 0.3,
+      "max_tokens": 200,
+      "thinking_level": "B",
+      "enabled": true
+    },
+    "planner": {
+      "provider": "auto",
+      "model": null,
+      "temperature": null,
+      "max_tokens": null,
+      "thinking_level": "OFF",
+      "enabled": true
+    },
+    "presenter": {
+      "provider": "auto",
+      "model": null,
+      "temperature": 0.7,
+      "max_tokens": 512,
+      "thinking_level": "A",
+      "enabled": true
+    },
+    "evaluator": {
+      "provider": "auto",
+      "model": null,
+      "temperature": null,
+      "max_tokens": null,
+      "thinking_level": "OFF",
+      "enabled": true
+    },
+    "adapter": {
+      "provider": "auto",
+      "model": null,
+      "temperature": null,
+      "max_tokens": null,
+      "thinking_level": "OFF",
+      "enabled": true
+    },
+    "answer_solver": {
+      "provider": "auto",
+      "model": null,
+      "temperature": null,
+      "max_tokens": 1800,
+      "thinking_level": "A",
+      "enabled": true
+    },
+    "affection_supportor": {
+      "provider": "auto",
+      "model": null,
+      "temperature": null,
+      "max_tokens": 900,
+      "thinking_level": "A",
+      "enabled": true
+    },
+    "self_update_agent": {
+      "provider": "auto",
+      "model": null,
+      "temperature": null,
+      "max_tokens": 1500,
+      "thinking_level": "A",
+      "enabled": true
+    },
+    "individuality": {
+      "provider": "auto",
+      "model": null,
+      "temperature": null,
+      "max_tokens": 400,
+      "thinking_level": "B",
+      "enabled": true
+    },
+    "resource_librarian": {
+      "provider": "auto",
+      "model": null,
+      "temperature": null,
+      "max_tokens": 800,
+      "thinking_level": "OFF",
+      "enabled": true
+    }
+  },
+  "_usage_examples": {
+    "为 presenter 换模型": "改 agents.presenter.model 为 'deepseek-v4-flash' 或改 provider 为 'openai' + model 'gpt-4o-mini'",
+    "关闭某 subagent": "改 agents.evaluator.enabled 为 false（回退确定性规则）",
+    "调温度": "改 agents.presenter.temperature 为 0.5（更严谨）或 0.9（更有创意）",
+    "思考级别": "A=深度思考链 / B=普通chat / OFF=不调用LLM（确定性规则）"
+  }
+}
