@@ -53,6 +53,27 @@ final = tpl.replace("{{CONTENT}}", content_html)
 - **设计原则**：纯 HTML+CSS（Chromium/Edge 打印友好）；颜色克制（2-3 主色）；中文字体回退；A4 打印（@page + 页眉页脚 + 表格 thead 跨页）
 - **回归验证**：改样式后渲染一篇测试文档 + Edge 截图检查（封面占满/正文可读/表格分页）
 
+
+## 渲染生成经验（备份 · 与元能力 §5.6 一致）
+
+**1. A4 打印**：`@page { size: A4; margin: 22mm 18mm 20mm 18mm }` + 封面 `@page :first { margin: 0 }`（封面独立无页眉页脚）。
+
+**2. 封面占满**：`.cover-inner { min-height: 297mm; display: flex; flex-direction: column; justify-content: space-between }`——品牌顶部/标题中/元信息底；右侧视觉锚点（圆环）放**右上角小尺寸避让内容**（曾覆盖标题卡/能力卡）。
+
+**3. 表格双底线修复**：`table { border-bottom: none }` + `tbody tr:last-child td { border-bottom: 0.6pt }`——外框与末行边框叠加会成双线。
+
+**4. Mermaid 渲染（关键）**：
+- ```mermaid 块 → `<pre class="mermaid">`（render_pdf.py 正则预处理）
+- 模板引入 mermaid.js CDN + Edge `--virtual-time-budget=15000` 等 JS 渲染
+- flowchart/sequenceDiagram 均渲染为 SVG（PDF 含矢量图）
+- **正则坑**：匹配换行用 `"```mermaid\n(.*?)```"`（非 raw 字符串——raw 的 \n 不匹配换行）
+
+**5. 排版留白**：行高 1.85、段距 15pt、表格 padding 10-11pt——更清晰可读。
+
+**6. 可复用**：占位符 `{{DOC_TITLE}}/{{TAGLINE_LINES}}/{{FEATURES}}/{{META_ITEMS}}` + render_pdf.py 一键脚本（md→HTML→Edge→PDF）。
+
+**7. 语言规范**：文档文字过语言规范（避免"30 秒看懂"类非正式词）。
+
 ## 更新日志
 
 | 日期 | 版本 | 改动 |
