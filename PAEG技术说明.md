@@ -329,6 +329,167 @@ sequenceDiagram
 ```
 
 
+
+**图 10 · 17 维学生画像正交模型**
+
+```mermaid
+flowchart TD
+    P["LearnerProfile 17 维"] --> L1["L1 核心 5 维<br/>identity/cognitive_style/mastery/study_goal/emotion"]
+    P --> L2["L2 触发 5 维<br/>engagement/motivation/belief/intention/error_response"]
+    P --> L3["L3 懒加载 6 维<br/>world_view/learning_rhythm/time/collaboration/media/accessibility"]
+    P --> D["第 17 维<br/>动态扩展 add_dimension"]
+    L1 -->|始终注入| SYS["system prompt"]
+    L2 -->|条件注入| SYS
+    L3 -->|按需注入| SYS
+    Ind["Individuality 增量建模"] -->|对话后 LLM 提取| P
+```
+
+**图 11 · 三层记忆生命周期**
+
+```mermaid
+flowchart LR
+    ST["短期记忆<br/>≤12 条/token≤6000"] -->|超阈值| CP["compress_if_needed<br/>LLM 摘要"]
+    CP --> MT["中期记忆<br/>主题/掌握/薄弱/情感四信号<br/>≤900 字"]
+    MT -->|持久化| LT["长期记忆<br/>memory_summary.json"]
+    LT --> Profile["LearnerProfile 画像"]
+    ST -->|build_context| LLM["注入 LLM"]
+    MT -->|build_context| LLM
+```
+
+**图 12 · 教学策略决策树（choose_strategy）**
+
+```mermaid
+flowchart TD
+    In["诊断+学科+画像"] --> Bloom["学科默认 Bloom 起点"]
+    Bloom --> R1{"有缺口且无前置?"}
+    R1 -->|是| S1["scaffolded 支架式"]
+    R1 -->|否| R2{"depth=basic?"}
+    R2 -->|是| S1
+    R2 -->|否| R3{"技能类学科?"}
+    R3 -->|是| S2["mastery 掌握式"]
+    R3 -->|否| R4{"高阶 Bloom?"}
+    R4 -->|是| S3["socratic 苏格拉底"]
+    R4 -->|否| R5{"画像兜底<br/>考研/初高中/具体偏好?"}
+    R5 -->|考研| S3
+    R5 -->|初高中技能| S2
+    R5 -->|具体/视觉| S1
+    R5 -->|默认| S4["default"]
+```
+
+**图 13 · 单步教学续讲（_pending_steps 状态机）**
+
+```mermaid
+stateDiagram-v2
+    [*] --> step_idle
+    step_idle --> step_in_progress: 首步进入
+    step_in_progress --> step_awaiting_answer: checkpoint 发出
+    step_awaiting_answer --> step_resumed: 学生回答
+    step_resumed --> step_awaiting_answer: 再 checkpoint
+    step_resumed --> step_final: 无剩余步骤
+    step_final --> plan_complete: done 事件
+```
+
+**图 14 · QualityGate L1-L4 四层过滤**
+
+```mermaid
+flowchart TD
+    C["候选内容"] --> L1["L1 宪法<br/>有害/注入/PII 正则 <1ms"]
+    L1 -->|pass| L2["L2 硬规则<br/>长度/去重/格式 <1ms"]
+    L2 -->|pass| L3["L3 LLM 评分 ~2s<br/>factuality/safety/pedagogy"]
+    L3 -->|pass| L4["L4 证据门槛<br/>沙盒池+实证贡献分"]
+    L1 -->|reject| X["拒绝"]
+    L2 -->|reject| X
+    L3 -->|reject| X
+    L4 -->|通过| OK["入库"]
+```
+
+**图 15 · 周期自我更新调度（periodic）**
+
+```mermaid
+sequenceDiagram
+    participant S as server
+    participant P as PeriodicUpdater
+    participant E as SelfEvolver
+    participant I as SelfImprover
+    S->>P: 启动后台线程
+    P->>P: 立即跑一次（消化积压）
+    loop 每 24h 检查
+        P->>E: weekly_insight_update
+        E-->>P: 洞察+Library 防护
+        P->>P: batch_update（清过期快照）
+        P->>I: analyze_failures
+        I-->>P: improvements.md
+    end
+    P-->>S: 下次教学自动加载改进
+```
+
+**图 16 · SSE 流式协议事件序列**
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant S as server
+    participant A as Agent
+    S->>A: connection_open
+    U->>S: user_message
+    S-->>U: event: diagnosis
+    S-->>U: event: plan
+    loop step 1..N
+        S-->>U: event: step
+        S-->>U: event: presentation（60字分片）
+    end
+    S-->>U: event: checkpoint
+    S-->>U: event: evaluation
+    S-->>U: event: adjustment
+    S-->>U: event: done
+```
+
+**图 17 · hooks 事件链（横切关注点）**
+
+```mermaid
+sequenceDiagram
+    participant App as 应用
+    participant H as hooks_hub
+    participant Handler as 各 handler
+    App->>H: session.start
+    App->>H: message.before_user
+    App->>H: llm.before（注入约束五层）
+    App->>H: llm.after（语言规范修正）
+    App->>H: tool.before/after
+    App->>H: session.end
+    H->>Handler: 按优先级串行（waterfall）
+    Handler-->>H: 可短路/透传
+```
+
+**图 18 · 危机信号拦截协议（affection_gate）**
+
+```mermaid
+flowchart TD
+    In["用户输入"] --> Det{"自伤/自杀信号?"}
+    Det -->|否| Normal["正常回应"]
+    Det -->|是| Gate["affection_gate 拦截"]
+    Gate --> R1["先完整回应用户的话<br/>不短路成预制提示"]
+    R1 --> R2["自然融入关怀<br/>热线+继续聊天+现实陪伴"]
+    R2 --> R3{"用户明确拒绝?"}
+    R3 -->|是| Respect["尊重选择不再重复"]
+    R3 -->|否| R2
+```
+
+**图 19 · spill 防护（上下文溢出+注入防御）**
+
+```mermaid
+flowchart TD
+    In["输入/工具返回"] --> L1["L1 注入模式正则"]
+    L1 -->|pass| L2["L2 PII 检测"]
+    L2 -->|pass| L3["L3 长文复合输入检测<br/>指令 vs 资料"]
+    L3 -->|pass| L4["L4 元能力边界<br/>自我指涉路由"]
+    L4 -->|pass| M["memory 写入审计"]
+    L1 -->|reject| X["拦截"]
+    L2 -->|reject| X
+    Out["工具返回超长"] --> Sp["spill 截断 12000 字符"]
+```
+
+
 ## 第 4 章 关键流程
 
 ### 4.1 教学生命周期（序列图要点）
