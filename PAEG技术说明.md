@@ -1,4 +1,4 @@
-# PAEG 教育智能体 — 简明技术说明（v0.70）
+# PAEG 教育智能体 — 简明技术说明（v0.71）
 
 > 面向项目所有者：快速恢复对 PAEG 技术实现的全貌认知。
 > 结构：TL;DR → 能力全景（每个功能：技术路线 + 实现方法）→ 分层架构 → 关键流程 → 扩展指南。
@@ -202,18 +202,25 @@ flowchart TB
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-flowchart TD
-    Start(["学生提问"]) --> D["① 诊断"]
-    D --> P["② 计划"]
-    P --> Pre["③ 讲解 LLM 流式"]
-    Pre --> CP{{"checkpoint 听懂了吗"}}
-    CP -->|回答| E["④ 评估"]
-    E --> A["⑤ 调整"]
-    A -->|继续| Pre
-    A -->|完成| Done["✓ 完成"]
-    Done --> Ev["自我进化"]
-    Ev --> KB[("知识库 热加载")]
-```
+flowchart LR
+    subgraph Main["主线 · 五阶段"]
+        Start(["学生提问"]) --> D["① 诊断"]
+        D --> P["② 计划"]
+        P --> Pre["③ 讲解 LLM 流式"]
+    end
+    subgraph Loop["互动循环"]
+        Pre --> CP{{"checkpoint 听懂了吗"}}
+        CP -->|回答| E["④ 评估"]
+        E --> A["⑤ 调整"]
+        A -->|继续| Pre
+    end
+    subgraph Done["完成 · 进化"]
+        A -->|完成| Done2["✓ 完成"]
+        Done2 --> Ev["自我进化"]
+        Ev --> KB[("知识库 热加载")]
+    end
+    Main ~~~ Loop
+    Loop ~~~ Done```
 
 **图 4 · 组件尺度（Presenter 内部装配）**
 
@@ -271,11 +278,8 @@ flowchart TD
     Refl --> Patch["subject_patches G5"]
     Patch --> TM["教学记忆注入"]
     Tool["工具调用"] --> Lesson["工具经验 G4/G6"]
-    Lesson --> TL["tool_lessons"]
-    FB["用户反馈 SEL-8"] --> SE["自我更新消费"]
-    TM -.->|下次教学| Teach
-    TL -.->|注入| Teach
-```
+    Lesson --> TL["tool_lessons.md"]
+    TL --> Next["下次教学注入"]```
 
 **图 6 · RALPH 循环（任务驱动持续改进）**
 
@@ -330,11 +334,11 @@ sequenceDiagram
     S->>T: 提问
     T->>P: 讲解步骤
     P-->>S: SSE 流式讲解
-    T-->>S: event: checkpoint（听懂了吗）
-    S->>T: 回答（strict_checkpoint 挂起后）
+    T-->>S: event: checkpoint(听懂了吗)
+    S->>T: 回答(strict_checkpoint 挂起后)
     T->>E: _student_signal 评估
     E-->>T: understood/partial/confused
-    T->>P: 续讲（_pending_steps + remediation）
+    T->>P: 续讲(_pending_steps + remediation)
     P-->>S: 继续流式讲解
 ```
 
