@@ -487,19 +487,23 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 
 ---
 
-## 五、当前技术状态快照（2026-08-14）
+## 五、当前技术状态快照（2026-08-14 · v0.70）
 
-- **版本**：v0.68+（server.py version=0.68.0）
+- **版本**：v0.70（server.py version 待 bump；§3.28/3.29 已实施）
+- **语言规范 MCP（§3.28 ✅）**：lang_gate_content 统一入口（13 处收敛）+ forbidden_words.json 数据化（内嵌 577 项去重 555 + 外部 18）+ 三工具（normalize_text/language_policy_check/forbidden_words）
+- **约束引擎（§3.29 ✅）**：constraint_engine.py 6 API（layer_get/set/compose/always_active/self_evolve/feedback_adjust）+ 数据化（constraint_layers.json/always_active.json/constraint_feedback_log.jsonl）
+- **工具集**：54 个（内置 19 + MCP + skills + workflows，无重复）
 - **config_hub**：统一配置中心（MCP/skills/hooks/workflows 四子模块 + get_all_tool_defs/execute_tool）
 - **hooks_hub**：waterfall+next/matcher/verdict 合并/timeout/legacy_adapter
 - **workflows_hub**：teach_minimal + teach_concept（DAG 拓扑执行）
 - **meta_router**：15 意图 LLM 优先 + capability_hint（意图→能力）
 - **subagents**：9 subagent + SUBAGENT_THINKING_LEVELS + _build_capability_manifest（能力清单注入）
 - **学习计划**：planner.py（StudyPlan）+ 推荐资料附录（确定性渲染）
-- **自我更新**：self_evolution.py（4 路进化：distill_knowledge/evolve_prompt/learn_tool_lesson/record_subject_request）+ reflection_store + SelfUpdateAgent
-- **记忆**：SESSIONS（短期）+ LearnerProfile/画像（长期）+ 三层记忆（未独立模块化）
-- **动态提示词**：prompt_template.py（STATIC_TEMPLATES 固定 + DYNAMIC_SLOTS 动态槽）；subject_patches.md 反思补丁（待接入动态槽/拼接 tool）
-- **已知问题**：学习计划 HTTP 附录偶发 False（polish 随机性，已用"提取附录+polish正文+拼回"根治，待回归确认）
+- **自我更新**：self_evolution.py（4 路进化）+ reflection_store + SelfUpdateAgent + RALPH 循环
+- **记忆**：SESSIONS（短期）+ LearnerProfile/画像（长期）+ 三层记忆
+- **动态提示词**：prompt_template.py（STATIC_TEMPLATES 固定 + DYNAMIC_SLOTS 动态槽）+ compose_dynamic_prompt tool
+- **DeepSeek Harness 借鉴（§二 Step 2 ✅）**：30 项优化需求已记录（P0/P1/P2 + 4 阶段路线），H-1~H-18 速查表
+- **测试**：42 工具相关测试全过（skill 11 断言/MCP 实际 API 已更新）
 
 ---
 
@@ -755,14 +759,19 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 - **同步**：完成后同步更新各文档（CHANGELOG/README/技术/元能力/亮点）
 - **优先级**：P0（用户明确要求，先记录后执行）
 
-### 3.28 语言规范模块 MCP 标准化（2026-08-14 用户 ULW · 待执行）
+### 3.28 语言规范模块 MCP 标准化（2026-08-14 用户 ULW · ✅ 已完成 v0.70）
 - **需求**：查看语言规范模块（polish/refiner/LANGUAGE_STYLE/违禁词模块）是否有**标准化接口接入所有输出端**；联网检索 + Oracle
 - **本质**：语言规范模块 = LLM 系统提示词（明晰分点列出的语法规则，约束 LLM 输出质量）+ 动态维护的违禁词模块
 - **开发方式**：按 **MCP 标准接口**开发（工具化/标准化）
 - **执行**：先写入底层逻辑+标准化+改进措施到需求文档 → 按需求实施
 - **优先级**：P0
+- **实施记录（v0.70，4 阶段全完成）**：
+  - Phase 1-2：13 处 `_polish_text` 收敛为 `lang_gate_content` 统一入口（server/file_generator/problem_solver 等 9 文件）+ 补 /api/solve 与知识导图漏洞
+  - Phase 3：违禁词数据化——`data/forbidden_words.json`（extra_forbidden/pseudo_empathy_verbs/ai_tells_extra）+ language_refiner 启动合并加载（内嵌 AI_TELLS 577 项去重后 555 + 外部 18 项，dict.fromkeys 去重，文件缺失容错）
+  - Phase 4：MCP 三工具（tool_registry + mcp_gateway 双层注册）——`normalize_text`（L0+L2 统一守门）/ `language_policy_check`（AI 味概率 + 违禁词命中，不调 LLM）/ `forbidden_words`（list/add/remove 落盘，幂等）；修复 _BUILTIN_NAMES 去重漏洞（config_hub 回灌导致 4 工具重复 → 54 工具无重复）
+  - Phase 5（并入）：PPT 生成路径确认已接 lang_gate（server.py 1487 `teach:ppt` + file_generator 176）
 
-### 3.29 L0-L8 分层动态 LLM 约束系统 MCP 升级（2026-08-14 用户 ULW · 待执行）
+### 3.29 L0-L8 分层动态 LLM 约束系统 MCP 升级（2026-08-14 用户 ULW · ✅ 已完成 v0.70）
 - **需求**：L0-L8 分层动态 LLM 约束系统升级——联网搜索 + Oracle；与"标准化格式提取提示词、动态拼接提示词"合并开发；按 MCP 标准接口
 - **目标**：实现 agent 动态性/自创生性/反馈控制能力
 - **资产**：固定提示词 + 可动态调整的提示词模板；功能=动态解放/添加约束、任意提示词组合拼接、指引约束大模型、可设永远保持激活的提示词
@@ -779,6 +788,11 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
   | constraint_self_evolve(insight) | 约束系统自我演化（LLM 提炼新规则入层） | self_evolution 联动 |
   | constraint_feedback_adjust(feedback, target) | 反馈调强/调弱约束 | 用户反馈 → 画像/约束 |
 - **实施要点**：①复用 prompts.py 现有层结构不重写 ②MCP tool 注册（tool_registry + mcp_gateway 双面）③数据化（约束规则可外置 JSON，如 constraint_layers.json）④与 §3.28 lang_gate 衔接（语言约束是 L1 的具体化）
+- **实施记录（v0.70，commit 0602792）**：
+  - 新建 `constraint_engine.py`：6 API 全实现——layer_get（层放开组+规则结构化输出）/ layer_set（复用 _build_constraint_layers 拼装）/ compose（任意块拼接）/ always_active（list/add/remove 落盘 always_active.json，内嵌 L0 11 条 + 外部）/ self_evolve（洞察写入指定层组，落盘 constraint_layers.json）/ feedback_adjust（信号词映射：啰嗦→loosen_m、太直接/冷漠→tighten_t、太机械→loosen_s、太浅→loosen_d、太深/听不懂→tighten_d；落盘 constraint_feedback_log.jsonl）
+  - 双层注册：tool_registry 6 工具（constraint_always_active/self_evolve 标 write 风险入 exam 黑名单）+ mcp_gateway 6 工具（异步 list_tools 真实调用验证通过）
+  - 数据化：`data/constraint_layers.json`（外部层覆盖）+ `data/always_active.json`（永远激活）+ `data/constraint_feedback_log.jsonl`（反馈日志）
+  - 验证：6 API 全测通过（L7 层 6 组展开/layer_set 返回 L1 段/self_evolve 去重/feedback 多信号/风险分级/exam 锁定）+ MCP 网关真实调用 + 54 工具无重复 + 42 测试全过
 
 ### 3.30 技术说明动态更新 + PDF（2026-08-14 用户 ULW · 待执行）
 - **需求**：技术说明手册动态更新——①F3 学习辅助工具加 数学视频/教学视频/PPT/讲义 功能记录 ②最近更新按特性更新入手册（注意插入位置衔接）
