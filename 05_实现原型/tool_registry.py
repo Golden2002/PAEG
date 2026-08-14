@@ -19,6 +19,7 @@ P0-1：DeepSeek 原生 Function Calling 的工具定义与执行。
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
@@ -95,7 +96,8 @@ PERMISSION_PRESETS = {
 
 # 写类工具黑名单（exam/read_only 模式禁用）
 _WRITE_TOOLS = {"save_document", "generate_handout", "generate_ppt", "generate_video",
-                "generate_animation", "mcp__pptx__generate_presentation"}
+                "generate_animation", "mcp__pptx__generate_presentation",
+                "forbidden_words"}  # v0.70 §3.28 Phase 4：违禁词维护属写操作
 
 _active_preset = "standard"  # 当前权限档（运行时可切换）
 
@@ -184,6 +186,35 @@ def get_tool_defs() -> List[dict]:
             {},
             [],
         ),
+        # v0.70+ §3.28 Phase 4 ⭐ 语言规范 MCP 标准化
+        _make_tool(
+            "normalize_text",
+            "语言规范守门：对生成内容（讲义/讲稿/视频/PPT 文案等）做 L0+L2 双层语言规范处理——"
+            "去除 AI 味、修正省略句/动宾搭配、深度矫正为最规范语言。"
+            "当一段文本将交付给学生/外部使用、且需要保证语言质量时调用。",
+            {"text": {"type": "string", "description": "待规范的文本"},
+             "context": {"type": "string", "description": "上下文（可选）"},
+             "apply_l2": {"type": "boolean", "description": "是否启用 L2 深度矫正（默认 true）"}},
+            ["text"],
+        ),
+        _make_tool(
+            "language_policy_check",
+            "语言政策检查：本地确定性检测文本的 AI 味概率与违禁词命中（不调 LLM）。"
+            "返回 AI 味概率与命中违禁词列表，供判断是否需要改写。",
+            {"text": {"type": "string", "description": "待检查的文本"}},
+            ["text"],
+        ),
+        _make_tool(
+            "forbidden_words",
+            "外部违禁词数据维护（list/add/remove，落盘 data/forbidden_words.json）。"
+            "scope 可选 extra_forbidden（网络用语/AI 腔）、pseudo_empathy_verbs（伪共情）、ai_tells_extra（套话）。"
+            "当需要动态增删语言规范禁词时调用。",
+            {"action": {"type": "string", "description": "操作：list / add / remove"},
+             "word": {"type": "string", "description": "add/remove 的违禁词"},
+             "scope": {"type": "string", "description": "分类：extra_forbidden / pseudo_empathy_verbs / ai_tells_extra"}},
+            ["action"],
+            risk="write",
+        ),
     ] + _extended_tool_defs()
 
 
@@ -205,9 +236,12 @@ def _extended_tool_defs() -> list:
         from config_hub import get_hub
         _hub = get_hub()
         _ext = list(_hub.get_all_tool_defs()) if _hub is not None else []
-        # 去重：跳过内置 7 工具（get_tool_defs 已含）
+        # 去重：跳过内置工具（get_tool_defs 已含）——必须与 get_tool_defs 全量同步，
+        # 否则 config_hub 回灌内置定义时产生重复（v0.70 §3.28 Phase 4 修复）
         _BUILTIN_NAMES = {"web_search", "verify_math", "fetch_page",
-                          "daily_quote", "get_time", "solve_problem", "save_document"}
+                          "daily_quote", "get_time", "solve_problem", "save_document",
+                          "compose_dynamic_prompt",
+                          "normalize_text", "language_policy_check", "forbidden_words"}
         _ext = [d for d in _ext
                 if isinstance(d, dict)
                 and d.get("function", {}).get("name") not in _BUILTIN_NAMES]
@@ -374,6 +408,124 @@ def _exec_compose_dynamic_prompt(*args, **kwargs) -> str:
         return f"[动态提示词补丁] 读取失败: {str(e)[:100]}"
 
 
+# ─────────────────────────────────────
+# v0.70+ §3.28 Phase 4 ⭐ 语言规范 MCP 标准化（三工具）
+#   normalize_text          → 统一语言规范入口（L0+L2，同 lang_gate.gate_content）
+#   language_policy_check   → 违禁词/AI 味本地确定性检测（不调 LLM）
+#   forbidden_words         → 外部违禁词数据维护（add/remove/list，落盘 forbidden_words.json）
+# ─────────────────────────────────────
+
+_FORBIDDEN_WORDS_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "data", "forbidden_words.json")
+
+
+def _load_forbidden_data() -> dict:
+    """读取外部违禁词数据（缺失/损坏 → 空骨架，不抛异常）。"""
+    try:
+        with open(_FORBIDDEN_WORDS_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {"extra_forbidden": [], "pseudo_empathy_verbs": [], "ai_tells_extra": []}
+
+
+def _save_forbidden_data(data: dict) -> bool:
+    """写回外部违禁词数据（保持原有其他键）。"""
+    try:
+        with open(_FORBIDDEN_WORDS_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+
+def _exec_normalize_text(text: str, context: str = "", apply_l2: bool = True) -> str:
+    """v0.70 §3.28 Phase 4：语言规范守门（L0 polish + L2 深度矫正）。
+    生成内容（讲义/讲稿/视频/PPT 等）产出后调用，得到最规范语言。
+    失败静默回退原文（不阻塞生成）。"""
+    if not text or not text.strip():
+        return text
+    try:
+        from services.lang_gate import lang_gate_content
+        return lang_gate_content(text, context=context, apply_l2=bool(apply_l2))
+    except Exception:
+        return text
+
+
+def _exec_language_policy_check(text: str) -> str:
+    """v0.70 §3.28 Phase 4：本地确定性检测违禁词 + AI 味（不调 LLM）。
+    返回 AI 味概率 + 命中的违禁词列表，供外部 agent 自行决定是否重写。"""
+    if not text or not text.strip():
+        return "文本为空"
+    report = []
+    # 1) AI 味概率（ai_taste_detector）
+    ai_prob = 0.0
+    try:
+        from ai_taste_detector import detect_ai_taste
+        sig = detect_ai_taste(text)
+        ai_prob = getattr(sig, "ai_likelihood", 0.0)
+    except Exception:
+        pass
+    report.append(f"AI 味概率: {ai_prob:.2f}（>=0.4 建议改写）")
+    # 2) 违禁词命中（内嵌 AI_TELLS + 外部 forbidden_words.json）
+    hits = []
+    try:
+        from infra.runtime import get_paeg
+        paeg = get_paeg()
+        if paeg is not None and getattr(paeg, "refiner", None) is not None:
+            hits = paeg.refiner.detect_ai_tells(text)
+    except Exception:
+        # 无 paeg 运行时 → 退化：直接加载 LanguageRefiner 类检测
+        try:
+            from language_refiner import LanguageRefiner
+            _r = LanguageRefiner(llm=None)
+            hits = _r.detect_ai_tells(text)
+        except Exception:
+            hits = []
+    if hits:
+        report.append(f"违禁词命中 {len(hits)} 个: {', '.join(hits[:10])}")
+    else:
+        report.append("违禁词命中: 0")
+    return "\n".join(report)
+
+
+def _exec_forbidden_words(action: str, word: str = "", scope: str = "extra_forbidden") -> str:
+    """v0.70 §3.28 Phase 4：外部违禁词数据维护（write 级工具）。
+    action ∈ {list, add, remove}；scope ∈ {extra_forbidden, pseudo_empathy_verbs, ai_tells_extra}。"""
+    data = _load_forbidden_data()
+    if scope not in data or not isinstance(data.get(scope), list):
+        scope = "extra_forbidden"
+    words = data.setdefault(scope, [])
+    action = (action or "list").strip().lower()
+    if action == "add":
+        w = (word or "").strip()
+        if not w:
+            return "参数错误：add 需要 word"
+        if w not in words:
+            words.append(w)
+            if _save_forbidden_data(data):
+                return f"已添加违禁词「{w}」到 {scope}（共 {len(words)} 项）"
+            return f"添加失败：写入 {_FORBIDDEN_WORDS_PATH} 出错"
+        return f"「{w}」已在 {scope} 中（共 {len(words)} 项）"
+    if action == "remove":
+        w = (word or "").strip()
+        if not w:
+            return "参数错误：remove 需要 word"
+        if w in words:
+            words.remove(w)
+            if _save_forbidden_data(data):
+                return f"已移除违禁词「{w}」（剩余 {len(words)} 项）"
+            return f"移除失败：写入 {_FORBIDDEN_WORDS_PATH} 出错"
+        return f"「{w}」不在 {scope} 中"
+    if action == "list":
+        if not words:
+            return f"{scope}: （空）"
+        return f"{scope}（{len(words)} 项）: " + "、".join(words[:30])
+    return f"未知操作: {action}（可用: list / add / remove）"
+
+
 _HANDLERS: Dict[str, Callable[..., str]] = {
     "web_search": _wrap("web_search", _exec_web_search, retries=2),
     "verify_math": _wrap("verify_math", _exec_verify_math, retries=1),
@@ -385,6 +537,10 @@ _HANDLERS: Dict[str, Callable[..., str]] = {
     "save_document": _exec_save_document,
     # v0.69+ §3.8 ⭐ 动态提示词拼接（用户核心设想）：LLM 主动调取自我更新的动态反思补丁
     "compose_dynamic_prompt": _exec_compose_dynamic_prompt,
+    # v0.70+ §3.28 Phase 4 ⭐ 语言规范 MCP 标准化（三工具）
+    "normalize_text": _exec_normalize_text,
+    "language_policy_check": _exec_language_policy_check,
+    "forbidden_words": _exec_forbidden_words,
 }
 
 

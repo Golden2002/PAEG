@@ -155,6 +155,22 @@ def build_mcp_server() -> Optional[Any]:
         except Exception as e:
             return f"知识库检索失败: {str(e)[:100]}"
 
+    # v0.70 §3.28 Phase 4 ⭐ 语言规范 MCP 标准化（外部 agent 也可调用 PAEG 语言规范能力）
+    @_mcp.tool()
+    def normalize_text(text: str, context: str = "", apply_l2: bool = True) -> str:
+        """语言规范守门（L0+L2）：去除 AI 味、修正省略句/动宾搭配、深度矫正为最规范语言。"""
+        return _run_tool("normalize_text", {"text": text, "context": context, "apply_l2": apply_l2})
+
+    @_mcp.tool()
+    def language_policy_check(text: str) -> str:
+        """语言政策检查：本地确定性检测 AI 味概率与违禁词命中（不调 LLM）。"""
+        return _run_tool("language_policy_check", {"text": text})
+
+    @_mcp.tool()
+    def forbidden_words(action: str, word: str = "", scope: str = "extra_forbidden") -> str:
+        """外部违禁词数据维护（list/add/remove，落盘 forbidden_words.json）。"""
+        return _run_tool("forbidden_words", {"action": action, "word": word, "scope": scope})
+
     return _mcp
 
 
