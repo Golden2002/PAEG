@@ -1420,6 +1420,12 @@ def build_presenter_system(subject: str, tone: str,
         grade_mode_line = "\n" + _gm["system"]
     except Exception:
         grade_mode_line = ""
+    # v0.71 ⭐ 学段讲述结构骨架（Oracle 升级）：可执行段序列模板——结构差异 + 内容深度双落实
+    try:
+        _scaf = get_grade_scaffold(grade_key)
+        scaffold_line = render_scaffold_to_system(_scaf, subject or "default")
+    except Exception:
+        scaffold_line = ""
 
     # 用户自我描述（v0.10）：学生自己写的"我是谁/目标/擅长与不擅长"，必须尊重并据此教学
     user_desc_line = ""
@@ -1569,6 +1575,7 @@ def build_presenter_system(subject: str, tone: str,
 {learner_line}
 {grade_line}
 {grade_mode_line}
+{scaffold_line}
 {questionnaire_line}
 {constraint_layers_line}
 {user_desc_line}
@@ -2046,6 +2053,120 @@ GRADE_TEACHING_MODES = {
 **禁止**学术史/人物引用——考研不要情怀，只要分。""",
     },
 }
+
+
+
+# ─────────────────────────────────────────────────────────────
+# v0.71 ⭐ 学段讲述结构骨架模板（Oracle 升级 · 4 学段 × 段序列）
+# 与 GRADE_TEACHING_MODES（风格描述）并列：本字典是"可执行输出骨架"——
+# 每学段定义段序列 [段名/目的/内容指令/长度约束/形式约束]，LLM 按【NEXT】逐段输出。
+# 结构差异（骨架可辨识）+ 内容深度差异（每段长度/形式量化）双落实。
+# 注入点：build_presenter_system 的 grade_mode_line 之后（constraint_layers_line 之前）。
+# ─────────────────────────────────────────────────────────────
+GRADE_SCAFFOLDS = {
+    "middle_school": {
+        "label": "初中",
+        "segments": [
+            {"name": "现象钩子", "purpose": "用一个看得见/感觉得到的生活场景切入",
+             "instruction": "用一句生活场景或体感提问开始（≤2 行）。如'你切洋葱时眼睛为什么会流泪？'",
+             "length": "≤2 行", "form": "提问/场景描写，禁用公式/术语"},
+            {"name": "画面/示意", "purpose": "把概念'画'出来",
+             "instruction": "用 emoji 视觉锚点（🌊⚙️🔍 等）或图表示意描述",
+             "length": "3-5 行", "form": "画面描述/表格/emoji，禁止公式"},
+            {"name": "类比", "purpose": "用学生熟悉的事类比陌生概念",
+             "instruction": "选 1 个生活类比（厨房/操场/身体），不超过 30 字",
+             "length": "≤3 行", "form": "比喻 1 个，禁止学术术语"},
+            {"name": "命名", "purpose": "用最少的术语命名（仅此一次）",
+             "instruction": "给出概念名称 + 一句话定义（≤15 字）",
+             "length": "1 行", "form": "术语出现 1 次"},
+            {"name": "复述触发", "purpose": "让学生用自己的话复述",
+             "instruction": "明确问'用你自己的话告诉我，刚才那件事是怎么回事？'",
+             "length": "≤2 行", "form": "提问，禁止给答案"},
+        ],
+    },
+    "high_school": {
+        "label": "高中",
+        "segments": [
+            {"name": "定义", "purpose": "一句话定义（≤30 字）",
+             "instruction": "用一句话讲清概念核心，不超过 30 字",
+             "length": "1 行", "form": "陈述句，必有 ### 标题"},
+            {"name": "公式/定理", "purpose": "形式化陈述",
+             "instruction": "完整 LaTeX 公式或定理陈述",
+             "length": "2-4 行", "form": "必须 $$...$$ 块"},
+            {"name": "典型例题", "purpose": "用 1 道最能体现方法的题",
+             "instruction": "选课本典型题，边做边说'这一步在做……'",
+             "length": "6-10 行", "form": "Markdown 步骤化"},
+            {"name": "误区", "purpose": "考前必踩的 2-3 个坑",
+             "instruction": "列出 2-3 个常见错误，标 ❌",
+             "length": "3-6 行", "form": "❌✅ 列表"},
+            {"name": "知识结构图", "purpose": "把本节所有概念连成图",
+             "instruction": "用箭头/框图描述概念关系",
+             "length": "3-5 行", "form": "概念 A→概念 B→公式 C"},
+        ],
+    },
+    "undergraduate": {
+        "label": "大学本科",
+        "segments": [
+            {"name": "严格定义", "purpose": "用形式化语言写清定义",
+             "instruction": "数学/形式化定义，每个条件解释'为什么必须存在，少一个会怎样'",
+             "length": "5-10 行", "form": "必有 $$...$$ 块"},
+            {"name": "定理框架", "purpose": "定理陈述 + 适用域",
+             "instruction": "写清充分/必要条件、适用域，1-2 句话点出'在说什么层面的事'",
+             "length": "3-5 行", "form": "定理 LaTeX + 文字"},
+            {"name": "关键推导", "purpose": "选 1-2 个关键步骤展开",
+             "instruction": "讲清'这一步在做什么、为什么这样走、跳过去会丢什么'",
+             "length": "10-20 行", "form": "完整 LaTeX 推导链"},
+            {"name": "应用", "purpose": "1 个真实应用场景",
+             "instruction": "实验验证/工程问题/学科经典问题",
+             "length": "5-10 行", "form": "含文献/实验引用"},
+            {"name": "学科视野", "purpose": "学科史 + 开放问题",
+             "instruction": "学科史位置（Euler 1736...）+ 当前开放问题 + 跨学科连接",
+             "length": "5-10 行", "form": "含人物/年代/期刊"},
+        ],
+    },
+    "graduate_exam": {
+        "label": "考研",
+        "segments": [
+            {"name": "考什么", "purpose": "考点定位 + 频次",
+             "instruction": "一句话点明本考点在真题中的位置与频次，如'近 10 年考了 7 次，必考'",
+             "length": "1 行", "form": "频次+必考点"},
+            {"name": "怎么考", "purpose": "命题思路 + 干扰项 + 变形套路",
+             "instruction": "说出题人爱挖的坑、设置的干扰项、常见变形",
+             "length": "3-5 行", "form": "紧凑分点"},
+            {"name": "解题套路", "purpose": "1 个真题示范",
+             "instruction": "边写边念'第一步看什么/第二步用什么方法/第三步验证什么'",
+             "length": "5-8 行", "form": "真题编号【20XX-YY】+ 步骤"},
+            {"name": "真题演示", "purpose": "1-2 道同类型快速解",
+             "instruction": "标注'用时建议 X 分钟'",
+             "length": "4-6 行", "form": "真题编号 + ⏱ 标签"},
+            {"name": "易错点清单", "purpose": "考场最爱错的 3 个地方",
+             "instruction": "用 ❌✅ 列出 3 个，每个配一句'考场提醒'",
+             "length": "3-5 行", "form": "❌✅ + ⚠️ 标签"},
+        ],
+    },
+}
+
+
+def get_grade_scaffold(grade_level: str) -> dict:
+    """获取学段骨架模板（未知学段回退高中）。"""
+    return GRADE_SCAFFOLDS.get(grade_level, GRADE_SCAFFOLDS["high_school"])
+
+
+def render_scaffold_to_system(scaffold: dict, subject: str) -> str:
+    """骨架模板 → system 段（注入 build_presenter_system）。"""
+    lines = [f"\n## v0.71 ⭐ 讲述结构骨架（{scaffold['label']}·必须严格按以下顺序逐段输出）【NEXT】分隔】"]
+    for i, seg in enumerate(scaffold["segments"], 1):
+        lines.append(
+            f"\n**第{i}段·{seg['name']}**（目的：{seg['purpose']}）\n"
+            f"- 内容要求：{seg['instruction']}\n"
+            f"- 长度：{seg['length']}\n"
+            f"- 形式：{seg['form']}"
+        )
+    lines.append(
+        f"\n**强制**：每段必须出现（用 【NEXT】 分隔）；可省略但不调换顺序；"
+        f"严禁把多段内容并到一段；输出后请自查：5 个段名是否都在文中出现？"
+    )
+    return "\n".join(lines)
 
 
 def get_grade_mode(grade_level: str) -> dict:
