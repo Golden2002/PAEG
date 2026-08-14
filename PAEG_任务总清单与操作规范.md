@@ -153,6 +153,119 @@
 - ❌ Step 1.5 插件选取（按上表，先 P1 三项）
 - ❌ 每个借鉴的来源记录（文件 + commit）
 
+### Step 2：Harness 架构深调研 → 16+ 优化需求（2026-08-14 用户新指令 · 待实施）
+
+> 用户原话："联网检索 Deepseek 的新的 Harness 库，调研其 Harness 架构，这个项目非常值得学习，依据其项目至少产生16项针对我们项目的优化需求，首先记录入需求文档"
+
+**调研结论（官方 docs/architecture.md 全文 + 仓库结构 + commit 12,293 条 / 81.5k stars）**：
+
+DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Plugin），基于 **Cordis** 框架（插件贡献服务/类型化事件/可逆副作用到共享 context）：
+- **无特权核心**：模型适配器、工具注册表、会话日志、agent 循环本身都是插件，全部可从配置替换——注册即副作用，插件卸载时自动解注册（unwind）
+- **Profile/Bundle 分层**：profile = 命名组合（bundles 堆叠顺序 + 用户 cordis.patch.yml + home 级 patch + --patch 覆盖层）；bundle = Cordis 配置行分发格式；`dsh --dump-config` 打印完整可打补丁树，**每一行都可被 patch 覆盖**
+- **事件系统三分域**：session 事件（持久事实，追加式日志）/ agent 事件（`agent/*` 携带 live Agent：pre-step/request/turn-stopping 等）/ 能力事件（`fs/*` `tools/*` `telemetry/*` 接缝）；瀑布事件需 next() 委托
+- **Turn/Step 流**：step = 一次模型请求+工具调用；turn = 0+ steps，输入收件箱驱动；`agent/turn-stopping` 串行无 next
+- **会话日志 = 模型上下文唯一真相源**：模型可见 = 已记录（运行时不变量断言！）；fork/resume/transcripts/telemetry 全部从日志派生
+- **能力接缝（Seam）**：Service Definition + Service Provider + Consumer 三角色；一个 provider 换全产品（filesystem/subprocess 共享执行世界，远程沙箱一次迁移 Bash/PTY/LSP）
+- **扩展点映射表**：官方给出"新行为挂哪里"完整对照表（添加 provider/工具/上下文/UI 节点/持久状态/会话标题/goals/fork 等）
+
+**依据 Harness 产生的 PAEG 优化需求（≥16 项，借鉴来源=deepseek-harness 对应文件）**：
+
+| # | 优化需求 | 借鉴来源 | PAEG 落地点 | 优先级 |
+|---|---|---|---|---|
+| H-1 | **⭐ 会话日志事件化**：把 SESSIONS 内存 dict 升级为追加式 SessionEvent 日志 + deriveMessages 投影（模型可见=已记录不变量断言）| packages/core/session | infra/session 或 server SESSIONS 改造 | P1 |
+| H-2 | **Profile 预设组合**：教学/考试/陪聊/外部 agent 四场景 profile（bundles 堆叠 + patch 覆盖），运行时 `--dump-config` 式导出 | packages/boot/app-boot profiles | config_hub 加 profile 层 | P1 |
+| H-3 | **扩展点映射文档**：官方"新行为挂哪里"对照表 → PAEG 技术文档新增同款映射（加工具/加 LLM 适配器/加钩子/注入上下文/持久状态）| docs/architecture.md Where new behavior goes | PAEG技术说明.md | P1 |
+| H-4 | **agent 生命周期事件**：hooks_hub 补 agent/pre-step、agent/request、agent/turn-stopping 事件（拦截/改写请求、停轮）| packages/core/agent + core/agent-loop | hooks_hub | P1 |
+| H-5 | **能力接缝化**：TTS/文件系统/工具执行三处 provider 抽象统一为 Seam（Definition/Provider/Consumer）| docs/architecture.md capability seams | voice_service/fs 封装 | P2 |
+| H-6 | **agent.inject() 运行时上下文注入**：运行中向下一请求注入上下文（教学中途补画像/提示）| core/agent inject | context_bundle 加 inject API | P2 |
+| H-7 | **子代理 provider 注册表**：subagents 9 个硬编码 → provider 接口（spawn/fork/委托外部 agent turn）| packages/subagent | subagents.py | P2 |
+| H-8 | **工具作用域隔离**：每 agent 可挂独立工具集（agent.ctx 隔离 realm），会话级能力组合 | cordis scope + isolate realm | tool_registry 加作用域 | P2 |
+| H-9 | **LLM 适配器接缝**：llm_adapter 升级为 ctx.llm 式 provider 注册表（模型/流式/工具 schema 组装）| packages/llm/llm | llm_adapter.py | P2 |
+| H-10 | **jobs 后台任务系统**：教学长任务（生成讲义/PPT/视频）注册后台 job + job_* 收集/停止 | core/jobs | config_hub 加 jobs | P2 |
+| H-11 | **UI 节点化**：前端功能（知识导图/气象/PPT）注册为 ConversationNode 式节点（keyed renderer）| core/agent Web Client Chat Node | 09_GUI前端 | P3 |
+| H-12 | **SessionEventMap 类型化**：会话事件类型化扩展点（新增模型可见输入必须先加事件）| core/session SessionEventMap | infra/session | P3 |
+| H-13 | **配置树导出 API**：`/api/admin/dump-config` 打印全部可 patch 配置行（对齐 dsh --dump-config）| app-boot dump-config | config_hub + server 端点 | P2 |
+| H-14 | **hooks 瀑布补全**：hooks_hub 对齐 waterfall 语义（llm/stream、tools/* 三事件 next 委托链）| docs/architecture.md turn flow | hooks_hub | P1 |
+| H-15 | **fork/resume 日志派生**：Thread fork/archive 改为从事件日志派生（保留原始 assistant/chunk 保真）| core/session fork/resume | thread 模型 | P3 |
+| H-16 | **Guard 插件化**：repeat-tool-reminder/timeout-policy 从单钩子升级为 guard 包（可组合可卸载）| packages/guard | hooks_hub/guard | P1 |
+| H-17 | **bundle 分发格式**：PAEG 技能/工具打包为 bundle（patch 文件 + 代码行，可整体上架下架）| packages/bundle | config_hub bundles | P3 |
+| H-18 | **可逆副作用注册**：工具/钩子注册支持 unwind（卸载即解注册，防热加载泄漏）| cordis effects | config_hub reload | P2 |
+
+**实施要求**：
+- a. 每项接入**不破坏现有功能**（ratchet 铁律：改前测、改后回归）
+- b. 每项记录来源（deepseek-harness 文件路径 + commit SHA `47f943859bef60e4160492346772ded9b24f765a`）
+- c. 优先 P1 六项：H-1 会话日志事件化 / H-2 Profile 预设 / H-3 扩展点文档 / H-4 agent 生命周期事件 / H-14 hooks 瀑布 / H-16 Guard 插件化
+
+### Step 2 补充：Librarian 30 项细化调研（2026-08-14 · 与 H-1~H-18 同源）
+
+> 说明：librarian 深度调研（15 章节 / 30 项需求 / 9 P0 + 14 P1 + 7 P2 / 4 阶段 6-10 周路线）。下表为**权威细化版**，H-1~H-18 为速查精简版，对应关系标注于#列。
+
+**关键架构五要点**：
+1. **"patch 是 YAML 行级覆盖，不是 Python 继承"**——同一文件同时管 bash/pwsh（`disabled: !!js process.platform === 'win32'`）
+2. **4 预设 = 工具子集差异**：standard（全工具）/ code-PTC（+Code Mode TS 程序）/ minimal（仅 2 工具）/ cordis（+tool-cordis 自修改运行时）——可直接迁移到 PAEG"标准/答疑/编程/薇依人格"
+3. **Capability Seam 三角色**（Definition/Provider/Consumer）——dsh 换一行即换 Codex/Claude Code 子代理；PAEG 9 subagent 应同模式重构
+4. **`!!js` 条件标签**：patch 文件支持 JS 表达式（平台/env 分支）
+5. **Permission Preset = sandbox + approval 命名组合**——一个选择器管两个开关；`custom` 是衍生状态不可作目标；切换写 `permission/preset` log-only 事件可回放
+
+**30 项优化需求（权威版）**：
+
+| # | 优化需求 | 借鉴来源（dsh） | PAEG 落地点 | 优先级 |
+|---|---|---|---|---|
+| 1 | **Subagent Patch 系统**：9 subagent YAML 装扮（persona/prompt/工具/调度全配置可换）| agent.cordis.yml `- id:` 整体替换 | subagents.py → subagent_loader | **P0** |
+| 2 | **Profile Bundle 机制**：`python paeg.py --profile education/minimal/research` | dsh.profile.bundles + --patch | config_hub profile 层 | **P0** |
+| 3 | **Persona 外置**：薇依 persona 拆 `paeg_personas/{id}.yml` | preset.yml name/description | prompts.py 长字符串外置 | **P0** |
+| 4 | **!!js 条件启停**：配置支持 JS 表达式 | `disabled: !!js expr` | config_hub SafeLoader | P1 |
+| 5 | **用户家目录 overlay**：`~/.paeg/cordis.patch.yml` 不改代码改默认模型/学科 | $DSH_HOME/cordis.patch.yml | config_hub 加载链 | P1 |
+| 6 | **OS 平台双轨**：TTS/STT/PPT 模板按平台分支 | bash+pwsh 双轨 | config_hub 条件挂载 | P2 |
+| 7 | **教学预设 4 内置+N 自定义**：standard/minimal/code-mode/weil-classical | 4 预设目录 | paeg/presets/ | **P0** |
+| 8 | **PresetService**：mount/list/resolve/recompose/copy/remove | ctx.agentPresets | paeg/preset/service.py | **P0** |
+| 9 | **Per-Agent Scope**：每 subagent 独立工具/提示词作用域（shadowing）| dsh-scope agent.ctx | AgentScope 类 | P1 |
+| 10 | **Preset 文件结构标准化**：agent.patch.yml + preset.yml + prompts/ + assets/ | preset 目录规范 | paeg/presets/* | P1 |
+| 11 | **9 Subagent 三角色重构**：Service Definition/Provider/Consumer（RuleDiagnostor vs LLMDiagnostor 等）| ctx.shell 三角色 | subagents.py | **P0** |
+| 12 | **LLM Provider Seam**：切换模型不改业务代码（deepseek/openai_compat）| ctx.llm 多 provider | llm_adapter.py | **P0** |
+| 13 | **Shell/Subprocess Seam**：本地/docker/沙箱执行可换 | ctx.shell + ctx.subprocess | tool 执行层 | **P0** |
+| 14 | **Tool Registry 能力协商**：元数据级先注入 name/desc，按需完整加载 | defer_loading + listChanged | skill_registry.py | P1 |
+| 15 | **Session Event Log**："Model-visible ⟺ logged" 铁律 + deriveMessages 投影 + SessionEventMap 类型化 | core/session | infra/session | P1 |
+| 16 | **Hooks 瀑布链**：waterfall 事件（next() 委托，短路可观测）| Waterfall listeners MUST call next() | hooks_hub | P2 |
+| 17 | **Subprocess 抽象**：MCP 客户端/ffmpeg/PDF/PPT 统一 spawn 服务 | ctx.subprocess | subprocess service | P2 |
+| 18 | **权限预设系统**：student-safe/tutor-write/researcher-full 三档 | permission-presets | tool_registry PERMISSION_PRESETS 升级 | P1 |
+| 19 | **Permission 事件入 Session Log**：切换可回放 | permission/preset log-only | session log | P1 |
+| 20 | **Custom 衍生状态**：临时切换显示"自定义"不可保存 | current() 返回 custom | permission service | P2 |
+| 21 | **Subagent Registry Provider 可插拔**：in-process/external-script/llm-call | ctx.subagents 6 providers | subagents.py registry | **P0** |
+| 22 | **Subagent Report/Continuable 协议**：子代理回报 + 父发消息 | subagent-control/report | subagent 控制 | P1 |
+| 23 | **Fresh-Agent Loop**（tool-ralph）：每轮 fresh child + 共享进度 + 结构化 handoff | tool-ralph | 对应 PAEG RALPH 循环（已有，对照增强）| P2 |
+| 24 | **Web UI 模式化**：shell/wire/slots 拆分，ui-*.js 插件化 | ui-* 插件 ~30 个 | 09_GUI前端 | P1 |
+| 25 | **Preset 即 UI 风格**：预设决定挂哪些 ui-* 模块 | web-app patch | 前端按 preset 挂载 | P1 |
+| 26 | **客户端 HMR 热刷新**：dev 模式前端自动刷新 | client-hmr | 09_GUI前端 | P2 |
+| 27 | **Self-Update via Patch**：AI 读/写自己 patch 文件（cordis preset 自修改）| tool-cordis | 对应 PAEG self_evolution + tool-cordis 化 | P1 |
+| 28 | **Constitutional AI 补丁化**：反思/门禁/重复检测走 patch 配置 | plan-mode + repeat-tool-reminder | quality_gate 配置化 | P2 |
+| 29 | **用户级 + Profile 级 + 全局级 Skill 目录** | skill-filesystem customSkillDirs | skill_registry 多目录 | P1 |
+| 30 | **Cordis 式 Service Registry**："一切皆 ctx"（llm/sessions/agents/tools/subagents...）| ctx.<key> Service | runtime/registry.py Context | P1 |
+
+**H 表 ↔ #表 对应关系**：H-1↔#15 · H-2↔#2/#7 · H-3↔文档类(新增扩展点映射) · H-4↔#16 · H-5↔#11/#13 · H-6↔#15(context_inject) · H-7↔#21 · H-8↔#9 · H-9↔#12 · H-10↔dsh tool-jobs(独立项) · H-11↔#24/#25 · H-12↔#15/#19 · H-13↔dsh --dump-config(独立项) · H-14↔#16 · H-15↔#15(fork/resume) · H-16↔#28 · H-17↔#2(bundle) · H-18↔#30(effects unwind)
+
+**实施路线（4 阶段，6-10 周）**：
+- Phase 1 运行时底座（1-2 周）：#30 Context Registry / #12 LLM Seam / #13 Shell Seam / #15 Session Event Log
+- Phase 2 装扮系统（2-3 周）：#1 subagent patch / #2 profile / #3 persona / #7-10 教学预设 / #4-6 条件+overlay
+- Phase 3 能力接缝+权限+UI（2-3 周）：#11 三角色 / #14 Tool Registry / #18-20 权限 / #21-23 subagent / #24-26 UI
+- Phase 4 元能力+自我改造（1-2 周）：#27 Self-Update via Patch / #28 Constitutional Patch / #29 多级 skill
+
+**证据链接（permalinks）**：架构 [docs/architecture.md](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/architecture.md) · Cordis 原语 [cordis-primer.md](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-primer.md) · 4 预设目录 [agent-presets/](https://github.com/deepseek-ai/deepseek-harness/tree/master/apps/cli/config/agent-presets) · base bundle（~80 插件清单）[base/cordis.patch.yml](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/bundle/base/cordis.patch.yml) · 权限预设 [permission-presets/README.md](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/interaction/permission-presets/README.md) · 子代理 seam [subagent/README.md](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/subagent/README.md) · Capability Seams 全图 [capability-seams.md](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/capability-seams.md)
+
+**建议**：本项需求（#1-30）为**长期架构升级蓝图**（6-10 周），建议先实施高价值低成本的 P1 子集：#18 权限预设升级 / #5 home overlay / #9 per-agent scope / #14 tool 元数据按需加载 / #16 hooks 瀑布补全——与当前 §3.28/§3.29 语言规范 MCP + 约束系统工作衔接。
+
+### Step 3：技术说明图表渲染问题（2026-08-14 用户新反馈 · 待技术说明任务处理）
+
+> 用户原话："技术说明的图9，图中元素和背景同为黑色（如，sse输出），因而视觉效果欠佳，请优化" / "增加：技术文档的图15也有同样的问题：深色文字和深色背景在渲染后无法辨认，不可见"
+
+**问题**：Mermaid 图（图 9、图 15）渲染后出现**深色文字 + 深色背景**——元素与背景同为深色（如图 9 的 sse 输出节点、图 15 的对应节点），导致文字无法辨认/不可见。视觉对比度不足。
+
+**修复要求**（并入"技术说明最终任务"，最后做）：
+- a. 定位图 9、图 15 的 Mermaid 源码：找出深色文字节点（深色主题色文字/描边）落在深色背景（主题暗色填充）的节点
+- b. 修复方式（二选一或组合）：① 给节点显式指定浅色文字/浅色填充（如 `style X fill:#1a1a2e,color:#eaeaea`）② 统一 Mermaid 主题为浅色（theme: base / themeVariables 高对比度）
+- c. 全文档巡检：不只图 9/15，扫描全部 Mermaid 图是否存在同类深色文字+深色背景问题，一并修复
+- d. 重新渲染 PDF 前完成（该任务属于 §3.30 技术说明最终更新的一部分）
+
 ---
 
 ## 三、自我更新能力审查与优化（用户新关注 · 重点）
