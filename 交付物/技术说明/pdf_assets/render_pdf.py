@@ -49,6 +49,11 @@ def render(md_path: str, out_pdf: str, title: str = None, sub: str = None,
     """md → HTML（套模板占位符）→ Edge headless → PDF"""
     tpl = io.open(os.path.join(ASSETS, 'template.html'), encoding='utf-8').read()
     md_text = io.open(md_path, encoding='utf-8').read()
+        # v0.70+ ⭐ Mermaid 支持：`mermaid 块 → <pre class="mermaid">（mermaid.js 渲染为图）
+    import re as _re
+    def _mermaid_sub(m):
+        return '<pre class="mermaid">' + m.group(1) + '</pre>'
+    md_text = _re.sub('`mermaid\n(.*?)`', _mermaid_sub, md_text, flags=_re.S)
     content_html = markdown.markdown(md_text, extensions=['tables', 'fenced_code'])
 
     repl = {
@@ -75,7 +80,7 @@ def render(md_path: str, out_pdf: str, title: str = None, sub: str = None,
     if not browser:
         raise RuntimeError('未找到 Edge/Chrome')
     subprocess.run([browser, '--headless', '--disable-gpu',
-                    '--print-to-pdf=' + out_pdf, '--no-margins',
+                    '--print-to-pdf=' + out_pdf, '--no-margins', '--virtual-time-budget=15000',
                     'file:///' + tmp_html.replace('\\', '/')],
                    capture_output=True, timeout=120)
     os.remove(tmp_html)

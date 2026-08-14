@@ -837,6 +837,7 @@ table {
   line-height: 1.55;
   background: var(--c-card);
   border: 0.6pt solid var(--c-line);
+  border-bottom: none;          /* v0.70+ 修复双底线：外框去底，底线由末行 td 提供 */
   border-radius: var(--r-md);
   overflow: hidden;
   page-break-inside: auto;
@@ -864,7 +865,7 @@ tbody td {
   vertical-align: top;
   color: var(--c-ink-900);
 }
-tbody tr:last-child td { border-bottom: none; }
+tbody tr:last-child td { border-bottom: 0.6pt solid var(--c-line); }
 
 tbody tr:nth-child(even) td {
   background: var(--c-table-zebra);

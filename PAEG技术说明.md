@@ -135,6 +135,19 @@
 
 > 一句话：PAEG 是大脑，LLM 是算力，知识库/外部/持久化是记忆与耳目，学生是服务对象，开发者通过热加载持续改进。
 
+**图示（Mermaid 渲染）**：
+
+```mermaid
+flowchart LR
+    User(["学生<br/>浏览器/微信"]) -->|HTTP/SSE| PAEG["PAEG 教育智能体"]
+    PAEG -->|Prompt| LLM(("LLM<br/>DeepSeek/OpenAI"))
+    LLM -->|生成/工具调用| PAEG
+    PAEG <-->|检索/写入| KB[("知识库")]
+    PAEG <-->|联网| Ext["外部世界"]
+    PAEG <-->|画像/历史| DB[("持久化")]
+    Dev["开发者"] -.->|热加载| PAEG
+```
+
 **图 2 · 系统尺度（六层 + 一次请求数据流）**
 
 | 层 | 职责 | 核心组件 | 本次请求的角色 |
@@ -148,6 +161,19 @@
 | **L0 横切** | 质量保障 | TRUTH_GROUNDING / QualityGate / 语言规范 | **约束每一层** |
 
 **一次请求的路径**：学生提问 → L1（POST /api/teach/stream）→ L2（判定 teach）→ L3（五阶段）→ L4（subagent 协作）→ L5（工具按需）→ 全程受 L0 约束。
+
+**图示（Mermaid 渲染）**：
+
+```mermaid
+flowchart TB
+    UI["Web UI"] --> API["REST API"] --> R["meta_router 15意图"] --> T["paeg.teach / teach_stream"]
+    T --> S["9 个领域专家"]
+    S --> M["25 MCP 工具"]
+    S --> LL["LLM 适配"]
+    T --> ST["持久化"]
+    L0{{"L0 横切质量层"}} -.- T
+    L0 -.- S
+```
 
 **图 3 · 教学流尺度（五阶段 + checkpoint 互动）**
 
@@ -163,6 +189,22 @@
 
 **互动循环**：讲解 → checkpoint（听懂了吗）→ 学生回答 → 评估（_student_signal）→ 调整 → 继续或重讲；教学完成后自动进入自我进化（蒸馏知识点、沉淀教学补丁、积累工具经验）。
 
+**图示（Mermaid 渲染）**：
+
+```mermaid
+flowchart TD
+    Start(["学生提问"]) --> D["① 诊断"]
+    D --> P["② 计划"]
+    P --> Pre["③ 讲解 LLM 流式"]
+    Pre --> CP{{"checkpoint 听懂了吗"}}
+    CP -->|回答| E["④ 评估"]
+    E --> A["⑤ 调整"]
+    A -->|继续| Pre
+    A -->|完成| Done["✓ 完成"]
+    Done --> Ev["自我进化"]
+    Ev --> KB[("知识库 热加载")]
+```
+
 **图 4 · 组件尺度（Presenter 内部装配）**
 
 | 装配块 | 内容 | 作用 |
@@ -176,6 +218,18 @@
 **内部流程**：确定性装配（上述块）→ system prompt → LLM 调用（重试+超时）→ 60 字分片 → SSE yield；如需工具则经 config_hub 路由到 mcp__ 工具，结果回灌 LLM。
 
 > 设计原则：**确定性骨架（装配/分片/路由）由 Agent 负责，生成由 LLM 负责**——这是"教学交给 Agent、生成交给 LLM"的具体实现。
+
+**图示（Mermaid 渲染）**：
+
+```mermaid
+flowchart LR
+    subgraph ASM["system 装配"]
+        B["WEIL_CORE"]; T2["TRUTH_GROUNDING"]; SS["SUBJECT_STYLES"]; LG["LANGUAGE_STYLE"]
+    end
+    ASM --> Sys["system prompt"] --> LLM2["LLM 调用 重试+超时"]
+    LLM2 --> St["60字分片"] --> Y["SSE yield"]
+    Y -.->|需工具| MC["mcp__ 工具"] --> LLM2
+```
 
 ### 核心调用链（用户问"什么是导数"）
 用户输入 → L1(POST /api/teach/stream) → L2(meta_router → intent=teach) → L3(teach_stream：诊断→计划→讲解→checkpoint→评估→调整) → L4(subagent 协作) → L5(工具按需调用) → L0(防幻觉全程约束)
