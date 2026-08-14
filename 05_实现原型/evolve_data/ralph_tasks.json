@@ -1,0 +1,19 @@
+{
+  "test_ralph_1": {
+    "source": "manual",
+    "goal": "蒸馏牛顿第二定律策略",
+    "acceptance_criteria": [
+      {
+        "metric": "factuality",
+        "threshold": 0.85,
+        "current": 0.9,
+        "source": ""
+      }
+    ],
+    "context": {},
+    "max_rounds": 10,
+    "high_risk": false,
+    "status": "done",
+    "verdict": "DONE"
+  }
+}

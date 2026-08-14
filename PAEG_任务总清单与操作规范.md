@@ -432,7 +432,137 @@
 ### 3.15 用户新批次任务（2026-08-14 ULW 四连 · 待执行）
 - **T1 Dockerfile 对比覆盖**：✅ 已确认（v0.69+ 本地 Dockerfile/docker-compose/.dockerignore 哈希与远程最新 10c8494 完全一致——本地即最新含 Pango/GLib 修复；远程 3 提交是平台端历史演进，最终版已同步本地，无需覆盖）
 - **T2 运行卡住原因→执行标准**：✅ 已完成（纪律 20：5 类根因——残留进程/LLM 超时/SSE 挂起/工具阻塞/网络 + 诊断顺序先进程→再缓存→最后代码）
-- **T3 DeepSeek Harness 模块引入**：调研 DeepSeek Harness github 库，把**在 agent 中引入同样的模块**加入需求文件（已有经验文档+Step1.5 做过部分：Guard/Permission Preset；补充未引入的模块：如 sandbox/code-exec/prompt-overflow/Provider Registry 等）
-- **T4 执行存量需求**：执行需求文件中 **P1、P2 和 §3.12** 的内容（大部分已完成——核对剩余）+ **执行 3. 新加入需求文件的内容**（即本批次 T1-T3 实施）
-- **优先级**：T1 立即（git 确认）；T2 记录；T3 调研后加清单；T4 核对执行
+- **T3 DeepSeek Harness 模块引入（完整调研 · 2026-08-14 完成调研，待实施）**：调研 DeepSeek Harness github 库，把**在 agent 中引入同样的模块**加入需求文件。完整 packages 清单见下方 §3.16。
+- **T5 RALPH 循环能力 · ✅ 核心已实现（v0.69+）**：①记录入需求文件+元能力 §5.3 ✅②Oracle 设计已落地——新增 ralph/ 子系统（loop_controller/task_registry/completion_evaluator/termination_guard/contracts），端到端验证 DONE（2 轮达标+快照+日志）③已记录：技术/维护/CHANGELOG/README/亮点总览。P1/P2 后续：Web UI/优先级队列/人类确认点 UI/周度适配器。
+- **T5 RALPH 循环能力（2026-08-14 用户新增）**：**RALPH 循环本身是重要能力**——①记录 RALPH 循环（自我指涉开发循环：持续推进直到完成，每轮输出 DONE promise，系统自动续触发）到需求文件 + 元能力文档②**咨询 Oracle 补全 PAEG 的 RALPH 循环能力**（如何让 PAEG agent 具备自我驱动持续工作直到完成的循环能力——融入自我更新/任务执行）③完成后记录：技术文档、维护文档、README、**亮点文档**
+- **T4 执行存量需求**：执行 P1、P2 和 §3.12（大部分已完成——核对剩余）+ 执行 3. 新加入内容
 
+---
+
+### 3.16 T3 深度调研产出：DeepSeek Harness 完整模块清单与 PAEG 引入候选（2026-08-14）
+
+> 来源：本地克隆 `D:\wbo-workspace\deepseek-harness-research\dsh\`（已校验）+ GitHub `deepseek-ai/deepseek-harness` 公开 README/packages 索引
+> 调研方法：遍历 `packages/` 下 41 个顶层分组 / 167 个子包，按 README 提取语义；对照 PAEG 现有 80+ Python 模块做映射
+
+#### 一、Harness 完整顶层分组（41 组）
+
+| # | 分组 | 子包数 | 角色 |
+|---|---|---|---|
+| 1 | `core/` | 8 | 产品 API 脊柱：session / system-prompt / tools / agent / agent-loop / scope / agent-default-model / agent-tool-presentation |
+| 2 | `llm/` | 5 | LLM 能力族：seam + DeepSeek/pi-ai adapter + token-meter + retry |
+| 3 | `shell/` | 9 | Bash 能力族：executor seam + local/pwsh provider + 4 个工具 |
+| 4 | `fs/` | 7 | 文件系统能力族：seam + local + observation-policy + sandbox + 3 工具 |
+| 5 | `subprocess/` | 2 | 子进程能力族（local process-tree provider）|
+| 6 | `terminal/` | 3 | 持久 PTY 能力族（owner-scoped session）|
+| 7 | `code-runtime/` | 2 | 代码执行能力族（worker-thread runtime）|
+| 8 | `sandbox/` | 4 | **进程隔离沙箱**（bwrap/Landlock/Seatbelt/Windows-ACL）|
+| 9 | `lsp/` | 3 | LSP 能力族（go-to-def / find-ref / hover 语义）|
+| 10 | `mcp/` | 1 | MCP client bridge（外接 stdio/HTTP MCP server）|
+| 11 | `skill/` | 4 | 技能注册表 + filesystem provider + tool |
+| 12 | `compaction/` | 4 | **上下文压缩**能力族（token-meter + LLM summarizer）|
+| 13 | `spill/` | 3 | **工具输出溢出防护**（spill store + policy）|
+| 14 | `web/` | 5 | Web 能力族：search/fetch seam + Exa/Perplexity/DeepSeek/Http provider |
+| 15 | `context/` | 4 | 模型可见上下文：AGENTS.md 加载 / 时间 / tmux / session-reference |
+| 16 | `subagent/` | 11 | **子代理能力族**：registry + spawn/fork/ACP/Codex/Claude/dsh-sdk provider + 3 工具 |
+| 17 | `workflow/` | 4 | **工作流编排**（worker-thread 引擎 + workflow/ralph 工具）|
+| 18 | `jobs/` | 3 | 后台 job 运行时（owner-scoped long-running task）|
+| 19 | `goal/` | 4 | **同 session 目标持久化**（goal domain + round driver）|
+| 20 | `schedule/` | 1 | **会话级定时提醒**（schedule_create/list/delete）|
+| 21 | `todo/` | 1 | 模型可见 `todo_write` 工具 |
+| 22 | `plan/` | 1 | **Plan 协作模式**（`/plan`/`exit_plan_mode`）|
+| 23 | `preset/` | 2 | Preset 系统（agent-presets / persona shadowing）|
+| 24 | `guard/` | 2 | **循环卫生守卫**（repeat-tool-reminder / timeout-policy）|
+| 25 | `bundle/` | 3 | 可安装 profile bundle（base / web-app / headless）|
+| 26 | `extensions/` | 4 | Agent 自修改工具（runtime 检视/mount/unmount plugin）|
+| 27 | `hooks/` | 3 | **Hook 桥**：claude-code / codex / shared protocol |
+| 28 | `session/` | 13 | 会话持久化层（JSONL/SQLite）+ 投影 + 标题 + 统计 + 遥测 OTel |
+| 29 | `session-query/` | 4 | **会话检索**（SQLite FTS + lineage + 关系图）|
+| 30 | `settings/` | 2 | 用户设置 seam（file provider）|
+| 31 | `credentials/` | 2 | 凭据引用 seam（env/.env provider）|
+| 32 | `storage/` | 4 | 非会话存储 hub（json/sqlite + storage-domain）|
+| 33 | `identity/` | 1 | 匿名 user id（UUID v4 持久化）|
+| 34 | `interaction/` | 5 | **人机协作平面**：approval / ask-user / commands / permission-presets / user-questions |
+| 35 | `attachment/` | 2 | 持久附件（图像字节验证 + content-addressed 存储）|
+| 36 | `runtime-diagnostics/` | 1 | 运行时不变量（invariants companion）|
+| 37 | `feedback/` | 2 | 反馈记录（`/feedback` + 消息级 message-feedback sidecar）|
+| 38 | `acp/` | 1 | Agent Client Protocol（自动化 JSON-RPC stdio）|
+| 39 | `host/` | 8 | Web-GUI 后端：API gateway + webserver + static + directory-picker + plugin-inventory |
+| 40 | `client/` | 42 | Web-GUI 前端（shell/runtime/modules + 35 个 ui-* 子包）|
+| 41 | `util/` | 8 | 零依赖工具（atomic-write / brand / home-paths / timeout / output-retention 等）|
+
+#### 二、PAEG 已引入清单对照（基线 · v0.69+）
+
+| PAEG 模块 | 对应 Harness | 状态 |
+|---|---|---|
+| `config_hub.py` | `core/agent-default-model` + `preset/agent-presets` 的 patch 层思想 | ✅ 已实现（Patch Layer / 4 档权限）|
+| `hooks_hub.py` | `hooks/hook-protocol` | ✅ 已实现（waterfall + matcher + verdict 合并）|
+| `workflows_hub.py` | `workflow/workflow` | ✅ 已实现 MVP（plain JS 脚本 DSL）|
+| `subagents.py`（9 subagent）| `subagent/subagent-spawn-in-process` | ✅ 已实现（单进程 spawn 派生子代理）|
+| `expert_guard.py` | `guard/repeat-tool-reminder`（启发式部分）| ✅ 已实现（v0.69+ 重复工具提醒）|
+| `tool_registry.py` | `core/tools`（部分）+ `interaction/permission-presets`（4 档）| ✅ 已实现（4 档风险分级）|
+| `mcp_client.py` / `mcp_gateway.py` | `mcp/mcp-client` | ✅ 已实现 |
+| `skill_registry.py`（10 skill）| `skill/skill`（provider 抽象思想）| ✅ 已实现 |
+| `llm_api.py` / `llm_adapter.py` | `llm/llm-deepseek` | ✅ 已实现（DeepSeek 适配）|
+| `context_bundle.py` / `context_manager.py` | `core/system-prompt` + `core/scope` 思想 | ✅ 已实现（上下文打包契约）|
+| `safety.py` | `runtime-diagnostics/invariants` 思想（部分）| ✅ 已实现（粗粒度）|
+| `session_model.py` | `core/session`（部分：thread/turn/item 三层）| ✅ 已实现 |
+| `observability.py` | `session/session-telemetry`（轻量版）| ✅ 已实现 |
+
+#### 三、未引入候选模块清单（按价值排序 · 11 项）
+
+> 评估维度：**①PAEG 痛点匹配度 ②实施复杂度（低/中/高）③教育领域独特价值**
+
+##### 🔴 P0 高价值（首批必做 · 4 项）
+
+| # | Harness 包名 | 功能说明 | PAEG 对应物 | 引入价值 | 建议方式 |
+|---|---|---|---|---|---|
+| 1 | **`compaction/compaction-basic`** + **`compaction/compaction-tool-result-pruner`** | 上下文压缩：当 token 接近模型上限（默认 0.8 阈值）自动调用 LLM 总结旧历史 + 裁剪超大工具结果；保留原始事件在日志（replay-safe） | **无**（PAEG 长 session 易爆 LLM 上下文；只能靠对话长度限制 + 简单截断） | **极高**——教育场景多轮 35 学科 × 学段联动极易超限；防止"后面忘了前面"的工程级解决方案 | **新增模块** `services/compaction.py`：用 token-meter 测压 → 触发总结 → shadowed region + checkpoint；写回 `core/session` 日志 |
+| 2 | **`spill/spill-policy`** + **`spill/spill-local`** | **提示词溢出防护**：当工具结果 > `maxInlineBytes`（默认 8192），自动落盘 + 用 head/tail 预览替换为 `Omitted N bytes. Full stored at: <locator>` | **无**（`context_bundle.py` 只能控制总长度，无法按工具结果单独裁剪） | **高**——MCP/联网/PDF 提取常返回大文档；当前只能让 LLM "假装看到"或暴力截断，丢内容 | **新增模块** `services/spill.py`：监听 `tools/post-execute`（类比 hooks_hub），超阈值则 spill 到 `users_data/<uid>/spill/` + 返回 locator |
+| 3 | **`interaction/user-approval`** + **`interaction/tool-ask-user`** + **`interaction/user-questions`** | **三件套**：① `ask_user_question` 工具：让 LLM 主动向学生澄清歧义（如"你想问的是函数极限还是数列极限？"）② approval seam：高风险工具需学生确认③ user-questions service：UI 适配契约 | **无**（当前只能被动等学生输入；LLM 无法主动追问） | **极高**——**教育学必备**：诊断阶段（Diagnostor）需要追问学生；高风险操作（修改 Library/分享对话）需要确认 | **新增模块** `interaction/` 三文件：`user_questions.py`（service）+ `ask_user_tool.py`（注册到 tool_registry）+ `approval.py`（高风险工具如 file_gen/pptx 接入）；扩展前端：多选按钮 UI |
+| 4 | **`workflow/tool-ralph`** | **RALPH 循环工具**：固定策略的工作流——给一个不可变目标，每轮启动**全新子 session**（不继承父对话），用结构化 handoff（status/summary/evidence/nextSteps/blocker）跨循环传状态；maxRounds 防护 | **无**（当前 subagent 继承父对话 + 自由递归，无"持续推进直到完成"的固定循环） | **极高**——**T5 任务直接命中**；自我更新（§3.5-3.9）+ 复杂任务（论文辅导/解题全流程）天然适合 RALPH | **新增模块** `workflows/ralph.py`：在 workflows_hub 加 `ralph(objective, maxRounds)` 工具；每次启动 fresh subagent + handoff 结构；maxRounds 默认 64 |
+
+##### 🟡 P1 中价值（中期迭代 · 4 项）
+
+| # | Harness 包名 | 功能说明 | PAEG 对应物 | 引入价值 | 建议方式 |
+|---|---|---|---|---|---|
+| 5 | **`guard/timeout-policy`** | 工具调用协作超时：声明 `timeoutMs` 的工具到时返回 `TOOL_TIMEOUT` 错误（不杀进程，仅通知） | 部分（`hooks_hub` 有 timeout 字段但未对接工具声明）| **中**——防止 LLM 陷入无限循环；MCP/联网工具易卡死 | **扩展现有** `hooks_hub.py`：在 `tools/execute` 包一层 timeout 监听；tool_registry 给每个工具声明 `timeoutMs` |
+| 6 | **`llm/llm-retry`** | **模型请求重试**：normal mode（EMPTY_RESPONSE/RATE_LIMIT/SERVER/TIMEOUT/TRANSPORT 各重试 2 次，500ms-10s 指数退避 + 10% 抖动）+ always mode（无上限重试到成功） | **无**（PAEG 失败即返回，依赖前端重试）| **高**——教育 LLM 调用频次高；429/服务端抖动常见；学生体验"刚才没答上来"是糟糕的 | **新增模块** `services/llm_retry.py`：监听 `agent/request-error` 瀑布；分类错误码 → 退避 → 重试；可关闭（default on） |
+| 7 | **`session/session-persistence-sqlite`** + **`session-query/session-query-sqlite`** | **SQLite 持久化 + FTS5 检索**：会话日志落 SQLite（单文件 0600 权限），session-query 提供全文检索 + lineage + 事件关系 | **JSON 文件**（`users_data/<uid>/sessions/*.json`，无检索能力）| **中**——多用户扩展（v0.38+）后 JSON 不可持续；历史检索是"教过什么"的关键 | **新增模块** `infra/session_db.py`：用 SQLite + FTS5 替换 JSON；提供 `search_sessions(uid, query, date_range)` API |
+| 8 | **`feedback/message-feedback`** | **消息级反馈 sidecar**：对每条 final assistant message 单独点赞/点踩 + 备注；带 version 乐观锁 + header identity fence | **无**（PAEG 只有 session 级反馈）| **中**——精确定位"哪条回答有问题"；为 self-evolution（§3.2-3.4）提供更细粒度数据 | **新增模块** `feedback/message_feedback.py`：每条 message 一行；前端加 👍👎 按钮；纳入 self_evolution 数据源 |
+
+##### 🟢 P2 低价值 / 实验性（3 项）
+
+| # | Harness 包名 | 功能说明 | PAEG 对应物 | 引入价值 | 建议方式 |
+|---|---|---|---|---|---|
+| 9 | **`sandbox/sandbox`** + **`sandbox/sandbox-policy`** + **`sandbox/sandbox-local`** | **进程隔离沙箱**：3 档（read-only / workspace-write / danger-full-access）；local backend 在 Linux 用 bwrap / macOS 用 sandbox-exec / Windows 用 ACL restricted-token | **无**（学生可写路径无隔离；工具调用直接落盘）| **低**——教育场景"考试模式"锁定可写路径有意义，但当前 PAEG 多用读工具（找答案/讲解）| **暂搁置**：等 P0/P1 完成 + 出现"考试场景"需求再实施；可借 `windows-acl` 实现 Windows-only 简化版 |
+| 10 | **`plan/plan-mode`** | **Plan 协作模式**：激活后让 LLM 只设计不执行；`exit_plan_mode` 让学生审阅 plan 才能执行 | **无**（学生无法"先看方案再执行"）| **低-中**——主要价值在多步教学场景（"先教我思路，再教我细节"）| **暂搁置**：v0.41+ Phase 3 后再议；可作 interaction/user-questions 的特例（带 `plan-review` intent）|
+| 11 | **`code-runtime/code-runtime`** + **`code-runtime/code-runtime-worker-thread`** | **代码执行能力**（TypeScript/Python worker-thread）：LLM 写代码一次多步（run_code），绑定工具为 async functions | **无**（PAEG 无代码执行；manim_service.py 仅执行预生成代码）| **低**——教育 agent 主要解释概念不写代码；但"数学步解 + 可执行验证"有潜力 | **暂搁置**：等数学学科 subagent（math-step-solver skill）需求出现再评估；可借 `e2b`（远程沙箱）而非本地 worker |
+
+#### 四、PAEG 整体建议与 T3 → T4 衔接
+
+1. **首要执行（T4 立即）**：P0 四项——compaction + spill + user-approval/ask-user + ralph loop。理由：直接命中已知痛点（长 session 爆炸 / 工具结果太大 / 学生主动澄清缺失 / T5 RALPH 闭环）
+2. **次要执行（v0.70-0.80 路线）**：P1 四项——timeout-policy（增量）+ llm-retry（高频价值）+ session-persistence-sqlite（多用户扩展）+ message-feedback（精细化）
+3. **战略观望**：P2 三项——sandbox/plan-mode/code-runtime，待需求自然出现再引入，避免过早工程化
+4. **借鉴来源记录（必须）**：每个 P0 实施时附 commit SHA（本地克隆当前 SHA 可用 `git rev-parse HEAD` 在 `D:\wbo-workspace\deepseek-harness-research\dsh\` 取得）
+5. **不破坏原则**：ratchet 铁律——任何模块接入必须 smoke_test.py + pytest 全绿；现有 hooks_hub/workflows_hub 不删不退
+
+#### 五、Harness 顶层分组中"PAEG 暂不需要"的明确清单（18 组 · 仅备查）
+
+- `core/` 全部 8 个子包：理念已融入 config_hub/hooks_hub/session_model，**不重写** Python 实现（Node.js+TypeScript 不直接迁）
+- `shell/` 9 子包：PAEG 无 shell executor 需求（学生不直接跑 bash）
+- `fs/` 7 子包：PAEG 文件操作走 tool_registry（LLM 调用）+ 用户上传走 9_GUI前端
+- `lsp/` 3 子包：教育 agent 不做代码导航
+- `bundle/` 3 子包：仅 TS 打包概念，Python 端用 paeg_modules.json 已实现
+- `extensions/` 4 子包：agent 自修改当前 PAEG 不开放（教学安全边界）
+- `settings/` 2 子包：已被 config_hub 覆盖
+- `credentials/` 2 子包：API key 单 env 即可
+- `storage/` 4 子包：JSON 落盘够用，session 级 SQLite 是 P1 范围
+- `identity/` 1 子包：用户 uid 已在 users.json/user_store.py
+- `attachment/` 2 子包：图像/附件当前走 9_GUI前端 上传
+- `runtime-diagnostics/` 1 子包：safety.py 粗粒度已覆盖
+- `host/` 8 子包：Flask 后端结构不迁移
+- `client/` 42 子包：9_GUI前端 已独立演化
+- `util/` 8 子包：Python 端 utils/ 目录已存在
+- `acp/` 1 子包：自动化协议当前不开放
+- `e2b/` 3 子包：远程沙箱仅 code-runtime 配套
+- `sdk/` 3 子包：仅 SDK 概念

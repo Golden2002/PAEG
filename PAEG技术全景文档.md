@@ -5463,3 +5463,5 @@ Start-Process cmd -ArgumentList '/c','start /b python server.py > server_run.log
 | `cmd start` 启动 | PID 归属混乱 | 端口反查 + 启动时间验证 |
 | 跳过 Step 3 | 残留进程继续响应 | 必须确认端口空闲 |
 
+
+> **v0.69+ RALPH 循环子系统（2026-08-14 T5）**：`05_实现原型/ralph/`——任务执行循环器（Oracle 设计）。loop_controller（主循环：执行→判定→持久化→防呆→续触）、task_registry（任务队列持久化 JSON）、completion_evaluator（L0 QualityGate + L1 任务指标 + L2 改进证据 三层判定）、termination_guard（五道防线：轮次上限/收益递减/质量回退/人类确认/资源熔断）、contracts（Verdict DONE/CONTINUE/ABORT + `<promise>` 承诺协议）。与自我更新整合：周度调度器 emit 改进任务 → RALPH 跑完 → 回流 self_evolution。
