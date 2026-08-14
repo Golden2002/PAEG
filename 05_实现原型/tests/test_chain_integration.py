@@ -41,8 +41,15 @@ def test_intent_inference_short_input():
 
 
 def test_manim_suitability_inference():
-    """主题推断：subject 空时靠关键词识别 manim 主题。"""
-    from manim_service import infer_manim_suitability
+    """主题推断：subject 空时靠关键词识别 manim 主题。
+
+    v0.69+：manim 环境不可用时 skip（infer_manim_suitability 依赖 manim_service
+    初始化，无 manim 环境的 CI/新机器上是预期跳过）。"""
+    import pytest
+    try:
+        from manim_service import infer_manim_suitability
+    except Exception as _m_e:
+        pytest.skip(f"manim 环境不可用: {_m_e}")
     assert infer_manim_suitability('行列式的几何意义', '') is True
     assert infer_manim_suitability('文言文实词', '') is False
     print('[PASS] 主题推断: 行列式=True, 文言文=False')

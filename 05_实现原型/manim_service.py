@@ -7,7 +7,9 @@ LLM 生成 Manim 代码 → 隔离渲染 → 数学动画视频
 """
 import os, re, ast, subprocess, tempfile, uuid, sys, io
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+# v0.69+：stdout 包装移入 __main__——模块级替换会破坏 pytest capsys（import 时副作用）
+if __name__ == '__main__':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 from manim_speed import _SPEED_STANDARD_TEXT  # v0.64 ⭐ 速度规范固定化
 
