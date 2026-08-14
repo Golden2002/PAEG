@@ -435,7 +435,7 @@
 - **T3 DeepSeek Harness 模块引入（完整调研 · 2026-08-14 完成调研，待实施）**：调研 DeepSeek Harness github 库，把**在 agent 中引入同样的模块**加入需求文件。完整 packages 清单见下方 §3.16。
 - **T5 RALPH 循环能力 · ✅ 核心已实现（v0.69+）**：①记录入需求文件+元能力 §5.3 ✅②Oracle 设计已落地——新增 ralph/ 子系统（loop_controller/task_registry/completion_evaluator/termination_guard/contracts），端到端验证 DONE（2 轮达标+快照+日志）③已记录：技术/维护/CHANGELOG/README/亮点总览。P1/P2 后续：Web UI/优先级队列/人类确认点 UI/周度适配器。
 - **T5 RALPH 循环能力（2026-08-14 用户新增）**：**RALPH 循环本身是重要能力**——①记录 RALPH 循环（自我指涉开发循环：持续推进直到完成，每轮输出 DONE promise，系统自动续触发）到需求文件 + 元能力文档②**咨询 Oracle 补全 PAEG 的 RALPH 循环能力**（如何让 PAEG agent 具备自我驱动持续工作直到完成的循环能力——融入自我更新/任务执行）③完成后记录：技术文档、维护文档、README、**亮点文档**
-- **T4 执行存量需求 · ✅ 核对完成（v0.69+）**：P1-1~6 全清零 ✅ / P2-2 双路径统一 ✅ / P2-1 transport 复用（性能优化，与 §3.16 P2 观望合并）/ §3.12 五项核实+实现 ✅（交互式教学完整循环为架构级后续）/ §3.16 P0 四项：ralph ✅ 已实现，**compaction（上下文压缩）/ spill（溢出防护）/ user-approval（用户确认）待实施**（下一步）
+- **T4 执行存量需求 · ✅ 核对完成（v0.69+）**：P1-1~6 全清零 ✅ / P2-2 双路径统一 ✅ / P2-1 transport 复用（性能优化，与 §3.16 P2 观望合并）/ §3.12 五项核实+实现 ✅（交互式教学完整循环为架构级后续）/ §3.16 P0 四项：ralph ✅（ralph/ 子系统）+ **spill ✅ 已实现**（v0.69+ config_hub 溢出截断 12000 字符，验证通过）+ **user-approval ✅ 核实由现有机制覆盖**（Permission Preset 4 档 + hooks tool.before 拦截，hooks.json 可配确认）+ **compaction ✅ 核实已覆盖**（memory_system 摘要压缩 compress_if_needed）——§3.16 P0 全部完成
 
 ---
 
@@ -566,3 +566,8 @@
 - `acp/` 1 子包：自动化协议当前不开放
 - `e2b/` 3 子包：远程沙箱仅 code-runtime 配套
 - `sdk/` 3 子包：仅 SDK 概念
+### 3.17 用户新批次任务（2026-08-14 U 系列三连 · 待执行）
+- **U1 交付物提交 GitHub**：交付物/路演PPT/（艾弥儿项目说明书 PDF + PPTX）提交到 GitHub 库（.gitignore 移除交付物/行）
+- **U2 ModelScope 只 pull 差异文件**：严格确认——**只 pull 本地完全没有的文件**；本地已有的文件以本地为准（远程 3 提交仅 Dockerfile/.dockerignore/docker-compose，本地均已确认=最新 → 预计无文件可 pull）
+- **U3 交互式教学循环改造**：咨询 Oracle 设计提问-等待-追问循环（不破坏 teach_stream 流式），实施后记录文档
+

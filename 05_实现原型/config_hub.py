@@ -25,6 +25,10 @@ import threading
 from typing import Dict, List, Optional
 
 
+# v0.69+ §3.16 P0：spill 溢出防护阈值（工具返回超限截断，防 LLM 上下文爆掉）
+_SPILL_MAX_CHARS = 12000
+
+
 class ConfigHub:
     """统一配置中心：持有 MCP/Skills/Hooks/Workflows/内置工具 子模块。"""
 
@@ -168,6 +172,18 @@ class ConfigHub:
                 self.hooks.run_hook("tool.after", {"tool": name, "args": arguments, "result": _result})
             except Exception:
                 pass
+        # v0.69+ §3.16 P0：spill 溢出防护（借鉴 deepseek-harness guard/prompt-overflow）——
+        # 工具返回超长（MCP/PDF/联网大文档）会爆 LLM 上下文 → 截断 + 保留首尾 + 标记
+        try:
+            if isinstance(_result, str) and len(_result) > _SPILL_MAX_CHARS:
+                _keep_head = _SPILL_MAX_CHARS * 3 // 4
+                _keep_tail = _SPILL_MAX_CHARS - _keep_head
+                _result = (_result[:_keep_head]
+                           + f"\n\n[spill-guard] 工具 {name} 返回过长（{len(_result)} 字符），"
+                             f"已截断保留首 {_keep_head} + 尾 {_keep_tail} 字符。需要全文请分段请求。\n\n"
+                           + _result[-_keep_tail:])
+        except Exception:
+            pass
         return _result
 
     # ─── admin 查看 ───
