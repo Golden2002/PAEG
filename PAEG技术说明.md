@@ -26,6 +26,18 @@
 - **SSE**：流式推送——AI 边想边输出，像打字机一样逐字显示
 - **TRUTH_GROUNDING**：防幻觉底线——10 条规则强制 AI 不准编造，宁可说"不知道"
 
+
+## 最近更新（v0.70 · 2026-08-14）
+
+| 特性 | 说明 | 章节 |
+|---|---|---|
+| 深入版教学互动 | checkpoint 挂起等回答 + 评估 + 续讲 | 第3章 |
+| 数学可视化脚本生成 | 对话轮询→script.json→Manim 高质量动画 | 第3章/扩展 |
+| 教学物料包 workflow | teach_materials：一键产出 6 类物料 | 第3章 |
+| Harness 引入补全 | llm-retry/compaction/spill | 第4章 |
+| 语言规范/约束系统 MCP 标准化 | 开发中（§3.28/3.29） | 扩展指南 |
+| RALPH 循环 | 任务驱动持续改进 | 第4章 |
+
 ## 第 1 章 项目概览
 
 | 项 | 内容 |
@@ -73,6 +85,10 @@
 | **文档生成** | "生成讲义/要点/例题/笔记" | services/handlers/keyword_doc.py | 4 类 doc_type 模板切换，教学对话中关键词触发 |
 | **学习测评** | 出选择题 | services/quiz_service.py | 概念→单选题 JSON（题干/选项/正确索引/解析） |
 | **用户反馈** | 消息气泡 👍/👎 | /api/feedback | 前端按钮→feedback_log.jsonl→自我更新消费 |
+| **数学可视化视频** | 生成高质量数学动画 | visual_script_generator + manim_service | 对话+轮询→script.json（3B1B 原则）→Manim 渲染；脚本+讲稿+PPT+讲义+思维导图联动可下载 |
+| **教学视频** | 授课视频生成 | script_service（视频讲稿）+ 视频管线 | 大纲→口语化讲稿（秒数控制）→合成视频 |
+| **PPT** | 教学 PPT 生成 | pptx 管线 | 大纲→LLM 排版→.pptx |
+| **讲义/要点/例题/笔记** | 教学文档生成 | keyword_doc | 4 类 doc_type 模板，教学对话关键词触发 |
 
 ### F4 自我进化闭环
 
