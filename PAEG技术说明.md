@@ -498,20 +498,6 @@ flowchart TD
 ```
 
 
-
-### 数学可视化脚本生成器（v0.70+ §3.26 开发中）
-
-**流程**：对话+轮询（选择题/填空题收集主题/学段/时长/风格/核心直觉/前置概念）→ **生成 script.json**（单一真相源）→ 校验修补（7 铁律，最多 2 轮）→ **5 资产联动**（Manim 视频 + 讲稿 + PPT + 讲义 + 思维导图，全部可下载）。
-
-**方法来源**：3Blue1Brown 8 大原则（直觉先于形式化/单一聚焦/空间承载含义/慢而稳/停顿/文字最小化/回看锚点）+ manim_skill 社区库（scenes.md 模板/ManimCE 颜色语义与节奏规范）+ Oracle 设计。
-
-**script.json 结构**：meta（标题/受众/时长/风格）+ narrative_arc（hook/直觉先行/进阶路径）+ visual_system（调色板/语义绑定）+ scenes[]（concept/duration/narration/mobjects/animations/keyframes/prerequisites）+ qa_self_check。
-
-**核心模块**：visual_script_generator.py（系统提示词+生成）+ visual_script_validator.py（7 铁律校验+自动修补）+ manim_renderer（模板渲染，P1）+ 资产联动（P1-P2）。
-
-**可靠性**：脚本→确定性模板渲染（非 LLM 直出代码），LLM 只补 lambda/文案/keyframes；三级降级（自动修复→简化场景→静态分镜卡片）。
-
-
 ## 第 4 章 关键流程
 
 ### 4.1 教学生命周期（序列图要点）
@@ -544,6 +530,48 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 | 维护违禁词 | `normalize_text`/`language_policy_check`/`forbidden_words` MCP 工具（或直接编辑 data/forbidden_words.json 三类）——动态增删，不改代码 |
 | 调整约束层 | `constraint_layer_set` MCP 工具（教学/考试/自由层 0-7）或 `constraint_always_active` 固定永远生效规则 |
 | 约束自演化 | `constraint_self_evolve` 把教学洞察写入指定层组（落盘 data/constraint_layers.json） |
+
+---
+
+## 第 5 章附录 可扩展模块（框架化 · v0.70 ⭐）
+
+> **框架化原则**：所有可扩展能力（约束层级/语言规范/配置体系）都是"**内嵌默认内容 + 外部扩展**"双层结构——PAEG 自身的设计逻辑与内容 100% 保留为内嵌默认，外部开发者可在此基础上更换内容或拓展结构，**不破坏原设计**。
+
+### A. 约束层级框架（constraint_engine · §3.29）
+
+**框架化确认**：是。约束层级已框架化，其他开发者可：
+
+| 扩展操作 | 方法 | 示例 |
+|---|---|---|
+| **a. 更换每一层内容** | 编辑 `data/constraint_layers.json` 的 `layers`，同名层整体替换 | `{"5": ["M","R","X"]}` 替换 L5 放开组 |
+| **b. 拓展更多层级** | `layers` 加新键（任意 L8+），`constraint_layer_set(layer=N)` 立即生效 | `{"8": ["M","R","T","D","S","P"]}` 新增 L8 |
+| **c. 新增约束组** | `group_rules` 加新组，层定义引用即可 | `{"X": ["允许比喻"]}` + L5 含 X |
+| **d. 永远激活** | `data/always_active.json` 的 `rules` 不随任何层放开 | 加自定义底线 |
+
+**内嵌默认（PAEG 原设计完整保留，不可改源码）**：
+- 8 层（L0 绝对底线 → L7 自由创造）× 6 组开关矩阵（M 节奏/R 修辞/T 温度/D 教学法深度/S 学科教学法/P 哲学框架）
+- L0 保底 11 条（公式 LaTeX/语法完整/反伪共情/三条语言铁律/不重复/不煽情/学科风格/身份不泄漏/危机协议/反 AI 腔/关键信息先判断）
+- 6 组共 25 条放开规则（内嵌）
+- 3 位掩码兼容映射（MASK_A/B/C → L2-L7）
+
+**自省 API**：`constraint_layer_scope`（MCP 工具）返回当前层范围、内嵌/外部来源、可用组、扩展指南——二次开发者可直接调用了解框架。
+
+### B. 语言规范框架（lang_gate · §3.28）
+
+| 扩展操作 | 方法 |
+|---|---|
+| 增删违禁词 | `forbidden_words` MCP 工具（list/add/remove）或编辑 `data/forbidden_words.json` 三类（网络用语/伪共情/套话） |
+| 统一入口 | 所有生成内容过 `lang_gate_content`（L0 规则 + L2 薇依语料矫正），外部 agent 可调 `normalize_text` |
+| 内嵌默认 | AI_TELLS 577 项（去重 555）+ LANGUAGE_STYLE 规范 + 薇依语料 few-shot——完整保留 |
+
+### C. 配置体系框架（config_hub）
+
+| 扩展操作 | 方法 |
+|---|---|
+| 接 MCP 工具 | `config/mcp_servers.json` 加声明 → `/api/admin/reload` 热更新 |
+| 新增 skill | `skills/<name>/SKILL.md`（frontmatter + 正文）→ 自动注册 |
+| 编写 workflow | `config/workflows/<name>.json`（DAG）→ run_workflow__ 路由 |
+| 新增钩子 | `config/hooks.json` 加 {event, module, function} |
 
 ---
 
@@ -670,3 +698,67 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 | data/constraint_layers.json | 外部约束层覆盖（self_evolve 落盘） |
 | data/always_active.json | 永远激活规则（外部维护） |
 | 09_GUI前端/index.html | Web UI（含 checkpoint 问答面板/反馈按钮） |
+
+---
+
+## 附录 C 技术创新亮点（v0.70 ⭐）
+
+> 展示 PAEG 核心技术创新的**原创设计亮点**——每个都是"独立设计思想 + 可框架化/可扩展 + 构成技术壁垒"的量级。全规范模块与动态约束模块为本次 v0.70 新增的并列双亮点。
+
+### C.1 全规范模块：语言规范 MCP 化（§3.28）
+
+**一句话**：把"语言像真人"从散落的函数调用升级为**统一入口 + 外部数据 + 标准工具**的可治理服务——外部 agent 也能调用 PAEG 的语言规范能力。
+
+| 维度 | 内容 |
+|---|---|
+| **统一入口** | 13 处 `_polish_text` 收敛为 `lang_gate_content`（L0 规则检测 + L2 薇依语料深度矫正双守门），调用点不散调 |
+| **违禁词数据化** | `forbidden_words.json` 外部数据源（网络用语/伪共情/套话三类），language_refiner 启动合并内嵌 AI_TELLS（577 项去重 555 + 外部 18），文件缺失容错 |
+| **MCP 三工具** | `normalize_text`（生成内容统一过语言规范）/ `language_policy_check`（AI 味概率+违禁词命中，不调 LLM 零成本）/ `forbidden_words`（list/add/remove 动态维护禁词，不改代码） |
+| **示例** | `normalize_text("简单来说，这个公式的推导很关键，加油！")` → `"这个公式的推导是关键的。我们来说明一下它的来龙去脉。"` |
+| **创新点** | ①语言规范独立于模型性能（L1 提示词约束 + L0/L2 规则矫正 + 违禁词兜底三层）②MCP 化使外部智能体可复用 ③数据化可动态治理（对应元能力"标准化工具开发"4 原则） |
+
+### C.2 动态约束模块：L0-L8 约束引擎 MCP 化（§3.29）
+
+**一句话**：L0-L8 分层约束从"prompts.py 常量"升级为**6 API 约束引擎 + 可框架化扩展**——动态切换层、任意组合、永远激活、自我演化、反馈调强，全部数据化落盘。
+
+| 维度 | 内容 |
+|---|---|
+| **6 API 全覆盖** | `layer_get`（读层放开组）/ `layer_set`（动态切换教学/考试/自由，支持外部扩展层）/ `compose`（任意提示词块拼接）/ `always_active`（永远激活不随层放开）/ `self_evolve`（教学洞察自动提炼入层）/ `feedback_adjust`（"太啰嗦→放宽节奏、太深→收紧深度"信号映射） |
+| **框架化** | 内嵌 8 层 × 6 组（PAEG 原设计完整保留）+ 外部 JSON 可更换层内容/拓展 L8+ 层级/新增组；`constraint_layer_scope` 框架自省 API |
+| **示例** | `constraint_feedback_adjust("你讲得太啰嗦了")` → 检测到『啰嗦』→ 建议放宽节奏组(M) + 落盘反馈日志；`constraint_self_evolve("分步讲解时先给结论再展开")` → 自动写入 L5 组 M |
+| **创新点** | ①8 层线性约束谱（L0 绝对底线→L7 自由创造，crisis 强制 L1）②"约束"作为可治理资源（自演进/反馈调强=agent 自创生性）③框架化双层结构（内嵌默认+外部扩展） |
+
+### C.3 同等量级技术创新一览（explore 调研确认 · 2026-08-14）
+
+> 与 C.1/C.2 旗鼓相当的项目内技术创新（按"框架化深度 × MCP/插件化形态 × 不可复制壁垒"三维度评估）。
+
+| 等级 | 亮点 | 核心创新机制 | 实现证据 |
+|---|---|---|---|
+| **A+** | **RALPH 持续改进子系统** | 6 模块任务驱动循环：Verdict 承诺协议（DONE/CONTINUE/ABORT）+ L0-L2 三层完成判定 + 五道防线防呆（轮次上限/收益递减/质量回退/人类确认/资源熔断）+ 任务注册表持久化 + 优先级队列 | ralph/ 6 模块（contracts/loop_controller/completion_evaluator/termination_guard/task_registry） |
+| **A+** | **插件生态中枢（config_hub 三件套）** | MCP/Skills/Hooks/Workflows 四子 hub 统一注册 + 热更新 + waterfall+next() 钩子链 + matcher 引擎 + DAG 工作流 + 两道防护（repeat_guard 防重复调用循环 + spill_guard 防上下文爆掉） | config_hub.py + hooks_hub.py + workflows_hub.py + config/*.json |
+| **A** | **17 维学生画像 Individuality** | 16+1 维正交 dataclass + L1/L2/L3 三级注入 + add_dimension 动态扩展（加到第 18/19 维不破坏 to_prompt）+ 增量建模 merge 算法 + 五层注入控制（语言/风格/深度/节奏/情绪）+ 持久化闭环 | student_trait.py（956 行）+ subagents.py Individuality |
+| **A-** | **3B1B 数学可视化剧本生成器** | 8 项铁律形式化（渐进揭示/单一聚焦/颜色语义/节奏/文字最小化/构图/回看锚点/依赖显式）+ 5 段式 JSON Schema + 校验修补循环（失败→重生成最多 2 轮）——3B1B 方法论工程化封装 | visual_script_generator.py + visual_script_validator.py |
+
+### C.4 自我更新模块（四路自进化 + 质量门禁闭环 · F4 展开）
+
+**一句话**：PAEG 的自我更新不是"记录日志"，而是**四路进化 + 四层门禁 + 热加载闭环**的完整自成长系统——每次教学都沉淀为下一次教学的能力。
+
+| 维度 | 内容 |
+|---|---|
+| **四路进化** | ①知识蒸馏（教学→LLM 提炼→evolved_*.json）②提示词补丁（反思→subject_patches.md→注入下次教学）③工具经验（工具成败→LLM 提炼→tool_lessons.md，40KB 限长）④学科需求闭环（用户问新学科→记录→反馈） |
+| **四层门禁 QualityGate** | L1 宪法硬规则（有害/注入/PII）→ L2 长度去重 → L3 LLM 多维评分（factuality/safety/pedagogy）→ L4 证据沙盒 |
+| **热加载闭环** | evolved 写入→reload_library→KB 即时可检索（G3，无需重启） |
+| **被动 + 主动双子生态** | 四路自进化（被动，教学后沉淀）+ RALPH 循环（主动，任务驱动持续改进）——自成长双引擎 |
+| **动态提示词拼接** | compose_dynamic_prompt tool：LLM 主动调取 subject_patches/tool_lessons/教师笔记动态段，与固定 system 合并 |
+| **创新点** | ①蒸馏有门禁（不是什么都进）②失败案例也可提炼（ReasoningBank 反直觉）③G1-G11 闭环全验证（流式蒸馏/门禁澄清/热加载/教学记忆/LLM 提炼） |
+
+### C.5 更多亮点速览（简明）
+
+| 亮点 | 一句话 |
+|---|---|
+| **哲学三角情绪支持** | 胡塞尔（如何看）+ 薇依（为何看）+ 尼采（看完后重新站立）+ 危机协议（先回应再关怀 + 12356 热线 + 尊重拒绝）——不可复制的价值观壁垒 |
+| **防幻觉底层约束** | TRUTH_GROUNDING 10 条底线（不编造/信源为绝对命令/允许说不知道）注入全模式，幂等兜底 |
+| **九模块教学底座** | 诊断→计划→呈现→评估→调整→反思→自更新完整闭环，评估用确定性启发式（可复现不随机） |
+| **三层记忆** | SESSIONS 短期 + 画像长期 + 教学记忆语义层（token 估算 + 摘要压缩） |
+| **教学物料 workflow** | teach_materials DAG：一个主题→6 类物料（知识导图/讲义/PPT/讲稿/视频脚本/数学动画）联动可下载 |
+| **权限预设** | read_only/standard/exam/full 四档，exam 锁写工具（借鉴 deepseek-harness） |

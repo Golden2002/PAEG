@@ -802,3 +802,15 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 ### 3.31 DeepSeek Harness 继续调研（2026-08-14 用户 ULW · 待执行）
 - **需求**：继续调研 DeepSeek Harness github 库（新发布内容）→ 为需求文档更新需求
 
+### 3.32 sub agent 模型配置化 + 面向用户配置化定制服务（2026-08-14 用户新指令 · 待实施）
+- **背景**：用户观察到 Oh My OpenCode 支持 JSON 配置为每个 sub agent 分配不同模型；询问 PAEG 是否支持（现状：不支持——所有 LLM subagent 共用同一个 model_api，paeg.py 统一传入）
+- **需求**：①设计 config/agents.json——每 subagent 可配置 model/provider/temperature/prompt/工具开关 ②探索项目其他方面可配置化（面向用户的可定制服务，如教学风格/学科/人格）③咨询 Oracle + 联网检索 opencode/codex/DeepSeek Harness 最新实践 ④按需求文档实施 ⑤上传示例配置 + push GitHub
+- **执行**：先记录入需求文档 → 并行调研（librarian 联网 + explore 项目现状）→ Oracle 方案 → 实施 → 示例 + 上传
+- **优先级**：P0
+- **现状核查（2026-08-14 已完成）**：
+  - paeg.py 构造时统一创建 model_api → 传 Diagnostor/Planner/Presenter/Evaluator/Adapter/ResourceLibrarian/LanguageRefiner/SelfEvolver（8 个 LLM subagent）
+  - subagent 类构造器接受 `model` 参数（`_safe_chat`/`_safe_reason_chat` 函数级传入）——**改造基础已具备，成本低**
+  - llm_adapter.create_llm 已支持 provider 选择（auto/reasoner/flash 等）
+  - 无 per-subagent 模型 JSON 配置；无面向用户的 subagent 定制配置
+- **设计方向（调研后细化）**：config/agents.json schema：`{"diagnostor": {"model": "reasoner", "temperature": 0.3, "prompt_ref": "diagnostor_v2", "tools": [...]}, ...}`；缺失回退默认；paeg.py 按配置创建各 subagent model
+

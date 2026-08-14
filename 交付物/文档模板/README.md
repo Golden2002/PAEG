@@ -79,8 +79,37 @@ final = tpl.replace("{{CONTENT}}", content_html)
 
 **9. Playwright 用系统 Edge**：`channel='msedge'`（无需下载 chromium）——`pip install playwright` 即可，浏览器用系统自带 Edge。
 
+**10. Mermaid 高对比度主题（图9/15 深色文字修复 · v0.70）**：
+- 原 `theme:'neutral'` 渲染 sequenceDiagram 时出现**深色文字 + 深色背景不可见**（如 SSE 节点）
+- 修复：`theme:'base'` + 显式 themeVariables（`background:#ffffff / primaryColor:#f0f4ff / primaryTextColor:#1a1a2e / actorBkg/actorBorder/actorTextColor/noteBkgColor...`）+ CSS 强制覆盖（`.mermaid text,tspan { fill:#1a1a2e !important }` 等）
+- **教训**：不要只调 theme 名，sequenceDiagram 的 actor/note/activation 配色必须显式声明——高对比度原则（浅底深字）对所有 Mermaid 图类型统一生效
+
+**11. 封面背景截断教训（Chromium print 大高度渐变只画 ~50-62%）**：
+- `.cover` 高度 297mm/1122px + 渐变背景在 `page.pdf` 中**只渲染上半**（Chromium print 对大高度元素背景的已知 bug）
+- 尝试过：px 固定高度 / mm / prefer_css_page_size / dsf=1 独立页 / base64 SVG 背景 / PyMuPDF 流前缀 / insert_image(overlay=False)——**均无法根治**（fitz 渲染 Chromium PDF 还有兼容白屏问题）
+- **结论**：接受既有状态（v0.69 同款，渐变到签名行），不强行全页背景；**关键修复优先于完美背景**（图 9/15 文字可见性是用户核心诉求）
+
+**12. 图片排版留白控制（v0.70 用户要求）**：
+- 单页大图时上方易有大片空白 → 用 `margin:8mm auto` + `max-height:170mm` + 行高/段距微调（行高 1.85 / 段距 15pt）让图尽量贴上下文
+- 宁可一页一张图，也不留 >半页空白——图前段距压缩、图后紧跟说明文字
+
+**13. 表格框线去重（双底线修复）**：
+- `table { border-bottom: none }` + `tbody tr:last-child td { border-bottom: 0.6pt }`——外框底边与末行边框叠加会成**双线**；thead 用 `border-bottom` 单独声明，tbody 各行 `border-bottom` 保证横线连续不断
+- 每次改样式后渲染测试文档 + Edge 截图检查（封面/正文/表格三处）
+
+**14. Mermaid 图容器化（v0.71 排版优化 · 核心）**：
+- **dsf=1 截图**：`device_scale_factor=2` 使 PNG 高 2 倍产生超长窄图+大片空白；改 dsf=1 后 PNG 尺寸减半，文件 2.5MB→2.2MB
+- **figure 容器**：`.mermaid-fig` 统一控制（`max-width:174mm` 页宽自适应 + `max-height:215mm` 留页眉页脚缓冲 + `object-fit:contain`）+ 浅色底/圆角/细边框/微阴影提升视觉完成度
+- **`.tall` 类**：高窄图（viewBox h>1.6w）加 `.tall` 允许跨页（`page-break-inside:auto`）——根治"一页一张图+大片空白"
+- **防节尾空白**：`h2/h3 + figure { page-break-before: avoid }` 防标题孤立页底；`figure + p { margin-top:-2mm }` 图后段落拉近
+- **教训**：不要把"图后短段落"自动转 figcaption——文档里的"图 N · 标题"段落是既有标题，误判会导致重复标题+隐藏原文（第 8 页 Mermaid 显示源码的根因）。保留既有标题，不做自动 caption
+
+**15. 图片排版留白策略（v0.71 用户要求）**：单页大图上方易大片空白 → ①图容器 max-width/height 双约束 ②高窄图允许跨页 ③图后段落拉近 ④h2/h3 与图 page-break-before:avoid ⑤宁可一页一张图也不留 >半页空白
+
 ## 更新日志
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
 | 2026-08-14 | v0.70 | 初始模板（visual-engineering 设计）：封面三段式（品牌/标题/元信息）+ 能力亮点区 + 页眉页脚 + 表格跨页 + 代码块样式 |
+| 2026-08-14 | v0.70.1 | Mermaid 高对比度主题（theme:base + themeVariables 显式配色 + CSS 强制覆盖）修复图9/15 深色文字不可见；封面亮点卡提亮（rgba 0.10→0.17 + 纯白标签 + 亮青数字）；dsf=1 独立 PDF 页面；经验记录 #10-13（高对比度主题/封面截断教训/图片排版/表格框线） |
+| 2026-08-14 | v0.71 | Mermaid 图容器化排版优化（Oracle+visual 双咨询）：dsf=1 截图（PNG 减半）+ figure 容器（max-width/height 双约束 + 浅色底圆角细边框）+ .tall 高窄图跨页 + 节尾防空白（h2/h3 与图 page-break-before:avoid + 图后段落拉近）+ 修复 figcaption 误判既有标题；经验 #14-15 |
