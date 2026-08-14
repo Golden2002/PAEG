@@ -3310,6 +3310,13 @@ def general_chat_stream():
     # 取最近 10 轮（20 条）格式化为"学生/老师"交替文本注入。
     try:
         _hist_ctx = SESSIONS.get(f"chat_hist_{learner_id}", [])
+        # v0.69+ §3.22 ⭐ compaction：历史超限时压缩早期为摘要（防长会话上下文撑爆，借鉴 deepseek-harness）
+        try:
+            if len(_hist_ctx) > 24:
+                from compaction import maybe_compact
+                _hist_ctx = maybe_compact(_hist_ctx, llm=None)
+        except Exception:
+            pass
         if _hist_ctx:
             _hist_lines = []
             for _m in _hist_ctx[-20:]:

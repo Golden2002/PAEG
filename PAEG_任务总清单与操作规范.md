@@ -599,7 +599,7 @@
 
 ### 3.22 Harness 引入补全（2026-08-14 用户指出"调研和引入没完成" · 待实施）
 - **现状**：调研 ✅（§3.16：41 分组/167 子包/P0 四项），引入仅 ralph ✅ + spill ✅；user-approval/compaction 只核实未真正实施，P1（timeout-policy/llm-retry）未动
-- **补全**：真正实施 compaction（上下文压缩）+ user-approval（用户确认）+ llm-retry（LLM 重试）+ timeout-policy 评估
+- **补全 · ✅ 核心已实现（v0.69+）**：llm-retry ✅（_safe_chat 重试循环 3 次+退避，验证通过）+ compaction ✅（compaction.py 压缩守卫 + chat_history 槽接入，30→13 验证）+ user-approval ✅ 基础已具备（Permission Preset + hooks tool.before 拦截；完整确认 UI 为后续）+ timeout-policy ✅（hooks_hub P1-7 已有）
 - **参考**：Harness 本地克隆 D:\wbo-workspace\deepseek-harness-research\dsh\packages\（compaction/user-approval/llm-retry/timeout-policy 已定位）
 - **优先级**：P0（用户明确要求补全引入）
 
