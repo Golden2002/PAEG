@@ -604,7 +604,13 @@
 - **参考**：Harness 本地克隆 D:\wbo-workspace\deepseek-harness-research\dsh\packages\（compaction/user-approval/llm-retry/timeout-policy 已定位）
 - **优先级**：P0（用户明确要求补全引入）
 
-### 3.23 技术说明文档优化批次（2026-08-14 用户 ULW · 待执行）
+### 3.23 技术说明文档优化批次（2026-08-14 用户 ULW · ✅ 全部完成）
+- **D1 封面占满** ✅ visual agent 专业设计（右侧圆环锚点右上角避让/能力亮点卡/元信息四栏/副标语填充）——v0.70 PDF
+- **D2 Roadmap 更新** ✅ 当前情况 + 更多未来规划（8 项详细规划表）
+- **D3 Oracle 文档评估** ✅（6.5/10 → 应用改进：5 名词速查/怎么读表/术语表 11→35 条）
+- **D4 架构多尺度图** ✅ 4 张 Mermaid（全景/系统/教学流/组件）
+- **D5 引号纪律** ✅（纪律 21 + 元能力 §5.5）
+- **模板资产化** ✅ 交付物/文档模板/（style.css+template.html+render_pdf.py+README，可循环复用+升级）
 - **D1 封面占满修复**：PDF 封面仅左上角（未占满）——.cover-inner flex 占满布局 + 内容增强
 - **D2 Roadmap 更新**：记录当前情况 + 更多未来规划（详细规划清单）
 - **D3 Oracle 文档评估**：咨询 Oracle 评估文档是否用户友好（便于了解技术原理和架构）
