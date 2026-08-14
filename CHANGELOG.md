@@ -1,3 +1,25 @@
+### v0.70 语言规范 MCP 标准化 + L0-L8 约束引擎 MCP 化 + Harness 深调研（2026-08-14 ⭐）
+
+**本版定位**：①语言规范模块 MCP 化（统一入口 + 违禁词数据化 + 三工具）②L0-L8 约束系统 MCP 化（constraint_engine 6 API）③DeepSeek Harness 架构深调研（30 项优化需求记录）。
+
+**语言规范 MCP 标准化（§3.28，用户 ULW）**：
+- Phase 1-2：13 处 `_polish_text` 收敛为 `lang_gate_content` 统一入口（9 文件）+ 补 /api/solve 与知识导图漏洞
+- Phase 3：违禁词数据化 `data/forbidden_words.json`（extra_forbidden/pseudo_empathy_verbs/ai_tells_extra）——language_refiner 启动合并加载（内嵌 AI_TELLS 577 项去重 555 + 外部 18，dict.fromkeys 去重，文件缺失容错）
+- Phase 4：MCP 三工具双层注册（tool_registry + mcp_gateway）——`normalize_text`（L0+L2 统一守门）/ `language_policy_check`（AI 味概率 + 违禁词命中，不调 LLM）/ `forbidden_words`（list/add/remove 幂等落盘）
+- 修复 `_BUILTIN_NAMES` 去重漏洞（config_hub 回灌内置定义导致 compose_dynamic_prompt 等 4 工具重复 → 54 工具无重复）
+
+**L0-L8 约束引擎 MCP 化（§3.29，Oracle 设计）**：
+- 新建 `constraint_engine.py`：6 API——layer_get（读层放开组/规则）/ layer_set（动态切换层，复用 _build_constraint_layers）/ compose（任意提示词块拼接）/ always_active（永远激活管理，内嵌 L0 11 条 + 外部）/ self_evolve（洞察写入层组，数据化落盘）/ feedback_adjust（信号词映射：啰嗦→loosen_m、太直接→tighten_t、太机械→loosen_s、太浅→loosen_d、太深→tighten_d）
+- 双层注册 6 工具（always_active/self_evolve 标 write 风险入 exam 黑名单）+ 数据化（constraint_layers.json/always_active.json/constraint_feedback_log.jsonl）
+- 验证：6 API 全测 + MCP 网关真实调用 + 42 测试全过
+
+**DeepSeek Harness 深调研（§二 Step 2，用户要求 ≥16 项）**：
+- 官方架构文档全文 + Cordis 原语（Service/Inject/4 事件模式/Effect/Scope）+ 4 预设差异 + patch 加载顺序 + capability seams + 权限预设 + 子代理 provider
+- 产出 30 项 PAEG 优化需求（9 P0 + 14 P1 + 7 P2，含 H-1~H-18 速查表）+ 4 阶段实施路线（6-10 周）+ 30+ permalinks
+- 技术说明图 9/15 深色文字+深色背景不可见问题记录（待技术说明任务修复）
+
+**测试修复**：skill 断言更新为 11 技能（含 teaching-capability）+ MCP stats() 更新为 connect_all/list_tool_defs 实际 API——42 工具相关测试全过。
+
 ### v0.69 自我更新闭环 + 配置体系运行时接入 + 哲学专项 + 防幻觉（2026-08-14 ⭐）
 
 **本版定位**：①自我更新闭环全链路修复（G1 流式蒸馏/G2 门禁澄清/G3 热加载/G5 教学记忆/G6 工具经验 LLM 提炼）②独立配置体系（config_hub/hooks/workflows）真正接入运行时（Step4 P0 断链修复）③哲学学科专项教学能力 ④防幻觉底线（TRUTH_GROUNDING）覆盖全模式 ⑤10 条执行纪律固化。

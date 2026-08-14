@@ -395,3 +395,9 @@ PAEG 具备**任务驱动的自我驱动循环**：围绕改进任务做"执行�
 PAEG 可生成**高质量数学可视化视频**：对话+轮询收集需求 → 生成动画脚本（script.json，遵循 3Blue1Brown 方法论）→ 渲染 Manim 动画 → 同步产出讲稿/PPT/讲义/思维导图（全部可下载）。
 ## 教学物料包 workflow（v0.70+）
 `teach_materials` 工作流：一个主题 → 自动产出 6 类教学物料（知识导图/讲义/PPT/讲稿/视频脚本/数学动画）→ 打包为资产供下载。DAG 并行执行，物料间自动衔接。
+
+## 语言规范 MCP 标准化（v0.70+ · §3.28）
+语言规范从"散落的函数调用"升级为**统一入口 + 外部数据 + 标准工具**的插件服务：13 处 `_polish_text` 收敛为 `lang_gate_content` 统一守门；违禁词数据化 `forbidden_words.json`（可动态维护不改代码）；MCP 三工具 `normalize_text`（生成内容统一过语言规范）/ `language_policy_check`（AI 味+违禁词零成本检测）/ `forbidden_words`（list/add/remove）。外部 agent 也能调用 PAEG 的语言规范能力。
+
+## L0-L8 约束引擎 MCP 化（v0.70+ · §3.29）
+L0-L8 分层约束升级为 **6 API 约束引擎**：`layer_get`（读层放开组）/ `layer_set`（动态切换教学/考试/自由层）/ `compose`（任意提示词块拼接）/ `always_active`（永远激活，不随层放开）/ `self_evolve`（教学洞察自动提炼入层，数据化落盘）/ `feedback_adjust`（"太啰嗦→放宽节奏、太深→收紧深度"信号映射）。约束系统可治理、自演进、反馈调强。
