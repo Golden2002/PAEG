@@ -161,6 +161,8 @@ class LanguageRefiner:
     def __init__(self, llm, corpus_path: Optional[str] = None):
         self.llm = llm
         self.corpus = self._load_corpus(corpus_path)
+        self.ai_tells = list(dict.fromkeys(AI_TELLS))  # 内嵌去重（AI_TELLS 含历史重复项）
+        self._load_extra_forbidden()
 
     def _load_corpus(self, corpus_path: Optional[str] = None):
         """加载薇依语料。"""
@@ -172,10 +174,25 @@ class LanguageRefiner:
         except Exception:
             return []
 
+    def _load_extra_forbidden(self):
+        """v0.70 §3.28 Phase 3: 加载 data/forbidden_words.json 外部禁词，与内嵌 self.ai_tells 合并。"""
+        path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), 'data', 'forbidden_words.json')
+        try:
+            with open(path, encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception:
+            return
+        extra = data.get('extra_forbidden', []) + data.get('ai_tells_extra', [])
+        for w in extra:
+            if isinstance(w, str) and w and w not in self.ai_tells:
+                self.ai_tells.append(w)
+
+
     def detect_ai_tells(self, text: str) -> list:
         """检测文本中的 AI 痕迹。返回命中的模式列表。"""
         hits = []
-        for tell in AI_TELLS:
+        for tell in self.ai_tells:
             if tell in text:
                 hits.append(tell)
         return hits
