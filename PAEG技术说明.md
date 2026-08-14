@@ -1,4 +1,4 @@
-# PAEG 教育智能体 — 简明技术说明（v0.69）
+# PAEG 教育智能体 — 简明技术说明（v0.70）
 
 > 面向项目所有者：快速恢复对 PAEG 技术实现的全貌认知。
 > 结构：TL;DR → 能力全景（每个功能：技术路线 + 实现方法）→ 分层架构 → 关键流程 → 扩展指南。
@@ -26,17 +26,6 @@
 - **SSE**：流式推送——AI 边想边输出，像打字机一样逐字显示
 - **TRUTH_GROUNDING**：防幻觉底线——10 条规则强制 AI 不准编造，宁可说"不知道"
 
-
-## 最近更新（v0.70 · 2026-08-14）
-
-| 特性 | 说明 | 章节 |
-|---|---|---|
-| 深入版教学互动 | checkpoint 挂起等回答 + 评估 + 续讲 | 第3章 |
-| 数学可视化脚本生成 | 对话轮询→script.json→Manim 高质量动画 | 第3章/扩展 |
-| 教学物料包 workflow | teach_materials：一键产出 6 类物料 | 第3章 |
-| Harness 引入补全 | llm-retry/compaction/spill | 第4章 |
-| 语言规范/约束系统 MCP 标准化 | 开发中（§3.28/3.29） | 扩展指南 |
-| RALPH 循环 | 任务驱动持续改进 | 第4章 |
 
 ## 第 1 章 项目概览
 
@@ -85,10 +74,7 @@
 | **文档生成** | "生成讲义/要点/例题/笔记" | services/handlers/keyword_doc.py | 4 类 doc_type 模板切换，教学对话中关键词触发 |
 | **学习测评** | 出选择题 | services/quiz_service.py | 概念→单选题 JSON（题干/选项/正确索引/解析） |
 | **用户反馈** | 消息气泡 👍/👎 | /api/feedback | 前端按钮→feedback_log.jsonl→自我更新消费 |
-| **数学可视化视频** | 生成高质量数学动画 | visual_script_generator + manim_service | 对话+轮询→script.json（3B1B 原则）→Manim 渲染；脚本+讲稿+PPT+讲义+思维导图联动可下载 |
-| **教学视频** | 授课视频生成 | script_service（视频讲稿）+ 视频管线 | 大纲→口语化讲稿（秒数控制）→合成视频 |
-| **PPT** | 教学 PPT 生成 | pptx 管线 | 大纲→LLM 排版→.pptx |
-| **讲义/要点/例题/笔记** | 教学文档生成 | keyword_doc | 4 类 doc_type 模板，教学对话关键词触发 |
+
 
 ### F4 自我进化闭环
 
@@ -110,6 +96,10 @@
 | **讲义/PPT/视频/manim/思维导图** | 制作教学材料 | 文件生成器 + MCP | 能力清单注入（_build_capability_manifest）→ LLM 判断何时生成 → manim 动画（manim_service）/PPT（mcp__pptx）/讲义（keyword_doc）/视频脚本（script_service）/思维导图（knowledge_map） |
 | **MCP 工具链** | 联网/文件/检索 | 25 个 MCP 工具 | filesystem/memory/brave-search/pptx 等；config_hub 统一路由（mcp__ 前缀），spill 溢出防护（超 12000 字符截断） |
 | **语音朗读** | 播放回复 | /api/voice/tts | 前端朗读按钮→TTS |
+| **数学可视化视频** | 生成高质量数学动画 | visual_script_generator + manim_service | 对话+轮询→script.json（3B1B 原则）→Manim 渲染；脚本+讲稿+PPT+讲义+思维导图联动可下载 |
+| **教学视频** | 授课视频生成 | script_service（视频讲稿）+ 视频管线 | 大纲→口语化讲稿（秒数控制）→合成视频 |
+| **PPT** | 教学 PPT 生成 | pptx 管线 | 大纲→LLM 排版→.pptx |
+| **讲义/要点/例题/笔记** | 教学文档生成 | keyword_doc | 4 类 doc_type 模板，教学对话关键词触发 |
 
 ### F6 配置与扩展体系
 
@@ -121,6 +111,8 @@
 | **工作流** | 声明式流程 | workflows_hub.py | teach_minimal/teach_concept DAG（诊断→计划→实施→评估），run_workflow__ 路由 |
 | **权限预设** | 考试模式锁写工具 | Permission Preset | read_only/standard/exam/full 四档，exam 禁写工具 |
 | **动态提示词拼接** | LLM 主动调取自我更新补丁 | compose_dynamic_prompt tool | LLM 调用返回 subject_patches/tool_lessons/教师笔记 动态段合并 |
+| **语言规范 MCP 化** | 语言质量成为可治理服务 | lang_gate + forbidden_words.json | 统一入口（13 处收敛 lang_gate_content）+ 违禁词数据化（内嵌 AI_TELLS 去重 555+外部 18）+ MCP 三工具（normalize_text/language_policy_check/forbidden_words），外部 agent 可调用 |
+| **约束引擎 MCP 化** | L0-L8 约束可治理/自演进 | constraint_engine.py | 6 API（layer_get/set/compose/always_active/self_evolve/feedback_adjust）+ 数据化落盘（constraint_layers.json/always_active.json/feedback_log） |
 
 ### F7 安全与质量保障
 
@@ -128,7 +120,7 @@
 |---|---|---|---|
 | **防幻觉底线** | 不编造事实 | TRUTH_GROUNDING | 10 条底线（绝不编造/信源为绝对命令/允许说不知道）注入全模式（presenter/general_chat/affection），幂等 |
 | **质量门禁** | 自我更新入库审核 | QualityGate | L1 宪法（有害/注入/PII）→L2 硬规则→L3 LLM 多维评分（factuality/safety/pedagogy）→L4 证据沙盒 |
-| **语言规范** | 输出像人话 | LANGUAGE_STYLE + polish/refiner | 三层语言规范（主谓宾/词法/介词）+ 薇依语料矫正 + 反 AI 腔 |
+| **语言规范** | 输出像人话 | LANGUAGE_STYLE + lang_gate + refiner | L1 提示词约束（主谓宾/词法/介词）+ L0/L2 规则+薇依语料矫正 + 违禁词兜底（内嵌 AI_TELLS + 外部 forbidden_words.json 合并）——统一入口 lang_gate_content，MCP 工具化（§3.28） |
 | **安全协议** | 危机/有害内容 | safety.py | 危机识别（自伤/自杀）→ 注入指引不短路；有害内容 L1 拦截 |
 | **事实锚定** | 真实信息优先 | 知识库检索 + 联网降级栈 | web_search（Brave→Tavily→Serper→Bing 降级）；知识库优先 |
 
@@ -549,6 +541,42 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 | 新增 skill | `skills/<name>/SKILL.md`（frontmatter: name+description + Markdown 正文）→ 自动注册 |
 | 编写 workflow | `config/workflows/<name>.json`（DAG：steps+depends_on）→ run_workflow__ 路由 |
 | 新增钩子 | `config/hooks.json` 加 {event, module, function} → 事件触发 |
+| 维护违禁词 | `normalize_text`/`language_policy_check`/`forbidden_words` MCP 工具（或直接编辑 data/forbidden_words.json 三类）——动态增删，不改代码 |
+| 调整约束层 | `constraint_layer_set` MCP 工具（教学/考试/自由层 0-7）或 `constraint_always_active` 固定永远生效规则 |
+| 约束自演化 | `constraint_self_evolve` 把教学洞察写入指定层组（落盘 data/constraint_layers.json） |
+
+---
+
+## 第 5A 章 DeepSeek Harness 借鉴蓝图（2026-08-14 调研）
+
+> 来源：[github.com/deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（81.5k stars · MIT）——**一切皆插件**（Everything is a Plugin），Cordis 驱动。PAEG 依据其架构产出 **30 项优化需求**（§二 Step 2 需求文档，9 P0 + 14 P1 + 7 P2）。
+
+### 核心架构五要点（PAEG 已落地部分标注）
+
+| dsh 机制 | 原理 | PAEG 对应状态 |
+|---|---|---|
+| **无特权核心** | 模型适配器/工具注册表/会话日志/agent 循环全是插件，注册即副作用（卸载自动 unwind）| config_hub 插件体系（MCP/skills/hooks/workflows）✅ 部分对齐 |
+| **Patch 行级覆盖** | YAML `- id:` 整体替换 config（非 deep merge）；`disabled: !!js expr` 条件启停 | constraint_layers.json 外部层覆盖 ✅ 已用同思想 |
+| **Profile/Bundle 分层** | profile = bundles 堆叠 + 用户 patch + --patch overlay；`--dump-config` 打印可 patch 树 | ❌ 待实施（H-2） |
+| **事件三分域** | session 事件（持久）/ agent 事件（拦截进行中工作）/ 能力事件（fs/tools 接缝）| hooks_hub 7 事件 ✅ 部分对齐 |
+| **Capability Seam** | Service Definition/Provider/Consumer 三角色，换 provider 换全产品 | ❌ 待实施（H-5/#11） |
+
+### 30 项优化需求速查（完整清单见需求文档 §二 Step 2）
+
+**P0（9 项，长期蓝图核心）**：#1 subagent patch · #2 profile bundle · #3 persona 外置 · #7 教学预设 · #8 PresetService · #11 三角色重构 · #12 LLM Provider Seam · #13 Shell Seam · #21 Subagent Registry
+
+**P1（14 项）**：#4 !!js 条件 · #5 home overlay · #9 per-agent scope · #10 preset 结构 · #14 tool 按需加载 · #15 Session Event Log · #18 权限预设升级 · #19 权限事件 · #22 subagent report · #24/25 UI 模式化 · #27 self-update via patch · #29 多级 skill · #30 ctx registry
+
+**P2（7 项）**：#6 OS 双轨 · #16 hooks 瀑布 · #17 subprocess 抽象 · #20 custom 状态 · #23 fresh-agent loop（对照 RALPH）· #26 HMR · #28 Constitutional patch
+
+### 建议实施路线（4 阶段，6-10 周）
+
+- **Phase 1 运行时底座**（1-2 周）：#30 ctx registry / #12 LLM Seam / #13 Shell Seam / #15 Session Event Log
+- **Phase 2 装扮系统**（2-3 周）：#1 subagent patch / #2 profile / #3 persona / #7-10 预设 / #4-6 条件+overlay
+- **Phase 3 能力接缝+权限+UI**（2-3 周）：#11 三角色 / #14 tool registry / #18-20 权限 / #21-23 subagent / #24-26 UI
+- **Phase 4 元能力**（1-2 周）：#27 self-update via patch / #28 constitutional patch / #29 多级 skill
+
+**衔接**：已落地的 constraint_engine（§3.29）+ lang_gate MCP（§3.28）正是 P1 #5/#18/#27 的雏形——约束/语言规范已数据化可动态，后续沿此模式扩展。
 
 ---
 
@@ -634,5 +662,11 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 | config_hub.py | 配置中心（MCP/skills/hooks/workflows 统一） |
 | ralph/ | RALPH 循环子系统（6 模块） |
 | pedagogy.py | 教学策略选择（画像驱动） |
+| constraint_engine.py | L0-L8 约束引擎（6 API：layer_get/set/compose/always_active/self_evolve/feedback_adjust） |
+| services/lang_gate.py | 语言规范统一入口（L0+L2 守门，13 处收敛） |
+| language_refiner.py | 薇依语料矫正（AI_TELLS + forbidden_words.json 合并） |
 | services/ | 场景 handler（method/study_plan/quiz/keyword_doc 等）+ planner + 生产管线 |
+| data/forbidden_words.json | 外部违禁词数据（extra_forbidden/pseudo_empathy_verbs/ai_tells_extra） |
+| data/constraint_layers.json | 外部约束层覆盖（self_evolve 落盘） |
+| data/always_active.json | 永远激活规则（外部维护） |
 | 09_GUI前端/index.html | Web UI（含 checkpoint 问答面板/反馈按钮） |

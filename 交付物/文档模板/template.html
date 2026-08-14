@@ -88,7 +88,55 @@
   </main>
 
 <script src="./mermaid.min.js"></script>
-<style>.mermaid{text-align:center;margin:6mm 0} .mermaid svg{max-width:100%} .mermaid img{max-height:170mm;page-break-inside:avoid;margin:8mm auto;display:block;max-width:100%}</style>
-<script>try{mermaid.initialize({startOnLoad:false,theme:'neutral',securityLevel:'loose'}); try{mermaid.run({querySelector:'.mermaid'});}catch(e){};}catch(e){}</script>
+<style>.mermaid{text-align:center;margin:6mm 0} .mermaid svg{max-width:100%} .mermaid img{max-height:170mm;page-break-inside:avoid;margin:8mm auto;display:block;max-width:100%}
+/* v0.70 修复：图9/15 深色文字+深色背景不可见——强制 Mermaid SVG 高对比度（浅底深字），
+   防止 sequenceDiagram actor/节点使用深色填充时文字不可辨认 */
+.mermaid svg, .mermaid svg * { background-color: #ffffff !important; }
+.mermaid .actor, .mermaid .actor-top, .mermaid .actor-bottom,
+.mermaid .messageText, .mermaid .messageLine0, .mermaid .messageLine1,
+.mermaid .labelText, .mermaid .nodeLabel, .mermaid .edgeLabel,
+.mermaid text, .mermaid tspan { fill: #1a1a2e !important; color: #1a1a2e !important; }
+.mermaid .actor { fill: #f0f4ff !important; stroke: #4a6fa5 !important; }
+.mermaid .actor-line { stroke: #4a6fa5 !important; }
+.mermaid .sequenceNumber { fill: #ffffff !important; }
+.mermaid .noteText, .mermaid .note { fill: #fff8e1 !important; stroke: #b08900 !important; color: #3a3000 !important; }
+.mermaid .loopText, .mermaid .label { fill: #1a1a2e !important; }
+.mermaid .cluster-label span, .mermaid .cluster-label { fill: #1a1a2e !important; color: #1a1a2e !important; }
+.mermaid rect.actor { fill: #f0f4ff !important; }
+.mermaid .messageText { fill: #1a1a2e !important; }
+.mermaid .activation0 { fill: #e8f0fe !important; stroke: #4a6fa5 !important; }
+.mermaid .arrowhead { fill: #4a6fa5 !important; }
+.mermaid rect { fill-opacity: 1 !important; }
+</style>
+<script>try{mermaid.initialize({startOnLoad:false,theme:'base',securityLevel:'loose',
+  themeVariables:{
+    background:'#ffffff',
+    primaryColor:'#f0f4ff',
+    primaryTextColor:'#1a1a2e',
+    primaryBorderColor:'#4a6fa5',
+    secondaryColor:'#e8f0fe',
+    secondaryTextColor:'#1a1a2e',
+    secondaryBorderColor:'#4a6fa5',
+    tertiaryColor:'#fff8e1',
+    tertiaryTextColor:'#1a1a2e',
+    tertiaryBorderColor:'#b08900',
+    lineColor:'#4a6fa5',
+    textColor:'#1a1a2e',
+    actorBkg:'#f0f4ff',
+    actorBorder:'#4a6fa5',
+    actorTextColor:'#1a1a2e',
+    actorLineColor:'#4a6fa5',
+    signalColor:'#4a6fa5',
+    signalTextColor:'#1a1a2e',
+    noteBkgColor:'#fff8e1',
+    noteTextColor:'#3a3000',
+    noteBorderColor:'#b08900',
+    loopTextColor:'#1a1a2e',
+    activationBkgColor:'#e8f0fe',
+    activationBorderColor:'#4a6fa5',
+    sequenceNumberColor:'#ffffff',
+    fontFamily:'Noto Sans SC, sans-serif',
+    fontSize:'14px'
+  }}); try{mermaid.run({querySelector:'.mermaid'});}catch(e){};}catch(e){}</script>
 </body>
 </html>
