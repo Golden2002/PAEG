@@ -130,6 +130,13 @@ final = tpl.replace("{{CONTENT}}", content_html)
 - hero（独占页放大）仅给关键架构总览图（如 fig0/8）
 - 高窄图可源码层改分栏式（flowchart TD→LR + subgraph 分组）占满版心——仅适合并行/阶段型流程，决策树/状态机保持纵向
 
+**20. 双主题方案（v0.71.1 用户精确指令 · 白框不可见的正确解法）**：
+- **核心认知**：用户要的不是"去掉白框"，而是"**白框融入节点不可见**"——第一版 neutral 主题（白色节点 + 深色文字）下，Mermaid 文字标签白底与白色节点融为一体，白框自然消失
+- **方案**：图按类型双主题——①保持现状（base 蓝灰）图9/15/16/17 ②其余 15 图第一版方案（`%%{init: {'theme': 'neutral'}}%%` 每图内嵌覆盖全局 base）
+- **实现**：Mermaid 图内嵌 `%%{init: {'theme': 'neutral'}}%%` 指令（图级覆盖全局 initialize）——比改全局 initialize 灵活，可逐图指定
+- **去白框 CSS 的真相**：`.mermaid foreignObject div{background:transparent}` 等强制透明，在 neutral 白节点上=文字直接印白色节点（白框消失）；在 base 蓝灰节点上=文字印蓝灰（无白框）——**两种主题下都成立**，是让白框不可见的通用手段
+- **教训**：用户说"去白框"可能指"让框不可见"（融入背景）而非"删掉框元素"——先理解意图（白框 vs 蓝灰/白节点背景对比突兀），再选方案（同色系融合 或 透明）
+
 ## 更新日志
 
 | 日期 | 版本 | 改动 |
@@ -138,3 +145,4 @@ final = tpl.replace("{{CONTENT}}", content_html)
 | 2026-08-14 | v0.70.1 | Mermaid 高对比度主题（theme:base + themeVariables 显式配色 + CSS 强制覆盖）修复图9/15 深色文字不可见；封面亮点卡提亮（rgba 0.10→0.17 + 纯白标签 + 亮青数字）；dsf=1 独立 PDF 页面；经验记录 #10-13（高对比度主题/封面截断教训/图片排版/表格框线） |
 | 2026-08-14 | v0.71 | Mermaid 图容器化排版优化（Oracle+visual 双咨询）：dsf=1 截图（PNG 减半）+ figure 容器（max-width/height 双约束 + 浅色底圆角细边框）+ .tall 高窄图跨页 + 节尾防空白（h2/h3 与图 page-break-before:avoid + 图后段落拉近）+ 修复 figcaption 误判既有标题；经验 #14-15 |
 | 2026-08-14 | v0.71.1 | 排版深水区修复（多轮 Oracle+visual+用户洞察）：①print 图片压扁（去 max-height）②深色背景（pre.mermaid 白底）③紫底白框冲突（文字标签与节点同色）④配色方案 A 蓝灰专业 ⑤dsf=4 至尊高清 ⑥图分类三类+hero ⑦pre 去边框；经验 #16-19 |
+| 2026-08-14 | v0.71.2 | 图双主题方案（用户精确指令）：保持现状（base 蓝灰）图9/15/16/17 + 其余 15 图第一版（neutral 白节点深字，白框融入不可见）；Mermaid 图级 `%%{init:{theme:'neutral'}}%%` 覆盖；经验 #20 |
