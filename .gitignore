@@ -39,3 +39,9 @@ manim_env/
 Library/KnowledgeBase/subjects/evolved_*.json
 Library/Physics/
 Library/usr_knowledge/
+
+# v0.69+ RALPH 循环运行时数据
+05_实现原型/evolve_data/ralph_tasks.json
+05_实现原型/evolve_data/ralph_state/
+05_实现原型/evolve_data/ralph_log.jsonl
+交付物/
