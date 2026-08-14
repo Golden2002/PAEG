@@ -1,0 +1,66 @@
+{
+  "id": "teach_materials",
+  "description": "教学物料包：主题→大纲→讲义/PPT/讲稿/知识导图→脚本→视频脚本/数学动画→资产包（6 资产全部可下载）",
+  "params": {
+    "topic": "string (必填)",
+    "stage": "string (junior/high/undergrad, 默认 high)",
+    "subject": "string (默认 general)",
+    "learner": "string (默认 student)"
+  },
+  "steps": [
+    {
+      "id": "outline",
+      "type": "subagent",
+      "agent": "planner",
+      "config": {
+        "input": "为「{topic}」（学段 {stage}）写一份教学大纲，含 5-8 节，每节 2-4 个知识点，并标注核心直觉。"
+      }
+    },
+    {
+      "id": "knowledge_map",
+      "type": "tool",
+      "tool": "knowledge_map",
+      "depends_on": ["outline"],
+      "config": {"topic": "{topic}", "outline": "{outline}", "stage": "{stage}"}
+    },
+    {
+      "id": "keyword_doc",
+      "type": "tool",
+      "tool": "keyword_doc",
+      "depends_on": ["outline"],
+      "config": {"topic": "{topic}", "outline": "{outline}", "stage": "{stage}", "doc_type": "讲义"}
+    },
+    {
+      "id": "ppt",
+      "type": "tool",
+      "tool": "save_document",
+      "depends_on": ["outline"],
+      "config": {"title": "{topic} 教学 PPT", "content": "{outline}", "subject": "{stage}"}
+    },
+    {
+      "id": "script",
+      "type": "tool",
+      "tool": "compose_dynamic_prompt",
+      "depends_on": ["outline"],
+      "config": {}
+    },
+    {
+      "id": "lecture",
+      "type": "llm",
+      "depends_on": ["outline", "keyword_doc"],
+      "config": {
+        "system": "你是教学讲稿撰写者。基于大纲和讲义生成完整讲稿（分节、含过渡句、口语化）。",
+        "user": "主题：{topic}\n大纲：{outline}\n讲义：{keyword_doc}\n请生成讲稿。"
+      }
+    },
+    {
+      "id": "package",
+      "type": "llm",
+      "depends_on": ["knowledge_map", "keyword_doc", "ppt", "script", "lecture"],
+      "config": {
+        "system": "你是教学物料汇总器。基于下列产物清单输出 Markdown 资产包索引（每资产一行：类型/标题/要点）。",
+        "user": "主题：{topic}\n物料：知识导图={knowledge_map} 讲义={keyword_doc} PPT={ppt} 脚本={script} 讲稿={lecture}"
+      }
+    }
+  ]
+}

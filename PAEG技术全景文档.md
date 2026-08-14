@@ -5468,3 +5468,4 @@ Start-Process cmd -ArgumentList '/c','start /b python server.py > server_run.log
 
 > **v0.70+ PDF 渲染与 Mermaid 图经验（2026-08-14）**：技术文档 PDF 渲染（render_pdf.py）关键经验——①Mermaid 图：Chromium 打印 SVG 空白 → 用 Playwright（channel=msedge 系统 Edge）元素截图 PNG 嵌入（device_scale_factor=2 高清）②图限高 170mm + page-break-inside:avoid 防跨页截断 ③图与文字 margin 8mm ④mermaid.js 本地化（file:// 相对加载）⑤正则匹配换行用非 raw 字符串。详见 交付物/文档模板/README.md 渲染生成经验 + 元能力 §5.6。
 > **v0.70+ 数学可视化脚本生成器（§3.26）**：对话+轮询→script.json（单一真相源）→7 铁律校验→5 资产联动（Manim 视频/讲稿/PPT/讲义/思维导图全部可下载）。方法：3B1B 8 原则 + manim_skill + Oracle。P0 已实施（generator+validator）。
+> **v0.70+ workflow 教学物料包（§3.27）**：`config/workflows/teach_materials.json`（7 步 DAG：outline→{knowledge_map/keyword_doc/ppt/script}→lecture→package）；workflows_hub 占位符统一替换（_resolve_placeholders）+ 物料联动；并行增强 P1。

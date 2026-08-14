@@ -176,6 +176,8 @@ class WorkflowsHub:
         _llm = get_llm()
         _paeg = get_paeg()
         _agent_name = st.agent
+        # v0.70+ §3.27：占位符替换（config 里 {step_id}/{param}）
+        _cfg = self._resolve_placeholders(dict(st.config or {}), results, args)
         _sub = getattr(_paeg, _agent_name, None)
         if _sub is None:
             # 尝试 subagents 模块
@@ -206,12 +208,28 @@ class WorkflowsHub:
     def _run_tool(self, st: WorkflowStep, args: dict, results: dict) -> str:
         from tool_registry import execute_tool
         _tool = st.tool
-        _targs = dict(st.config or {})
-        # 从 args/results 注入
-        for _k, _v in list(_targs.items()):
-            if isinstance(_v, str) and _v.startswith("{") and _v.endswith("}"):
-                _targs[_k] = results.get(_v[1:-1], "")
+        _targs = self._resolve_placeholders(dict(st.config or {}), results, args)
         return execute_tool(_tool, _targs)
+
+    # v0.70+ §3.27：统一占位符替换——{step_id} 从 results 取，{param} 从 args 取
+    def _resolve_placeholders(self, cfg: dict, results: dict, args: dict = None) -> dict:
+        import re as _re
+        _args = args or {}
+        _out = {}
+        for _k, _v in cfg.items():
+            if isinstance(_v, str):
+                def _sub(m):
+                    _key = m.group(1)
+                    if _key in results:
+                        _rv = results[_key]
+                        return _rv if isinstance(_rv, str) else str(_rv)
+                    return str(_args.get(_key, m.group(0)))
+                _out[_k] = _re.sub(r"\{([a-zA-Z0-9_]+)\}", _sub, _v)
+            elif isinstance(_v, dict):
+                _out[_k] = self._resolve_placeholders(_v, results, _args)
+            else:
+                _out[_k] = _v
+        return _out
 
     def _run_skill(self, st: WorkflowStep, args: dict, results: dict) -> str:
         from skill_registry import SkillRegistry
