@@ -20,7 +20,7 @@ DEFAULT_TAGLINE = (
 )
 DEFAULT_FEATURES = '''
         <div class="f" data-num="35"><span class="f-k">35</span><span class="f-v">学科 × 4 学段</span></div>
-        <div class="f" data-num="25"><span class="f-k">25</span><span class="f-v">MCP 工具</span></div>
+        <div class="f" data-num="54"><span class="f-k">54</span><span class="f-v">工具（含 MCP/skills）</span></div>
         <div class="f" data-num="09"><span class="f-k">9</span><span class="f-v">领域专家 subagent</span></div>
         <div class="f" data-num="G11"><span class="f-k">G1-G11</span><span class="f-v">自我进化闭环</span></div>
 '''
@@ -117,8 +117,28 @@ def render(md_path: str, out_pdf: str, title: str = None, sub: str = None) -> in
             page.wait_for_timeout(500)
         except Exception as _se:
             print(f'[render] Mermaid 转 PNG 跳过: {_se}')
-        page.pdf(path=out_pdf, format='A4', print_background=True,
-                 margin={'top': '0', 'bottom': '0', 'left': '0', 'right': '0'})
+        # v0.70 修复：用独立标准页面（dsf=1）输出 PDF——device_scale_factor=2 会导致
+        # page.pdf 的 CSS px 物理缩放异常（封面 1122px 只渲染上半 47%）
+        # 先把已替换 Mermaid→PNG 的最终 HTML 落盘，供 dsf=1 页面加载
+        tmp_html2 = os.path.join(ASSETS, '_render_tmp2.html')
+        try:
+            final_html = page.content()
+            io.open(tmp_html2, 'w', encoding='utf-8').write(final_html)
+        except Exception as _e2:
+            print(f'[render] HTML 快照失败: {_e2}')
+            tmp_html2 = tmp_html
+        pdf_page = browser.new_page(device_scale_factor=1)
+        pdf_page.goto('file:///' + tmp_html2.replace('\\', '/'), wait_until='networkidle')
+        pdf_page.wait_for_timeout(500)
+        pdf_page.pdf(path=out_pdf, format='A4', print_background=True,
+                     margin={'top': '0', 'bottom': '0', 'left': '0', 'right': '0'})
+        pdf_page.close()
+        if os.path.exists(tmp_html2) and tmp_html2 != tmp_html:
+            try:
+                os.remove(tmp_html2)
+            except Exception:
+                pass
+
         browser.close()
     os.remove(tmp_html)
     return os.path.getsize(out_pdf)

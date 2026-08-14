@@ -196,13 +196,17 @@ a:hover { color: var(--c-primary-800); }
    4) 所有数据/文本由 CSS 变量 + HTML 占位符驱动，可复用
    ============================================================ */
 
+/* v0.70 修复说明：封面背景铺满由 .cover 固定 px 高度 + 渐变实现，
+   不依赖命名页（Chromium 对 page:cover 命名页在 print 中支持不稳定）。
+   封面为文档第一个元素，天然在第一页。 */
+
 .cover {
-  page: cover;
-  margin: 0;
+  margin: 0 !important;
   padding: 0;
   height: 297mm;
   width: 210mm;
   position: relative;
+  z-index: 0;
   background:
     /* 顶部主色块 */
     linear-gradient(168deg,
@@ -217,7 +221,9 @@ a:hover { color: var(--c-primary-800); }
   break-after: page;
 }
 
-/* ── 装饰层 1：全局点阵纹理（细密） ── */
+/* v0.70 修复：背景渐变放 ::before 伪元素（absolute inset:0），
+   规避 Chromium page.pdf 对整页元素 background 的分页截断 bug（渐变只画 47%）。
+   渐变 + 点阵纹理叠加在同一伪元素。 */
 .cover::before {
   content: "";
   position: absolute;
@@ -357,10 +363,10 @@ a:hover { color: var(--c-primary-800); }
   position: relative;
   z-index: 5;
   padding: 28mm 22mm 22mm 22mm;
-  min-height: 297mm;
+  min-height: 1122px;  /* v0.70：与 .cover 高度一致（px 防 DPI 换算异常） */
   box-sizing: border-box;
   display: grid;
-  grid-template-rows: auto auto 1fr auto auto;
+  grid-template-rows: auto auto auto auto auto auto;
   gap: 0;
 }
 
@@ -505,10 +511,10 @@ a:hover { color: var(--c-primary-800); }
 }
 .cover-features .f {
   position: relative;
-  background: var(--cover-glass-bg);
-  border: 0.6pt solid var(--cover-glass-bd);
+  background: rgba(255,255,255,0.17);  /* v0.70 提亮：0.10→0.17，修复亮点卡深底浅字对比不足 */
+  border: 0.8pt solid rgba(255,255,255,0.45);
   border-radius: var(--r-md);
-  padding: 10pt 10pt 11pt;
+  padding: 12pt 10pt 12pt;
   text-align: center;
   overflow: hidden;
   /* 卡片左侧的序号小竖条 */
@@ -541,7 +547,7 @@ a:hover { color: var(--c-primary-800); }
   display: block;
   font-size: 22pt;
   font-weight: 700;
-  color: var(--c-accent-400);
+  color: #5ef0da;  /* v0.70 提亮：accent-400→更亮青绿，修复数字对比度 */
   line-height: 1.15;
   margin-bottom: 3pt;
   letter-spacing: 0.3pt;
@@ -552,7 +558,7 @@ a:hover { color: var(--c-primary-800); }
 }
 .cover-features .f-v {
   font-size: 8.5pt;
-  color: var(--cover-glass-text);
+  color: #ffffff;  /* v0.70 提亮：纯白，修复标签文字对比度 */
   letter-spacing: 0.4pt;
   position: relative;
   z-index: 2;
@@ -569,6 +575,7 @@ a:hover { color: var(--c-primary-800); }
   color: var(--c-ink-900);
   border-radius: var(--r-lg);
   padding: var(--sp-4) var(--sp-5);
+  margin-top: 4mm;  /* v0.70 修复：与 features 保持间距 */
   box-shadow:
     0 4pt 22pt rgba(11,37,69,0.22),
     0 0 0 0.5pt rgba(255,255,255,0.6);
@@ -630,6 +637,7 @@ a:hover { color: var(--c-primary-800); }
   color: var(--cover-muted);
   z-index: 4;
   padding-top: 4mm;
+  margin-top: auto;  /* v0.70 修复：推到底部，消除封面下方大片空白 */
 }
 .cover-footer .seal {
   color: #fff;
