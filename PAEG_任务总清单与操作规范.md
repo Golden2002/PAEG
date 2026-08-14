@@ -34,6 +34,8 @@
 17. **⭐ git checkout/restore 前必须备份未提交改动 + 禁止 reset --hard（2026-08-14，全新——事故：git checkout 恢复文件时丢失未提交的 TRUTH_GROUNDING/能力清单，已重新注入+提交 a112575 固化；依据 Pro Git 第 2.4 章 "dangerous command" 警告）**：`git checkout -- <file>` / `git checkout <commit> -- <file>` / `git restore` 会**静默丢弃工作区未提交内容**（Pro Git 原话："Any local changes you made to that file are gone"）；`git reset --hard` 是终极大杀器（未提交改动 Git 无法恢复）。恢复前必须：①`git status` 列出未提交文件②未提交改动先 `git stash` 或 cp 备份（<file>.bak）③确认要恢复的确实是"出错的改动"而非"未提交的新工作"④恢复后重新验证语法+功能⑤**禁止在 PAEG 工作区用 `git reset --hard`**，除非已确认所有改动都已 commit/stash。
 
 18. **更新内容及时记录入各个文档（2026-08-14 用户执行标准）**：任何代码/配置/功能改动，**必须同步记录到相应文档**——CHANGELOG（变更历史）、维护手册（故障/修复/SOP）、技术全景文档（架构/机制）、元能力文档（踩坑/经验）、任务清单（状态更新）。禁止只改代码不记文档；文档更新与代码提交同步完成（同一 commit 或紧随其后）。
+20. **运行卡住诊断 SOP（2026-08-14 用户要求 T2，记录有时运行卡住的原因）**：agent 运行有时卡住的 5 类根因与处理——①**残留进程**（最常见）：改代码后行为不变/无响应，99% 是旧进程未杀——端口反查 PID→精确杀→确认释放→清 pyc→touch→重启→验证启动时间（技术 §10.16/维护 §18.25）②**LLM 超时/慢响应**：v4-flash 思考型空响应/长响应——检查 thinking/max_tokens 配置；hooks timeout（P1-7）隔离超时钩子不阻断主流程③**SSE 挂起**：客户端断开但生成器未完成——teach_stream try/except + done 事件兜底；前端 AbortController 停止④**工具调用阻塞**：MCP npx 启动慢/失败（fetch/git 404 包）——mcp_client 连接失败跳过不阻塞；web_search 降级栈（Brave→Tavily→Serper→Bing）⑤**网络**（git push/外部 API）：SSL 重置/连接拒绝——本地已提交安全，重试或换网络。**诊断顺序：先怀疑进程→再缓存→最后代码**（改代码后 HTTP 行为不变先查进程）。
+
 19. **subagent 结果及时移入项目文件夹（2026-08-14 用户执行标准）**：**subagent（explore/librarian/writing 等）的输出文件一定落在 wbo-workspace 文件夹**（沙箱/工作区），主 agent 必须**及时将其移动/复制入项目文件夹**（如 ForMaitenance/、audit/、05_实现原型/ 等目标目录），并在任务清单记录移动结果。禁止让 subagent 产物滞留 wbo-workspace 而不归档。
 
 ## 一、ULW Loop 大任务（进行中，5 步）
@@ -426,4 +428,11 @@
 - **内容**：自我更新闭环（G1/G2/G3/G5/G6）+ 配置体系运行时接入（Step4 P0-1~4）+ 哲学专项 + 防幻觉 + AffectionSupportor WEIL_CORE + 执行纪律 15-19 + bug report 档案 + CHANGELOG v0.69
 - **ModelScope 结论（2026-08-14 最终）**：远程 3 个平台端 Dockerfile 提交（10c8494/c44811e/e49107c）——force push 被平台 pre-receive hook 拒绝（保护机制）；ModelScope 保持现状，**GitHub 为权威完整源**（v0.69.0 tag + 全部提交）；如需同步 ModelScope 需用户联系平台解除 hook 或手动 merge
 - **后续**：P1×5（mcp_servers 双份/skill 注入重复/teach+answer 工具集/手工工具列表/answer 无 skill）+ P2×2 + §3.12 诊断闭环与画像驱动
+
+### 3.15 用户新批次任务（2026-08-14 ULW 四连 · 待执行）
+- **T1 Dockerfile 对比覆盖**：✅ 已确认（v0.69+ 本地 Dockerfile/docker-compose/.dockerignore 哈希与远程最新 10c8494 完全一致——本地即最新含 Pango/GLib 修复；远程 3 提交是平台端历史演进，最终版已同步本地，无需覆盖）
+- **T2 运行卡住原因→执行标准**：✅ 已完成（纪律 20：5 类根因——残留进程/LLM 超时/SSE 挂起/工具阻塞/网络 + 诊断顺序先进程→再缓存→最后代码）
+- **T3 DeepSeek Harness 模块引入**：调研 DeepSeek Harness github 库，把**在 agent 中引入同样的模块**加入需求文件（已有经验文档+Step1.5 做过部分：Guard/Permission Preset；补充未引入的模块：如 sandbox/code-exec/prompt-overflow/Provider Registry 等）
+- **T4 执行存量需求**：执行需求文件中 **P1、P2 和 §3.12** 的内容（大部分已完成——核对剩余）+ **执行 3. 新加入需求文件的内容**（即本批次 T1-T3 实施）
+- **优先级**：T1 立即（git 确认）；T2 记录；T3 调研后加清单；T4 核对执行
 
