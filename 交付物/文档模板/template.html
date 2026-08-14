@@ -117,11 +117,11 @@
 .mermaid g.node rect.basic, .mermaid g.node rect.rect,
 .mermaid .node rect, .mermaid .node polygon,
 .mermaid .label-container rect, .mermaid rect.label-container {
-  fill: #eef0ff !important;
-  stroke: #4a6fa5 !important;
+  fill: #f0f4f9 !important;
+  stroke: #2b3a55 !important;
 }
 .mermaid g.node .label-container, .mermaid .node .label-container {
-  fill: #eef0ff !important;
+  fill: #f0f4f9 !important;
 }
 .mermaid g.node foreignObject div, .mermaid g.node foreignObject span,
 .mermaid .node foreignObject div, .mermaid .node foreignObject span {
@@ -131,13 +131,13 @@
   color: #1a1a2e !important;
 }
 .mermaid g.node polygon, .mermaid .node polygon {
-  fill: #f5ecff !important;
-  stroke: #7c5cbf !important;
+  fill: #e3ecf5 !important;
+  stroke: #475569 !important;
 }
 .mermaid g.node circle, .mermaid .node circle,
 .mermaid g.node ellipse, .mermaid .node ellipse {
-  fill: #eef0ff !important;
-  stroke: #4a6fa5 !important;
+  fill: #f0f4f9 !important;
+  stroke: #2b3a55 !important;
 }
 .mermaid g.node text, .mermaid .node text,
 .mermaid g.node .nodeLabel, .mermaid .node .nodeLabel {
@@ -149,30 +149,16 @@
 <script>try{mermaid.initialize({startOnLoad:false,theme:'base',securityLevel:'loose',
   themeVariables:{
     background:'#ffffff',
-    primaryColor:'#eef0ff',           /* v0.71 修复：节点淡紫底（原 #f0f4ff 近白像白框）*/
-    primaryTextColor:'#1a1a2e',
-    primaryBorderColor:'#4a6fa5',
-    secondaryColor:'#f5ecff',         /* 淡紫（子图/次级节点）*/
-    secondaryTextColor:'#1a1a2e',
-    secondaryBorderColor:'#7c5cbf',
-    tertiaryColor:'#fff8e1',
-    tertiaryTextColor:'#1a1a2e',
-    tertiaryBorderColor:'#b08900',
-    lineColor:'#4a6fa5',
-    textColor:'#1a1a2e',
-    actorBkg:'#eef0ff',
-    actorBorder:'#4a6fa5',
-    actorTextColor:'#1a1a2e',
-    actorLineColor:'#4a6fa5',
-    signalColor:'#4a6fa5',
-    signalTextColor:'#1a1a2e',
-    noteBkgColor:'#fff8e1',
-    noteTextColor:'#3a3000',
-    noteBorderColor:'#b08900',
-    loopTextColor:'#1a1a2e',
-    activationBkgColor:'#eef0ff',
-    activationBorderColor:'#4a6fa5',
-    sequenceNumberColor:'#ffffff',
+    primaryColor:'#f0f4f9',primaryTextColor:'#0f1f3a',primaryBorderColor:'#2b3a55',
+    secondaryColor:'#e3ecf5',secondaryTextColor:'#0f1f3a',secondaryBorderColor:'#475569',
+    tertiaryColor:'#d6e2ee',tertiaryTextColor:'#0f1f3a',tertiaryBorderColor:'#475569',
+    lineColor:'#475569',textColor:'#0f1f3a',mainBkg:'#f0f4f9',secondBkg:'#e3ecf5',
+    border1:'#2b3a55',border2:'#475569',clusterBkg:'#eaf1f8',clusterBorder:'#2b3a55',
+    titleColor:'#0f1f3a',edgeLabelBackground:'#ffffff',
+    actorBkg:'#f0f4f9',actorBorder:'#2b3a55',actorTextColor:'#0f1f3a',actorLineColor:'#475569',
+    signalColor:'#475569',signalTextColor:'#0f1f3a',noteBkgColor:'#fef3c7',noteTextColor:'#78350f',
+    noteBorderColor:'#b45309',loopTextColor:'#0f1f3a',activationBkgColor:'#e3ecf5',
+    activationBorderColor:'#2b3a55',sequenceNumberColor:'#ffffff',
     /* v0.71 修复：subgraph 边框色（原默认黑框突兀）*/
     clusterBkg:'#faf7ff',
     clusterBorder:'#b8a6e0',
