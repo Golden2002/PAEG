@@ -814,3 +814,11 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
   - 无 per-subagent 模型 JSON 配置；无面向用户的 subagent 定制配置
 - **设计方向（调研后细化）**：config/agents.json schema：`{"diagnostor": {"model": "reasoner", "temperature": 0.3, "prompt_ref": "diagnostor_v2", "tools": [...]}, ...}`；缺失回退默认；paeg.py 按配置创建各 subagent model
 
+### 3.33 学段教学模式差异化（2026-08-14 用户 ULW 新增 · 待实施）
+- **背景**：用户指出初中/高中/大学（考研）的授课风格应当差距非常大——大学考研要像正式 presentation/lecture；高中重知识结构/解题/实例/适时复习；初中重 visualization/直观/生活化例子。要求学段上明确区分。
+- **需求**：①学段教学模式明确差异化（不只是深度档位，而是授课风格本质不同）②咨询 Oracle 调研项目现状 ③寻找解决方案实施
+- **执行**：先记录入需求文档 → Oracle 咨询 → 调研项目（SUBJECT_STYLES/SUBJECT_GRADES/学段联动现状）→ 方案 → 实施
+- **优先级**：P0
+- **用户原话**："初中、高中、大学和考研阶段对于教学模式来说，它的授课风格依然应当差距非常大。大学的考研水平……你讲课要像一场正式的presentation，要像一场正式的lecture一样，然后去完成对一个知识的讲授。而高中呢，可能更加需要注重知识结构啊，解题呀，然后应用一些实例，以及总是在适当的时候引入复习的环节，而初中可能更加强调visualization，能强调一些直观和更多生活化的例子。"
+- **现状待调研**：SUBJECT_GRADES（4 学段档位）+ SUBJECT_STYLES 的 grade 联动 + Presenter 教学模式三档（easy/normal/deep）+ build_presenter_system 的 grade_level 参数——现有学段差异是否只是"深度"区别而非"风格"区别？
+
