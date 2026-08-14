@@ -106,6 +106,30 @@ final = tpl.replace("{{CONTENT}}", content_html)
 
 **15. 图片排版留白策略（v0.71 用户要求）**：单页大图上方易大片空白 → ①图容器 max-width/height 双约束 ②高窄图允许跨页 ③图后段落拉近 ④h2/h3 与图 page-break-before:avoid ⑤宁可一页一张图也不留 >半页空白
 
+**16. Chromium print 图片压扁（v0.71 关键坑）**：
+- 症状：动态 JS 插入的 `<img>`（`height:auto` + 父容器 `max-height`）在 `page.pdf` 中被压成 6pt 细线（宽正常、高塌陷），screen 正常
+- 根因：**CSS `max-height` 对动态插入 img 在 Chromium print 中触发高度塌陷**（screen 正常但 print 塌陷）
+- 修复：**去掉 img 的 `max-height`**（保留 max-width + 显式 HTML width/height 属性）——比例自动保持，print 不再塌陷
+- 教训：print 渲染与 screen 不同，动态元素高度必须显式（width/height 属性）或去掉 max-height；用 fitz 的 `get_image_info().bbox` 检查 `<20pt` 高度图排查
+
+**17. Mermaid 深色背景与配色统一（v0.71 用户洞察）**：
+- **深色背景来源**：`style.css` 的 `pre{background:#1f2937}`（代码块深色）被 `<pre class="mermaid">` 继承 → 截图含深色边框残留
+- **修复**：`pre.mermaid{background:#fff!important;border:none!important;padding:0!important}` + 截图前 JS 强制 pre/svg 白底 + 去 border/outline/margin
+- **紫底白框冲突（用户核心洞察）**：把节点改淡紫后，文字标签背景仍白 → 紫底白框突兀。**改配色必须同步文字背景**——节点文字标签背景与节点同色（淡紫 #eef0ff）
+- **配色方案**：采纳 visual 方案 A 蓝灰专业（primaryColor #f0f4f9 + textColor #0f1f3a + border #2b3a55 + decision 琥珀 #fef3c7 + cluster #eaf1f8）——比淡紫更专业、打印 CMYK 稳定；stroke ≥1.2px 适配高清
+- **检测坑**：PNG 采样 (2,2) 落 pre 边框深色误报"深色图"——**采样应取 (10,10) 或图主体**，深色像素占比 <5% 为正常
+
+**18. 高清截图（v0.71 用户要求"最高至尊"）**：
+- `device_scale_factor=4`：PNG 像素×4（如 632→2528px），PDF 嵌入 DPI ~700，打印级清晰
+- 代价：PNG 文件 4x（27 页 PDF 4.4MB），渲染时间 +2-3s/张
+- 封面是纯 HTML/CSS 矢量渲染（无 PNG），page.pdf 输出天然最清晰——无需额外处理
+- 分类逻辑用 PIL 读 PNG 宽高比，与 dsf 无关（比例不变），无需改
+
+**19. 图分类策略（Oracle+visual 双咨询，v0.71 最终）**：
+- 按 PNG 真实宽高比（PIL 读）：`ar≥3` wide（占满版心+min-height 防孤）/ `ar≤0.6` tall（限宽居中）/ `ar>1.6` tall / 其余 normal；sequenceDiagram 一律 normal（天然横向）
+- hero（独占页放大）仅给关键架构总览图（如 fig0/8）
+- 高窄图可源码层改分栏式（flowchart TD→LR + subgraph 分组）占满版心——仅适合并行/阶段型流程，决策树/状态机保持纵向
+
 ## 更新日志
 
 | 日期 | 版本 | 改动 |
@@ -113,3 +137,4 @@ final = tpl.replace("{{CONTENT}}", content_html)
 | 2026-08-14 | v0.70 | 初始模板（visual-engineering 设计）：封面三段式（品牌/标题/元信息）+ 能力亮点区 + 页眉页脚 + 表格跨页 + 代码块样式 |
 | 2026-08-14 | v0.70.1 | Mermaid 高对比度主题（theme:base + themeVariables 显式配色 + CSS 强制覆盖）修复图9/15 深色文字不可见；封面亮点卡提亮（rgba 0.10→0.17 + 纯白标签 + 亮青数字）；dsf=1 独立 PDF 页面；经验记录 #10-13（高对比度主题/封面截断教训/图片排版/表格框线） |
 | 2026-08-14 | v0.71 | Mermaid 图容器化排版优化（Oracle+visual 双咨询）：dsf=1 截图（PNG 减半）+ figure 容器（max-width/height 双约束 + 浅色底圆角细边框）+ .tall 高窄图跨页 + 节尾防空白（h2/h3 与图 page-break-before:avoid + 图后段落拉近）+ 修复 figcaption 误判既有标题；经验 #14-15 |
+| 2026-08-14 | v0.71.1 | 排版深水区修复（多轮 Oracle+visual+用户洞察）：①print 图片压扁（去 max-height）②深色背景（pre.mermaid 白底）③紫底白框冲突（文字标签与节点同色）④配色方案 A 蓝灰专业 ⑤dsf=4 至尊高清 ⑥图分类三类+hero ⑦pre 去边框；经验 #16-19 |

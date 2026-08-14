@@ -76,7 +76,8 @@ def render(md_path: str, out_pdf: str, title: str = None, sub: str = None) -> in
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, channel='msedge')
-        page = browser.new_page(device_scale_factor=1)  # v0.71: dsf=1 截图——2x 使 PNG 高 2 倍产生超长窄图+空白
+        page = browser.new_page(device_scale_factor=4, color_scheme="light")  # v0.71: dsf=4 至尊高清 + color_scheme=light
+        #（Mermaid theme:base 在 prefers-color-scheme:dark 下会渲染成深色主题——强制 light 彻底解决深色背景）
         page.goto('file:///' + tmp_html.replace('\\', '/'), wait_until='networkidle')
         # 等待 Mermaid 渲染完成（关键：等所有 .mermaid 变 svg）
         try:
@@ -89,22 +90,33 @@ def render(md_path: str, out_pdf: str, title: str = None, sub: str = None) -> in
         # v0.71: Chromium 打印 Mermaid SVG 空白——元素截图 PNG 嵌入（100% 稳定）
         # 截图 dsf=1（避免 2x 产生超长窄图）；包装为 <figure class="mermaid-fig"> 由 CSS 统一缩放
         try:
-            page.wait_for_timeout(2000)  # 等 mermaid 渲染稳定
+            page.wait_for_timeout(3500)  # 等 mermaid 渲染稳定（dsf=4 渲染慢，加长等待）
             svg_count = page.locator('.mermaid svg').count()
             print(f'[render] Mermaid SVG 数量: {svg_count}')
-            # v0.71 ⭐ 修复：部分 Mermaid SVG 自带深色背景（rgb 31,41,55）——
-            # 截图前 JS 强制每个 svg 白底（CSS 选择器未覆盖 svg 自身 background）
-            try:
-                page.evaluate("""() => {
-                    document.querySelectorAll('.mermaid svg').forEach(s => {
-                        s.style.setProperty('background', '#ffffff', 'important');
-                        s.style.setProperty('background-color', '#ffffff', 'important');
-                    });
-                }""")
-                page.wait_for_timeout(200)
-            except Exception:
-                pass
+            # v0.71 ⭐ 深色背景（pre 容器 rgb 31,41,55）修复：每张图截图前立即强制白底——
+            # 一次性 JS 会被 Mermaid 后续渲染覆盖（dsf 越高渲染越慢越易覆盖）
+            def _force_white():
+                try:
+                    page.evaluate("""() => {
+                        document.querySelectorAll('.mermaid').forEach(pre => {
+                            pre.style.setProperty('background', '#ffffff', 'important');
+                            pre.style.setProperty('background-color', '#ffffff', 'important');
+                            pre.style.setProperty('padding', '0', 'important');
+                            pre.style.setProperty('border', 'none', 'important');
+                            pre.style.setProperty('outline', 'none', 'important');
+                            pre.style.setProperty('margin', '0', 'important');
+                        });
+                        document.querySelectorAll('.mermaid svg').forEach(s => {
+                            s.style.setProperty('background', '#ffffff', 'important');
+                            s.style.setProperty('background-color', '#ffffff', 'important');
+                        });
+                    }""")
+                except Exception:
+                    pass
+            _force_white()
             for i in range(svg_count):
+                _force_white()  # 每张截图前再强制（防 Mermaid 渲染覆盖）
+                page.wait_for_timeout(100)
                 loc = page.locator('.mermaid svg').nth(i)
                 png_path = os.path.join(ASSETS, f'_mermaid_{i}.png')
                 loc.screenshot(path=png_path)

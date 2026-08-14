@@ -1006,3 +1006,22 @@ p, li, td, th {
   hyphens: auto;
   -weasy-hyphens: auto;
 }
+
+/* v0.71 ⭐ 修复：.mermaid pre 继承 pre{background:#1f2937} 深色——强制白底（Mermaid 图须浅色） */
+pre.mermaid, pre.mermaid * {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+.mermaid svg {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+
+/* v0.71 ⭐ .mermaid 无边框/无 padding（去掉 pre 深色包装残留） */
+pre.mermaid {
+  border: none !important;
+  outline: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: #ffffff !important;
+}
