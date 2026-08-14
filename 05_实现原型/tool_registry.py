@@ -269,6 +269,14 @@ def get_tool_defs() -> List[dict]:
              "target": {"type": "string", "description": "调整目标 layer/group/active（默认 layer）"}},
             ["feedback"],
         ),
+        _make_tool(
+            "constraint_layer_scope",
+            "约束层级框架自省：返回当前层范围（L0-Lmax）、内嵌层与外部扩展层来源、"
+            "可用约束组、以及如何扩展（更换层内容/拓展更多层级/新增组）。"
+            "当需要了解约束系统可扩展性或指导他人二次开发时调用。",
+            {},
+            [],
+        ),
     ] + _extended_tool_defs()
 
 
@@ -298,7 +306,7 @@ def _extended_tool_defs() -> list:
                           "normalize_text", "language_policy_check", "forbidden_words",
                           "constraint_layer_get", "constraint_layer_set", "constraint_compose",
                           "constraint_always_active", "constraint_self_evolve",
-                          "constraint_feedback_adjust"}
+                          "constraint_feedback_adjust", "constraint_layer_scope"}
         _ext = [d for d in _ext
                 if isinstance(d, dict)
                 and d.get("function", {}).get("name") not in _BUILTIN_NAMES]
@@ -614,6 +622,7 @@ _HANDLERS: Dict[str, Callable[..., str]] = {
     "constraint_always_active": lambda **kw: _exec_constraint("constraint_always_active", kw),
     "constraint_self_evolve": lambda **kw: _exec_constraint("constraint_self_evolve", kw),
     "constraint_feedback_adjust": lambda **kw: _exec_constraint("constraint_feedback_adjust", kw),
+    "constraint_layer_scope": lambda **kw: _exec_constraint("constraint_layer_scope", kw),
 }
 
 

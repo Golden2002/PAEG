@@ -113,16 +113,73 @@ def _merged_always_active() -> list:
     return merged
 
 
+def _max_layer() -> int:
+    """动态最大层号 = 合并后层定义的最大键（内嵌 0-7 + 外部可扩展 L8+）。"""
+    layers = _merged_layers()
+    if not layers:
+        return 7
+    return max(int(k) for k in layers)
+
+
+def _clamp_layer(layer: int) -> int:
+    """层号 clamp 到 [0, _max_layer()]（框架化：支持外部扩展任意层）。"""
+    try:
+        layer = int(layer)
+    except Exception:
+        layer = 4
+    return max(0, min(_max_layer(), layer))
+
+
+def constraint_layer_scope() -> str:
+    """v0.70 ⭐ 框架自省：约束层级系统是框架化的——其他开发者可
+    ① 更换每层内容（外部 JSON 覆盖 constraint_layers.json）② 拓展更多层级（任意 L8+）。
+    返回当前层范围、每层来源、可用组、如何扩展。"""
+    c = _get_prompts_constants()
+    inner = dict(c["layers"]) if c else {}
+    ext_data = _load_ext_data(_CONSTRAINT_DATA_PATH)
+    ext_layers = ext_data.get("layers", {}) if isinstance(ext_data, dict) else {}
+    ext_groups = ext_data.get("group_rules", {}) if isinstance(ext_data, dict) else {}
+    all_layers = _merged_layers()
+    max_l = _max_layer()
+    names = dict(c["group_names"]) if c else {}
+    groups = _merged_groups()
+
+    lines = [
+        f"[约束层级框架] 当前层范围 L0-L{max_l}（{len(all_layers)} 层）",
+        "",
+        "── 内嵌层（prompts.py CONSTRAINT_LAYERS，不可改源码）──",
+    ]
+    for k in sorted(inner):
+        opened = sorted(inner[k])
+        lines.append(f"  L{k}: 放开组 {opened if opened else '（无=全约束）'}")
+    if ext_layers:
+        lines.append("── 外部扩展层（data/constraint_layers.json，可增可改）──")
+        for k in sorted(ext_layers):
+            opened = sorted(ext_layers[k])
+            lines.append(f"  L{k}: 放开组 {opened if opened else '（无=全约束）'}")
+    else:
+        lines.append("  （暂无外部扩展层）")
+    lines.append("")
+    lines.append("── 可用约束组（M节奏/R修辞/T温度/D教学法深度/S学科教学法/P哲学框架 + 可新增）──")
+    for g in sorted(groups):
+        src = "外部" if g in ext_groups else "内嵌"
+        lines.append(f"  组[{g}]{names.get(g, g)}（{len(groups[g])} 条规则，{src}）")
+    lines.append("")
+    lines.append("── 框架扩展指南 ──")
+    lines.append("a. 更换每层内容：编辑 data/constraint_layers.json 的 layers（如 {\"5\": [\"M\",\"R\"]}）整体替换该层 config")
+    lines.append("b. 拓展更多层级：在 layers 加新键（如 \"8\": [\"M\",\"R\",\"T\",\"D\",\"S\",\"P\"]）→ constraint_layer_set(layer=8) 立即生效")
+    lines.append("c. 新增约束组：在 group_rules 加新组（如 \"X\": [\"规则1\"]）→ 层定义引用 X 即可")
+    lines.append("d. 永远激活：data/always_active.json 的 rules 不随任何层放开")
+    return "\n".join(lines)
+
+
 # ─────────────────────────────────────
 # 6 API 实现
 # ─────────────────────────────────────
 
 def constraint_layer_get(layer: int) -> str:
-    """读某层（0-7）放开组与规则。返回结构化的层描述。"""
-    try:
-        layer = max(0, min(7, int(layer)))
-    except Exception:
-        layer = 4
+    """读某层（0-Lmax，支持外部扩展层）放开组与规则。返回结构化的层描述。"""
+    layer = _clamp_layer(layer)
     layers = _merged_layers()
     groups = _merged_groups()
     names = _get_prompts_constants()["group_names"] if _get_prompts_constants() else {}
@@ -145,13 +202,28 @@ def constraint_layer_get(layer: int) -> str:
 
 def constraint_layer_set(session: Optional[str] = None, layer: int = 4,
                          reason: str = "") -> str:
-    """动态切换约束层（教学/考试/自由）。session 可指定会话级覆盖；
+    """动态切换约束层（教学/考试/自由，支持外部扩展层）。session 可指定会话级覆盖；
     未指定则返回"当前层配置段"（供拼接进 system prompt）。"""
-    try:
-        layer = max(0, min(7, int(layer)))
-    except Exception:
-        layer = 4
+    layer = _clamp_layer(layer)
     c = _get_prompts_constants()
+    # 外部扩展层（>内嵌最大层）→ 用本引擎自拼（prompts._build_constraint_layers 内部 clamp 到 7）
+    inner_max = max((int(k) for k in (c["layers"] if c else {})), default=7)
+    if layer > inner_max:
+        opened = sorted(_merged_layers().get(layer, set()))
+        groups = _merged_groups()
+        names = dict(c["group_names"]) if c else {}
+        opened_rules = []
+        for g in opened:
+            opened_rules.extend(groups.get(g, []))
+        parts = [f"## 输出效果约束（外部扩展层 · 当前 L{layer}）",
+                 "L0 保底规则全部保留（语言规范/公式/反AI腔/安全）——永不放开。"]
+        if opened_rules:
+            parts.append("本层放开规则：")
+            parts.extend(f"- {r}" for r in opened_rules[:10])
+        else:
+            parts.append("本层无放开组（保持全部约束）。")
+        parts.append(f"放开组：{', '.join(f'{g}({names.get(g, g)})' for g in opened) if opened else '无'}")
+        return "\n".join(parts)
     # 构建约束段（复用 prompts._build_constraint_layers 拼装逻辑）
     if c is not None:
         try:
@@ -375,6 +447,18 @@ TOOL_DEFS = [
                            "required": ["feedback"]},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "constraint_layer_scope",
+            "description": "约束层级框架自省：返回当前层范围（L0-Lmax）、内嵌层与外部扩展层来源、"
+                           "可用约束组、以及如何扩展（更换层内容/拓展更多层级/新增组）。"
+                           "当需要了解约束系统可扩展性或指导他人二次开发时调用。",
+            "parameters": {"type": "object",
+                           "properties": {},
+                           "required": []},
+        },
+    },
 ]
 
 # 执行映射
@@ -390,6 +474,7 @@ _HANDLERS = {
         a.get("insight", ""), a.get("target_layer", 4), a.get("group", "D")),
     "constraint_feedback_adjust": lambda a: constraint_feedback_adjust(
         a.get("feedback", ""), a.get("target", "layer")),
+    "constraint_layer_scope": lambda a: constraint_layer_scope(),
 }
 
 

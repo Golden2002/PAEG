@@ -203,6 +203,11 @@ def build_mcp_server() -> Optional[Any]:
         """反馈调强/调弱约束（太啰嗦/太直接/太机械/太深等信号 → 调整建议 + 记录）。"""
         return _run_tool("constraint_feedback_adjust", {"feedback": feedback, "target": target})
 
+    @_mcp.tool()
+    def constraint_layer_scope() -> str:
+        """约束层级框架自省：层范围（L0-Lmax）/内嵌与外部来源/可用组/扩展指南。"""
+        return _run_tool("constraint_layer_scope", {})
+
     return _mcp
 
 
