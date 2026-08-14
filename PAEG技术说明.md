@@ -5,7 +5,7 @@
 
 ---
 
-## 第 0 章 TL;DR（30 秒看懂）
+## 第 0 章 TL;DR（快速概览）
 
 **PAEG 是什么**：一个**多 Agent 架构的学科教学智能体**——不是"给 LLM 套聊天框"，而是让 LLM 扮演"有教学法、有过程、有陪伴、能自我成长"的教师，完成诊断→计划→讲解→评估→调整→自我进化的完整教学闭环。
 
@@ -19,7 +19,7 @@
 ---
 
 
-### 先认识 5 个关键名词（30 秒速查）
+### 先认识 5 个关键名词（快速速查）
 - **subagent**：专科老师——每个负责一个领域（诊断/讲解/评估…），职责单一
 - **MCP**：工具调用标准——让 AI 能联网、读写文件、调用外部工具（25 个）
 - **Skill**：按需加载的能力包——需要时才加载的专业流程（11 个）
@@ -124,83 +124,58 @@
 
 **图 1 · 全景尺度（PAEG 与外部世界）**
 
-```mermaid
-flowchart LR
-    User(["👤 学生<br/>(浏览器/微信)"])
-    PAEG["🧠 PAEG 教育智能体"]
-    LLM(("☁️ LLM<br/>DeepSeek/OpenAI"))
-    KB[("📚 知识库")]
-    External["🌐 外部世界<br/>搜索/论文"]
-    DB[("💾 持久化")]
-    Dev["🛠️ 开发者"]
-    User -->|HTTP/SSE| PAEG
-    PAEG -->|Prompt| LLM
-    LLM -->|生成/工具调用| PAEG
-    PAEG <-->|检索/写入| KB
-    PAEG <-->|联网| External
-    PAEG <-->|画像/历史| DB
-    Dev -.->|热加载| PAEG
-```
+| 参与方 | 与 PAEG 的关系 | 数据方向 |
+|---|---|---|
+| 👤 学生（浏览器/微信） | 服务对象 | HTTP/SSE → PAEG |
+| ☁️ LLM（DeepSeek/OpenAI） | 算力提供者 | Prompt → LLM；生成/工具调用 ← |
+| 📚 知识库（Library/） | 记忆与素材 | 双向（检索/写入） |
+| 🌐 外部世界（搜索/论文） | 信息源 | 双向（联网） |
+| 💾 持久化（users_data） | 画像/历史存储 | 双向 |
+| 🛠️ 开发者 | 维护者 | 热加载注入改进（虚线） |
+
+> 一句话：PAEG 是大脑，LLM 是算力，知识库/外部/持久化是记忆与耳目，学生是服务对象，开发者通过热加载持续改进。
 
 **图 2 · 系统尺度（六层 + 一次请求数据流）**
 
-```mermaid
-flowchart TB
-    subgraph L1["L1 用户入口"]
-        UI["Web UI"]; API["REST API"]; WX["微信桥"]
-    end
-    subgraph L2["L2 意图路由"]
-        R["meta_router<br/>15 意图"]
-    end
-    subgraph L3["L3 教学编排"]
-        T["paeg.teach / teach_stream (SSE)"]
-    end
-    subgraph L4["L4 Subagent"]
-        S["9 个领域专家"]
-    end
-    subgraph L5["L5 能力组件"]
-        M["25 MCP"]; K["11 Skills"]; W["Workflows"]
-    end
-    subgraph L6["L6 基础设施"]
-        LL["LLM 适配"]; KB2["知识库"]; CF["config_hub"]; ST["持久化"]
-    end
-    L0{{"L0 横切质量层"}}
-    UI --> API --> R --> T --> S
-    S --> M
-    S --> LL
-    S --> KB2
-    T --> ST
-    L0 -.- T
-    L0 -.- S
-```
+| 层 | 职责 | 核心组件 | 本次请求的角色 |
+|---|---|---|---|
+| L1 用户入口 | 接收请求 | Web UI / REST API / 微信桥 | 收到提问，发起请求 |
+| L2 意图路由 | 识别意图 | meta_router（15 意图） | 判定 intent=teach |
+| L3 教学编排 | 流程控制 | paeg.teach / teach_stream（SSE） | 五阶段编排 + 流式输出 |
+| L4 Subagent | 领域执行 | 9 个领域专家 | 诊断/计划/讲解/评估协作 |
+| L5 能力组件 | 可复用能力 | 25 MCP / 11 Skills / Workflows | 按需调工具 |
+| L6 基础设施 | 底层支撑 | LLM 适配 / 知识库 / config_hub / 持久化 | 提供算力与数据 |
+| **L0 横切** | 质量保障 | TRUTH_GROUNDING / QualityGate / 语言规范 | **约束每一层** |
+
+**一次请求的路径**：学生提问 → L1（POST /api/teach/stream）→ L2（判定 teach）→ L3（五阶段）→ L4（subagent 协作）→ L5（工具按需）→ 全程受 L0 约束。
 
 **图 3 · 教学流尺度（五阶段 + checkpoint 互动）**
 
-```mermaid
-flowchart TD
-    Start(["学生提问"]) --> D["① 诊断<br/>前置知识+LLM"]
-    D --> P["② 计划<br/>策略+步骤"]
-    P --> Pre["③ 讲解<br/>LLM 流式生成"]
-    Pre --> CP{{"checkpoint?<br/>听懂了吗"}}
-    CP -->|回答| E["④ 评估<br/>0.6讲解+0.4信号"]
-    E --> A["⑤ 调整<br/>switch/continue"]
-    A -->|继续| Pre
-    A -->|完成| Done["✓ 完成"]
-    Done --> Ev["自我进化<br/>蒸馏/补丁/经验"]
-    Ev --> KB3[("知识库<br/>热加载")]
-```
+| 阶段 | 执行者 | 做什么 | 产出 |
+|---|---|---|---|
+| ① 诊断 | Diagnostor | 前置知识检查 + LLM 深度建议 | recommended_depth/identified_gaps |
+| ② 计划 | Planner | 策略选择 + 差异化步骤 | 3 步教学计划 |
+| ③ 讲解 | Presenter | LLM 流式生成（60 字分片） | event: presentation |
+| ↳ checkpoint | teach_stream | 每步后发理解检查问题 | event: checkpoint（前端 3 按钮） |
+| ④ 评估 | Evaluator | score = 0.6·讲解 + 0.4·学生信号 | 掌握度/困惑信号 |
+| ⑤ 调整 | Adapter | switch/reinforce/continue | 下一轮策略 |
+| → 自我进化 | self_evolution | 蒸馏/补丁/工具经验 | evolved 写入 → 热加载 → 知识库可检索 |
+
+**互动循环**：讲解 → checkpoint（听懂了吗）→ 学生回答 → 评估（_student_signal）→ 调整 → 继续或重讲；教学完成后自动进入自我进化（蒸馏知识点、沉淀教学补丁、积累工具经验）。
 
 **图 4 · 组件尺度（Presenter 内部装配）**
 
-```mermaid
-flowchart LR
-    subgraph ASM["system 装配"]
-        B["WEIL_CORE"]; T2["TRUTH_GROUNDING"]; SS["SUBJECT_STYLES"]; LG["LANGUAGE_STYLE"]
-    end
-    ASM --> Sys["system prompt"] --> LLM2["LLM 调用<br/>(重试+超时)"]
-    LLM2 --> St["60字分片"] --> Y["SSE yield"]
-    Y -.->|需工具| MC["mcp__ 工具"] --> LLM2
-```
+| 装配块 | 内容 | 作用 |
+|---|---|---|
+| WEIL_CORE | 薇依人格基线 | 身份与教育信念锚定 |
+| TRUTH_GROUNDING | 防幻觉 10 条底线 | 不编造/信源为绝对命令 |
+| SUBJECT_STYLES | 35 学科风格（persona/语言/方法论） | 因材施教 |
+| LANGUAGE_STYLE | 语言规范三层 | 输出像人话 |
+| 动态补丁 | compose_dynamic_prompt | 注入自我更新建议 |
+
+**内部流程**：确定性装配（上述块）→ system prompt → LLM 调用（重试+超时）→ 60 字分片 → SSE yield；如需工具则经 config_hub 路由到 mcp__ 工具，结果回灌 LLM。
+
+> 设计原则：**确定性骨架（装配/分片/路由）由 Agent 负责，生成由 LLM 负责**——这是"教学交给 Agent、生成交给 LLM"的具体实现。
 
 ### 核心调用链（用户问"什么是导数"）
 用户输入 → L1(POST /api/teach/stream) → L2(meta_router → intent=teach) → L3(teach_stream：诊断→计划→讲解→checkpoint→评估→调整) → L4(subagent 协作) → L5(工具按需调用) → L0(防幻觉全程约束)
@@ -240,33 +215,55 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 
 ---
 
-## 第 6 章 即将更新（Roadmap · 2026-08-14 进行中）
+## 第 6 章 未来规划（Roadmap · Oracle 咨询 2026-08-14）
 
-> 以下能力正在开发/规划中，完成后将更新到本说明。
+> 主线：**让现有闭环（教学互动 + 评估 + RALPH）具备生产可用性**——Q3 补齐工程化短板，Q4 教育语义层升级，2027 产品化。每项挂钩九模块薄弱点或调研成果（非空泛目标）。
 
-| 更新项 | 状态 | 技术路线 |
-|---|---|---|
-| **深入版教学互动** | ✅ 已完成 | strict_checkpoint 挂起（checkpoint 后结束流等回答）+ 续讲评估（_student_signal → understood/partial/confused → remediation 引导重讲）+ 复用 _pending_steps 续讲 |
-| **Harness 引入补全** | ✅ 已完成 | compaction（compaction.py 守卫，30→13 验证）+ llm-retry（_safe_chat 重试 3 次）+ user-approval（Permission Preset + hooks 基础）+ timeout-policy（hooks P1-7） |
-| **技术说明 PDF** | ✅ 已完成 | Markdown → HTML（微 agent 设计模板）→ Edge headless 渲染（1MB，已发微信+交付物） |
-| 交互式教学深度版（挂起+resume 端点） | 📋 规划 | checkpoint 后结束流 → /api/teach/resume 从挂起状态续讲 |
-| 学习效果评估闭环 | 📋 规划 | Evaluator 加 learning_effect（学生复述/答题正确率 → 画像） |
-| 前端点赞 UI 完善 | 📋 规划 | 消息气泡反馈按钮已实现，反馈→策略调整深化 |
+### Q3 近期（1-2 月）：工程化补齐 + 闭环数据沉淀
 
+| # | 目标 | 价值 | 依赖 | 工作量 |
+|---|---|---|---|---|
+| Q3-1 | timeout-policy（教学长任务分级超时+中断恢复）+ llm-retry 合并入 harness 统一 | 防长会话卡死/超时 | 当前 llm-retry | Short |
+| Q3-2 | message-feedback 落地：每轮互动 👍/👎+文本反馈入库 SQLite | 给效果评估提供真实数据 | message-feedback 子包 | Short |
+| Q3-3 | session-sqlite 全量替换：会话状态内存/JSON → SQLite（回放） | 会话可审计可回放（合规必需） | 现有会话管理 | Short |
+| Q3-4 | 九模块薄弱点扫描：对照 §3.12 产出评估覆盖率矩阵 | 让 Roadmap 可量化 | §3.12 文档 | Quick |
+| Q3-5 | 教学能力结构化 v2：teaching-capability 接入 TPACK/加涅元数据标注 | 能力体系真正接入运行 | teaching-capability | Short |
 
-**更多未来规划（详细）**：
-| 规划项 | 说明 |
-|---|---|
-| 交互式教学深度版（挂起+resume 端点） | checkpoint 后结束流 → /api/teach/resume 从挂起状态续讲（Oracle 方案 A） |
-| 学习效果评估闭环 | Evaluator 加 learning_effect（学生复述/答题率→画像→下一轮计划） |
-| 前端点赞 UI 完善 | 反馈→策略调整深化（SEL-8 完整闭环） |
-| 记忆系统语义分层 | MemGPT 风格 episodic/semantic/procedural（当前时间维度三层已有） |
-| 上下文工程全量统一 | context_bundle 覆盖所有 system 拼接（当前 9 处引用） |
-| 多 agent 协作扩展 | 任务级并行（RALPH P2） |
-| 教学反思独立循环 | 秒级课堂反思 + 小时级改进循环解耦 |
-| 评估可视化 | RALPH 循环时间线 UI（每轮决策可追溯） |
+**Q3 退出条件**：生产会话零丢失；≥30% 会话带反馈数据；九模块覆盖矩阵公开。
 
-**Roadmap 说明**：所有更新按需求文档（PAEG_任务总清单与操作规范.md §3.20-3.22）执行——先记录需求、再执行、完成后更新状态并同步本说明。
+### Q4 中期（3-4 月）：教育语义层 + 上下文工程统一
+
+| # | 目标 | 价值 | 依赖 | 工作量 |
+|---|---|---|---|---|
+| Q4-1 | 记忆系统语义分层（working/episodic/semantic + 教学知识图谱） | 解耦对话与长期认知图谱 | Q3-3/Q3-5 | Medium |
+| Q4-2 | 教育知识图谱 MVP（教资 8 模块 × 专业标准 6 能力 × ADDIE） | 诊断/画像有"该教什么"依据 | 教育体系调研 | Medium |
+| Q4-3 | 多 agent 协作（教师+学生+评估 Agent，RALPH 编排不换框架） | Berliner 专家级反思 + LLM-as-judge | Q4-1/ralph | Medium |
+| Q4-4 | 上下文工程全量统一（预算分配 + 知识图谱检索槽位） | 防长会话丢关键上下文 | runoob 调研/compaction | Short |
+| Q4-5 | RAG 接入语义层（反馈+能力标注+知识图谱为检索源） | 画像/策略有据可查 | Q4-1/Q4-2/Q3-2 | Medium |
+
+**Q4 退出条件**：同一学生 3 次会话可复现认知图谱；多 agent 评估与人工一致率 ≥70%。
+
+### 2027 远期：产品化方向
+
+| # | 方向 | 触发条件 | 里程碑 | 工作量 |
+|---|---|---|---|---|
+| Y-1 | 个性化自适应闭环成熟（诊断→画像→差异化→评估→反馈全自动） | Q4-3 跑通 ≥1 学科 | 自适应学习案例 | Large |
+| Y-2 | 教师协作平台（班级薄弱点洞察 + 干预建议 + 策略编辑） | 反馈数据 ≥6 个月 | 教师端 dashboard | Large |
+| Y-3 | 多模态教学（板书/公式 OCR、语音、图形化思维呈现） | 用户具体需求 | ≥1 学科可用 | Large |
+| Y-4 | 数据洞察 + 学习分析（知识图谱薄弱热力图） | Q4-2 有真实数据 | 分析报告 | Medium |
+
+### 价值-成本矩阵（优先做 ★★★→★★→★）
+
+| | 低成本 | 中成本 | 高成本 |
+|---|---|---|---|
+| **高价值** | Q3-1 timeout ★、Q3-3 sqlite ★、Q4-4 上下文统一 ★ | Q4-1 记忆分层 ★★、Q4-2 知识图谱 ★★、Q4-3 多 agent ★★ | Y-1 自适应闭环 ★★★、Y-2 教师协作 ★★ |
+| **中价值** | Q3-2 feedback、Q3-5 能力标注 | Q4-5 RAG、Y-4 数据洞察 | Y-3 多模态 |
+| **低价值** | Q3-4 评估矩阵 | — | — |
+
+### 决策规则（项目所有者）
+1. 每条 Roadmap 项必须挂钩：九模块薄弱点 / 教育体系能力 / Harness 包——空泛项砍掉
+2. 季度回顾硬指标：Q3 看"零丢失+反馈入库率"，Q4 看"认知图谱可复现"，2027 看"教师实际干预次数"
+3. 多 agent 不换框架（复用 RALPH）；知识图谱先轻量本体（JSON）确认需求再上 Neo4j
 
 ## 附录 A 术语表
 

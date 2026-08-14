@@ -69,8 +69,8 @@
 
   /* === 间距（pt，4-pt 栅格） === */
   --sp-1: 4pt;
-  --sp-2: 8pt;
-  --sp-3: 12pt;
+  --sp-2: 10pt;
+  --sp-3: 15pt;
   --sp-4: 16pt;
   --sp-5: 24pt;
   --sp-6: 32pt;
@@ -170,7 +170,7 @@ html, body {
   color: var(--c-ink-900);
   font-family: var(--ff-sans);
   font-size: var(--fs-body);
-  line-height: 1.72;
+  line-height: 1.85;
   font-feature-settings: "kern", "liga";
   -weasy-font-feature-settings: "kern", "liga";
   text-spacing: trim-start allow-end;
@@ -850,7 +850,7 @@ thead th {
   color: #ffffff;
   font-weight: 600;
   text-align: left;
-  padding: 8pt 10pt;
+  padding: 11pt 12pt;
   font-size: 9.5pt;
   letter-spacing: 0.3pt;
   border-bottom: 0.6pt solid var(--c-primary-900);
@@ -859,7 +859,7 @@ thead th:first-child { border-top-left-radius: var(--r-md); }
 thead th:last-child  { border-top-right-radius: var(--r-md); }
 
 tbody td {
-  padding: 7pt 10pt;
+  padding: 10pt 12pt;
   border-bottom: 0.4pt solid var(--c-line-soft);
   vertical-align: top;
   color: var(--c-ink-900);
