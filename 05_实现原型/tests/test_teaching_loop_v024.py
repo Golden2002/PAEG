@@ -10,7 +10,9 @@ v0.24 教学闭环修复测试。
 """
 
 import sys, os
-sys.stdout.reconfigure(encoding="utf-8")
+# v0.69+：reconfigure 移入 __main__——模块级执行会破坏 pytest capsys（收集期副作用）
+if __name__ == '__main__':
+    sys.stdout.reconfigure(encoding='utf-8')
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
