@@ -634,4 +634,5 @@
 - **资产清单（一条线连通，全部可下载）**：Manim 脚本（脚本化流程产物）+ 讲稿（script_service）+ PPT（pptx 管线）+ 讲义（keyword_doc）+ 思维导图（knowledge_map）
 - **涉及模块**：manim_service（动画）、script_service（讲稿）、production_pipeline（大纲）、轮询功能（选择题/填空题）、knowledge_map（思维导图）、资产下载
 - **设计**：咨询 Oracle 设计对话+轮询→脚本→动画+资产联动流程 → 实施
+- **数学可视化脚本创作方法调研（2026-08-14 追加）**：如何生成优秀的数学可视化演示视频脚本——调研 Manim 官方 GitHub 库 + 联网检索他人经验（数学可视化脚本创作最佳实践）+ 咨询 Oracle → 决定方法
 - **优先级**：P0（用户明确要求，先记录后执行）
