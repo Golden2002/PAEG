@@ -148,7 +148,7 @@
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
     User(["学生<br/>浏览器/微信"]) -->|HTTP/SSE| PAEG["PAEG 教育智能体"]
     PAEG -->|Prompt| LLM(("LLM<br/>DeepSeek/OpenAI"))
@@ -156,8 +156,7 @@ flowchart LR
     PAEG <-->|检索/写入| KB[("知识库")]
     PAEG <-->|联网| Ext["外部世界"]
     PAEG <-->|画像/历史| DB[("持久化")]
-    Dev["开发者"] -.->|热加载| PAEG
-```
+    Dev["开发者"] -.->|热加载| PAEG```
 
 **图 2 · 系统尺度（六层 + 一次请求数据流）**
 
@@ -176,7 +175,7 @@ flowchart LR
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart TB
     UI["Web UI"] --> API["REST API"] --> R["meta_router 15意图"] --> T["paeg.teach / teach_stream"]
     T --> S["9 个领域专家"]
@@ -184,8 +183,7 @@ flowchart TB
     S --> LL["LLM 适配"]
     T --> ST["持久化"]
     L0{{"L0 横切质量层"}} -.- T
-    L0 -.- S
-```
+    L0 -.- S```
 
 **图 3 · 教学流尺度（五阶段 + checkpoint 互动）**
 
@@ -204,7 +202,7 @@ flowchart TB
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
     subgraph Main["主线 · 五阶段"]
         Start(["学生提问"]) --> D["① 诊断"]
@@ -242,15 +240,14 @@ flowchart LR
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
     subgraph ASM["system 装配"]
         B["WEIL_CORE"]; T2["TRUTH_GROUNDING"]; SS["SUBJECT_STYLES"]; LG["LANGUAGE_STYLE"]
     end
     ASM --> Sys["system prompt"] --> LLM2["LLM 调用 重试+超时"]
     LLM2 --> St["60字分片"] --> Y["SSE yield"]
-    Y -.->|需工具| MC["mcp__ 工具"] --> LLM2
-```
+    Y -.->|需工具| MC["mcp__ 工具"] --> LLM2```
 
 ### 核心调用链（用户问"什么是导数"）
 用户输入 → L1(POST /api/teach/stream) → L2(meta_router → intent=teach) → L3(teach_stream：诊断→计划→讲解→checkpoint→评估→调整) → L4(subagent 协作) → L5(工具按需调用) → L0(防幻觉全程约束)
@@ -271,7 +268,7 @@ flowchart LR
 **图 5 · 自我进化闭环（G1-G11）**
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart TD
     Teach["教学完成"] --> Hist["对话历史抓取 G1"]
     Hist --> Dist["知识蒸馏<br/>LLM 提炼"]
@@ -289,7 +286,7 @@ flowchart TD
 **图 6 · RALPH 循环（任务驱动持续改进）**
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart TD
     Sub["任务提交 TaskRegistry"] --> Exec["执行本轮 executor"]
     Exec --> Eval["三层判定<br/>L0门禁+L1指标+L2证据"]
@@ -297,13 +294,12 @@ flowchart TD
     Guard -->|继续| Exec
     Guard -->|轮次上限/停滞| ABORT["ABORT + 摘要"]
     Eval -->|达标| DONE["DONE 承诺协议"]
-    DONE --> Back["结果回流 self_evolution"]
-```
+    DONE --> Back["结果回流 self_evolution"]```
 
 **图 7 · 意图路由（meta_router）**
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart TD
     In["用户输入"] --> Mode{"模式短路<br/>用户显式选择?"}
     Mode -->|是| Direct["确定性意图<br/>confidence 0.95"]
@@ -312,13 +308,12 @@ flowchart TD
     LLM -->|高置信| Use["使用意图"]
     Rule --> Use
     Direct --> Use
-    Use --> Route["路由到处理链"]
-```
+    Use --> Route["路由到处理链"]```
 
 **图 8 · 配置体系（config_hub）**
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
     App["server.py/subagents"] -->|get_all_tool_defs| Hub["config_hub"]
     Hub --> MCP["MCP 25 工具"]
@@ -328,13 +323,12 @@ flowchart LR
     MCP -->|mcp__ 前缀| Exec["execute_tool 统一路由"]
     SK -->|load_skill__| Exec
     WF -->|run_workflow__| Exec
-    Exec -->|spill 防护| Out["LLM 工具结果"]
-```
+    Exec -->|spill 防护| Out["LLM 工具结果"]```
 
 **图 9 · checkpoint 互动时序（深入版教学互动）**
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 sequenceDiagram
     participant S as 学生
     participant T as teach_stream
@@ -348,8 +342,7 @@ sequenceDiagram
     T->>E: _student_signal 评估
     E-->>T: understood/partial/confused
     T->>P: 续讲(_pending_steps + remediation)
-    P-->>S: 继续流式讲解
-```
+    P-->>S: 继续流式讲解```
 
 
 
@@ -364,26 +357,24 @@ flowchart TD
     L1 -->|始终注入| SYS["system prompt"]
     L2 -->|条件注入| SYS
     L3 -->|按需注入| SYS
-    Ind["Individuality 增量建模"] -->|对话后 LLM 提取| P
-```
+    Ind["Individuality 增量建模"] -->|对话后 LLM 提取| P```
 
 **图 11 · 三层记忆生命周期**
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
     ST["短期记忆<br/>≤12 条/token≤6000"] -->|超阈值| CP["compress_if_needed<br/>LLM 摘要"]
     CP --> MT["中期记忆<br/>主题/掌握/薄弱/情感四信号<br/>≤900 字"]
     MT -->|持久化| LT["长期记忆<br/>memory_summary.json"]
     LT --> Profile["LearnerProfile 画像"]
     ST -->|build_context| LLM["注入 LLM"]
-    MT -->|build_context| LLM
-```
+    MT -->|build_context| LLM```
 
 **图 12 · 教学策略决策树（choose_strategy）**
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart TD
     In["诊断+学科+画像"] --> Bloom["学科默认 Bloom 起点"]
     Bloom --> R1{"有缺口且无前置?"}
@@ -398,13 +389,12 @@ flowchart TD
     R5 -->|考研| S3
     R5 -->|初高中技能| S2
     R5 -->|具体/视觉| S1
-    R5 -->|默认| S4["default"]
-```
+    R5 -->|默认| S4["default"]```
 
 **图 13 · 单步教学续讲（_pending_steps 状态机）**
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 stateDiagram-v2
     [*] --> step_idle
     step_idle --> step_in_progress: 首步进入
@@ -412,13 +402,12 @@ stateDiagram-v2
     step_awaiting_answer --> step_resumed: 学生回答
     step_resumed --> step_awaiting_answer: 再 checkpoint
     step_resumed --> step_final: 无剩余步骤
-    step_final --> plan_complete: done 事件
-```
+    step_final --> plan_complete: done 事件```
 
 **图 14 · QualityGate L1-L4 四层过滤**
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart TD
     C["候选内容"] --> L1["L1 宪法<br/>有害/注入/PII 正则 <1ms"]
     L1 -->|pass| L2["L2 硬规则<br/>长度/去重/格式 <1ms"]
@@ -427,13 +416,12 @@ flowchart TD
     L1 -->|reject| X["拒绝"]
     L2 -->|reject| X
     L3 -->|reject| X
-    L4 -->|通过| OK["入库"]
-```
+    L4 -->|通过| OK["入库"]```
 
 **图 15 · 周期自我更新调度（periodic）**
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 sequenceDiagram
     participant S as server
     participant P as PeriodicUpdater
@@ -448,8 +436,7 @@ sequenceDiagram
         P->>I: analyze_failures
         I-->>P: improvements.md
     end
-    P-->>S: 下次教学自动加载改进
-```
+    P-->>S: 下次教学自动加载改进```
 
 **图 16 · SSE 流式协议事件序列**
 
@@ -469,8 +456,7 @@ sequenceDiagram
     S-->>U: event: checkpoint
     S-->>U: event: evaluation
     S-->>U: event: adjustment
-    S-->>U: event: done
-```
+    S-->>U: event: done```
 
 **图 17 · hooks 事件链（横切关注点）**
 
@@ -486,8 +472,7 @@ sequenceDiagram
     App->>H: tool.before/after
     App->>H: session.end
     H->>Handler: 按优先级串行（waterfall）
-    Handler-->>H: 可短路/透传
-```
+    Handler-->>H: 可短路/透传```
 
 **图 18 · 危机信号拦截协议（affection_gate）**
 
@@ -500,13 +485,12 @@ flowchart TD
     R1 --> R2["自然融入关怀<br/>热线+继续聊天+现实陪伴"]
     R2 --> R3{"用户明确拒绝?"}
     R3 -->|是| Respect["尊重选择不再重复"]
-    R3 -->|否| R2
-```
+    R3 -->|否| R2```
 
 **图 19 · spill 防护（上下文溢出+注入防御）**
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
+%%{init: {'theme': 'dark'}}%%
 flowchart TD
     In["输入/工具返回"] --> L1["L1 注入模式正则"]
     L1 -->|pass| L2["L2 PII 检测"]
@@ -515,8 +499,7 @@ flowchart TD
     L4 -->|pass| M["memory 写入审计"]
     L1 -->|reject| X["拦截"]
     L2 -->|reject| X
-    Out["工具返回超长"] --> Sp["spill 截断 12000 字符"]
-```
+    Out["工具返回超长"] --> Sp["spill 截断 12000 字符"]```
 
 
 ## 第 4 章 关键流程

@@ -88,82 +88,95 @@
   </main>
 
 <script src="./mermaid.min.js"></script>
-<style>.mermaid{text-align:center;margin:6mm 0} .mermaid svg{max-width:100%}
-/* v0.71 ⭐ 排版优化：Mermaid 图容器化（figure）——统一缩放 + 防大片空白 + 视觉完成度
-   - max-width:100% 按页宽自适应；max-height 留出页眉页脚缓冲
-   - 浅色底 + 圆角 + 细边框 + 微阴影：视觉完成度提升
-   - page-break-inside:avoid 防图被截断；.tall 图允许跨页（防"一页一张图+大片空白"） */
-.mermaid-fig{text-align:center;page-break-inside:avoid;break-inside:avoid;margin:6mm auto}
-/* v0.71 Oracle+visual 双咨询 三类图版式：
-   wide(宽扁)占满版心+min-height防孤 / tall(高窄)限高 240mm+垂直居中 /
-   normal(方形)容器化适中 / hero(关键架构图)独占页 */
-.mermaid-fig img{display:block;margin:0 auto;width:auto;height:auto}
-/* 宽扁横条：占满版心宽 + min-height 防“细线孤”，无容器 */
-.mermaid-fig.wide{background:transparent;border:0;box-shadow:none;padding:0}
-.mermaid-fig.wide img{width:auto;max-width:174mm;max-height:85mm;min-height:20mm;padding:0;border:0;border-radius:0;background:transparent}
-/* 高窄竖条：限高一页内 + 垂直居中（避免下半页空白） */
-.mermaid-fig.tall{background:transparent;border:0;box-shadow:none;padding:0;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:180mm}
-.mermaid-fig.tall img{max-width:170mm;padding:0;border:0;border-radius:0;background:transparent}
-/* 方形/正常：浅容器 + 适中放大，不溢出版心 */
-.mermaid-fig.normal{background:transparent;border:0;border-radius:0;padding:0}
-.mermaid-fig.normal img{max-width:174mm}
-/* hero：关键架构图独占一页 + 放大版心 + 居中 */
-.mermaid-fig.hero{page-break-before:always;break-before:page;background:#fafbfd;border:0.6pt solid #c8d4e6;border-radius:8pt;box-shadow:0 2pt 6pt rgba(11,37,69,0.08);padding:12pt 16pt;min-height:220mm;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0 auto}
-.mermaid-fig.hero img{max-width:170mm;max-height:210mm}
-/* figcaption：紧贴图下（不留大空隙） */
-.mermaid-fig figcaption{font-size:9pt;color:#3d4a63;text-align:center;padding:4pt 0 2pt;margin-top:0;border-top:0.3pt solid #e2e8f0;max-width:90%;margin-left:auto;margin-right:auto;letter-spacing:0.2pt;line-height:1.4}
-.mermaid-fig figcaption::before{content:"▸ ";color:#14b8a6;font-weight:700}
-/* v0.71 终极修复：节点文字标签背景与节点同色（淡紫）——消除紫色节点 + 白底文字框的突凿感 */
-.mermaid g.node rect.basic, .mermaid g.node rect.rect,
-.mermaid .node rect, .mermaid .node polygon,
-.mermaid .label-container rect, .mermaid rect.label-container {
-  fill: #f0f4f9 !important;
-  stroke: #2b3a55 !important;
+<style>
+/* ═══════════ v1.1 SVG 矢量直出 · Mermaid 排版（终极版）═══════════
+   图由浏览器渲染为 SVG 矢量，直接进 PDF——无需截图/容器/分类。
+   关键：figure 间距规范（Verdigris/DigitalOcean 调研）+ 防跨页截断 + svg 自适应 */
+.mermaid {
+  text-align: center;
+  margin: 1.5em 0;               /* 图与段落间距：上下 24px（DigitalOcean 2rem 规范） */
+  page-break-inside: avoid;      /* 防跨页截断（librarian 调研关键） */
+  break-inside: avoid;
 }
-.mermaid g.node .label-container, .mermaid .node .label-container {
-  fill: #f0f4f9 !important;
+.mermaid svg {
+  max-width: 100% !important;    /* 覆盖 mermaid 注入的 inline max-width（useMaxWidth 关键） */
+  max-height: 240mm !important;  /* v1.1 ⭐ 限高：超高 SVG（stateDiagram 等）防跨页截断——等比缩放 */
+  height: auto !important;
+  width: auto !important;        /* 宽度自适应（max-width 控制），配合 max-height 等比 */
+  display: inline-block;
+  object-fit: contain;
 }
-.mermaid g.node foreignObject div, .mermaid g.node foreignObject span,
-.mermaid .node foreignObject div, .mermaid .node foreignObject span {
+/* 图后段落紧凑（图与文字衔接，防大片空白） */
+.mermaid + p, .mermaid + ul, .mermaid + h3, .mermaid + h4 {
+  margin-top: 0.75em !important; /* 12px——Verdigris 规范：图与文字间距 */
+}
+/* v1.1 ⭐ 去 sequenceDiagram/flowchart 文字白框：edgeLabel/messageText/foreignObject 强制透明 */
+.mermaid .edgeLabel, .mermaid .nodeLabel, .mermaid .labelText,
+.mermaid .label, .mermaid .messageText, .mermaid .messageText tspan {
   background: transparent !important;
   background-color: transparent !important;
-  fill: #1a1a2e !important;
-  color: #1a1a2e !important;
+  fill: inherit !important;
 }
-.mermaid g.node polygon, .mermaid .node polygon {
-  fill: #e3ecf5 !important;
-  stroke: #475569 !important;
+.mermaid foreignObject div, .mermaid foreignObject span {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
 }
-.mermaid g.node circle, .mermaid .node circle,
-.mermaid g.node ellipse, .mermaid .node ellipse {
-  fill: #f0f4f9 !important;
-  stroke: #2b3a55 !important;
-}
-.mermaid g.node text, .mermaid .node text,
-.mermaid g.node .nodeLabel, .mermaid .node .nodeLabel {
-  fill: #1a1a2e !important;
-  stroke: none !important;
+.mermaid g.node foreignObject div, .mermaid g.cluster foreignObject div {
   background: transparent !important;
 }
 </style>
-<script>try{mermaid.initialize({startOnLoad:false,theme:'base',securityLevel:'loose',
-  themeVariables:{
-    background:'#ffffff',
-    primaryColor:'#f0f4f9',primaryTextColor:'#0f1f3a',primaryBorderColor:'#2b3a55',
-    secondaryColor:'#e3ecf5',secondaryTextColor:'#0f1f3a',secondaryBorderColor:'#475569',
-    tertiaryColor:'#d6e2ee',tertiaryTextColor:'#0f1f3a',tertiaryBorderColor:'#475569',
-    lineColor:'#475569',textColor:'#0f1f3a',mainBkg:'#f0f4f9',secondBkg:'#e3ecf5',
-    border1:'#2b3a55',border2:'#475569',clusterBkg:'#eaf1f8',clusterBorder:'#2b3a55',
-    titleColor:'#0f1f3a',edgeLabelBackground:'#ffffff',
-    actorBkg:'#f0f4f9',actorBorder:'#2b3a55',actorTextColor:'#0f1f3a',actorLineColor:'#475569',
-    signalColor:'#475569',signalTextColor:'#0f1f3a',noteBkgColor:'#fef3c7',noteTextColor:'#78350f',
-    noteBorderColor:'#b45309',loopTextColor:'#0f1f3a',activationBkgColor:'#e3ecf5',
-    activationBorderColor:'#2b3a55',sequenceNumberColor:'#ffffff',
-    /* v0.71 修复：subgraph 边框色（原默认黑框突兀）*/
-    clusterBkg:'#faf7ff',
-    clusterBorder:'#b8a6e0',
-    fontFamily:'Noto Sans SC, sans-serif',
-    fontSize:'14px'
-  }}); try{mermaid.run({querySelector:'.mermaid'});}catch(e){};}catch(e){}</script>
+<script>
+/* v1.1 SVG 直出：base 蓝灰默认 + useMaxWidth（图随版心自适应缩放）
+   逐图主题由 markdown 内 %%{init: {theme:'dark'|'base'}}%% 覆盖（官方 directive 支持） */
+try {
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'loose',
+    theme: 'base',
+    themeVariables: {
+      fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
+      fontSize: '14px',
+      primaryColor: '#f0f4f9',
+      primaryTextColor: '#0f1f3a',
+      primaryBorderColor: '#2b3a55',
+      secondaryColor: '#e3ecf5',
+      secondaryTextColor: '#0f1f3a',
+      secondaryBorderColor: '#475569',
+      tertiaryColor: '#d6e2ee',
+      tertiaryTextColor: '#0f1f3a',
+      tertiaryBorderColor: '#475569',
+      lineColor: '#475569',
+      textColor: '#0f1f3a',
+      mainBkg: '#f0f4f9',
+      secondBkg: '#e3ecf5',
+      border1: '#2b3a55',
+      border2: '#475569',
+      clusterBkg: '#eaf1f8',
+      clusterBorder: '#2b3a55',
+      titleColor: '#0f1f3a',
+      background: '#ffffff',
+      /* sequenceDiagram 显式配色（README #10 经验） */
+      actorBkg: '#f0f4f9',
+      actorBorder: '#2b3a55',
+      actorTextColor: '#0f1f3a',
+      actorLineColor: '#475569',
+      signalColor: '#475569',
+      signalTextColor: '#0f1f3a',
+      noteBkgColor: '#fef3c7',
+      noteTextColor: '#78350f',
+      noteBorderColor: '#b45309',
+      activationBkgColor: '#e3ecf5',
+      activationBorderColor: '#2b3a55',
+      sequenceNumberColor: '#ffffff',
+      edgeLabelBackground: 'transparent'  /* v1.1: 消息文字白底矩形→透明 */
+    },
+    flowchart: { useMaxWidth: true, htmlLabels: true },
+    sequence: { useMaxWidth: true },
+    state: { useMaxWidth: true }
+  });
+  try { mermaid.run({ querySelector: '.mermaid' }); } catch (e) {}
+} catch (e) {}
+</script>
 </body>
 </html>
