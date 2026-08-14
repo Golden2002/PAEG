@@ -234,6 +234,101 @@ flowchart LR
 ### 核心调用链（用户问"什么是导数"）
 用户输入 → L1(POST /api/teach/stream) → L2(meta_router → intent=teach) → L3(teach_stream：诊断→计划→讲解→checkpoint→评估→调整) → L4(subagent 协作) → L5(工具按需调用) → L0(防幻觉全程约束)
 
+### 架构图集（尺度分级 · 从全景到模块）
+
+**图集总览**：
+
+| 尺度 | 图 | 覆盖 |
+|---|---|---|
+| L0 全景 | 图1 全景（PAEG 与外部世界） | 系统边界 |
+| L1 系统 | 图2 六层架构 | 分层+数据流 |
+| L2 教学流 | 图3 五阶段+checkpoint | 一次教学 |
+| L3 组件 | 图4 Presenter 装配 | subagent 内部 |
+| L4 机制 | 图5-9（自我进化/RALPH/意图路由/配置体系/checkpoint 时序） | 关键机制细节 |
+| L5 事件 | 图9 时序（SSE 事件序列） | 流式协议 |
+
+**图 5 · 自我进化闭环（G1-G11）**
+
+```mermaid
+flowchart TD
+    Teach["教学完成"] --> Hist["对话历史抓取 G1"]
+    Hist --> Dist["知识蒸馏<br/>LLM 提炼"]
+    Dist --> Gate["QualityGate L1-L3<br/>事实评分"]
+    Gate -->|pass| Evolved["evolved_*.json"]
+    Evolved --> Hot["热加载 G3"]
+    Hot --> KB[("知识库可检索")]
+    Teach --> Refl["教学反思"]
+    Refl --> Patch["subject_patches G5"]
+    Patch --> TM["教学记忆注入"]
+    Tool["工具调用"] --> Lesson["工具经验 G4/G6"]
+    Lesson --> TL["tool_lessons"]
+    FB["用户反馈 SEL-8"] --> SE["自我更新消费"]
+    TM -.->|下次教学| Teach
+    TL -.->|注入| Teach
+```
+
+**图 6 · RALPH 循环（任务驱动持续改进）**
+
+```mermaid
+flowchart TD
+    Sub["任务提交 TaskRegistry"] --> Exec["执行本轮 executor"]
+    Exec --> Eval["三层判定<br/>L0门禁+L1指标+L2证据"]
+    Eval -->|未达标| Guard{"防呆五防线"}
+    Guard -->|继续| Exec
+    Guard -->|轮次上限/停滞| ABORT["ABORT + 摘要"]
+    Eval -->|达标| DONE["DONE 承诺协议"]
+    DONE --> Back["结果回流 self_evolution"]
+```
+
+**图 7 · 意图路由（meta_router）**
+
+```mermaid
+flowchart TD
+    In["用户输入"] --> Mode{"模式短路<br/>用户显式选择?"}
+    Mode -->|是| Direct["确定性意图<br/>confidence 0.95"]
+    Mode -->|否| LLM["LLM 判断 15 意图"]
+    LLM -->|低置信/异常| Rule["规则兜底<br/>正则检测器"]
+    LLM -->|高置信| Use["使用意图"]
+    Rule --> Use
+    Direct --> Use
+    Use --> Route["路由到处理链"]
+```
+
+**图 8 · 配置体系（config_hub）**
+
+```mermaid
+flowchart LR
+    App["server.py/subagents"] -->|get_all_tool_defs| Hub["config_hub"]
+    Hub --> MCP["MCP 25 工具"]
+    Hub --> SK["Skills 11"]
+    Hub --> HK["hooks 7 事件"]
+    Hub --> WF["Workflows DAG"]
+    MCP -->|mcp__ 前缀| Exec["execute_tool 统一路由"]
+    SK -->|load_skill__| Exec
+    WF -->|run_workflow__| Exec
+    Exec -->|spill 防护| Out["LLM 工具结果"]
+```
+
+**图 9 · checkpoint 互动时序（深入版教学互动）**
+
+```mermaid
+sequenceDiagram
+    participant S as 学生
+    participant T as teach_stream
+    participant P as Presenter
+    participant E as Evaluator
+    S->>T: 提问
+    T->>P: 讲解步骤
+    P-->>S: SSE 流式讲解
+    T-->>S: event: checkpoint（听懂了吗）
+    S->>T: 回答（strict_checkpoint 挂起后）
+    T->>E: _student_signal 评估
+    E-->>T: understood/partial/confused
+    T->>P: 续讲（_pending_steps + remediation）
+    P-->>S: 继续流式讲解
+```
+
+
 ## 第 4 章 关键流程
 
 ### 4.1 教学生命周期（序列图要点）
