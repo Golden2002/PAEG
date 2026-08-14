@@ -137,6 +137,21 @@ final = tpl.replace("{{CONTENT}}", content_html)
 - **去白框 CSS 的真相**：`.mermaid foreignObject div{background:transparent}` 等强制透明，在 neutral 白节点上=文字直接印白色节点（白框消失）；在 base 蓝灰节点上=文字印蓝灰（无白框）——**两种主题下都成立**，是让白框不可见的通用手段
 - **教训**：用户说"去白框"可能指"让框不可见"（融入背景）而非"删掉框元素"——先理解意图（白框 vs 蓝灰/白节点背景对比突兀），再选方案（同色系融合 或 透明）
 
+**21. SVG 矢量直出终极方案（v1.1 ⭐ 放弃 PNG 截图，图直接矢量进 PDF）**：
+- **核心决策**：不截图 PNG，让 mermaid.js 在浏览器渲染 SVG → page.pdf 直接输出矢量（2782 矢量路径、0 位图）——无限清晰，无截图/深色/白框/压扁/高清问题
+- **白框根治（librarian 源码级）**：白框 = Mermaid `textPlacement:'fo'`（foreignObject 路径）内嵌 HTML div 默认白底，PDF 打印时显现。**根治：`sequence: { textPlacement: 'tspan' }`**——sequence 文字走原生 SVG text，完全绕开 foreignObject（mermaid svgDraw.js byFo→byTspan）
+- **跨页截断**：`.mermaid svg { max-height: 240mm !important }` 限高，超高 SVG 等比缩放防跨页
+- **宽度解放**：`svg { width: 100% !important }` 图占满版心全宽（用户要求），高度受限
+- **大图分页**：渲染后 JS 检测 SVG viewBox 高度 > 页高 55% → 在【图标题段落前】插 `page-break-before:always` 分隔符——标题+图独占一页，不分离。**关键：用 viewBox 高度（非 getBoundingClientRect，避免 margin 误判）；阈值适中（65% 误伤小图，55% 合适）**
+- **图标题同页**：分页符必须插在标题段落（pre 前含"图 N"的 p）之前，而非 pre 前——否则标题孤立上一页
+- **教训**：①PNG 截图路线所有问题（深色/白框/压扁/高清/截断）在 SVG 直出下全部消失 ②白框优先查 Mermaid 渲染机制（textPlacement/foreignObject）而非 CSS 修补 ③分页判断用真实元素尺寸（viewBox）而非含 margin 的 rect
+
+**22. 图标题-图同页（v1.1.2 用户反馈迭代）**：
+- 症状：大图标题在上一页、图在下一页，中间大片空白
+- 修复：JS 在【标题段落前】插 `page-break-before:always`（标题+图一起独占下一页）
+- 迭代：阈值 65% 误伤小图（第11页图4被推走）→ 调 55% + 用 viewBox 真实高度 → 修复
+- 教训：分页判断要区分"真大图"（viewBox 高）与"宽扁小图"（宽但矮）；阈值需实测调优
+
 ## 更新日志
 
 | 日期 | 版本 | 改动 |
@@ -146,3 +161,4 @@ final = tpl.replace("{{CONTENT}}", content_html)
 | 2026-08-14 | v0.71 | Mermaid 图容器化排版优化（Oracle+visual 双咨询）：dsf=1 截图（PNG 减半）+ figure 容器（max-width/height 双约束 + 浅色底圆角细边框）+ .tall 高窄图跨页 + 节尾防空白（h2/h3 与图 page-break-before:avoid + 图后段落拉近）+ 修复 figcaption 误判既有标题；经验 #14-15 |
 | 2026-08-14 | v0.71.1 | 排版深水区修复（多轮 Oracle+visual+用户洞察）：①print 图片压扁（去 max-height）②深色背景（pre.mermaid 白底）③紫底白框冲突（文字标签与节点同色）④配色方案 A 蓝灰专业 ⑤dsf=4 至尊高清 ⑥图分类三类+hero ⑦pre 去边框；经验 #16-19 |
 | 2026-08-14 | v0.71.2 | 图双主题方案（用户精确指令）：保持现状（base 蓝灰）图9/15/16/17 + 其余 15 图第一版（neutral 白节点深字，白框融入不可见）；Mermaid 图级 `%%{init:{theme:'neutral'}}%%` 覆盖；经验 #20 |
+| 2026-08-15 | v1.1 | SVG 矢量直出终极方案：放弃 PNG 截图，mermaid.js 浏览器渲染 SVG 直接 page.pdf（矢量无限清晰）；白框根治（sequence textPlacement:'tspan' 绕开 foreignObject div 白底）；跨页截断修复（svg max-height 240mm）；大图分页（标题前插 page-break-before）；宽度解放（svg width:100%）；经验 #21-22 |

@@ -93,6 +93,42 @@ def render(md_path: str, out_pdf: str, title: str = None, sub: str = None) -> in
         page.wait_for_timeout(2000)  # 等字体/渲染稳定
         svg_count = page.locator('.mermaid svg').count()
         print(f'[render] Mermaid SVG 数量: {svg_count}（SVG 矢量直出）')
+        # v1.1.1 ⭐ 大图强制分页 + 白框防御（用户要求：大图直接分页，标题+图独占一页）
+        try:
+            page.evaluate("""() => {
+                /* 白框防御：SVG 文字关闭 Chromium PDF 的 paint-order 白衬底 */
+                document.querySelectorAll('.mermaid svg text, .mermaid svg tspan').forEach(t => {
+                    t.style.setProperty('paint-order', 'stroke fill markers', 'important');
+                    t.style.setProperty('stroke', 'transparent', 'important');
+                });
+                /* 大图分页：SVG 高度 > 页高 55% → 在【图标题段落】前插分页符（标题+图独占一页）。
+                   用 svg.viewBox 高度（真实图高，不含 margin）判断 */
+                const pageH = window.innerHeight;
+                document.querySelectorAll('pre.mermaid').forEach(pre => {
+                    const svg = pre.querySelector('svg');
+                    if (!svg) return;
+                    const vb = svg.viewBox && svg.viewBox.baseVal;
+                    const svgH = vb && vb.height ? vb.height : svg.getBoundingClientRect().height;
+                    if (svgH > pageH * 0.55) {
+                        /* 找到 pre 前面的标题段落（含"图 N"）——分页符插在标题前 */
+                        let anchor = pre;
+                        let prev = anchor.previousElementSibling;
+                        if (prev && prev.tagName === 'P' && /图\s*\d/.test(prev.textContent)) {
+                            anchor = prev;
+                        }
+                        const before = anchor.previousElementSibling;
+                        if (!before || !before.classList.contains('page-break-spacer')) {
+                            const spacer = document.createElement('div');
+                            spacer.className = 'page-break-spacer';
+                            spacer.style.cssText = 'page-break-before:always;break-before:page;height:1px;';
+                            anchor.parentNode.insertBefore(spacer, anchor);
+                        }
+                    }
+                });
+            }""")
+            page.wait_for_timeout(200)
+        except Exception as _pe:
+            print(f'[render] 大图分页/白框处理跳过: {_pe}')
         # 直接输出 PDF——SVG 矢量保留，图无限清晰
         page.pdf(path=out_pdf, format='A4', print_background=True,
                  margin={'top': '0', 'bottom': '0', 'left': '0', 'right': '0'})

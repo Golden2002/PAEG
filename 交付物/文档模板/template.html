@@ -101,8 +101,8 @@
 .mermaid svg {
   max-width: 100% !important;    /* 覆盖 mermaid 注入的 inline max-width（useMaxWidth 关键） */
   max-height: 240mm !important;  /* v1.1 ⭐ 限高：超高 SVG（stateDiagram 等）防跨页截断——等比缩放 */
+  width: 100% !important;        /* v1.1.2 ⭐ 宽度解放：图占满版心全宽（不收缩），仅高度受限 */
   height: auto !important;
-  width: auto !important;        /* 宽度自适应（max-width 控制），配合 max-height 等比 */
   display: inline-block;
   object-fit: contain;
 }
@@ -110,20 +110,61 @@
 .mermaid + p, .mermaid + ul, .mermaid + h3, .mermaid + h4 {
   margin-top: 0.75em !important; /* 12px——Verdigris 规范：图与文字间距 */
 }
-/* v1.1 ⭐ 去 sequenceDiagram/flowchart 文字白框：edgeLabel/messageText/foreignObject 强制透明 */
+/* v1.1 ⭐ 文字背景与节点同色（用户洞察：透明导致页面白底透出形成白框，应与节点保持颜色相同）
+   文字背景 = 节点淡蓝灰 #f0f4f9（同 primaryColor）——融合而非透明 */
 .mermaid .edgeLabel, .mermaid .nodeLabel, .mermaid .labelText,
 .mermaid .label, .mermaid .messageText, .mermaid .messageText tspan {
-  background: transparent !important;
-  background-color: transparent !important;
+  background: #f0f4f9 !important;
+  background-color: #f0f4f9 !important;
   fill: inherit !important;
 }
 .mermaid foreignObject div, .mermaid foreignObject span {
-  background: transparent !important;
-  background-color: transparent !important;
+  background: #f0f4f9 !important;
+  background-color: #f0f4f9 !important;
   border: none !important;
 }
 .mermaid g.node foreignObject div, .mermaid g.cluster foreignObject div {
-  background: transparent !important;
+  background: #f0f4f9 !important;
+}
+/* v1.1.1 ⭐ Oracle 诊断补充：sequenceDiagram 白框来自 SVG rect 的 fill（非 background）
+   —— actor 矩形/消息底层的白色 fill 是"白框"真源，用 fill 控制（用户洞察：与节点同色） */
+.mermaid svg .actor rect,
+.mermaid svg .messageBox,
+.mermaid svg .note rect,
+.mermaid svg .labelBox,
+.mermaid svg .edgeLabel rect,
+.mermaid svg .cluster rect {
+  fill: #f0f4f9 !important;   /* 与节点同色，融合而非白框 */
+}
+/* flowchart 节点保留主色底（不被误杀） */
+.mermaid svg .node rect,
+.mermaid svg .node circle,
+.mermaid svg .node polygon,
+.mermaid svg .node ellipse {
+  fill: #f0f4f9 !important;
+}
+/* 文字 paint-order：关闭 Chromium PDF 的白色描边衬底（Oracle 层 2/3） */
+.mermaid svg text,
+.mermaid svg tspan {
+  paint-order: stroke fill markers !important;
+  stroke: transparent !important;
+  fill: #0f1f3a !important;
+}
+/* v1.1 ⭐ 标题与图同页：图标题（"图 N · ..."段落）紧跟图，不孤立在页底大片空白 */
+/* 图标题段落 = .mermaid 前一个 p（markdown 中"**图 N · ...**"） */
+p:has(+ pre.mermaid) {
+  page-break-after: avoid;      /* 标题后不强制分页——与图同页 */
+  break-after: avoid;
+  margin-bottom: 0.5em !important;  /* 标题与图间距收紧 */
+}
+.mermaid {
+  page-break-before: avoid;     /* 图不因标题而推到下一页（标题→图连续） */
+  break-before: avoid;
+}
+/* 通用：任何 h2/h3 + 图标题 + 图 连续（防 h2 在页底、图在下页） */
+h2, h3, h4 {
+  page-break-after: avoid;
+  break-after: avoid;
 }
 </style>
 <script>
@@ -169,10 +210,10 @@ try {
       activationBkgColor: '#e3ecf5',
       activationBorderColor: '#2b3a55',
       sequenceNumberColor: '#ffffff',
-      edgeLabelBackground: 'transparent'  /* v1.1: 消息文字白底矩形→透明 */
+      edgeLabelBackground: '#f0f4f9'  /* v1.1: 消息文字底色与节点同色（用户洞察） */
     },
     flowchart: { useMaxWidth: true, htmlLabels: true },
-    sequence: { useMaxWidth: true },
+    sequence: { useMaxWidth: true, textPlacement: 'tspan' },  /* v1.1.1 ⭐ 根治白框：sequence 文字走原生 SVG text（绕开 foreignObject div 白底，librarian 源码级确认） */
     state: { useMaxWidth: true }
   });
   try { mermaid.run({ querySelector: '.mermaid' }); } catch (e) {}
