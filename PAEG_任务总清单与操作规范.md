@@ -802,7 +802,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 ### 3.31 DeepSeek Harness 继续调研（2026-08-14 用户 ULW · 待执行）
 - **需求**：继续调研 DeepSeek Harness github 库（新发布内容）→ 为需求文档更新需求
 
-### 3.32 sub agent 模型配置化 + 面向用户配置化定制服务（2026-08-14 用户新指令 · 待实施）
+### 3.32 sub agent 模型配置化 + 面向用户配置化定制服务（2026-08-14 用户新指令 · ✅ 已完成 v0.71）
 - **背景**：用户观察到 Oh My OpenCode 支持 JSON 配置为每个 sub agent 分配不同模型；询问 PAEG 是否支持（现状：不支持——所有 LLM subagent 共用同一个 model_api，paeg.py 统一传入）
 - **需求**：①设计 config/agents.json——每 subagent 可配置 model/provider/temperature/prompt/工具开关 ②探索项目其他方面可配置化（面向用户的可定制服务，如教学风格/学科/人格）③咨询 Oracle + 联网检索 opencode/codex/DeepSeek Harness 最新实践 ④按需求文档实施 ⑤上传示例配置 + push GitHub
 - **执行**：先记录入需求文档 → 并行调研（librarian 联网 + explore 项目现状）→ Oracle 方案 → 实施 → 示例 + 上传
@@ -812,13 +812,23 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
   - subagent 类构造器接受 `model` 参数（`_safe_chat`/`_safe_reason_chat` 函数级传入）——**改造基础已具备，成本低**
   - llm_adapter.create_llm 已支持 provider 选择（auto/reasoner/flash 等）
   - 无 per-subagent 模型 JSON 配置；无面向用户的 subagent 定制配置
-- **设计方向（调研后细化）**：config/agents.json schema：`{"diagnostor": {"model": "reasoner", "temperature": 0.3, "prompt_ref": "diagnostor_v2", "tools": [...]}, ...}`；缺失回退默认；paeg.py 按配置创建各 subagent model
+- **实施记录（v0.71，commit 20dc3ce）**：
+  - 新建 `config_loader.py`：三层合并（DEFAULTS 内置 → ~/.paeg/agents.json 用户全局 → config/agents.json 项目级）+ `{env:KEY|默认}`/`{file:path}` 变量替换 + `create_llm_for(name)` per-subagent LLM 工厂 + `get_agent_config` + disabled 回退
+  - 新建 `config/agents.json`：10 subagent 可配（provider/model/temperature/max_tokens/thinking_level/enabled），含使用示例注释
+  - `paeg.py` __init__ 增加 `agents_config`/`use_agents_config` 参数：各 LLM subagent 按配置创建独立 LLM（presenter 用 A 模型、answer_solver 用 B 等），配置缺失/失败回退原 model_api
+  - 验证：7 项 config_loader 测试（默认完整/三层合并/变量替换/global 默认/disabled 回退）+ 3 项 paeg 注入测试（默认启用/关闭回退/自定义 mock）全过
+  - 借鉴来源：opencode 多层 merge + DeepSeek Harness 稀疏 patch + Claude Code 文件引用——librarian 四项目对比报告（opencode.json/Codex toml/Harness preset.yml/Claude Code frontmatter）已存档
 
-### 3.33 学段教学模式差异化（2026-08-14 用户 ULW 新增 · 待实施）
+### 3.33 学段教学模式差异化（2026-08-14 用户 ULW 新增 · ✅ 已完成 v0.71）
 - **背景**：用户指出初中/高中/大学（考研）的授课风格应当差距非常大——大学考研要像正式 presentation/lecture；高中重知识结构/解题/实例/适时复习；初中重 visualization/直观/生活化例子。要求学段上明确区分。
 - **需求**：①学段教学模式明确差异化（不只是深度档位，而是授课风格本质不同）②咨询 Oracle 调研项目现状 ③寻找解决方案实施
 - **执行**：先记录入需求文档 → Oracle 咨询 → 调研项目（SUBJECT_STYLES/SUBJECT_GRADES/学段联动现状）→ 方案 → 实施
 - **优先级**：P0
 - **用户原话**："初中、高中、大学和考研阶段对于教学模式来说，它的授课风格依然应当差距非常大。大学的考研水平……你讲课要像一场正式的presentation，要像一场正式的lecture一样，然后去完成对一个知识的讲授。而高中呢，可能更加需要注重知识结构啊，解题呀，然后应用一些实例，以及总是在适当的时候引入复习的环节，而初中可能更加强调visualization，能强调一些直观和更多生活化的例子。"
 - **现状待调研**：SUBJECT_GRADES（4 学段档位）+ SUBJECT_STYLES 的 grade 联动 + Presenter 教学模式三档（easy/normal/deep）+ build_presenter_system 的 grade_level 参数——现有学段差异是否只是"深度"区别而非"风格"区别？
+- **实施记录（v0.71，commit ed98c3a + 276d6d1）**：
+  - **Phase 1（ed98c3a）**：新增 `GRADE_TEACHING_MODES`（prompts.py）——4 学段 × 6 维教学法结构（structure/explanation/examples/interaction/review/output + system 提示词段）：初中"感官优先·三步可视化"（现象→画面→类比→命名→复述）/ 高中"结构优先·五步走"（定义→公式→例题→误区→知识结构图）/ 大学"正式 lecture·五步论证"（严格定义→定理→推导→应用→学科视野，绝不把大学课当高中补习讲）/ 考研"考点解剖·五步得分"（考什么→怎么考→套路→真题→易错点）；`get_grade_mode()` 未知学段回退高中；build_presenter_system 注入 grade_mode_line（grade_line 后、constraint 前）
+  - **Phase 2 升级（276d6d1，Oracle 二次咨询）**：用户要求"风格差异不仅体现在内容，也体现在结构上"——新增 `GRADE_SCAFFOLDS`（可执行段序列模板：段名/目的/内容指令/长度约束/形式约束）+ `get_grade_scaffold()` + `render_scaffold_to_system()`（渲染为【NEXT】逐段强制清单）→ build_presenter_system 注入 scaffold_line。结构差异（骨架段名互斥）+ 内容深度量化（初中每段≤5行禁公式/高中必有LaTeX+###标题/大学5-20行LaTeX推导+学科史/考研真题编号+⚡⚠️📌⏱标签）双落实
+  - **验证**：6 项学段测试（4×6维完整/风格互斥/回退/三学段注入/顺序/兼容）+ 6 项骨架测试（段数/字段/段名互斥/渲染/注入/顺序）全过；测试断言修复（self_update_agent 懒加载）
+  - **注意**：学段模式与 Presenter easy/normal/deep 三档、L0-L7 约束层正交——四层叠加不覆盖
 

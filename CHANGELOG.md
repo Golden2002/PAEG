@@ -1,3 +1,23 @@
+### v0.71 学段教学模式差异化 + sub agent 模型配置化 + 配置化定制服务（2026-08-14 ⭐）
+
+**学段教学模式差异化（§3.33，用户 ULW + Oracle 两次咨询）**：
+- `GRADE_TEACHING_MODES`：4 学段 × 6 维教学法结构——初中"感官优先·三步可视化"（现象→画面→类比→命名→复述，emoji/生活类比/复述触发）/ 高中"结构优先·五步走"（定义→公式→例题→误区→知识结构图，LaTeX+### 标题）/ 大学"正式 lecture·五步论证"（严格定义→定理→推导→应用→学科视野，学科史/开放问题，绝不把大学课当高中补习讲）/ 考研"考点解剖·五步得分"（考什么→怎么考→套路→真题→易错点，真题编号+⚡⚠️📌⏱标签）
+- `GRADE_SCAFFOLDS`（Oracle 升级）：可执行段序列骨架模板（段名/目的/指令/长度/形式量化）→ render_scaffold_to_system 渲染为【NEXT】逐段强制清单——**结构差异 + 内容深度双落实**（非仅措辞）
+- build_presenter_system 注入 grade_mode_line + scaffold_line（grade_line 后、constraint 前）；get_grade_mode/get_grade_scaffold 未知学段回退高中
+- 与 Presenter easy/normal/deep + L0-L7 约束层正交（四层叠加）
+
+**sub agent 模型配置化（§3.32，用户新指令 + librarian 四项目调研）**：
+- `config_loader.py`：三层合并（DEFAULTS → ~/.paeg/agents.json → config/agents.json）+ {env:KEY|默认}/{file:path} 变量替换 + create_llm_for per-subagent LLM 工厂 + disabled 回退
+- `config/agents.json`：10 subagent 可配（provider/model/temperature/max_tokens/thinking_level/enabled）——用户不改代码即可为每个 subagent 分配不同模型
+- paeg.py：agents_config/use_agents_config 参数——各 LLM subagent 按配置创建独立 LLM，失败回退
+- 借鉴：opencode 多层 merge + DeepSeek Harness 稀疏 patch + Claude Code 文件引用
+
+**配置化定制服务蓝图（面向用户）**：explore 全量盘点可配置化点（SUBJECT_STYLES 外置/Adapter 阈值/温度散落 15 处/教学模式三档/危机关键词等 14 项，含行号）——config/agents.json 已落地，其余为后续
+
+**技术说明 PDF 排版优化（Oracle + visual 双咨询）**：dsf=1 截图（PNG 减半）+ figure 容器化 + 高窄图 .tall 跨页 + 节尾防空白 + 修复 figcaption 误判既有标题
+
+**文档治理**：需求文档即工作流中枢（元能力 §5.9 + 技术说明附录 D + 维护 18.36）
+
 ### v0.70 语言规范 MCP 标准化 + L0-L8 约束引擎 MCP 化 + Harness 深调研（2026-08-14 ⭐）
 
 **本版定位**：①语言规范模块 MCP 化（统一入口 + 违禁词数据化 + 三工具）②L0-L8 约束系统 MCP 化（constraint_engine 6 API）③DeepSeek Harness 架构深调研（30 项优化需求记录）。
