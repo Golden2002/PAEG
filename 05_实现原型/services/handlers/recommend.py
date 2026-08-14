@@ -72,7 +72,7 @@ def _handle_recommend_query(learner, question, subject, llm_arg):
         )
     # v0.43 ⭐ P1 修复：recommend 语言规范收口（此前未过 polish）
     try:
-        from services.polish import _polish_text
+        from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
         answer = _polish_text(answer, context=f"recommend:{question[:30]}")
     except Exception:
         pass

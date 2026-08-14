@@ -84,7 +84,7 @@ def _handle_problem_request(learner, concept, subject):
                   f"（生成失败，请重试）")
     # v0.43 ⭐ P1 修复：problem 语言规范收口 + 问卷注入对齐（此前未过 polish）
     try:
-        from services.polish import _polish_text
+        from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
         answer = _polish_text(answer, context=f"problem:{concept[:30]}")
     except Exception:
         pass

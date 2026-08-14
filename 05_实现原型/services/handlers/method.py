@@ -146,7 +146,7 @@ def _handle_method_advice(learner, concept, subject, deadline=""):
                   f"再通过做典型例题巩固，最后用错题复盘查漏补缺。具体方法我可以展开讲。")
     # v0.42.3 ⭐ P1 修复：method 语言规范收口（L2/L3）——对齐 affection 接入范式
     try:
-        from services.polish import _polish_text
+        from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
         answer = _polish_text(answer, context=f"method:{concept[:30]}")
     except Exception:
         pass

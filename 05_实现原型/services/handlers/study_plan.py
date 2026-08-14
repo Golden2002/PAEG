@@ -44,7 +44,7 @@ def _handle_study_plan_request(learner, topic: str, subject: str = "",
     else:
         _summary_body = _summary_full
     try:
-        from services.polish import _polish_text
+        from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
         _summary = _polish_text(_summary_body, context=f"study_plan:{_plan.topic[:30]}")
     except Exception:
         _summary = _summary_body

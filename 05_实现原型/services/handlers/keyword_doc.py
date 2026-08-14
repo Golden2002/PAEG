@@ -89,7 +89,7 @@ def handle_keyword_doc(user_text: str, reply: str, learner, data: dict):
         doc_content = f"# {topic}\n\n（生成失败，请重试）"
     # v0.43 ⭐ P1 修复：keyword_doc 语言规范收口（此前未过 polish）
     try:
-        from services.polish import _polish_text
+        from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
         doc_content = _polish_text(doc_content, context=f"doc:{doc_type}:{topic[:20]}")
     except Exception:
         pass

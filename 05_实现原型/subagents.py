@@ -507,7 +507,7 @@ def _summarize_resource(title: str, snippet: str, llm=None) -> str:
                 _out = _normalize_resource_summary(title, snippet, _r)
                 # v0.46.1 ⭐ 语言规范收口：summary 也是生成内容，必须过 L2/L3 polish
                 try:
-                    from services.polish import _polish_text
+                    from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
                     _out = _polish_text(_out, context="resource_summary")
                     # polish 可能删标签 → 再校验一次
                     _out = _normalize_resource_summary(title, snippet, _out)

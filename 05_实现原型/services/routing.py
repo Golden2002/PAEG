@@ -56,7 +56,7 @@ def _mode_auto_correct(
         if requested_mode != "affection" and is_affection_expression(text):
             from subagents import AffectionSupportor
             from infra.sessions import SESSIONS
-            from services.polish import _polish_text
+            from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
             from infra.runtime import get_llm
             _emo = AffectionSupportor()
             _hist = SESSIONS.get(f"chat_hist_{learner_id}", [])

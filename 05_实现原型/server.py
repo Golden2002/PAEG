@@ -68,7 +68,7 @@ from utils import (
 from services._learner_session import ensure_learner_session
 # v0.43 ⭐ Wave 3 拆分：业务处理函数迁出 server.py。
 # polish/steering/routing 各自负责一段领域逻辑，所有依赖在函数体内懒加载。
-from services.polish import _polish_text
+from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
 from services.steering import _steer_subject, _steer_unknown_response
 from services.routing import _mode_auto_correct
 from infra.runtime import (
@@ -1210,7 +1210,7 @@ def teach_stream():
                     pass
                 # v0.46.1 ⭐ 语言规范收口：grade_blocked 分支的 LLM 内容过 polish
                 try:
-                    from services.polish import _polish_text
+                    from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
                     _gb_content = _polish_text(_gb_content, context="teach:grade_blocked")
                 except Exception as _e:
                     print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
@@ -1231,7 +1231,7 @@ def teach_stream():
             _unk_content = _unk.get("presentations", [{}])[0].get("content", "")
             # v0.46.1 ⭐ 语言规范收口：unknown 分支的 LLM 内容过 polish
             try:
-                from services.polish import _polish_text
+                from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
                 _unk_content = _polish_text(_unk_content, context="teach:unknown")
             except Exception as _e:
                 print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
@@ -1413,6 +1413,14 @@ def teach_stream():
         if _llm_intent == "knowledge_map" or (_llm_intent is None and is_knowledge_map_request(concept)):
             _map_result = handle_knowledge_map(concept, subject, learner, llm, history=SESSIONS.get(f"chat_hist_{learner_id}", []))
             _map_content = _map_result.get("content", "")
+            # v0.70+ §3.28 Phase 2：知识导图补语言规范（此前漏洞不过 polish）
+            try:
+                from services.lang_gate import lang_gate_content
+                _map_polished = lang_gate_content(_map_content, context=f"knowledge_map:{concept[:20]}")
+                if _map_polished:
+                    _map_content = _map_polished
+            except Exception:
+                pass
 
             def gen_map():
                 _save_teach_turn("knowledge_map", _map_content)  # v0.36.2 早退分支补保存
@@ -1475,7 +1483,7 @@ def teach_stream():
                 "做演示文稿我建议用课程备课流程——把你的素材和大纲给我，我帮你组织成 PPT。"
             # v0.46.1 ⭐ 语言规范收口：PPT 分支的 LLM 内容也过 polish
             try:
-                from services.polish import _polish_text
+                from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
                 _ppt_reply = _polish_text(_ppt_reply, context="teach:ppt")
             except Exception as _e:
                 print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
@@ -1969,7 +1977,7 @@ def teach_stream():
             # v0.46.1 ⭐ 语言规范兜底：教学讲解也过 L2/L3 polish（refiner 侧重薇依语料，
             # polish 保证主谓宾/词法/介词规范——用户要求"所有生成内容都经语言规范控制"）
             try:
-                from services.polish import _polish_text
+                from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
                 _teach_text = presentation.get("content") or ""
                 if _teach_text:
                     _polished_t = _polish_text(_teach_text, context=f"teach:{concept[:30]}")

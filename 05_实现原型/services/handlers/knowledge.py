@@ -140,7 +140,7 @@ def _handle_knowledge_query(learner, subject):
     answer = llm_answer or ("我目前的知识库里收录了这些领域的资料，你可以问我相关问题，也可以上传资料让我更擅长。")
     # v0.42.3 ⭐ P1 修复：knowledge 语言规范收口（L2/L3）——对齐 affection 接入范式
     try:
-        from services.polish import _polish_text
+        from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
         answer = _polish_text(answer, context=f"knowledge:{subject[:30]}")
     except Exception:
         pass
