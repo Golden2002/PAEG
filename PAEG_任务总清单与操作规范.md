@@ -636,4 +636,9 @@
 - **设计**：咨询 Oracle 设计对话+轮询→脚本→动画+资产联动流程 → 实施
 - **数学可视化脚本创作方法调研（2026-08-14 完成 · 决定方法）**：Manim 官方（3B1B 8 原则：直觉先于形式化/单一聚焦/空间承载含义/慢而稳/停顿/文字最小化/回看锚点）+ manim_skill 社区库（scenes.md 模板/12 失败模式/ManimCE 颜色语义与节奏规范）+ Oracle 设计（**script.json 单一真相源**：对话轮询→脚本生成→校验修补→5 资产联动[Manim视频/讲稿/PPT/讲义/思维导图全部可下载]）
 - **实施（P0 起）**：visual_script_generator（系统提示词+script.json）+ visual_script_validator（7 铁律）+ manim_renderer（模板渲染）+ 资产联动（script_service/pptx/keyword_doc/knowledge_map）+ 轮询 question bank
+- **优先级**：P0（用户明确要求，先记录后执行）### 3.27 workflow 增强教学物料制作（2026-08-14 用户 ULW · 待执行）
+- **需求**：既然已有 workflow（声明式 DAG，teach_minimal/teach_concept），是否可利用 workflow 增强教学物料制作——思维导图/讲义/PPT 讲稿/视频脚本/数学视频/讲解视频，用 workflow 进一步提升效果
+- **执行**：咨询 Oracle（workflow 教学物料制作设计）+ 调研项目（workflows_hub/现有 workflow/物料生成模块）+ 检索联网经验（workflow 编排最佳实践）→ 设计 workflow 增强方案 → 实施
+- **同步**：完成后同步更新各文档（CHANGELOG/README/技术/元能力/亮点）
 - **优先级**：P0（用户明确要求，先记录后执行）
+

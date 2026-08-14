@@ -5467,3 +5467,4 @@ Start-Process cmd -ArgumentList '/c','start /b python server.py > server_run.log
 > **v0.69+ RALPH 循环子系统（2026-08-14 T5）**：`05_实现原型/ralph/`——任务执行循环器（Oracle 设计）。loop_controller（主循环：执行→判定→持久化→防呆→续触）、task_registry（任务队列持久化 JSON）、completion_evaluator（L0 QualityGate + L1 任务指标 + L2 改进证据 三层判定）、termination_guard（五道防线：轮次上限/收益递减/质量回退/人类确认/资源熔断）、contracts（Verdict DONE/CONTINUE/ABORT + `<promise>` 承诺协议）。与自我更新整合：周度调度器 emit 改进任务 → RALPH 跑完 → 回流 self_evolution。
 
 > **v0.70+ PDF 渲染与 Mermaid 图经验（2026-08-14）**：技术文档 PDF 渲染（render_pdf.py）关键经验——①Mermaid 图：Chromium 打印 SVG 空白 → 用 Playwright（channel=msedge 系统 Edge）元素截图 PNG 嵌入（device_scale_factor=2 高清）②图限高 170mm + page-break-inside:avoid 防跨页截断 ③图与文字 margin 8mm ④mermaid.js 本地化（file:// 相对加载）⑤正则匹配换行用非 raw 字符串。详见 交付物/文档模板/README.md 渲染生成经验 + 元能力 §5.6。
+> **v0.70+ 数学可视化脚本生成器（§3.26）**：对话+轮询→script.json（单一真相源）→7 铁律校验→5 资产联动（Manim 视频/讲稿/PPT/讲义/思维导图全部可下载）。方法：3B1B 8 原则 + manim_skill + Oracle。P0 已实施（generator+validator）。

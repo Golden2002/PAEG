@@ -2249,3 +2249,4 @@ SECRET_KEY 生产强制；ResourceLibrarian 全局持有；文件操作能力扩
 - 乱码快速兜底（utils/gibberish.py）：78s → 0.2s
 - 测试框架资产化（stress_parallel.py 可复用）
 **文档**：技术全景 12.4/12.5 + 维护手册 18.13/18.14 + 元能力 6.41
+**数学可视化脚本生成器（§3.26 同日）**：Manim 生成升级"提示词→脚本"——对话+轮询收集信息 → script.json（单一真相源）→ 7 铁律校验 → 5 资产联动（Manim 视频/讲稿/PPT/讲义/思维导图全部可下载）；方法来源 3B1B 8 原则 + manim_skill + Oracle。P0：visual_script_generator + validator。
