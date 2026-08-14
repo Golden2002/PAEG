@@ -104,8 +104,12 @@ def render(md_path: str, out_pdf: str, title: str = None, sub: str = None) -> in
                         const img = document.createElement('img');
                         img.src = '_mermaid_' + i + '.png';
                         img.style.display = 'block';
-                        img.style.margin = '6mm auto';
+                        img.style.margin = '8mm auto';          /* v0.70+ 图与文字间距 */
                         img.style.maxWidth = '100%';
+                        img.style.maxHeight = '170mm';          /* v0.70+ 限高防跨页截断 */
+                        img.style.objectFit = 'contain';
+                        img.style.pageBreakInside = 'avoid';    /* 不跨页断开 */
+                        img.style.breakInside = 'avoid';
                         pre.replaceWith(img);
                     }
                 });

@@ -74,6 +74,11 @@ final = tpl.replace("{{CONTENT}}", content_html)
 
 **7. 语言规范**：文档文字过语言规范（避免"30 秒看懂"类非正式词）。
 
+
+**8. 图跨页与高清**：Mermaid 图用 Playwright 元素截图 PNG 嵌入（device_scale_factor=2 高清）；img 设 `max-height:170mm` + `page-break-inside:avoid` 防跨页截断；图与文字 `margin:8mm auto`。
+
+**9. Playwright 用系统 Edge**：`channel='msedge'`（无需下载 chromium）——`pip install playwright` 即可，浏览器用系统自带 Edge。
+
 ## 更新日志
 
 | 日期 | 版本 | 改动 |
