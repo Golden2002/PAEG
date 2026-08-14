@@ -18,6 +18,14 @@
 
 ---
 
+
+### 先认识 5 个关键名词（30 秒速查）
+- **subagent**：专科老师——每个负责一个领域（诊断/讲解/评估…），职责单一
+- **MCP**：工具调用标准——让 AI 能联网、读写文件、调用外部工具（25 个）
+- **Skill**：按需加载的能力包——需要时才加载的专业流程（11 个）
+- **SSE**：流式推送——AI 边想边输出，像打字机一样逐字显示
+- **TRUTH_GROUNDING**：防幻觉底线——10 条规则强制 AI 不准编造，宁可说"不知道"
+
 ## 第 1 章 项目概览
 
 | 项 | 内容 |
@@ -112,55 +120,90 @@
 
 ## 第 3 章 系统架构（六层）
 
-```
-┌─────────────────────────────────────────────────┐
-│ L1 用户入口层（Web UI / REST API / 微信桥）      │
-├─────────────────────────────────────────────────┤
-│ L2 意图路由层（meta_router，15 意图 + 模式短路）│
-├─────────────────────────────────────────────────┤
-│ L3 教学编排层（teach_stream，5 阶段状态机）      │
-├─────────────────────────────────────────────────┤
-│ L4 Subagent 层（9 个领域专家）                   │
-├─────────────────────────────────────────────────┤
-│ L5 能力组件层（25 MCP 工具 + 11 Skills + Workflows）│
-├─────────────────────────────────────────────────┤
-│ L6 基础设施层（LLM 适配 / 知识库 / 配置中心 / 持久化）│
-└─────────────────────────────────────────────────┘
-     横切：L0 安全质量层（TRUTH_GROUNDING / QualityGate / 语言规范）
+### 架构多尺度图（从最大尺度到精细尺度）
+
+**图 1 · 全景尺度（PAEG 与外部世界）**
+
+```mermaid
+flowchart LR
+    User(["👤 学生<br/>(浏览器/微信)"])
+    PAEG["🧠 PAEG 教育智能体"]
+    LLM(("☁️ LLM<br/>DeepSeek/OpenAI"))
+    KB[("📚 知识库")]
+    External["🌐 外部世界<br/>搜索/论文"]
+    DB[("💾 持久化")]
+    Dev["🛠️ 开发者"]
+    User -->|HTTP/SSE| PAEG
+    PAEG -->|Prompt| LLM
+    LLM -->|生成/工具调用| PAEG
+    PAEG <-->|检索/写入| KB
+    PAEG <-->|联网| External
+    PAEG <-->|画像/历史| DB
+    Dev -.->|热加载| PAEG
 ```
 
-### 分层详解
+**图 2 · 系统尺度（六层 + 一次请求数据流）**
 
-| 层 | 职责 | 核心组件 | 一句话 |
-|---|---|---|---|
-| **L1 用户入口** | 接收请求 | Web UI / server.py 端点 / SSE | 用户从哪里进入 |
-| **L2 意图路由** | 识别 15 类意图 | meta_router.py | 判断"要教学/规划/答疑…"——LLM 优先 + 规则兜底 + 模式短路（用户显式选模式则确定性覆盖） |
-| **L3 教学编排** | 教学流程控制 | paeg.teach / teach_stream | 一次完整教学的"剧本"：诊断→计划→讲解→评估→调整→反思→自我更新 |
-| **L4 Subagent** | 领域执行 | 9 个 subagent（Diagnostor/Planner/Presenter/ResourceLibrarian/Evaluator/Adapter/AnswerSolver/AffectionSupportor/SelfUpdateAgent + Individuality） | 每个 subagent 是"专科老师" |
-| **L5 能力组件** | 可复用能力 | MCP（filesystem/memory/brave-search/pptx…）+ skills（teaching-capability 等）+ workflows（teach_minimal/teach_concept） | "工具箱"——subagent 按需调用（config_hub 统一路由） |
-| **L6 基础设施** | 底层支撑 | LLM 适配（llm_api）/ Library+knowledge_base（知识库）/ config_hub（配置中心）/ users_data+SQLite（持久化）/ ralph（循环器） | 系统运转的"水电煤" |
-| **L0 横切** | 质量保障 | TRUTH_GROUNDING / QualityGate / LANGUAGE_STYLE / safety | "安全网"——任何层受其约束 |
+```mermaid
+flowchart TB
+    subgraph L1["L1 用户入口"]
+        UI["Web UI"]; API["REST API"]; WX["微信桥"]
+    end
+    subgraph L2["L2 意图路由"]
+        R["meta_router<br/>15 意图"]
+    end
+    subgraph L3["L3 教学编排"]
+        T["paeg.teach / teach_stream (SSE)"]
+    end
+    subgraph L4["L4 Subagent"]
+        S["9 个领域专家"]
+    end
+    subgraph L5["L5 能力组件"]
+        M["25 MCP"]; K["11 Skills"]; W["Workflows"]
+    end
+    subgraph L6["L6 基础设施"]
+        LL["LLM 适配"]; KB2["知识库"]; CF["config_hub"]; ST["持久化"]
+    end
+    L0{{"L0 横切质量层"}}
+    UI --> API --> R --> T --> S
+    S --> M
+    S --> LL
+    S --> KB2
+    T --> ST
+    L0 -.- T
+    L0 -.- S
+```
+
+**图 3 · 教学流尺度（五阶段 + checkpoint 互动）**
+
+```mermaid
+flowchart TD
+    Start(["学生提问"]) --> D["① 诊断<br/>前置知识+LLM"]
+    D --> P["② 计划<br/>策略+步骤"]
+    P --> Pre["③ 讲解<br/>LLM 流式生成"]
+    Pre --> CP{{"checkpoint?<br/>听懂了吗"}}
+    CP -->|回答| E["④ 评估<br/>0.6讲解+0.4信号"]
+    E --> A["⑤ 调整<br/>switch/continue"]
+    A -->|继续| Pre
+    A -->|完成| Done["✓ 完成"]
+    Done --> Ev["自我进化<br/>蒸馏/补丁/经验"]
+    Ev --> KB3[("知识库<br/>热加载")]
+```
+
+**图 4 · 组件尺度（Presenter 内部装配）**
+
+```mermaid
+flowchart LR
+    subgraph ASM["system 装配"]
+        B["WEIL_CORE"]; T2["TRUTH_GROUNDING"]; SS["SUBJECT_STYLES"]; LG["LANGUAGE_STYLE"]
+    end
+    ASM --> Sys["system prompt"] --> LLM2["LLM 调用<br/>(重试+超时)"]
+    LLM2 --> St["60字分片"] --> Y["SSE yield"]
+    Y -.->|需工具| MC["mcp__ 工具"] --> LLM2
+```
 
 ### 核心调用链（用户问"什么是导数"）
-
-```
-用户输入
-  → L1: POST /api/teach/stream（SSE）
-  → L2: meta_router.route_intent() → intent="teach"（LLM 判断 + mode 短路）
-  → L3: paeg.teach / teach_stream
-       ├─ Diagnostor.run() → 学情诊断（前置知识 + LLM 深度建议）
-       ├─ Planner.run(diagnosis) → choose_strategy → 3 步差异化计划
-       ├─ Presenter.run(step) → build_presenter_system（35 学科风格 + 画像 + 教学记忆）
-       │    → LLM 生成讲解 → refiner/polish 语言规范 → SSE 分片 yield
-       │    → event: checkpoint（每步后理解检查）
-       ├─ Evaluator.run() → score = 0.6*讲解 + 0.4*学生状态
-       ├─ Adapter.run() → 下一轮策略调整
-       └─ self_evolution → 蒸馏/反思（G1-G11）
-  → L5: 按需调 MCP 工具（联网/验证/渲染）/ skills / workflows
-  → L0: TRUTH_GROUNDING 约束全程
-```
-
----
+用户输入 → L1(POST /api/teach/stream) → L2(meta_router → intent=teach) → L3(teach_stream：诊断→计划→讲解→checkpoint→评估→调整) → L4(subagent 协作) → L5(工具按需调用) → L0(防幻觉全程约束)
 
 ## 第 4 章 关键流程
 
@@ -209,6 +252,19 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 | 交互式教学深度版（挂起+resume 端点） | 📋 规划 | checkpoint 后结束流 → /api/teach/resume 从挂起状态续讲 |
 | 学习效果评估闭环 | 📋 规划 | Evaluator 加 learning_effect（学生复述/答题正确率 → 画像） |
 | 前端点赞 UI 完善 | 📋 规划 | 消息气泡反馈按钮已实现，反馈→策略调整深化 |
+
+
+**更多未来规划（详细）**：
+| 规划项 | 说明 |
+|---|---|
+| 交互式教学深度版（挂起+resume 端点） | checkpoint 后结束流 → /api/teach/resume 从挂起状态续讲（Oracle 方案 A） |
+| 学习效果评估闭环 | Evaluator 加 learning_effect（学生复述/答题率→画像→下一轮计划） |
+| 前端点赞 UI 完善 | 反馈→策略调整深化（SEL-8 完整闭环） |
+| 记忆系统语义分层 | MemGPT 风格 episodic/semantic/procedural（当前时间维度三层已有） |
+| 上下文工程全量统一 | context_bundle 覆盖所有 system 拼接（当前 9 处引用） |
+| 多 agent 协作扩展 | 任务级并行（RALPH P2） |
+| 教学反思独立循环 | 秒级课堂反思 + 小时级改进循环解耦 |
+| 评估可视化 | RALPH 循环时间线 UI（每轮决策可追溯） |
 
 **Roadmap 说明**：所有更新按需求文档（PAEG_任务总清单与操作规范.md §3.20-3.22）执行——先记录需求、再执行、完成后更新状态并同步本说明。
 
