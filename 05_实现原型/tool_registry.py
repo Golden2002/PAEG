@@ -97,7 +97,9 @@ PERMISSION_PRESETS = {
 # 写类工具黑名单（exam/read_only 模式禁用）
 _WRITE_TOOLS = {"save_document", "generate_handout", "generate_ppt", "generate_video",
                 "generate_animation", "mcp__pptx__generate_presentation",
-                "forbidden_words"}  # v0.70 §3.28 Phase 4：违禁词维护属写操作
+                "forbidden_words",          # v0.70 §3.28 Phase 4：违禁词维护属写操作
+                "constraint_always_active",  # v0.70 §3.29：永远激活规则维护属写操作
+                "constraint_self_evolve"}    # v0.70 §3.29：约束自演化写入属写操作
 
 _active_preset = "standard"  # 当前权限档（运行时可切换）
 
@@ -215,6 +217,58 @@ def get_tool_defs() -> List[dict]:
             ["action"],
             risk="write",
         ),
+        # v0.70 §3.29 ⭐ L0-L8 约束系统 MCP 化（constraint_engine 6 API）
+        _make_tool(
+            "constraint_layer_get",
+            "读取 L0-L8 约束层（0-7）当前放开组与规则。"
+            "当需要了解某约束层内容、或确认当前约束状态时调用。",
+            {"layer": {"type": "integer", "description": "层号 0-7（默认 4）"}},
+            [],
+        ),
+        _make_tool(
+            "constraint_layer_set",
+            "动态切换 L0-L8 约束层（教学/考试/自由）。返回该层约束配置段，"
+            "可拼接进 system prompt。当需要按场景调整约束严格度时调用。",
+            {"layer": {"type": "integer", "description": "目标层 0-7（默认 4 标准新授）"},
+             "session": {"type": "string", "description": "会话标识（可选）"},
+             "reason": {"type": "string", "description": "切换原因（记录用）"}},
+            [],
+        ),
+        _make_tool(
+            "constraint_compose",
+            "任意提示词块组合拼接（如 WEIL_CORE+LANGUAGE_STYLE+约束段）。"
+            "当需要把多个提示词块合成一个 system prompt 时调用。",
+            {"parts": {"type": "array", "items": {"type": "string"}, "description": "提示词块列表"},
+             "title": {"type": "string", "description": "组合标题（默认'组合提示词'）"}},
+            ["parts"],
+        ),
+        _make_tool(
+            "constraint_always_active",
+            "永远激活提示词管理（list/add/remove，落盘 always_active.json）。"
+            "这些规则不随约束层放开，任何层都保留。当需要固定某条规则永远生效时调用。",
+            {"action": {"type": "string", "description": "操作：list / add / remove"},
+             "rule": {"type": "string", "description": "add/remove 的规则文本"}},
+            ["action"],
+            risk="write",
+        ),
+        _make_tool(
+            "constraint_self_evolve",
+            "约束系统自我演化：把教学洞察提炼为约束规则写入指定层/组（数据化落盘）。"
+            "当从教学反思中发现可复用的约束改进时调用。",
+            {"insight": {"type": "string", "description": "教学洞察/新规则文本"},
+             "target_layer": {"type": "integer", "description": "目标层 0-7（默认 4）"},
+             "group": {"type": "string", "description": "目标组 M/R/T/D/S/P（默认 D 教学法深度）"}},
+            ["insight"],
+            risk="write",
+        ),
+        _make_tool(
+            "constraint_feedback_adjust",
+            "反馈调强/调弱约束：根据用户反馈（太啰嗦/太直接/太机械/太深等信号）"
+            "给出约束调整建议并记录。当用户对输出风格/深度不满时调用。",
+            {"feedback": {"type": "string", "description": "用户反馈文本"},
+             "target": {"type": "string", "description": "调整目标 layer/group/active（默认 layer）"}},
+            ["feedback"],
+        ),
     ] + _extended_tool_defs()
 
 
@@ -241,7 +295,10 @@ def _extended_tool_defs() -> list:
         _BUILTIN_NAMES = {"web_search", "verify_math", "fetch_page",
                           "daily_quote", "get_time", "solve_problem", "save_document",
                           "compose_dynamic_prompt",
-                          "normalize_text", "language_policy_check", "forbidden_words"}
+                          "normalize_text", "language_policy_check", "forbidden_words",
+                          "constraint_layer_get", "constraint_layer_set", "constraint_compose",
+                          "constraint_always_active", "constraint_self_evolve",
+                          "constraint_feedback_adjust"}
         _ext = [d for d in _ext
                 if isinstance(d, dict)
                 and d.get("function", {}).get("name") not in _BUILTIN_NAMES]
@@ -526,6 +583,15 @@ def _exec_forbidden_words(action: str, word: str = "", scope: str = "extra_forbi
     return f"未知操作: {action}（可用: list / add / remove）"
 
 
+def _exec_constraint(name: str, arguments: dict) -> str:
+    """v0.70 §3.29：转发到 constraint_engine 约束引擎执行。"""
+    try:
+        from constraint_engine import execute as _ce_execute
+        return _ce_execute(name, arguments or {})
+    except Exception as e:
+        return f"约束引擎 {name} 调用失败: {str(e)[:120]}"
+
+
 _HANDLERS: Dict[str, Callable[..., str]] = {
     "web_search": _wrap("web_search", _exec_web_search, retries=2),
     "verify_math": _wrap("verify_math", _exec_verify_math, retries=1),
@@ -541,6 +607,13 @@ _HANDLERS: Dict[str, Callable[..., str]] = {
     "normalize_text": _exec_normalize_text,
     "language_policy_check": _exec_language_policy_check,
     "forbidden_words": _exec_forbidden_words,
+    # v0.70 §3.29 ⭐ L0-L8 约束系统 MCP 化（constraint_engine 6 API 转发）
+    "constraint_layer_get": lambda **kw: _exec_constraint("constraint_layer_get", kw),
+    "constraint_layer_set": lambda **kw: _exec_constraint("constraint_layer_set", kw),
+    "constraint_compose": lambda **kw: _exec_constraint("constraint_compose", kw),
+    "constraint_always_active": lambda **kw: _exec_constraint("constraint_always_active", kw),
+    "constraint_self_evolve": lambda **kw: _exec_constraint("constraint_self_evolve", kw),
+    "constraint_feedback_adjust": lambda **kw: _exec_constraint("constraint_feedback_adjust", kw),
 }
 
 

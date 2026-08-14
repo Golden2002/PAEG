@@ -171,6 +171,38 @@ def build_mcp_server() -> Optional[Any]:
         """外部违禁词数据维护（list/add/remove，落盘 forbidden_words.json）。"""
         return _run_tool("forbidden_words", {"action": action, "word": word, "scope": scope})
 
+    # v0.70 §3.29 ⭐ L0-L8 约束系统 MCP 化（constraint_engine 6 API）
+    @_mcp.tool()
+    def constraint_layer_get(layer: int = 4) -> str:
+        """读取 L0-L8 约束层（0-7）当前放开组与规则。"""
+        return _run_tool("constraint_layer_get", {"layer": layer})
+
+    @_mcp.tool()
+    def constraint_layer_set(layer: int = 4, session: str = "", reason: str = "") -> str:
+        """动态切换 L0-L8 约束层（教学/考试/自由）。返回该层约束配置段。"""
+        return _run_tool("constraint_layer_set", {"layer": layer, "session": session, "reason": reason})
+
+    @_mcp.tool()
+    def constraint_compose(parts: list, title: str = "组合提示词") -> str:
+        """任意提示词块组合拼接（如 WEIL_CORE+LANGUAGE_STYLE+约束段）。"""
+        return _run_tool("constraint_compose", {"parts": parts, "title": title})
+
+    @_mcp.tool()
+    def constraint_always_active(action: str, rule: str = "") -> str:
+        """永远激活提示词管理（list/add/remove，落盘 always_active.json）。"""
+        return _run_tool("constraint_always_active", {"action": action, "rule": rule})
+
+    @_mcp.tool()
+    def constraint_self_evolve(insight: str, target_layer: int = 4, group: str = "D") -> str:
+        """约束系统自我演化：把教学洞察提炼为约束规则写入指定层/组。"""
+        return _run_tool("constraint_self_evolve",
+                         {"insight": insight, "target_layer": target_layer, "group": group})
+
+    @_mcp.tool()
+    def constraint_feedback_adjust(feedback: str, target: str = "layer") -> str:
+        """反馈调强/调弱约束（太啰嗦/太直接/太机械/太深等信号 → 调整建议 + 记录）。"""
+        return _run_tool("constraint_feedback_adjust", {"feedback": feedback, "target": target})
+
     return _mcp
 
 

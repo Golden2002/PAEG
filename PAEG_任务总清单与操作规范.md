@@ -768,6 +768,17 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 - **资产**：固定提示词 + 可动态调整的提示词模板；功能=动态解放/添加约束、任意提示词组合拼接、指引约束大模型、可设永远保持激活的提示词
 - **执行**：先写入需求文档 → 联网调研 + Oracle → 升级方案写入需求文档 → 按需求实施
 - **优先级**：P0
+- **现有基础（已核实）**：prompts.py CONSTRAINT_LAYERS（8 层 × 6 组开关矩阵：M节奏/R修辞/T温度/D教学法深度/S学科教学法/P哲学框架）+ L0_RESERVED_RULES（11 条保底）+ `_build_constraint_layers(constraint_flags, layer, crisis_signal)`（L0→L7 线性谱，crisis 强制 L1）+ `_flags_to_layer`（3 位掩码兼容）
+- **Oracle 升级方案（已收）**：MCP 化 `paeg_constraint_engine`，6 API：
+  | API | 功能 | 对应资产 |
+  |---|---|---|
+  | constraint_layer_get(layer) | 读某层放开组/规则 | CONSTRAINT_LAYERS + _GROUP_RULES |
+  | constraint_layer_set(session, layer) | 动态切换约束层（教学/考试/自由） | _build_constraint_layers |
+  | constraint_compose(parts[]) | 任意提示词块组合拼接 | prompt_template STATIC_TEMPLATES + DYNAMIC_SLOTS |
+  | constraint_always_active(names[]) | 永远保持激活的提示词（不随层放开） | L0_RESERVED_RULES 扩展 |
+  | constraint_self_evolve(insight) | 约束系统自我演化（LLM 提炼新规则入层） | self_evolution 联动 |
+  | constraint_feedback_adjust(feedback, target) | 反馈调强/调弱约束 | 用户反馈 → 画像/约束 |
+- **实施要点**：①复用 prompts.py 现有层结构不重写 ②MCP tool 注册（tool_registry + mcp_gateway 双面）③数据化（约束规则可外置 JSON，如 constraint_layers.json）④与 §3.28 lang_gate 衔接（语言约束是 L1 的具体化）
 
 ### 3.30 技术说明动态更新 + PDF（2026-08-14 用户 ULW · 待执行）
 - **需求**：技术说明手册动态更新——①F3 学习辅助工具加 数学视频/教学视频/PPT/讲义 功能记录 ②最近更新按特性更新入手册（注意插入位置衔接）
