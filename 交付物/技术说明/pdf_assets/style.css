@@ -1,0 +1,712 @@
+/* ============================================================
+   教育智能体 · 简明技术说明 — 打印样式
+   引擎: WeasyPrint
+   规范: A4 / 印刷友好 / 中文优先
+   ============================================================ */
+
+/* ---------- 设计令牌（Design Tokens） ---------- */
+:root {
+  /* 主色 — 深靛蓝（专业、教育、可信） */
+  --c-primary-900: #0b2545;
+  --c-primary-800: #13315c;
+  --c-primary-700: #1b4079;
+  --c-primary-600: #2a5fa8;
+  --c-primary-500: #3a7bd5;
+  --c-primary-100: #e6efff;
+  --c-primary-050: #f3f7ff;
+
+  /* 辅色 — 青绿（科技、活跃） */
+  --c-accent-600: #0e9f8b;
+  --c-accent-500: #14b8a6;
+  --c-accent-100: #d1faec;
+  --c-accent-050: #ecfdf7;
+
+  /* 中性 */
+  --c-ink-900: #1a2233;     /* 正文 */
+  --c-ink-700: #3d4a63;     /* 次级正文 */
+  --c-ink-500: #6b7691;     /* 辅助 */
+  --c-ink-300: #aab2c4;     /* 占位 */
+  --c-line:    #dfe4ee;     /* 分割线 */
+  --c-line-soft: #eef1f7;
+  --c-bg:      #fafbfd;     /* 页面底色（不是纯白） */
+  --c-card:    #ffffff;     /* 卡片底 */
+  --c-code-bg: #f4f6fa;     /* 代码底 */
+  --c-table-zebra: #f7f9fd;
+
+  /* 语义 */
+  --c-warn-100: #fff4e0;
+  --c-warn-600: #c4720d;
+  --c-danger-100:#fde6e6;
+  --c-danger-600:#b3271c;
+
+  /* 字体栈 */
+  --ff-sans: "PingFang SC", "Microsoft YaHei", "微软雅黑",
+             "Source Han Sans CN", "Noto Sans CJK SC",
+             "Hiragino Sans GB", "WenQuanYi Micro Hei", sans-serif;
+  --ff-mono: "JetBrains Mono", "Cascadia Code", "Fira Code",
+             "Source Code Pro", "Consolas", "Menlo", monospace;
+  --ff-display: "PingFang SC", "Microsoft YaHei",
+                "Source Han Sans CN", "Noto Serif CJK SC",
+                "Songti SC", "SimSun", serif;
+
+  /* 字号（pt，绝对单位，印刷稳定） */
+  --fs-cover-title:  34pt;
+  --fs-cover-sub:    16pt;
+  --fs-cover-meta:   11pt;
+  --fs-h1: 22pt;
+  --fs-h2: 16pt;
+  --fs-h3: 13pt;
+  --fs-h4: 11.5pt;
+  --fs-body: 10.5pt;
+  --fs-small: 9pt;
+  --fs-caption: 8.5pt;
+  --fs-mono: 9pt;
+
+  /* 间距 */
+  --sp-1: 4pt;
+  --sp-2: 8pt;
+  --sp-3: 12pt;
+  --sp-4: 16pt;
+  --sp-5: 24pt;
+  --sp-6: 32pt;
+  --sp-7: 48pt;
+
+  /* 圆角 / 阴影 */
+  --r-sm: 3pt;
+  --r-md: 6pt;
+  --r-lg: 10pt;
+  --shadow-card: 0 0 0 0.6pt var(--c-line);
+}
+
+/* ============================================================
+   @page — 页面盒模型、页眉页脚
+   ============================================================ */
+
+@page {
+  size: A4;
+  margin: 22mm 18mm 20mm 18mm;
+
+  /* 页眉：左为文档标题，右为章节名 */
+  @top-left {
+    content: string(doc-title);
+    font-family: var(--ff-sans);
+    font-size: 8.5pt;
+    color: var(--c-ink-500);
+    border-bottom: 0.4pt solid var(--c-line);
+    padding-bottom: 2mm;
+    width: 100%;
+    vertical-align: bottom;
+  }
+
+  @top-right {
+    content: string(chapter);
+    font-family: var(--ff-sans);
+    font-size: 8.5pt;
+    color: var(--c-primary-700);
+    font-weight: 600;
+    border-bottom: 0.4pt solid var(--c-line);
+    padding-bottom: 2mm;
+    vertical-align: bottom;
+  }
+
+  /* 页脚：左版本号 / 中页码 / 右签章 */
+  @bottom-left {
+    content: "教育智能体 · 技术说明 v1.0";
+    font-family: var(--ff-sans);
+    font-size: 8pt;
+    color: var(--c-ink-500);
+  }
+
+  @bottom-center {
+    content: counter(page) " / " counter(pages);
+    font-family: var(--ff-sans);
+    font-size: 8.5pt;
+    color: var(--c-ink-700);
+    font-weight: 600;
+  }
+
+  @bottom-right {
+    content: "●  Confidential";
+    font-family: var(--ff-sans);
+    font-size: 8pt;
+    color: var(--c-accent-600);
+    letter-spacing: 0.3pt;
+  }
+}
+
+/* 首页（封面）—— 无页眉页脚 */
+@page :first {
+  margin: 0;
+  @top-left { content: none; }
+  @top-right { content: none; }
+  @bottom-left { content: none; }
+  @bottom-center { content: none; }
+  @bottom-right { content: none; }
+}
+
+/* 目录页（若有）—— 简洁页脚 */
+@page toc {
+  @top-left { content: string(doc-title); }
+  @top-right { content: "目录"; color: var(--c-ink-500); }
+}
+
+/* ============================================================
+   全局基线
+   ============================================================ */
+
+html, body {
+  background: var(--c-bg);
+  color: var(--c-ink-900);
+  font-family: var(--ff-sans);
+  font-size: var(--fs-body);
+  line-height: 1.72;
+  font-feature-settings: "kern", "liga";
+  -weasy-font-feature-settings: "kern", "liga";
+  /* 中英文字间距微调 */
+  text-spacing: trim-start allow-end;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* 链接 */
+a {
+  color: var(--c-primary-600);
+  text-decoration: none;
+  border-bottom: 0.4pt dotted var(--c-primary-500);
+}
+a:hover { color: var(--c-primary-800); }
+
+/* ============================================================
+   封面
+   ============================================================ */
+
+.cover {
+  page: cover;
+  /* 与 :first 同步：无页眉页脚 */
+  margin: 0;
+  padding: 0;
+  height: 297mm;          /* A4 高 */
+  width: 210mm;
+  position: relative;
+  background:
+    /* 顶部主色块 */
+    linear-gradient(180deg,
+      var(--c-primary-900) 0%,
+      var(--c-primary-800) 38%,
+      var(--c-primary-700) 62%,
+      var(--c-bg)          100%);
+  color: #fff;
+  overflow: hidden;
+  /* 让封面独立成页 */
+  page-break-after: always;
+  break-after: page;
+}
+
+/* 装饰：斜向网格底纹（用径向点阵模拟） */
+.cover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.08) 1px, transparent 0);
+  background-size: 14pt 14pt;
+  pointer-events: none;
+}
+
+/* 装饰：右上角青色光晕 */
+.cover::after {
+  content: "";
+  position: absolute;
+  top: -40mm;
+  right: -40mm;
+  width: 140mm;
+  height: 140mm;
+  background: radial-gradient(circle,
+              rgba(20,184,166,0.45) 0%,
+              rgba(20,184,166,0.0)  65%);
+  pointer-events: none;
+}
+
+.cover-inner {
+  position: relative;
+  z-index: 2;
+  padding: 30mm 22mm 24mm 22mm;
+  height: 100%;
+  display: block;
+}
+
+/* 顶部品牌条 */
+.cover-brand {
+  display: flex;
+  align-items: center;
+  gap: 8pt;
+  font-family: var(--ff-sans);
+  font-size: 9.5pt;
+  letter-spacing: 4pt;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.85);
+  margin-bottom: 70mm;
+}
+.cover-brand .dot {
+  display: inline-block;
+  width: 6pt; height: 6pt;
+  border-radius: 50%;
+  background: var(--c-accent-500);
+  box-shadow: 0 0 0 3pt rgba(20,184,166,0.25);
+}
+
+/* 主标题 */
+.cover-title {
+  font-family: var(--ff-display);
+  font-size: var(--fs-cover-title);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: 1pt;
+  margin: 0 0 var(--sp-3) 0;
+  color: #ffffff;
+  /* 阴影提升层次 */
+  text-shadow: 0 1pt 0 rgba(0,0,0,0.12);
+}
+.cover-title .accent {
+  color: var(--c-accent-500);
+}
+
+/* 副标题 */
+.cover-sub {
+  font-size: var(--fs-cover-sub);
+  font-weight: 300;
+  line-height: 1.5;
+  color: rgba(255,255,255,0.82);
+  margin: 0 0 var(--sp-6) 0;
+  max-width: 140mm;
+  letter-spacing: 0.5pt;
+}
+
+/* 元信息卡（白底卡片，置于下半部分） */
+.cover-meta {
+  position: absolute;
+  left: 22mm;
+  right: 22mm;
+  bottom: 28mm;
+  background: rgba(255,255,255,0.97);
+  color: var(--c-ink-900);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5) var(--sp-5);
+  box-shadow:
+    0 4pt 18pt rgba(11,37,69,0.18),
+    0 0 0 0.5pt rgba(255,255,255,0.6);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4) var(--sp-5);
+}
+.cover-meta .item .k {
+  display: block;
+  font-size: 8.5pt;
+  letter-spacing: 1.5pt;
+  text-transform: uppercase;
+  color: var(--c-ink-500);
+  margin-bottom: 4pt;
+}
+.cover-meta .item .v {
+  font-size: 12pt;
+  font-weight: 600;
+  color: var(--c-primary-800);
+  line-height: 1.35;
+}
+.cover-meta .item .v small {
+  font-weight: 400;
+  font-size: 9pt;
+  color: var(--c-ink-500);
+  display: block;
+  margin-top: 2pt;
+}
+
+/* 封面底部署名 */
+.cover-footer {
+  position: absolute;
+  left: 22mm; right: 22mm;
+  bottom: 14mm;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 8.5pt;
+  color: var(--c-ink-500);
+  z-index: 2;
+}
+.cover-footer .seal {
+  color: var(--c-primary-700);
+  font-weight: 600;
+  letter-spacing: 2pt;
+}
+
+/* ============================================================
+   正文容器
+   ============================================================ */
+
+main.body {
+  string-set: doc-title content();
+  /* 默认章节名为空，由各 h1 重写 */
+}
+
+/* 段落 */
+p {
+  margin: 0 0 var(--sp-3) 0;
+  text-align: justify;
+  text-justify: inter-character;
+  orphans: 2;
+  widows: 2;
+}
+p strong { color: var(--c-primary-800); font-weight: 600; }
+p em { color: var(--c-ink-700); }
+
+/* ============================================================
+   标题层级 — 颜色 / 下划线 / 编号
+   ============================================================ */
+
+/* h1: 章节大标题 —— 蓝色色块 + 章节序号 */
+h1 {
+  font-family: var(--ff-display);
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  color: var(--c-primary-900);
+  margin: var(--sp-7) 0 var(--sp-4) 0;
+  padding: var(--sp-3) 0 var(--sp-3) var(--sp-3);
+  border-left: 6pt solid var(--c-primary-600);
+  background: linear-gradient(90deg,
+              var(--c-primary-050) 0%,
+              transparent 70%);
+  line-height: 1.3;
+  page-break-before: always;
+  break-before: page;
+  /* 注入章节名到页眉 */
+  string-set: chapter content();
+}
+h1:first-of-type,
+h1.first {
+  page-break-before: avoid;
+  break-before: auto;
+}
+
+/* h2: 二级 —— 蓝色横线 + 色块标签 */
+h2 {
+  font-size: var(--fs-h2);
+  font-weight: 600;
+  color: var(--c-primary-800);
+  margin: var(--sp-6) 0 var(--sp-3) 0;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-primary-050);
+  border-left: 3pt solid var(--c-primary-500);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  line-height: 1.35;
+  page-break-after: avoid;
+  break-after: avoid;
+}
+
+/* h3: 三级 —— 下划线 + 序号点 */
+h3 {
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  color: var(--c-primary-700);
+  margin: var(--sp-5) 0 var(--sp-2) 0;
+  padding-bottom: 4pt;
+  border-bottom: 0.6pt solid var(--c-line);
+  line-height: 1.4;
+  page-break-after: avoid;
+  break-after: avoid;
+}
+h3::before {
+  content: "▎";
+  color: var(--c-accent-500);
+  margin-right: 4pt;
+  font-weight: 700;
+}
+
+/* h4: 四级 */
+h4 {
+  font-size: var(--fs-h4);
+  font-weight: 600;
+  color: var(--c-ink-900);
+  margin: var(--sp-4) 0 var(--sp-2) 0;
+  page-break-after: avoid;
+  break-after: avoid;
+}
+
+/* ============================================================
+   列表
+   ============================================================ */
+
+ul, ol {
+  margin: 0 0 var(--sp-3) 0;
+  padding-left: 1.6em;
+}
+li {
+  margin-bottom: 4pt;
+  line-height: 1.7;
+}
+ul li::marker {
+  color: var(--c-accent-500);
+}
+ol li::marker {
+  color: var(--c-primary-600);
+  font-weight: 600;
+}
+li > p { margin-bottom: 2pt; }
+
+/* 嵌套 */
+li > ul, li > ol { margin-top: 4pt; margin-bottom: 4pt; }
+
+/* ============================================================
+   引用块
+   ============================================================ */
+
+blockquote {
+  margin: var(--sp-4) 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-accent-050);
+  border-left: 4pt solid var(--c-accent-500);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  color: var(--c-ink-700);
+  font-size: 10pt;
+  line-height: 1.7;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+blockquote p:last-child { margin-bottom: 0; }
+blockquote strong { color: var(--c-accent-600); }
+
+/* ============================================================
+   行内代码
+   ============================================================ */
+
+code {
+  font-family: var(--ff-mono);
+  font-size: 0.88em;
+  background: var(--c-code-bg);
+  color: var(--c-primary-800);
+  padding: 1pt 5pt;
+  border-radius: var(--r-sm);
+  border: 0.4pt solid var(--c-line);
+  /* 不换行（行内） */
+  white-space: nowrap;
+}
+
+/* ============================================================
+   代码块
+   ============================================================ */
+
+pre {
+  font-family: var(--ff-mono);
+  font-size: var(--fs-mono);
+  line-height: 1.6;
+  background: #1f2937;            /* 深色印刷友好底 */
+  color: #e6edf3;
+  margin: var(--sp-3) 0 var(--sp-4) 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  border: 0.5pt solid #111827;
+  overflow-x: auto;
+  page-break-inside: avoid;
+  break-inside: avoid;
+  /* 等宽对齐 */
+  tab-size: 4;
+}
+pre code {
+  background: transparent;
+  color: inherit;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  white-space: pre;
+}
+
+/* ASCII 架构图（专门类） */
+pre.ascii {
+  background: #ffffff;
+  color: var(--c-primary-800);
+  border: 0.6pt solid var(--c-primary-100);
+  border-left: 4pt solid var(--c-primary-500);
+  font-size: 8.5pt;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+
+/* ============================================================
+   表格 — 能力矩阵 / 架构分层
+   ============================================================ */
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: var(--sp-3) 0 var(--sp-4) 0;
+  font-size: 9.5pt;
+  line-height: 1.55;
+  background: var(--c-card);
+  border: 0.6pt solid var(--c-line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  page-break-inside: auto;
+  break-inside: auto;
+}
+
+/* thead 跨页重复 */
+thead { display: table-header-group; }
+
+thead th {
+  background: var(--c-primary-800);
+  color: #ffffff;
+  font-weight: 600;
+  text-align: left;
+  padding: 8pt 10pt;
+  font-size: 9.5pt;
+  letter-spacing: 0.3pt;
+  border-bottom: 0.6pt solid var(--c-primary-900);
+}
+thead th:first-child { border-top-left-radius: var(--r-md); }
+thead th:last-child  { border-top-right-radius: var(--r-md); }
+
+tbody td {
+  padding: 7pt 10pt;
+  border-bottom: 0.4pt solid var(--c-line-soft);
+  vertical-align: top;
+  color: var(--c-ink-900);
+}
+tbody tr:last-child td { border-bottom: none; }
+
+/* 斑马纹 */
+tbody tr:nth-child(even) td {
+  background: var(--c-table-zebra);
+}
+
+/* 表内强调 */
+tbody td strong { color: var(--c-primary-800); }
+tbody td code { font-size: 0.85em; }
+
+/* 行内徽章（用 <span class="badge ok/warn/info">） */
+.badge {
+  display: inline-block;
+  padding: 1pt 6pt;
+  border-radius: 999pt;
+  font-size: 8pt;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.2pt;
+  border: 0.4pt solid transparent;
+}
+.badge.ok    { background: var(--c-accent-100); color: var(--c-accent-600); border-color: var(--c-accent-500); }
+.badge.warn  { background: var(--c-warn-100);  color: var(--c-warn-600);  border-color: #e9a447; }
+.badge.info  { background: var(--c-primary-100); color: var(--c-primary-700); border-color: var(--c-primary-500); }
+.badge.danger{ background: var(--c-danger-100); color: var(--c-danger-600); border-color: #d04a3f; }
+
+/* ============================================================
+   信息卡片（可选 .callout 类）
+   ============================================================ */
+
+.callout {
+  margin: var(--sp-4) 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-card);
+  border: 0.5pt solid var(--c-line);
+  border-left: 4pt solid var(--c-primary-500);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.callout.info   { border-left-color: var(--c-primary-500); background: var(--c-primary-050); }
+.callout.tip    { border-left-color: var(--c-accent-500);  background: var(--c-accent-050); }
+.callout.warn   { border-left-color: #e9a447;              background: var(--c-warn-100); }
+.callout .title {
+  display: block;
+  font-size: 9.5pt;
+  font-weight: 700;
+  letter-spacing: 1pt;
+  text-transform: uppercase;
+  color: var(--c-primary-800);
+  margin-bottom: 4pt;
+}
+
+/* ============================================================
+   水平分割线
+   ============================================================ */
+
+hr {
+  border: none;
+  border-top: 0.6pt solid var(--c-line);
+  margin: var(--sp-5) 0;
+  position: relative;
+}
+hr::after {
+  content: "◆";
+  position: absolute;
+  top: -7pt;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--c-bg);
+  color: var(--c-primary-500);
+  font-size: 8pt;
+  padding: 0 8pt;
+}
+
+/* ============================================================
+   图片
+   ============================================================ */
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: var(--sp-3) auto;
+  border-radius: var(--r-sm);
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+figure { margin: var(--sp-4) 0; text-align: center; }
+figcaption {
+  font-size: var(--fs-caption);
+  color: var(--c-ink-500);
+  margin-top: 6pt;
+  text-align: center;
+  font-style: normal;
+}
+
+/* ============================================================
+   章节编号（自动生成，用 CSS counter）
+   ============================================================ */
+
+main.body {
+  counter-reset: chapter;
+}
+h1 {
+  counter-reset: section subsection;
+  counter-increment: chapter;
+}
+h1::before {
+  content: counter(chapter, decimal-leading-zero) "  ";
+  color: var(--c-accent-600);
+  font-family: var(--ff-mono);
+  font-size: 0.7em;
+  font-weight: 700;
+  letter-spacing: 1pt;
+  vertical-align: middle;
+  margin-right: 4pt;
+}
+
+/* ============================================================
+   工具类
+   ============================================================ */
+
+.text-center { text-align: center; }
+.text-right  { text-align: right; }
+.muted       { color: var(--c-ink-500); }
+.small       { font-size: var(--fs-small); }
+.mono        { font-family: var(--ff-mono); }
+.no-break    { page-break-inside: avoid; break-inside: avoid; }
+
+/* 防止孤行 */
+p, li, td, th {
+  hyphens: auto;
+  -weasy-hyphens: auto;
+}

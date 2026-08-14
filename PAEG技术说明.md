@@ -194,6 +194,24 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 
 ---
 
+
+---
+
+## 第 6 章 即将更新（Roadmap · 2026-08-14 进行中）
+
+> 以下能力正在开发/规划中，完成后将更新到本说明。
+
+| 更新项 | 状态 | 技术路线 |
+|---|---|---|
+| **深入版教学互动** | 🔄 开发中 | checkpoint 挂起等待学生回答 → 评估（_student_signal + LLM）→ 智能分支（理解→下一步/部分→换例子重讲/困惑→降级/沉默→简化）→ 续讲（复用 _pending_steps）；防挫败话术 |
+| **Harness 引入补全** | 🔄 开发中 | compaction（上下文压缩：历史超限自动摘要）+ user-approval（高风险操作用户确认）+ llm-retry（LLM 调用重试）+ timeout-policy（超时策略）——借鉴 deepseek-harness |
+| **技术说明 PDF** | 🔄 生成中 | Markdown → HTML（visual-engineering 设计模板）→ weasyprint 渲染（专业配色/封面/页眉页脚/表格跨页） |
+| 交互式教学深度版（挂起+resume 端点） | 📋 规划 | checkpoint 后结束流 → /api/teach/resume 从挂起状态续讲 |
+| 学习效果评估闭环 | 📋 规划 | Evaluator 加 learning_effect（学生复述/答题正确率 → 画像） |
+| 前端点赞 UI 完善 | 📋 规划 | 消息气泡反馈按钮已实现，反馈→策略调整深化 |
+
+**Roadmap 说明**：所有更新按需求文档（PAEG_任务总清单与操作规范.md §3.20-3.22）执行——先记录需求、再执行、完成后更新状态并同步本说明。
+
 ## 附录 A 术语表
 
 | 术语 | 含义 |

@@ -232,6 +232,22 @@ def _inject_skill_catalog(system: str) -> str:
         logger.warning("skill catalog 注入失败: %s", _e)
         return system
 
+def _build_remediation(steps, student_answer):
+    """v0.69+ §3.20 深入版互动：困惑时在剩余步骤前插入回应+换个方式重讲引导步骤。"""
+    try:
+        _resp = str(student_answer or "")[:100]
+        _lead = {
+            "type": "present",
+            "topic": "回应学生理解检查（温柔回应 + 换个方式重讲核心）",
+            "subtopic": ("学生说：" + _resp + "——先肯定其回答中合理的部分，再用更简单的例子或类比重讲刚才的核心概念，然后温和确认是否清楚"),
+            "duration_min": 2,
+            "is_remediation": True,
+            "bloom": "understand",
+        }
+        return [_lead] + list(steps or [])
+    except Exception:
+        return list(steps or [])
+
 def _append_chat_hist(learner_id: str, user_content: str, assistant_content: str = "") -> None:
     """v0.42.3 ⭐ P0 修复：统一对话历史写回（method/knowledge/affection 三端点共用）。
 
@@ -1081,6 +1097,10 @@ def teach_stream():
     """
     data = request.get_json(force=True)
 
+    # v0.69+ §3.20 ⭐ 深入版互动：strict_checkpoint 模式（交互式教学请求启用——每步后挂起等学生回答）
+    _strict_checkpoint = bool(data.get("strict_checkpoint")) or bool(data.get("interactive"))
+
+
     # v0.68+ P0-2（Step4）：hooks 事件触发（session.start / message.before_user），永不阻断
     try:
         from hooks_hub import get_hooks_hub
@@ -1748,6 +1768,27 @@ def teach_stream():
             plan = {"steps": _pending_steps}
             SESSIONS.pop(f"teach_plan_{learner_id}", None)  # 取走即清（本轮再存新的）
             SESSIONS.pop(f"teach_plan_done_{learner_id}", None)  # v0.46.2 修复：同步清 done 标志
+            # v0.69+ §3.20 ⭐ 深入版互动：续讲轮评估学生回答（concept=学生对上一步检查问题的回答）
+            # ——用 Evaluator._student_signal 判断理解度，困惑/部分时注入"回应+重讲引导"，
+            #   让 Presenter 在续讲前先温和回应学生，而非直接讲下一步
+            try:
+                _stu_signal = None
+                from subagents import Evaluator as _Ev
+                _sig = _Ev._student_signal(str(concept)[:200])
+                if _sig.get("quality") == "none":
+                    pass  # 无回答文本（学生新提问），正常续讲
+                elif _sig.get("confusion", 0) >= 0.3 or _sig.get("understanding", 0) < 0.4:
+                    _stu_signal = "confused"
+                    plan["steps"] = _build_remediation(plan.get("steps") or [], concept)
+                elif _sig.get("understanding", 0) >= 0.7:
+                    _stu_signal = "understood"
+                else:
+                    _stu_signal = "partial"
+                if _stu_signal:
+                    plan["_student_signal"] = _stu_signal
+                    plan["_student_answer"] = str(concept)[:200]
+            except Exception:
+                pass
             # 续讲轮：不重复诊断（诊断已在首轮完成），只推进剩余步骤
             yield f"event: plan\ndata: {json.dumps({'status': 'continuing', 'steps_left': len(_pending_steps)}, ensure_ascii=False)}\n\n"
         else:
@@ -1958,6 +1999,16 @@ def teach_stream():
                                           'question': _cp_q, 'concept': concept,
                                           'timeout_seconds': 60}, ensure_ascii=False)
                 yield "event: checkpoint\ndata: " + _cp_payload + "\n\n"
+                # v0.69+ §3.20 ⭐ 深入版互动：strict_checkpoint 模式（用户请求"交互式教学"时启用）
+                # ——checkpoint 后结束当前流，等待学生回答；学生回答走 quickAnswer→teach→续讲分支
+                # （teach_plan_{learner_id} 剩余步骤已被存下，新请求自动命中续讲，见行 1746）
+                if _strict_checkpoint:
+                    yield (f"event: done\ndata: "
+                           + json.dumps({'status': 'completed',
+                                         'checkpoint_pending': True,
+                                         'resume_at_step': presentation.get('step_id', i + 1)},
+                                        ensure_ascii=False) + "\n\n")
+                    return
             except Exception:
                 pass
 

@@ -586,3 +586,20 @@
 - **执行方式**：先咨询 Oracle（设计技术说明的结构/粒度/架构分层方式）→ 撰写文档 → 记录
 - **优先级**：P0（用户明确要求，先咨询 Oracle 再写）
 
+### 3.20 深入版教学互动（2026-08-14 用户新需求 · 待实施）
+- **需求**：§3.12 深入版教学互动——真正"挂起等待学生回答→评估回答→智能调整续讲"的循环（非可忽略提示）
+- **执行**：联网调研（已完成 bg_2515721a）+ 咨询 Oracle（bg_4f82f061 运行中）+ 本地调研（bg_e9fb1fab 运行中）→ 找合适方法实施
+- **现状基础**：checkpoint 事件（每步后，可答可忽略不挂起）+ _pending_steps 续讲机制 + Evaluator._student_signal 信号 + 前端问答面板
+- **优先级**：P0（用户明确要求认真完成）
+
+### 3.21 技术说明 PDF 渲染（2026-08-14 用户新需求 · 进行中）
+- **需求**：把 PAEG技术说明.md 渲染成**好看**的 PDF（微 agent 设计样式）→ 发微信一份 + 交付物一份
+- **执行**：visual-engineering agent 设计模板（bg_2c22c8f8 ✅ 已完成）→ weasyprint 渲染（weasyprint 可用）
+- **优先级**：P0（用户明确要求，已收到设计模板）
+
+### 3.22 Harness 引入补全（2026-08-14 用户指出"调研和引入没完成" · 待实施）
+- **现状**：调研 ✅（§3.16：41 分组/167 子包/P0 四项），引入仅 ralph ✅ + spill ✅；user-approval/compaction 只核实未真正实施，P1（timeout-policy/llm-retry）未动
+- **补全**：真正实施 compaction（上下文压缩）+ user-approval（用户确认）+ llm-retry（LLM 重试）+ timeout-policy 评估
+- **参考**：Harness 本地克隆 D:\wbo-workspace\deepseek-harness-research\dsh\packages\（compaction/user-approval/llm-retry/timeout-policy 已定位）
+- **优先级**：P0（用户明确要求补全引入）
+

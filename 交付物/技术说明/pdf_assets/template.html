@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>教育智能体 · 简明技术说明</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ============================================================
+       封面（首页，无页眉页脚）
+       ============================================================ -->
+  <section class="cover">
+    <div class="cover-inner">
+
+      <div class="cover-brand">
+        <span class="dot"></span>
+        <span>EDUCATION · AGENT · WHITEPAPER</span>
+      </div>
+
+      <h1 class="cover-title">
+        教育智能体<br>
+        <span class="accent">技术说明</span>
+      </h1>
+
+      <p class="cover-sub">
+        面向 K-12 与高等教育场景的智能教学代理架构、能力矩阵与
+        工程实现路径的系统性技术文档。
+      </p>
+
+      <!-- 元信息卡（自动浮于深色之上） -->
+      <div class="cover-meta">
+        <div class="item">
+          <span class="k">Version</span>
+          <span class="v">v1.0<small>正式交付版</small></span>
+        </div>
+        <div class="item">
+          <span class="k">Document</span>
+          <span class="v">技术白皮书<small>Technical Brief</small></span>
+        </div>
+        <div class="item">
+          <span class="k">Date</span>
+          <span class="v" id="cover-date">2026 · 08<small>项目所有者内部</small></span>
+        </div>
+      </div>
+
+      <div class="cover-footer">
+        <span class="seal">EDU · AGENT</span>
+        <span>Confidential — Internal Use Only</span>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       正文容器
+       string-set: doc-title — 注入到 @page 页眉左侧
+       ============================================================ -->
+  <main class="body" style="string-set: doc-title '教育智能体 · 简明技术说明';">
+
+    {{CONTENT}}
+
+  </main>
+
+</body>
+</html>
