@@ -208,6 +208,31 @@ def build_mcp_server() -> Optional[Any]:
         """约束层级框架自省：层范围（L0-Lmax）/内嵌与外部来源/可用组/扩展指南。"""
         return _run_tool("constraint_layer_scope", {})
 
+    # v1.1 §3.35 ⭐ 物料流水线 MCP 化（多阶段+门控+自检范式，material_pipeline）
+    @_mcp.tool()
+    def generate_handout(topic: str, subject: str = "通用", learner_id: str = "anon") -> str:
+        """生成结构化讲义（markdown，附概念/例题/小结），经语言规范门与门控流水线。"""
+        return _run_tool("generate_handout",
+                         {"topic": topic, "subject": subject, "learner_id": learner_id})
+
+    @_mcp.tool()
+    def generate_script(topic: str, subject: str = "通用", learner_id: str = "anon") -> str:
+        """生成讲稿（含 TTS 朗读稿），经语言规范门。"""
+        return _run_tool("generate_script",
+                         {"topic": topic, "subject": subject, "learner_id": learner_id})
+
+    @_mcp.tool()
+    def generate_ppt(topic: str, subject: str = "通用", learner_id: str = "anon") -> str:
+        """生成 PPT 大纲（供 pptx_mcp_server 排版），经门控流水线。"""
+        return _run_tool("generate_ppt",
+                         {"topic": topic, "subject": subject, "learner_id": learner_id})
+
+    @_mcp.tool()
+    def generate_mindmap(topic: str, subject: str = "通用", learner_id: str = "anon") -> str:
+        """生成知识导图（markdown 缩进列表），经门控流水线。"""
+        return _run_tool("generate_mindmap",
+                         {"topic": topic, "subject": subject, "learner_id": learner_id})
+
     return _mcp
 
 

@@ -99,7 +99,9 @@ _WRITE_TOOLS = {"save_document", "generate_handout", "generate_ppt", "generate_v
                 "generate_animation", "mcp__pptx__generate_presentation",
                 "forbidden_words",          # v0.70 §3.28 Phase 4：违禁词维护属写操作
                 "constraint_always_active",  # v0.70 §3.29：永远激活规则维护属写操作
-                "constraint_self_evolve"}    # v0.70 §3.29：约束自演化写入属写操作
+                "constraint_self_evolve",    # v0.70 §3.29：约束自演化写入属写操作
+                "generate_script",           # v1.1 §3.35：讲稿生成属写操作
+                "generate_mindmap"}          # v1.1 §3.35：知识导图生成属写操作
 
 _active_preset = "standard"  # 当前权限档（运行时可切换）
 
@@ -277,6 +279,46 @@ def get_tool_defs() -> List[dict]:
             {},
             [],
         ),
+        # v1.1 §3.35 ⭐ 物料流水线 MCP 化（多阶段+门控+自检范式，material_pipeline）
+        _make_tool(
+            "generate_handout",
+            "生成结构化讲义（markdown 双格式，附概念/例题/小结），经语言规范门与门控流水线。"
+            "当学生需要完整讲解材料时调用。",
+            {"topic": {"type": "string", "description": "教学主题"},
+             "subject": {"type": "string", "description": "学科（默认通用）"},
+             "learner_id": {"type": "string", "description": "学习者 ID（可选）"}},
+            ["topic", "subject"],
+            risk="write",
+        ),
+        _make_tool(
+            "generate_script",
+            "生成讲稿（含 TTS 朗读稿，按幕分段），经语言规范门。当学生需要讲解脚本/口播稿时调用。",
+            {"topic": {"type": "string", "description": "教学主题"},
+             "subject": {"type": "string", "description": "学科（默认通用）"},
+             "learner_id": {"type": "string", "description": "学习者 ID（可选）"}},
+            ["topic", "subject"],
+            risk="write",
+        ),
+        _make_tool(
+            "generate_ppt",
+            "生成 PPT 大纲（封面 + 3-6 页正文 + 结尾，供 pptx_mcp_server 排版），经门控流水线。"
+            "当学生需要演示文稿时调用。",
+            {"topic": {"type": "string", "description": "教学主题"},
+             "subject": {"type": "string", "description": "学科（默认通用）"},
+             "learner_id": {"type": "string", "description": "学习者 ID（可选）"}},
+            ["topic", "subject"],
+            risk="write",
+        ),
+        _make_tool(
+            "generate_mindmap",
+            "生成知识导图（中心主题 + 3-5 一级分支 + 2-4 二级节点，markdown 缩进列表），经门控流水线。"
+            "当学生需要知识结构图/思维导图时调用。",
+            {"topic": {"type": "string", "description": "教学主题"},
+             "subject": {"type": "string", "description": "学科（默认通用）"},
+             "learner_id": {"type": "string", "description": "学习者 ID（可选）"}},
+            ["topic", "subject"],
+            risk="write",
+        ),
     ] + _extended_tool_defs()
 
 
@@ -306,6 +348,7 @@ def _extended_tool_defs() -> list:
                           "normalize_text", "language_policy_check", "forbidden_words",
                           "constraint_layer_get", "constraint_layer_set", "constraint_compose",
                           "constraint_always_active", "constraint_self_evolve",
+                          "generate_handout", "generate_script", "generate_ppt", "generate_mindmap",
                           "constraint_feedback_adjust", "constraint_layer_scope"}
         _ext = [d for d in _ext
                 if isinstance(d, dict)
@@ -600,6 +643,31 @@ def _exec_constraint(name: str, arguments: dict) -> str:
         return f"约束引擎 {name} 调用失败: {str(e)[:120]}"
 
 
+def _exec_material(material_type: str, arguments: dict) -> str:
+    """v1.1 §3.35 ⭐ 物料流水线执行器：转发到 material_pipeline.run_material_pipeline。
+
+    风险：写盘 + 调 LLM——按权限预设拦截（与 save_document 同策略）。
+    """
+    try:
+        if not is_tool_allowed_by_preset(f"generate_{material_type}"):
+            return f"权限档拦截：当前预设不允许 generate_{material_type}"
+        from material_pipeline import run_material_pipeline
+        from llm_adapter import create_llm
+        llm = create_llm("auto")
+        args = arguments or {}
+        result = run_material_pipeline(
+            llm, material_type,
+            args.get("topic", ""),
+            args.get("subject", "通用"),
+            args.get("learner_id", "anon"),
+        )
+        return json.dumps({"ok": result.get("ok"), "errors": result.get("errors", []),
+                           "output": str(result.get("output", ""))[:500],
+                           "path": result.get("path", "")}, ensure_ascii=False)
+    except Exception as e:
+        return f"物料流水线 {material_type} 调用失败: {str(e)[:120]}"
+
+
 _HANDLERS: Dict[str, Callable[..., str]] = {
     "web_search": _wrap("web_search", _exec_web_search, retries=2),
     "verify_math": _wrap("verify_math", _exec_verify_math, retries=1),
@@ -623,6 +691,11 @@ _HANDLERS: Dict[str, Callable[..., str]] = {
     "constraint_self_evolve": lambda **kw: _exec_constraint("constraint_self_evolve", kw),
     "constraint_feedback_adjust": lambda **kw: _exec_constraint("constraint_feedback_adjust", kw),
     "constraint_layer_scope": lambda **kw: _exec_constraint("constraint_layer_scope", kw),
+    # v1.1 §3.35 ⭐ 物料流水线 MCP 化（handout/script/ppt/mindmap）
+    "generate_handout": lambda **kw: _exec_material("handout", kw),
+    "generate_script": lambda **kw: _exec_material("script", kw),
+    "generate_ppt": lambda **kw: _exec_material("ppt", kw),
+    "generate_mindmap": lambda **kw: _exec_material("mindmap", kw),
 }
 
 

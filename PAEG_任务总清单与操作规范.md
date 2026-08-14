@@ -858,4 +858,19 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 - **优化方向（待细化）**：①补齐"多 Agent 分阶段"（规划/草稿/实现/审查分离）②补几何审计门（重叠/越界检测）③补失败自动修复回路（错误日志→修复提示词）④动画作为教学视频上游（讲稿/讲义/脚本作为动画输入，动画输出回灌物料包）⑤范式平移到其他物料
 - **执行**：先记录入需求文档 → 调研现状（visual_script_generator/validator/manim_service）→ 方案（可咨询 Oracle）→ 实施
 - **优先级**：P1
+- **实施记录（v1.1，commit b5d3488 + 5eaef83）**：
+  - 新建 `manim_pipeline.py`：六阶段流水线（Phase1 规划→门控→Phase2A 草稿→Phase2B 实现+几何审计→Phase3 审查→Phase4 合成）+ 硬门控（结构/数量/可执行/时序/几何/视觉）+ 失败返工回路（错误日志→修复提示词→重跑最多 3 轮）+ 角色分层禁令（规划不写码/草稿不渲染/审查不改文件）+ 上下游衔接（link_to_assets 供 teach_materials 消费）
+  - 新建 `manim_geometric_audit.py`：几何审计门（ffmpeg 抽帧→越界/重叠/漂移检测，确定性启发式）
+  - 新建 `material_pipeline.py`：范式平移到讲义/讲稿/PPT/知识导图（MaterialPipeline 策略模式 + 语言规范门[纪律23] + 修复回路 + 4 类预置流水线工厂 + 统一入口）
+  - `manim_service.generate_manim_video` 接入：script.json 流水线优先（回退单段兼容）
+  - 验证：manim_pipeline 7 项测试全过（含 Phase2B 真实渲染 mp4）+ material_pipeline 5 项全过（含语言门实际检测 AI 味 0.60）
+
+### 3.35 MaterialPipeline MCP 标准化 + 亮点记录（2026-08-15 用户新指令 · 待实施）
+- **背景**：material_pipeline.py（§3.34 产出）已把"多 Agent 分阶段+门控+自检"范式用于讲义/PPT/讲稿/知识导图。用户要求进一步优化并 MCP 标准化。
+- **需求（用户三点）**：
+  1. **咨询 Oracle + 联网检索优秀项目架构** → 提出全面需求继续优化 material_pipeline → **MCP 标准化开发**，使其成为**模块化工具**（完美接入 PAEG + 便于复用）
+  2. material_pipeline 作为**亮点**记录入技术说明附录 + 亮点文档；**查询 MCP 标准化开发是否已计入元能力/技术/维护文档**（技术文档应记载已开发哪些标准化 MCP 工具）
+  3. **完整实施需求文档中记录的其他未来需求**
+- **执行**：先记录入需求文档 → Oracle 咨询 + librarian 检索 → 方案 → 实施 MCP 标准化 → 记录亮点 → 完整实施未来需求
+- **优先级**：P1
 
