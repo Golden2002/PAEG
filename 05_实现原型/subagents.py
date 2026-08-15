@@ -1031,6 +1031,13 @@ class Presenter:
                 system = inject_graph_into_system(system, self.kb, concept=concept, subject=subject or "")
             except Exception:
                 pass
+            # §3.43 P0 ⭐ 学段学科 profile 注入（v1.1.5）：深度阶梯 + 收尾模板 + 考研风格
+            try:
+                from services.grade_subject_profiles import inject_grade_profiles
+                _g = str(getattr(learner, "grade_level", "") or "high_school")
+                system = inject_grade_profiles(system, subject=subject or "", grade=_g)
+            except Exception:
+                pass
             # v0.26 ⭐ 教学模式识别（agent 引导 LLM 判断 easy/normal/deep，不靠关键词）
             try:
                 _mode = _detect_teaching_mode(concept, self.model)
