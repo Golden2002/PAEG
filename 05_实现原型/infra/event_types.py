@@ -56,6 +56,7 @@ PAEG_EVENT_TYPES = frozenset({
     "material/handout", "material/script", "material/ppt", "material/mindmap",
     "self/evolve", "self/distill", "self/tool-lesson",
     "profile/stale-refreshed",  # §3.12 ⭐ 画像陈旧轻量诊断触发
+    "config/invalid",           # §3.42 W11 ⭐ 配置 schema 校验失败
 })
 
 KNOWN_EVENT_TYPES = CORE_EVENT_TYPES | PLUGIN_EVENT_TYPES | PAEG_EVENT_TYPES

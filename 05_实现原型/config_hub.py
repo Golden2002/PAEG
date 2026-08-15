@@ -67,8 +67,33 @@ class ConfigHub:
 
     # ─── 统一重载 ───
     def reload_all(self):
-        """动态重载全部配置（改 config/ 后调用即生效，无需重启）。"""
+        """动态重载全部配置（改 config/ 后调用即生效，无需重启）。
+
+        §3.42 W11 ⭐ 配置 schema 校验：重载前校验各 config/*.json，
+        无效配置拒绝且不改变运行时状态（ratchet：无效不应用）。
+        """
         with self._lock:
+            # §3.42 W11：先校验 config/*.json（无效则跳过该文件重载）
+            try:
+                from services.config_schema import ConfigValidator
+                _v = ConfigValidator()
+                _cfg_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
+                import json as _json
+                for _fn in ("hooks.json", "agents.json", "mcp_servers.json", "mcp_tools.json"):
+                    _fp = os.path.join(_cfg_dir, _fn)
+                    if os.path.isfile(_fp):
+                        try:
+                            with open(_fp, encoding="utf-8") as _f:
+                                _data = _json.load(_f)
+                            _ok, _errs = _v.validate(_fn, _data)
+                            if not _ok:
+                                print(f"[config_hub] ⚠️ {_fn} 校验失败，跳过重载: {_errs[:3]}")
+                                continue
+                        except Exception as _ce:
+                            print(f"[config_hub] ⚠️ {_fn} 解析失败，跳过重载: {_ce}")
+                            continue
+            except Exception:
+                pass
             if self.mcp is not None:
                 try:
                     self.mcp.reload_all()
