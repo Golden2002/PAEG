@@ -1,25 +1,53 @@
 """
-chunker.py — 文本分块器（v0.21.5）
+chunker.py — 文本分块器（v0.21.5；v0.43+ 默认值从 config/rag.json 读）
 
 职责：把 readers 抽出来的完整文本切成 ≤max_chars 的块，相邻块重叠 overlap 字符；
       中文优先按句号/感叹号/问号切句，再按 max_chars 兜底切。
 
 设计要点：
-1. 段落优先：用 \\n\\n / \\n 分隔出"自然段"，对每段按句子窗口打包
+1. 段落优先：用 \n\n / \n 分隔出"自然段"，对每段按句子窗口打包
 2. 中文按句切：。！？视为句号位置（中文里标点后通常直接接下一句，无空格）
 3. 英文按句切：. ! ? 后跟空白视为句号位置
 4. 每块硬上限 max_chars；最后一块可以小于上限
 5. 块间重叠 overlap 字符（从上一块尾部复制前缀到下一块开头）
 6. 空文本 / max_chars<=0 返回 []，不抛异常
 7. chunk_documents 接收 readers.read_corpus_full 的输出，附加元数据
+
+参数化（B1 RAG 配置化）：
+- 默认值每次调用时从 ``services.rag_config.get_rag_config()["chunker"]`` 读
+  （缺键回退 400/50）；这样测试 hot-patch + reset cache 后能立即生效
+- 调用方显式传参（如 chunk_documents）优先级始终高于 config
 """
 from __future__ import annotations
 
 import re
-from typing import List
+from typing import List, Optional
+
+from services.rag_config import get_rag_config
 
 # 任意空白
 _WS = re.compile(r"\s+")
+
+# B1 配置化兜底：硬兜底常量（get_rag_config 本身就有缓存 + 缺键回退，这里
+# 是 get_rag_config 也崩了——例如 services 包未加载——时的最后防线）
+_FALLBACK_MAX_CHARS: int = 400
+_FALLBACK_OVERLAP: int = 50
+
+
+def _resolve_chunker_defaults() -> tuple:
+    """从 get_rag_config() 读 chunker 节，缺键/异常时回退硬兜底。
+
+    Returns:
+        (max_chars, overlap) 两个 int
+    """
+    try:
+        cfg = get_rag_config().get("chunker") or {}
+        return (
+            int(cfg.get("max_chars", _FALLBACK_MAX_CHARS)),
+            int(cfg.get("overlap", _FALLBACK_OVERLAP)),
+        )
+    except Exception:
+        return (_FALLBACK_MAX_CHARS, _FALLBACK_OVERLAP)
 
 # 中文句末标点：。！？ 全角；（含句末并存的 ！！。 等）
 # 用 finditer 扫描（而不是 split+lookahead），因为中文标点后通常无空白，直接切更稳
@@ -112,7 +140,11 @@ def _add_overlap(chunks: List[str], overlap: int) -> List[str]:
     return out
 
 
-def chunk_text(text: str, max_chars: int = 400, overlap: int = 50) -> List[str]:
+def chunk_text(
+    text: str,
+    max_chars: Optional[int] = None,
+    overlap: Optional[int] = None,
+) -> List[str]:
     """把一整段文本切成 ≤max_chars 的块，相邻块重叠 overlap 字符。
 
     切分策略：
@@ -121,13 +153,30 @@ def chunk_text(text: str, max_chars: int = 400, overlap: int = 50) -> List[str]:
     3. 贪心打包句子成块（每块 ≤max_chars）
     4. 块间重叠 overlap 字符
 
+    默认值（B1 RAG 配置化）：max_chars/overlap 不传时，从
+    ``config/rag.json`` 的 ``chunker`` 节读取（缺键回退 400/50）。
+    调用方显式传参优先级最高。
+
     返回：list[str]；空文本返回 []
     """
+    if max_chars is None or overlap is None:
+        cfg_max, cfg_overlap = _resolve_chunker_defaults()
+        if max_chars is None:
+            max_chars = cfg_max
+        if overlap is None:
+            overlap = cfg_overlap
+
     if not text or not text.strip():
         return []
-    if max_chars <= 0:
-        max_chars = 400
-    overlap = max(0, overlap)
+
+    # 此刻 max_chars / overlap 已被解析为非 None int
+    # （None 分支在上面 if 块里已覆盖；assert 帮助 pyright 跨过
+    # tuple-return 赋值做窄化）。
+    assert max_chars is not None
+    assert overlap is not None
+
+    max_chars_int: int = max_chars if max_chars > 0 else _FALLBACK_MAX_CHARS
+    overlap_int: int = max(0, overlap)
 
     # 段落切分（支持连续换行作段分隔）
     paragraphs = re.split(r"\n\s*\n", text)
@@ -144,16 +193,16 @@ def chunk_text(text: str, max_chars: int = 400, overlap: int = 50) -> List[str]:
     if not all_sentences:
         return []
 
-    base_chunks = _pack_sentences_into_chunks(all_sentences, max_chars)
-    if overlap > 0 and len(base_chunks) > 1:
-        return _add_overlap(base_chunks, overlap)
+    base_chunks = _pack_sentences_into_chunks(all_sentences, max_chars_int)
+    if overlap_int > 0 and len(base_chunks) > 1:
+        return _add_overlap(base_chunks, overlap_int)
     return base_chunks
 
 
 def chunk_documents(
     docs: List[dict],
-    max_chars: int = 400,
-    overlap: int = 50,
+    max_chars: Optional[int] = None,
+    overlap: Optional[int] = None,
 ) -> List[dict]:
     """批量分块：把 readers.read_corpus_full 输出（[{path,name,type,text,ok,chars}, ...]）
     切成带元数据的块列表 [{doc_name, doc_path, doc_type, chunk_index, total_chunks, text, chars}, ...]。
@@ -162,6 +211,8 @@ def chunk_documents(
     - 只处理 ok=True 的文档；ok=False 跳过
     - 空文档跳过
     - 每个文档独立 chunk_index，从 0 开始
+
+    默认值（B1 RAG 配置化）：不传参时走 config；显式传参优先级最高。
     """
     out: List[dict] = []
     for doc in docs or []:
