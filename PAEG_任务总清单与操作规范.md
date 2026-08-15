@@ -1428,9 +1428,37 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 
 **参考来源**：Promtable/Prompt20/PremAI/TopReviewed（生产实践）、ACL 2025 HyDE 论文、UTokyo-HitU TREC RAG 2025、BGE 官方文档、Ragas docs、Tencent WeKnora、AI之上中文分块。
 
-#### 3.47.3 优化方案（⏳ Oracle 咨询 bg_b8ecb904 进行中，返回后填充）
+#### 3.47.3 优化方案（✅ Oracle 咨询 bg_b8ecb904 已返回，2026-08-16）
 
-- 待 Oracle 返回：优化项排序/落点文件/波次嵌入/依赖顺序/评估先行/风险点
+> Oracle 核心判断：**最高 ROI 不是 embedding，而是①把 KnowledgeBase.search 从"伪 BM25"换成真 BM25Okapi ②Anthropic Contextual Chunking（零 LLM 版）③config/rag.json 集中硬编码参数**；Hybrid embedding 属第四波次，必须先有 Hybrid 抽象 + 50 题金标集评估基线才能证明 ROI。
+
+**8 项优化（按落地顺序）**：
+
+| # | 优化项 | 落点（文件:函数） | 收益/成本/复杂度 |
+|---|---|---|---|
+| 1 | **建 config/rag.json** 集中 top_k/chunk_size/overlap/RRF_k/bm25_k1_b/embedding 开关，调用方改读 config | 新增 `config/rag.json`；chunker.chunk_text L115、retriever.search L188、_pre_retrieve L315、web_search_multi L622 | ⭐⭐⭐/极低/极低——**所有后续优化前置** |
+| 2 | **KnowledgeBase.search 改用真 BM25Okapi**（复用 lib/ingest/retriever.BM25Retriever）——Recall +10~20% | knowledge_base.py L906-926；保留原接口签名防破坏 132 测试 | ⭐⭐⭐/极低/低 |
+| 3 | **Prompt 注入加固**：_pre_retrieve 输出 SOURCES 块 + 强制 [N] 编号引用 + "无答案路径"指令 | subagents.py L323-339 | ⭐⭐⭐/极低/极低——**立即可上** |
+| 4 | **Contextual Chunking（零 LLM 版）**：chunk 前加面包屑前缀 `[{doc_name} §{chunk_index}/{total}]` | lib/ingest/chunker.py _add_overlap 后追加 _add_context_breadcrumb | ⭐⭐⭐/低/低 |
+| 5 | **轻量 50 题金标集 + 3 指标手写评估器**（不引 RAGAS）：recall@5/引用命中率/答案有据率 | 新增 tests/rag_eval/gold.jsonl + run_eval.py | ⭐⭐⭐/1 人天/中——**测量标尺** |
+| 6 | **Hybrid Retriever 抽象 + RRF 融合**：BM25 + 同义词扩展 + 预留 embedding 钩子 | 新增 lib/ingest/hybrid_retriever.py；_pre_retrieve 改调 hybrid.search() | ⭐⭐/中/中——给 embedding 铺路 |
+| 7 | **evolved_*.json 节点字段补齐 + schema_version**：_normalize_node() 兜底空字段 | self_evolution.py _append_evolved_node L127-148；search L914-918 用 .get(k,"") | ⭐⭐/极低/低——**须先于 #2** |
+| 8 | **（条件触发）bge-small-zh-v1.5 + 进程内 NumPy 向量索引**：仅当金标集 KB-only recall<60% 启用 | 新增 lib/ingest/embed_retriever.py；config 加 embedding.enabled | ⭐⭐/高/中——**数据说话后再上** |
+
+**关键决策**：不引 sentence-transformers 直跑（CPU 延迟 1-3s 违反实时性）；不引 faiss/langchain（向量量级纯 NumPy 足够）；HyDE 排除（教育场景知识泄漏 + 延迟翻倍）；Multi-Query 路由化（仅 recall<70% 启用）。
+
+**ULW 波次嵌入**（不加新波次，作为现有循环并行子任务，每波跑四件套：audit+smoke+pytest+rag_eval 单调不减）：
+
+| §3.46 波次 | 嵌入任务 | 子任务 | 准入 |
+|---|---|---|---|
+| 并行 W-N | 基线+立竿见影 | #1 config + #2 BM25Okapi + #3 SOURCES 注入 + #7 schema_version | 三任务独立 |
+| W-N+1 | Contextual+评估基线 | #4 Contextual Chunking + #5 50 题金标集跑分 | W-N 完成出 recall@5 基线 |
+| W-N+2 | Hybrid 抽象 | #6 HybridRetriever+RRF；重跑对比 | 金标集 BM25 单独 recall<70% 才继续 |
+| W-N+3 | （条件）Embedding | #8 bge-small-zh | 仅 RRF 后 recall 仍<60% 才启 |
+
+**依赖链**：#1 config → #2/#3/#7（并行）→ #4+#5（金标集是测量尺）→ #6 Hybrid（必须先于 #8）→ #8 Embedding。
+
+**风险点**：①bge CPU 延迟——先用 bge-small-zh-v1.5（110MB，query<500ms）验证 ROI 再升级；②KnowledgeBase._search_cache 失效——改 BM25 时同步换 LRU+TTL，否则热加载后命中陈旧结果；③evolved 字段不齐——#7 必须先于 #2 否则 BM25 切换触发 KeyError；④web_search_multi 已有 RRF(k=60)——#6 直接复用该常量防漂移。
 
 #### 3.47.4 实施记录（逐项更新）
 
