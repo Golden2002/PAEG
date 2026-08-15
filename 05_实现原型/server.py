@@ -546,6 +546,7 @@ def proactive_greet():
         if time.time() - u_meta.get("last_at", 0) < 30 * 60:
             return jsonify({"ok": False, "error": "too_frequent"}), 429
     except Exception:
+        logger.warning(f"[server] proactive_greet 静默异常已记录 (L548)")
         pass
 
     # 2) 学科推断（从最近 chat_hist 提取）
@@ -563,6 +564,7 @@ def proactive_greet():
                     subject = _s
                     break
     except Exception:
+        logger.warning(f"[server] proactive_greet 静默异常已记录 (L565)")
         pass
 
     # 3) 选模板 + 写 chat_hist + 计数
@@ -577,6 +579,7 @@ def proactive_greet():
         if len(hist) > 60:
             SESSIONS[f"chat_hist_{uid}"] = hist[-60:]
     except Exception:
+        logger.warning(f"[server] proactive_greet 静默异常已记录 (L579)")
         pass
     try:
         meta = SESSIONS.setdefault("proactive_meta", {})
@@ -584,6 +587,7 @@ def proactive_greet():
         u_meta["count"] = u_meta.get("count", 0) + 1
         u_meta["last_at"] = time.time()
     except Exception:
+        logger.warning(f"[server] proactive_greet 静默异常已记录 (L586)")
         pass
 
     return jsonify({"ok": True, "content": content, "proactive": True, "subject": subject})
@@ -1102,6 +1106,7 @@ def teach_stream():
         from obs_trace import begin_trace
         begin_trace("teach_stream")
     except Exception:
+        logger.warning(f"[server] teach_stream 静默异常已记录 (L1104)")
         pass
 
     # v0.69+ §3.20 ⭐ 深入版互动：strict_checkpoint 模式（交互式教学请求启用——每步后挂起等学生回答）
@@ -1427,6 +1432,7 @@ def teach_stream():
                 if _map_polished:
                     _map_content = _map_polished
             except Exception:
+                logger.warning(f"[server] gen_kb 静默异常已记录 (L1429)")
                 pass
 
             def gen_map():
@@ -1803,6 +1809,7 @@ def teach_stream():
                     plan["_student_signal"] = _stu_signal
                     plan["_student_answer"] = str(concept)[:200]
             except Exception:
+                logger.warning(f"[server] generate 静默异常已记录 (L1805)")
                 pass
             # 续讲轮：不重复诊断（诊断已在首轮完成），只推进剩余步骤
             yield f"event: plan\ndata: {json.dumps({'status': 'continuing', 'steps_left': len(_pending_steps)}, ensure_ascii=False)}\n\n"
@@ -1961,6 +1968,7 @@ def teach_stream():
                 if _res_all.get("has_any"):
                     learner._teach_res_block = _res_all["block"]  # type: ignore[attr-defined]
             except Exception:
+                logger.warning(f"[server] generate 静默异常已记录 (L1963)")
                 pass
             presentation = paeg.presenter.run(
                 step=step,
@@ -2025,6 +2033,7 @@ def teach_stream():
                                         ensure_ascii=False) + "\n\n")
                     return
             except Exception:
+                logger.warning(f"[server] generate 静默异常已记录 (L2027)")
                 pass
 
             # 评估
@@ -2258,6 +2267,7 @@ def teach_stream():
             _hh.run_hook("message.after_assistant", {
                 "learner_id": str(learner_id), "text": str(_done_payload.get("reply") or "")[:200]})
         except Exception:
+            logger.warning(f"[server] generate 静默异常已记录 (L2260)")
             pass
         # v0.68+ ⭐ G1 修复：流式教学也从完整对话历史蒸馏知识点（2026-08-14 用户方案：
         # 自我更新与流式无关——蒸馏模块从完整输出后的对话历史抓取，不修改流式循环本体）
@@ -2664,6 +2674,7 @@ def submit_feedback():
                     _lr._feedback_stats = _stats  # type: ignore[attr-defined]
                 _stats[_rating] = _stats.get(_rating, 0) + 1
         except Exception:
+            logger.warning(f"[server] submit_feedback 静默异常已记录 (L2666)")
             pass
         return jsonify({"ok": True, "recorded": True, "rating": _rating})
     except Exception as _fb_e:
@@ -3346,6 +3357,7 @@ def general_chat_stream():
                 from compaction import maybe_compact
                 _hist_ctx = maybe_compact(_hist_ctx, llm=None)
         except Exception:
+            logger.warning(f"[server] gen_empty_chat 静默异常已记录 (L3348)")
             pass
         if _hist_ctx:
             _hist_lines = []
@@ -3958,6 +3970,7 @@ def general_chat():
                           + "另有联网检索（mcp__*）、技能（load_skill__*）、工作流（run_workflow__*）等扩展工具——"
                           + "按需调用，不要滥用；数学答案可先用 verify_math 验证再回答。")
         except Exception:
+            logger.warning(f"[server] general_chat 静默异常已记录 (L3960)")
             pass
         _agent_sys = system + _tool_hint
         if _use_agent_engine and AGENT_ENGINE is not None:
