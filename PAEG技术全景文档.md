@@ -193,6 +193,12 @@ flowchart TB
 |---|---|---|
 | **三种模式** | 教学（5 子代理链）/ 闲聊（general_chat 无子代理）/ 找答案（AnswerSolver）各自独立 system prompt | `build_presenter_system` / `build_general_chat_system` / AnswerSolver 三套不同指令 |
 | **35 个学科** | 每个学科有专属 persona/language/structure/emphasis（v0.25 新增语言学/大气科学/量子场论）| `SUBJECT_STYLES`（35 个，各 4 字段）|
+
+> **v0.68+ 学科专项增强机制（2026-08-14）**：同一教学 subagent（Presenter）下，学科能力通过 `SUBJECT_STYLES[subject]` 字段**分别增强**——扩展字段按学科条件渲染注入 system（build_presenter_system L1499-1517）：`subfield_guide`（分支导航，几乎全学科）、`method_guide`（方法论，physics/college_physics/philosophy）、`worked_example`（例题，physics/college_physics/philosophy）、`concept_analysis`（概念分析，philosophy）、`code_ability`（编程，CS/AI）。哲学专项 v0.68：新增 method_guide（文献论证结构分析+概念分析 6 步法）+ worked_example（洞穴寓言解构示范）+ 考研档 + SUBFIELD_TREE 三学段。**注意**：error_correction 等 6 个语言类字段已定义但无渲染代码（死字段）。
+
+> **v0.69+ 教学能力结构化（2026-08-14）**：`skills/teaching-capability/SKILL.md` 教学专业能力判断库（源自教资体系，6 领域 + 反教条）——**skill 化为主 + L1 锚点注入为辅**（build_presenter_system 注入教学能力锚点，判断视角非执行清单）；LLM 按需 `load_skill__teaching-capability` 加载判断准则（防僵化）。
+
+> **v0.69+ 配置体系运行时接入（2026-08-14 Step4 P0 修复）**：`config_hub.execute_tool` 成为真实路由（run_agent_loop 统一调用，hooks/repeat_guard/workflows 解锁）；`get_tool_defs` 合并扩展工具（内置+skills+MCP+workflows=45）；hooks 触发点（log_hook + 5 配置 + teach_stream）；`/api/admin/reload` 热更新。P1×6 全清零（inject_catalog 统一/工具提示动态生成/answer skill 注入等）。
 | **4 个学段** | 初中/高中/本科/考研 各自深度与语气适配 | `_GRADE_GUIDE`（4 档）|
 | **前端联动** | 右上角三模式按钮切换，教学模式显示学科+学段选择 | index.html mode-switch |
 
@@ -5081,63 +5087,469 @@ Step 5 QA：结构/音频/字幕/转帧
 - 视频旁白源自讲稿（narration 驱动 TTS）
 - 讲稿生成（v0.53）：先写演讲稿 → 再生成视频，保证音画同步
 
+## 9.8 Manim 教学动画速度规范（v0.65 ⭐ 三档分级固定标准）
 
-### 12.4 意图路由 Magic 口令架构（2026-08-12 ⭐）
+**背景**：用户要求速度调整方案固定化——不同模块速度不同（重复动作快、关键部分慢），统一速度不符合教学要求，且用户不需要自己思考调速度。
 
-**分层路由**（确定性信号 > Magic 口令 > 模式短路 > LLM > 规则）：
+**数据来源**：Manim 社区 pacing 最佳实践联网调研（browser-use/video-use、rohitg00/manim-video-generator、adithya-s-k/manim_skill、Manim 官方 `DEFAULT_ANIMATION_RUN_TIME=1.0`）。
+
+### 9.8.1 三档分级常量（manim_speed.py）
+
+| 档位 | run_time | wait | 适用场景 | rate_func |
+|------|----------|------|----------|-----------|
+| 快速 QUICK | 1.2s（0.8-1.5） | 0.4s | 重复动作/循环移动/逐步演示 | linear/smooth |
+| 中速 NORMAL | 1.8s（1.5-2.0） | 0.8s | 普通 Transform/写公式/过渡 | smooth |
+| 慢速 KEY | 3.0s（2.5-4.0） | 2.0s | 标题/结论/推导核心 | smooth/cubic |
+| Aha 时刻 | 2.5s | 3.0s | 关键洞察揭示 | smooth |
+
+### 9.8.2 黄金法则与节奏变化
+
+1. **黄金法则**：每个 `self.play()` 后必须跟 `self.wait()`——观众需要"读→联系→预期"三步
+2. **节奏变化**：同一场景内快慢交替（铺垫慢、辅助细节快、结论最慢），**禁止全程同一速度**
+3. **上下限**：run_time 禁止 <0.5s（快闪看不清）与 >4.0s（拖沓）
+
+### 9.8.3 固定化机制
+
+- `manim_speed.py`：集中定义常量 + `_SPEED_STANDARD_TEXT`（给 LLM 的速度规范文本）
+- `manim_templates.py`：模板用 `__CREATE_RUN__` 等占位符 → 模块加载时替换为常量值（单一数据源）
+- `manim_prompts.py` / `manim_service.py`：LLM 生成路径注入 `_SPEED_STANDARD_TEXT`（三档数值约束）
+- 效果：模板渲染与 LLM 生成速度一致；用户改速度只需改 manim_speed.py 一处
+
+### 9.8.4 实测
+
+- 圆面积动画：29.5s（快闪档 0.3-2s）→ 100s（慢速档 3-6s）→ **53.6s（三档分级，适中）**
+- 融合视频：136.2s（讲解 5 页 + 动画 53.6s）
+
+
+
+## 10.9 架构连通性重构（v0.66 ⭐ 2026-08-13）
+
+**背景**：用户强调"本项目架构必须连通"——PPT 生成与讲稿/讲义连通、视频与 PPT/讲稿/manim 连通、思维导图/知识库/网络检索全连通。Oracle 诊断出 B1-B10 断裂点。
+
+### 10.9.1 修复的断裂点
+
+| ID | 断裂点 | 修复 |
+|----|--------|------|
+| B1 | /api/teach/video 带 outline 走旧路径（跳过讲稿/manim/融合） | 统一走 produce_lesson_video 融合管线 |
+| B2 | 思维导图无前端按钮、无显式端点 | 第 6 功能按钮 + kmapChat + LLM 重试 |
+| B3 | PPT 与讲稿内容无数据共享 | PPT 注入 script key_points（同一事实源） |
+| B4 | 思维导图不连通资源池 | 注入用户物料 + KB + 网络三路 |
+| B7 | 找答案模式不联网 | 注入统一资源门面 |
+
+### 10.9.2 统一资源门面
+
+`services/library.py collect_all_resources(uid, topic, llm, subject)`：
+- 四路聚合：用户物料（usr_knowledge）+ 知识库（KB.search）+ 事实资料（facts）+ 联网检索
+- 接入：manim / 讲义 / 讲稿 / 找答案 / 教学每步（Presenter 注入）
+- 原则：单入口多消费、注入即事实、失败静默
+
+### 10.9.3 授课式讲义+讲稿 + 短指令补全
+
+- `file_generator.generate_handout`：完整教学讲义（6 段：目标/导入/新授/巩固/小结/作业）
+- `script_service` 授课式讲稿：称呼/引导提问/过桥句/互动标记，废弃要点拼接兜底
+- `services/intent_inference.py`：短输入（"极限"）→ 自动推断学段/学科/深度/时长 + 假设清单
+- 端到端：输入"极限"两字 → 72s 完整融合视频（讲义→讲稿→manim→视频）
+
+### 10.9.4 情绪+学习双轨
+
+- teach_stream 混合输入（情绪+学习）→ 先情绪回应 + 学习衔接语（不截断）
+- AffectionSupportor 提示词新增"情绪+学习并存"衔接指令
+
+### 10.9.5 语言规范 L0-L3 接入生成链路
+
+- `services/lang_gate.py`：统一守门（L0 polish + L2 refiner 薇依语料）
+- 讲义/讲稿/manim 讲稿全部过语言规范；L1 提示词约束注入生成 system
+
+### 10.9.6 验证
+
+- `tests/test_chain_integration.py` 6/6 通过
+- audit_check 36/39（P0 静默异常已修；pyright 环境 + server.py 4442 行结构性）
+- 实测：短指令视频生成、教学/倾诉/双轨、思维导图按钮
+
+
+
+## 10.11 Docker 化部署（v0.67 ⭐ 2026-08-13）
+
+**方案**：单容器最小可行版——Python 3.12 统一环境（用户方案：manim 0.19 兼容 3.12，无需隔离 venv）。
+
+### 10.11.1 文件清单
+
+| 文件 | 职责 |
+|------|------|
+| Dockerfile | python:3.12-slim + ffmpeg + pip manim 0.19 + 主依赖 + 源码 |
+| docker-compose.yml | 单服务 + 数据卷（users_data/downloads/Library）+ 环境变量 |
+| .dockerignore | 排除 manim_env/venv/数据/密钥（减体积） |
+| .env.example | 环境变量示例（DeepSeek key/语音/安全） |
+
+### 10.11.2 关键决策
+
+- **Python 3.12-slim**：manim 0.19 兼容最稳（moderngl 编译需 build-essential）
+- **manim pip 直接装**：放弃隔离 venv（容器内统一环境更简）
+- **manim_service 容器兼容**：检测 manim_env 不存在 → `shutil.which('manim')` 用系统命令
+- **数据卷持久化**：users_data/downloads/Library 挂载主机路径
+- **系统 ffmpeg**：apt 装（manim + 音视频通用）
+
+### 10.11.3 使用
+
+```bash
+cp .env.example .env   # 填 DEEPSEEK_API_KEY
+docker compose up -d --build
+# http://localhost:5000
 ```
-Layer 0:  安全过滤（self_harm → emotion）
-Layer 0.5: Magic 口令（magic_intent.py：精确匹配身份/能力/知识口令 → 固定模板，零 LLM）
-Layer 1:  模式短路（前端 mode 选择）
-Layer 2:  LLM 判断（route_intent，14 意图，含 interface/knowledge 区分）
-Layer 3:  规则兜底（rule_fallback_intent）
+
+### 10.11.4 边界与坑
+
+- whisper 模型首次下载 ~150MB（环境变量 WHISPER_MODEL）
+- manim LaTeX 渲染需 texlive（MVP 省略，报错时再装）
+- Windows 中文文件名挂载 → Docker Desktop File Sharing 或命名卷
+- MCP 三 server 跑同容器（fastmcp 进程内），完整版可拆
+
+
+
+## 10.12 双远程仓库同步（GitHub + ModelScope）（v0.67 ⭐ 2026-08-13）
+
+**背景**：项目同时托管于 GitHub（Golden2002/PAEG）与 ModelScope（Golden2002/Emile_Novis），需保持两仓库内容一致。
+
+### 10.12.1 远程配置
+
+```bash
+# 查看远程
+git remote -v
+# origin    → https://github.com/Golden2002/PAEG.git
+# modelscope → https://www.modelscope.cn/studios/Golden2002/Emile_Novis.git
 ```
 
-**Magic 口令**（卷首语 identity 桶能力词）：
-- 身份：你是谁/你叫什么/你的名字 → interface（identity 模板）
-- 能力：你能做什么/你有什么功能/你能帮我学知识 → interface
-- 知识：你学过什么/你会什么/你的知识库 → knowledge（库清点）
-- 界面：怎么使用/这个网站怎么用 → interface
+### 10.12.2 日常同步流程
 
-**复合输入**："帮我分析这段话"不走 interface（已移除），走 material/复合输入处理。
-
-### 12.5 高压测试资产（2026-08-12 ⭐）
-
-**测试脚本**（可复用，下次只改语料）：
-- `05_实现原型/stress_parallel.py`：6 模式并行/顺序测试框架
-- `05_实现原型/stress_teach_retry.py`：teach 防挂死版（socket 超时 + 重试）
-- `05_实现原型/utils/gibberish.py`：乱码快速兜底
-
-**2026-08-12 结果**：204 轮 6 模式 0 错误，平均 13.7s，模式切换 100%。
-
-**方法论**：见元能力 §6.41；维护手册 §18.13/18.14。
-
-
-### 12.6 Manim 数学动画模块（v6.1 规划 ⭐）
-
-**定位**：接入 3Blue1Brown 的 ManimCE（v0.21.0）作为视频生成的**上游可视化工具**——LLM 生成数学动画代码 → Docker 沙箱渲染 → 与讲稿/配音合并成教学视频。
-
-**架构**（Oracle 咨询 + Manim 调研结论）：
-```
-用户提问（数学概念）
-  → 对话路由：数学/几何类 + 动画收益高 → 触发 Manim
-  → LLM 生成 Manim Scene 代码（few-shot Prompt + Self-Healing 循环）
-  → 独立 worker 异步渲染（Docker 沙箱，资源/超时限制）
-  → 输出 mp4 → video_service 合并讲稿/配音 → 教学视频
+```bash
+git add .
+git commit -m "描述本次改动"
+git push origin master        # 推 GitHub
+git push modelscope master    # 推 ModelScope
 ```
 
-**关键决策**：
-1. **ManimCE v0.21.0**（非 ManimGL）——稳定、MIT 许可、中文支持（Text+Noto Sans CJK / Tex+ctex）
-2. **Docker 隔离**——LLM 生成代码可能恶意，必须沙箱（非 root/无网络/资源限制）
-3. **异步任务**——渲染慢（30-60s/场景），请求只提交 job_id
-4. **Self-Healing**——LLM 代码首次成功率 50-70%，归一化错误反馈 → 重试（最多 2 次）
-5. **渐进降级**——Manim 失败 → 回退现有 ffmpeg 静态视频
-6. **DSL 优先**——首期仅 5 类模板（函数曲线/坐标轴/导数切线/面积积分/简单变换），不开放任意代码
+### 10.12.3 一键推送（别名）
 
-**与现有模块连通**：
-- video_service.py：Manim 产物作为 visual_asset 输入（合并音频）
-- 知识库：数学概念资料注入 LLM（公式/变量域有来源）
-- PPT 生成：抽取 Manim 关键帧作为配图
-- 对话路由：数学+图形类问题触发
+```bash
+git config --global alias.pushall '!git push origin master && git push modelscope master'
+git pushall   # 一次推两个仓库
+```
 
-**需求表**：`audit/manim_requirements_v061.md`
+### 10.12.4 拉取更新
+
+```bash
+git pull origin master        # 建议只从 GitHub 拉（避免分歧）
+git pull modelscope master    # 若 ModelScope 有他人更新
+```
+
+### 10.12.5 注意事项
+
+1. **保持一致**：两个仓库内容应完全一致——建议只从 GitHub 拉取，再推两个
+2. **分支**：master 为默认；新分支（dev）推送需 `git push origin dev`
+3. **冲突**：若 ModelScope 有他人改动 → `git pull modelscope master` → 解决冲突 → 再推两个
+4. **token 安全**：remote URL 含 token（oauth2:xxx）——勿提交到公开处
+
+### 10.12.6 三处一致扩展
+
+原"本地 ↔ GitHub ↔ Release"三处一致原则扩展为"本地 ↔ GitHub ↔ ModelScope ↔ Release"四端一致——本地为权威源，改完推两仓 + 更新 Release。
+
+### 10.13 前端输入区布局修复（v0.67.1 ⭐ 2026-08-13 对话框被按钮挤没）
+
+**问题**：聊天输入区 `.input-bar`（单 flex-wrap 容器）含 3 下拉框 + 6 制作按钮 + textarea + 上传/语音/发送。窄视口下按钮换行后与 textarea 混行，输入框被挤压至 140px。
+
+**根因（flexbox 规范级缺陷）**：MDN 官方——"each flex line acts like a new flex container"，`flex-wrap + order` 下换行补位不可预测（W3C #5399）。
+
+#### 10.13.1 修复方案：flex-direction: column + 嵌套 toolbar
+
+采用 lobe-chat / MUI X / OpenSearch / vercel ai-chatbot 共识：
+
+```html
+<div class="input-bar">          <!-- flex-direction: column; align-items: stretch -->
+  <div class="input-toolbar">    <!-- 工具行：selects + 6 制作按钮，内部 flex-wrap -->
+    <select id="grade-select">...</select>
+    <button class="cmd-trigger">讲义</button> ... 6 个
+  </div>
+  <div class="input-composer">   <!-- 输入行：textarea 撑满 + 上传/语音/发送 -->
+    <textarea id="question-input">...</textarea>
+    <button id="ask-btn">发送</button>
+  </div>
+</div>
+```
+
+**HTML 改动**：`.input-bar` 内包 2 个容器 div（`.input-toolbar` 包 selects+6 按钮；`.input-composer` 包 textarea+按钮）。JS 无影响（全部 `getElementById` 引用）。
+
+**关键 CSS**：
+```css
+.input-bar { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.input-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.input-composer { display: flex; align-items: center; gap: 8px; width: 100%; }
+.input-composer .question-input { flex: 1 1 auto; min-width: 0; }  /* min-width:0 关键 */
+.input-composer .upload-btn, .input-composer .ask-btn { flex: 0 0 auto; }
+```
+
+#### 10.13.2 实测验证（Playwright）
+
+| 视口 | 对话框宽度 | 按钮混入输入行 | 横向溢出 |
+|------|-----------|--------------|---------|
+| 1280px | 665px | 0 | 无 |
+| 1036px | 421px（原 140px） | 0 | 无 |
+| 900px | 605px | 0 | 无 |
+| 700px | 395px | 0 | 无 |
+
+#### 10.13.3 前端布局经验（可复用）
+
+1. 聊天输入区**绝不用单 flex-wrap 容器**——必须 column + 嵌套（工具行/输入行物理分离）
+2. textarea 用 `flex: 1 1 auto; min-width: 0`（不是 `flex:1`），min-width:0 允许收缩
+3. 断点层（≤1024px）只调 toolbar 内部 select 比例，不动输入行
+4. 移动端（≤768px）textarea 仍撑满，按钮不独占整行（保持紧凑）
+5. UI 修复必须 Playwright 实测三档视口（桌面/平板/手机）+ 横向溢出检查
+
+### 10.14 学习计划工作流 + v4-flash 思考修复（v0.68 ⭐ 2026-08-13）
+
+#### 10.14.1 学习计划功能（method 子意图，Oracle 架构）
+
+**定位**：学习方法模式（method）的"制定学习计划"子流程——用户"对某领域感兴趣/想系统学X"时生成分阶段+资源+时长的学习计划。
+
+**意图路由（LM 优先）**：
+- `study_plan` 作为第 15 个意图加入 `meta_router.VALID_INTENTS` + `INTENT_PROMPT`（LLM 在多选项中判断）
+- `is_study_plan_intent()` 正则兜底（LLM 失败时）
+- 模式短路：method 模式 + 命中 plan 意图 → 分流到学习计划工作流
+
+**工作流（services/planner.py）**：
+1. `extract_plan_inputs`：提取 topic/deadline/每周小时（从输入 + LearnerProfile 画像）
+2. `aggregate_resources`：复用 `collect_all_resources`（用户物料/知识库/facts/联网 4 路，只调一次）
+3. `design_phases`：**阶段骨架确定性**（阶段数 2-4/模板：基础→强化→实战 + 语言/备考特化）+ **里程碑内容 LLM 个性化**
+4. `build_study_plan`：汇总为 StudyPlan JSON（phases[].milestones[].resources[] + summary_md + actions）
+
+**数据结构**：StudyPlan/Phase/Milestone/Resource dataclass（阶段数/周数/每周小时/截止日期/个性化备注）
+
+**前后端**：
+- `services/handlers/study_plan.py`：端点处理器（语言规范收口）
+- `method.py`：is_study_plan_intent 分流（teach 拦截同步支持）
+- 前端 `renderStudyPlan()`：阶段折叠卡片 + 里程碑 + 检验 + teach 跳转按钮
+- 快速开始文案新增"制定学习计划"示例
+
+#### 10.14.2 v4-flash 思考模型空响应修复（重要根因，需长期记住）
+
+**现象**：普通 chat 调用返回空字符串（content=""），导致学习计划走兜底、部分模式输出异常。
+
+**根因**（排查链）：
+1. `_safe_chat` 返回空 → 先疑 API 故障 → 直接调底层 `api.chat` 也空 → 发原始 HTTP 请求看完整响应
+2. **发现**：响应 `{"message": {"content": "", "reasoning_content": "...", "finish_reason": "length"}}`
+3. **结论**：`deepseek-v4-flash` 是思考型模型——即使不带 thinking 参数，API 也先输出 reasoning_content；max_tokens 太小时 content 被思考链占满 → 空
+4. **测试确认**：显式 `thinking: {"type": "disabled"}` 后 content 正常返回
+
+**修复**：
+```python
+# llm_api.py OpenAICompatModelAPI.chat
+payload = {
+    ...
+    "thinking": {"type": "disabled"},   # 普通/OFF/B 路径显式关思考
+}
+# max_tokens 默认 2000 → 4000（思考模型需 token 空间）
+```
+
+**设计对齐**：与 SUBAGENT_THINKING_LEVELS 矩阵一致——只有 A 路径（presenter/answer_solver 用 ReasonerModelAPI）开 thinking；B/OFF 路径用普通 chat（thinking: disabled）。
+
+**验证**：连续 5 次 _safe_chat 全返回；3 个学习计划测试全 LLM 高质量生成。
+
+**教训**：**思考型模型的"空 content"是配置/参数问题不是网络问题**——排查顺序：原始 HTTP 响应 → 检查 reasoning_content/finish_reason → 显式 thinking 开关。
+
+### 10.15 DeepSeek Harness 参考项目（2026-08-13 ⭐ 借鉴学习的第 N 个新项目）
+
+**项目**：DeepSeek Harness（github.com/deepseek-ai/deepseek-harness，npm `@deepseek-ai/dsh`）
+**定位**：Agent harness 架构（Claude Code / Codex 的替代增强），基于 Cordis 插件框架。
+**意义**：PAEG 独立配置体系（config_hub/阶段2 hooks/阶段3 workflows）的重要参考——它的 patch 层、事件模型、workflow DSL、预设系统可直接借鉴。
+
+#### 10.15.1 核心架构（可借鉴点）
+
+**1. "Everything is a Plugin" + Patch Layer（YAML 叠合）**：
+- 组合顺序：bundle 层 → profile 层 → 用户层 → 命令行 overlay
+- **Patch 替换整行 config（不做深度合并）**，后层覆盖前层
+- Bundle = npm 包 + `dsh.bundle` manifest 声明 patch 路径
+
+**2. `!!js` JS 表达式条件**：
+- **只在 plugin config 内求值**（mount 时按 ctx 注入变量）
+- **disabled/元数据不求值**（postmortem 0002 教训——条件用 overlay 叠加而非塞 disabled）
+- 可用变量：process.* / service injections / 自定义函数
+
+**3. 事件 4 种 dispatch 模式**：
+| 模式 | 等待 | 顺序 | 返回值 | 用途 |
+|---|---|---|---|---|
+| emit | 否 | 注册序 | 无 | 观察 |
+| waterfall | 否 | 注册序 | 有 | 中间件链（listener 必须 next() 让出）|
+| parallel | 是 | 并发 | 无 | 通知 |
+| serial | 是 | 顺序 | 有 | 串行处理 |
+
+**4. Capability 三角色**：Service Definition（接口）/ Service Provider（实现）/ Consumer（model-facing 工具）——能力必须三合一才完整。
+
+**5. Workflow = plain JS 脚本 + worker thread**（对应 PAEG 阶段 3）：
+- 全局 DSL：`agent(prompt, opts)` / `parallel(thunks)` / `pipeline(items, ...stages)` / `phase(title)` / `log(msg)`
+- 顶层 await 可用，脚本以 return 结束；隔离线程执行
+- Meta 数据（name/description/whenToUse/phases）是 plain JSON，脚本不求值它（防注入）
+- Parent Agent 必需，子 agent 自动归属（cwd/lineage/depth 继承）
+
+**6. 4-Preset 模式系统**：
+- standard（全功能）/ code=PTC（+tool-presentation 一行，工具暴露为 TS SDK，run_code 一次多步）/ minimal（bash+str_replace_editor 两工具）/ cordis（+自修改工具）
+- 自定义 preset = 一个目录 + agent.cordis.yml；只影响该 session（isolate realm）
+
+**7. 权限三层**：Sandbox（文件/进程边界）→ Approval（用户审批）→ Permission presets（read-only/workspace-write/full）
+- 子 agent 继承父 sandbox，approval 强制 never（captureDelegatedPolicyOverrides）
+- 运行时只能改 sandbox/approval，不能 mount/unmount 文件系统
+
+**8. Subagent Provider Registry**：spawn/fork/acp/codex/claude-code/dsh-sdk 多 provider 共存；Codex/Claude 是 one-shot（无 resume）
+
+#### 10.15.2 PAEG 借鉴映射（升级需求表）
+
+| PAEG 模块 | 借鉴 deepseek-harness | 优先级 |
+|---|---|---|
+| config_hub | Patch Layer YAML 叠合 + !!js 条件（仅 config 求值）| P0 |
+| hooks（阶段2）| waterfall+next() 中间件 / matcher DSL / most-restrictive 合并（deny>ask>allow）| P0 |
+| workflows（阶段3）| plain JS DSL（agent/parallel/pipeline/phase/log）+ parent 归属 | P0 |
+| config_hub 模式 | 4-Preset（标准/PTC/极简/创造）→ PAEG 教学预设 | P1 |
+| 权限 | Sandbox/Approval/Permission 三层 + 子 agent approval=never | P1 |
+| 子 agent | Provider Registry（spawn/fork/外部 agent）| P1 |
+
+#### 10.15.3 关键教训（避免踩坑）
+
+1. **JS 表达式只在 config 求值**——不要在 disabled/元数据里用（postmortem 0002）
+2. **Patch 替换整行而非合并**——避免配置漂移
+3. **Hook runHook 永远不抛**——执行器拒绝退化为非阻塞错误
+4. **Workflow Meta 是 plain JSON**——脚本不求值它（防注入）
+5. **子 agent 权限冻结**——approval 强制 never，sandbox 升级拒绝
+6. **Preset 用 isolate realm**——不污染其他 session
+
+### 10.16 进程管理 SOP（v0.68+ ⭐ 2026-08-14 第 N 次同类问题根治）
+
+**背景**：Windows 下"改代码后重启服务但行为仍旧"反复出现（残留进程占端口，新进程静默失败）。已发生 N 次，每次浪费大量时间。本 SOP 是根治方案。
+
+**核心原则**：**"重启成功" ≠ "新代码生效"——必须看进程启动时间，不能看 health 版本号**。
+
+#### 10.16.1 完整 SOP（每次改代码后必执行）
+
+```powershell
+# 1. 查端口进程 PID + 启动时间
+$conn = Get-NetTCPConnection -LocalPort 5000 -State Listen | Select -First 1
+(Get-Process -Id $conn.OwningProcess).StartTime   # 与"我最后启动时间"对比
+
+# 2. PID 精确杀（不要只靠 Get-Process python——cmd start 子进程会漏）
+Stop-Process -Id $conn.OwningProcess -Force
+
+# 3. 确认端口释放
+Get-NetTCPConnection -LocalPort 5000 -State Listen   # 应为空
+
+# 4. 清 pyc + touch + 启动
+Get-ChildItem -Recurse -Filter '__pycache__' | Remove-Item -Recurse -Force
+(Get-Item server.py).LastWriteTime = Get-Date
+Start-Process cmd -ArgumentList '/c','start /b python server.py > server_run.log 2>&1' -WindowStyle Hidden
+
+# 5. 8 秒后验证端口进程启动时间 = 本次
+```
+
+#### 10.16.2 诊断技巧
+
+- **函数级 vs HTTP 差异 = 进程版本差异**：函数级（新 python 进程）新、HTTP（服务器进程）旧 → 残留进程
+- **DEBUG 打印终极诊断**：加到怀疑函数体第一行，日志无输出 = 服务器加载旧版
+- **`os.path.realpath` 会骗人**：路径正确 ≠ 进程加载正确
+- **`Start-Process -RedirectStandardOutput` 会卡命令**——避免使用
+
+#### 10.16.3 常见陷阱
+
+| 陷阱 | 后果 | 正确做法 |
+|---|---|---|
+| 只看 health 版本号 | 以为更新了，实际旧进程 | 看进程启动时间 |
+| `Get-Process python \| Stop-Process` | cmd start 子进程漏杀 | 端口反查 PID |
+| 删 pyc 不确认端口 | 新进程没起来 | 先确认端口释放 |
+| `cmd start` 启动 | PID 归属混乱 | 端口反查 + 启动时间验证 |
+| 跳过 Step 3 | 残留进程继续响应 | 必须确认端口空闲 |
+
+
+> **v0.69+ RALPH 循环子系统（2026-08-14 T5）**：`05_实现原型/ralph/`——任务执行循环器（Oracle 设计）。loop_controller（主循环：执行→判定→持久化→防呆→续触）、task_registry（任务队列持久化 JSON）、completion_evaluator（L0 QualityGate + L1 任务指标 + L2 改进证据 三层判定）、termination_guard（五道防线：轮次上限/收益递减/质量回退/人类确认/资源熔断）、contracts（Verdict DONE/CONTINUE/ABORT + `<promise>` 承诺协议）。与自我更新整合：周度调度器 emit 改进任务 → RALPH 跑完 → 回流 self_evolution。
+
+> **v0.70+ PDF 渲染与 Mermaid 图经验（2026-08-14）**：技术文档 PDF 渲染（render_pdf.py）关键经验——①Mermaid 图：Chromium 打印 SVG 空白 → 用 Playwright（channel=msedge 系统 Edge）元素截图 PNG 嵌入（device_scale_factor=2 高清）②图限高 170mm + page-break-inside:avoid 防跨页截断 ③图与文字 margin 8mm ④mermaid.js 本地化（file:// 相对加载）⑤正则匹配换行用非 raw 字符串。详见 交付物/文档模板/README.md 渲染生成经验 + 元能力 §5.6。
+> **v0.70+ 数学可视化脚本生成器（§3.26）**：对话+轮询→script.json（单一真相源）→7 铁律校验→5 资产联动（Manim 视频/讲稿/PPT/讲义/思维导图全部可下载）。方法：3B1B 8 原则 + manim_skill + Oracle。P0 已实施（generator+validator）。
+> **v0.70+ workflow 教学物料包（§3.27）**：`config/workflows/teach_materials.json`（7 步 DAG：outline→{knowledge_map/keyword_doc/ppt/script}→lecture→package）；workflows_hub 占位符统一替换（_resolve_placeholders）+ 物料联动；并行增强 P1。
+
+
+## 10.17 MCP 工具可移植性：配置驱动加载器（v1.1.1 §3.36 ⭐ 2026-08-15）
+
+**问题**：config/mcp_tools.json 声明 14 个工具但无加载器接入——改配置不影响行为（14/14 description 与工具表不一致，断链）。
+
+**方案**（Oracle 架构咨询 + librarian 调研：LangFlow GHSA-2wcq-pvw2-xh7v + MCP SEP-986 + importlib 安全模式）：
+
+`
+config/mcp_tools.json（声明：name/description/risk/module/function/params/enabled）
+   │
+   ▼
+mcp_tools_loader.py（校验→解析→安全动态导入→(defs, handlers)）
+   ├─► tool_registry.get_tool_defs()       （内置+配置工具合并）
+   ├─► register_external_tools()           （handler 合入 _HANDLERS）
+   ├─► _apply_config_meta()                （配置元数据覆盖内置 description/params）
+   ├─► _WRITE_TOOLS 自动同步               （risk=write 入黑名单，exam 锁定）
+   └─► config_hub.reload_all()             （热重载，失败保留旧配置）
+`
+
+**安全边界**（四重）：①模块前缀白名单（tool_registry/constraint_engine/material_pipeline/services/lib/utils）②拒绝危险模块（os/sys/subprocess/importlib/builtins/pickle/yaml/ctypes/socket）③函数名非下划线 identifier ④永不 exec/eval。
+
+**生效规则**（ratchet）：改 description/params → 工具表立即反映；新增条目 → 注册；删除条目 → 下架；enabled:false → 不注册；内置冲突 → 内置优先（override:true 才覆盖）；risk=write → exam 锁定。
+
+**验证**：5 项测试 + 热重载实证（14/14 一致、增删条目即时生效）+ 回归 25/25。
+
+## 10.18 Harness P1 低成本实施三项（v1.1.2 §3.37 ⭐ 2026-08-15）
+
+### 10.18.1 H-16 repeat-tool-guard 升级（借鉴 guard/repeat-tool-reminder）
+
+hooks_hub.repeat_guard_check 升级为 **chain-key 精确计数**：
+- chain key = JSON.stringify([name, canonicalArgs])（深度键排序）——同工具**不同参数不算重复**
+- 多级阈值 [3, 5, 8]：3 温和提醒 / 5+ 详细提醒（含工具名+次数+参数预览）
+- on_user_message() 用户插话 → 重置 chain（对齐 agent/pre-step 语义）
+- config_hub.execute_tool 传入 tool_args
+
+### 10.18.2 #18 Permission Presets 双开关（借鉴 interaction/permission-presets）
+
+新建 services/permission.py：
+- 预设 = sandbox + approval 命名组合（一个选择器管两个开关）
+- 三 knob 事件：permission/preset（意图 log-only）/ sandbox/mode / approval/policy——append-only 可回放
+- **custom 派生状态**：knob 偏离所有预设 → custom（不可作切换目标）
+- 与 tool_registry 4 档兼容（standard/exam/read_only/full → 双 knob 映射）
+
+### 10.18.3 H-1/H-12 Session Event Log 类型化（借鉴 core/session）
+
+新建 infra/event_types.py：
+- SessionEvent envelope {type, seq, time, data, ignorable?, surfaceOp?}
+- **56 个已知事件类型**（13 核心 + 28 插件 + 15 PAEG 教学）
+- surface 事件（user/message、assistant/message、tool/result）强制 surfaceOp 校验
+- observability.emit_event_typed：未知类型早失败（ValueError）
+
+**验证**：16 项新测试全过 + 回归 47/47 + 真实验证（模块导入/双开关/custom 派生/guard 拦截重置/envelope 构造）。
+
+
+## 10.19 subagent 生命周期事件 + 多级 skill 目录（v1.1.4 §3.38 ⭐ 2026-08-15）
+
+### 10.19.1 多级 skill 目录（#29，借鉴 deepseek-harness skill-filesystem）
+
+`
+三层路径合并（低→高优先级）：
+1. 全局默认：{base}/skills
+2. 项目配置：{base}/config/skills.json 的 skills_dirs（向后兼容）
+3. 用户层：~/.paeg/skills.json（或 /skills.json）的 skills_dirs，
+   支持 {env:KEY|默认} 变量替换
+同名覆盖：高优先级层覆盖低优先级层（reload 时后扫覆盖先扫）
+配置缺失 → 静默回退（不抛错）
+`
+
+实现：skill_registry._load_dirs() + 
+eload()（_skill_origin 记录目录索引，同名高优先级覆盖）。
+
+### 10.19.2 subagent 生命周期事件（H-4，借鉴 deepseek-harness tool-workflow）
+
+| 事件 | 触发点 | 数据 |
+|---|---|---|
+| subagent/descriptor | PAEG.__init__ 构造后（9 个）| name/model/kb_ref/descriptor_path |
+| 	ool-workflow/agent-start | 每个 subagent .run() 前 | agent/run_id/learner_id/subject/ts |
+| 	ool-workflow/agent-end | 每个 subagent .run() 后 | agent/run_id/duration_ms/stop_reason |
+| hook/invoked | hooks_hub.run_hook 前 | event/source/matched |
+| hook/result | hooks_hub.run_hook 后 | event/listener_count/verdict |
+
+包装点：paeg._subagent_run()（teach 5 个核心）+ workflows_hub._run_subagent() + hooks_hub.run_hook()。
+runId UUID 配对 start/end（对齐 dsh SubagentRunInfo 模式）。
