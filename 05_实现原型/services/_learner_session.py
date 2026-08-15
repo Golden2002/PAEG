@@ -115,6 +115,25 @@ def ensure_learner_session(
             kwargs["subjects_mastery"] = src.get("subjects_mastery") or {}
         learner = LearnerProfile(**kwargs)
         SESSIONS[cache_key] = learner
+        # §3.12 ⭐ 画像陈旧轻量诊断（v1.1.5）：持久化画像 updated_at 超过阈值
+        # → 确定性刷新关键维度 + 发事件（不调 LLM，不阻塞请求）
+        if from_persistent_dict is not None:
+            try:
+                from services.profile_staleness import check_and_refresh
+                _lut = from_persistent_dict.get("updated_at")
+                # updated_at 可能是 ISO 字符串或时间戳
+                _lut_ts = None
+                if isinstance(_lut, (int, float)):
+                    _lut_ts = float(_lut)
+                elif isinstance(_lut, str):
+                    try:
+                        from datetime import datetime
+                        _lut_ts = datetime.fromisoformat(_lut.replace("Z", "+00:00")).timestamp()
+                    except Exception:
+                        _lut_ts = None
+                check_and_refresh(learner, _lut_ts)
+            except Exception:
+                pass
     elif from_persistent_dict is not None:
         # v0.68+ ⭐ Bug1 修复：持久化字典源覆盖缓存（保证最新落盘数据生效）
         # 根因：teach/chat 先以空 mastery 缓存 learner，后续 /api/profile GET

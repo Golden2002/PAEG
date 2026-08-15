@@ -1,0 +1,159 @@
+{
+ "generated_at": "2026-08-15T14:25:26.005988",
+ "base_url": "http://127.0.0.1:5000",
+ "results": {
+  "teach": [
+   {
+    "label": "教学-第1轮",
+    "input": "什么是导数？给我讲清楚概念",
+    "reply": "\n给我个提示\n换一种解释\n测试我一下\n举个类似例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   {
+    "label": "教学-第2轮",
+    "input": "导数的几何意义是什么？",
+    "reply": "例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   {
+    "label": "教学-第3轮",
+    "input": "能不能举一个生活中的例子？",
+    "reply": "\n给我个提示\n换一种解释\n测试我一下\n举个类似例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   {
+    "screenshot": "D:\\wbo-workspace\\playwright_test_out\\mode_teach.png"
+   }
+  ],
+  "chat": [
+   {
+    "label": "闲聊-第1轮",
+    "input": "你好呀，今天过得怎么样？",
+    "reply": "例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   {
+    "label": "闲聊-第2轮",
+    "input": "你觉得什么是幸福？",
+    "reply": "提示\n换一种解释\n测试我一下\n举个类似例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   {
+    "label": "闲聊-第3轮",
+    "input": "推荐一本哲学入门书吧",
+    "reply": "[无新增]"
+   },
+   {
+    "screenshot": "D:\\wbo-workspace\\playwright_test_out\\mode_chat.png"
+   }
+  ],
+  "answer": [
+   {
+    "label": "找答案-第1轮",
+    "input": "光合作用的完整过程是什么？",
+    "reply": "下\n举个类似例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   {
+    "label": "找答案-第2轮",
+    "input": "勾股定理怎么证明？",
+    "reply": "文章"
+   },
+   {
+    "screenshot": "D:\\wbo-workspace\\playwright_test_out\\mode_answer.png"
+   }
+  ],
+  "method": [
+   {
+    "label": "方法-第1轮",
+    "input": "怎么高效学习数学？",
+    "reply": "例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   {
+    "label": "方法-第2轮",
+    "input": "如何克服拖延症？",
+    "reply": "[无新增]"
+   },
+   {
+    "screenshot": "D:\\wbo-workspace\\playwright_test_out\\mode_method.png"
+   }
+  ],
+  "knowledge": [
+   {
+    "label": "知识库-第1轮",
+    "input": "你们知识库里有哲学的内容吗？",
+    "reply": "试我一下\n举个类似例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   {
+    "label": "知识库-第2轮",
+    "input": "列出物理学相关的知识",
+    "reply": "出练习题\n写讲解文章"
+   },
+   {
+    "screenshot": "D:\\wbo-workspace\\playwright_test_out\\mode_knowledge.png"
+   }
+  ],
+  "affection": [
+   {
+    "label": "倾诉-第1轮",
+    "input": "最近考试没考好，很难过",
+    "reply": "一下\n举个类似例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   {
+    "label": "倾诉-第2轮",
+    "input": "感觉自己很失败，什么都不行",
+    "reply": "测试我一下\n举个类似例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   {
+    "label": "倾诉-第3轮",
+    "input": "谢谢你听我说这些",
+    "reply": "文章"
+   },
+   {
+    "screenshot": "D:\\wbo-workspace\\playwright_test_out\\mode_affection.png"
+   }
+  ],
+  "materials": {
+   "handout": {
+    "trigger": "请帮我生成关于二次函数的讲义",
+    "reply": "定义\n给我个提示\n换一种解释\n测试我一下\n举个类似例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   "ppt": {
+    "trigger": "请帮我做一份关于微积分的PPT",
+    "reply": "似例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   "mindmap": {
+    "trigger": "请帮我画一张关于力学的知识导图",
+    "reply": "\nε-δ 定义\n给我个提示\n换一种解释\n测试我一下\n举个类似例子\n生成文件：\n出练习题\n写讲解文章"
+   },
+   "screenshot": "D:\\wbo-workspace\\playwright_test_out\\materials.png"
+  },
+  "features": {
+   "tool_handout": "✅ 存在可见",
+   "tool_ppt": "✅ 存在可见",
+   "tool_video": "✅ 存在可见",
+   "tool_manim": "✅ 存在可见",
+   "tool_deepthink": "✅ 存在可见",
+   "tool_kmap": "✅ 存在可见",
+   "deepthink_click": "✅ 点击成功，tag=不可见",
+   "stop_btn": "⚠️ 生成太快未捕获停止键（功能可能正常）",
+   "voice_btn": "✅ 存在"
+  },
+  "edge_cases": [
+   {
+    "label": "空输入",
+    "input": "",
+    "reply": "[空输入-不发送]"
+   },
+   {
+    "label": "情绪词",
+    "input": "我有点难过",
+    "reply": "找到的一个出口；有时候，它是那个声音的源头。这两种情况，我们要走的路不一样。\n\n复制\n不限\n初中\n高中\n大学本科\n考研\n通识素养\n不限\n美学\n大气科学\n生物学\n化学\n语文\n经济学\n英语\n道德/伦理\n法语\n地理学\n德语\n历史学\n日语\n法学\n语言学\n文学\n数学\n哲学\n物理\n思想政治\n（本学段无细分）\n讲"
+   },
+   {
+    "label": "危机信号",
+    "input": "我真的活不下去了",
+    "reply": "\n通识素养\n不限\n美学\n大气科学\n生物学\n化学\n语文\n经济学\n英语\n道德/伦理\n法语\n地理学\n德语\n历史学\n日语\n法学\n语言学\n文学\n数学\n哲学\n物理\n思想政治\n（本学段无细分）\n讲义\nPPT\n授课视频\n数学动画\n深度思考\n思维导图\n发送\n试试：\n什么是熵？\n为什么负负得正？\n电车难题\n孤独\nε-δ"
+   },
+   {
+    "label": "超短输入",
+    "input": "极限",
+    "reply": "\n换一种解释\n测试我一下\n举个类似例子\n生成文件：\n出练习题\n写讲解文章"
+   }
+  ]
+ }
+}

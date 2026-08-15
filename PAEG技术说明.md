@@ -270,6 +270,7 @@ flowchart LR
 | L3 组件 | 图4 Presenter 装配 | subagent 内部 |
 | L4 机制 | 图5-9（自我进化/RALPH/意图路由/配置体系/checkpoint 时序） | 关键机制细节 |
 | L5 事件 | 图9 时序（SSE 事件序列） | 流式协议 |
+| L6 机制扩充 | 图20-26（配置驱动/权限双开关/事件类型化/repeat-guard/Profile Bundle/生命周期/物料流水线） | v1.1.x 新增能力 |
 
 **图 5 · 自我进化闭环（G1-G11）**
 
@@ -506,6 +507,131 @@ flowchart TD
     L1 -->|reject| X["拦截"]
     L2 -->|reject| X
     Out["工具返回超长"] --> Sp["spill 截断 12000 字符"]```
+
+**图 20 · MCP 工具配置驱动加载器（v1.1.1 ⭐）**
+
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+flowchart LR
+    JSON["config/mcp_tools.json<br/>14 工具声明"] --> LD["mcp_tools_loader<br/>JSON→工具注册"]
+    LD --> W1{"模块白名单<br/>mcp_tools.*"}
+    W1 -->|拒绝| X["四重安全边界<br/>危险模块黑名单"]
+    LD --> W2["函数名校验<br/>非下划线开头"]
+    LD --> W3["危险模块拒绝<br/>os/sys/subprocess/importlib"]
+    W1 -->|通过| REG["工具注册表"]
+    W2 --> REG
+    W3 --> REG
+    REG --> R["/api/admin/reload<br/>热重载"]
+    R --> EX["execute_tool<br/>统一路由"]
+```
+
+**图 21 · 权限双开关（sandbox+approval+custom）**
+
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+flowchart TD
+    REQ["tool.before<br/>调用请求"] --> LD["加载 Profile<br/>+ preset 预设"]
+    LD --> P{"preset 类型<br/>read_only/standard/exam/full"}
+    P --> SB{"sandbox 检查<br/>写工具类型?"}
+    SB --> AP{"approval 检查<br/>需人工审批?"}
+    AP --> CU{"custom 派生<br/>场景规则匹配"}
+    CU -->|通过| OK["允许执行"]
+    CU -->|拒绝| NO["拒绝"]
+    AP -->|拒绝| NO
+    SB -->|拒绝| NO
+    OK --> EVT["权限事件 emit<br/>seq+profile+decision<br/>可回放审计"]
+```
+
+**图 22 · 事件类型化（56 类型 + SessionEvent envelope）**
+
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+flowchart TB
+    SRC["事件源<br/>hooks / subagent<br/>/ tool / workflow"] --> ENV["SessionEvent envelope<br/>seq + time + data<br/>+ surfaceOp"]
+    ENV --> SURF{"surfaceOp 校验<br/>强制 schema"}
+    SURF --> TY{"类型检查<br/>56 已知类型白名单"}
+    TY -->|拼错| ERR["立即报错<br/>fail-fast"]
+    TY -->|通过| RT["sinks 三路由"]
+    RT --> S1["审计日志"]
+    RT --> S2["持久化<br/>JSONL"]
+    RT --> S3["UI 事件流"]
+```
+
+**图 23 · repeat-tool-guard（chain-key + 多级阈值）**
+
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+stateDiagram-v2
+    [*] --> calc
+    calc: tool.before hook<br/>计算 chain-key<br/>hash tool+args
+    calc --> count
+    count: 累加 N
+    count --> tier1: N=3
+    count --> tier2: N=5
+    count --> tier3: N=8
+    tier1: 等级1<br/>温和提示
+    tier2: 等级2<br/>警告+改建议
+    tier3: 等级3<br/>强制终止
+    tier1 --> count: 继续
+    tier2 --> count: 继续
+    count --> reset: 用户插话
+    reset: 计数清零
+    reset --> count
+    tier3 --> [*]
+```
+
+**图 24 · Profile Bundle 分层堆叠 + dump-config**
+
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+flowchart TB
+    L1["L1 内嵌默认<br/>PAEG 原设计"] --> L2
+    L2["L2 Bundle 加载<br/>standard / exam / weil"]
+    L2 --> L3
+    L3["L3 Bundle 堆叠<br/>多 bundle 顺序覆盖"] --> L4
+    L4["L4 Profile 加载<br/>教师预设场景"] --> L5
+    L5["L5 用户 patch<br/>稀疏字段覆盖"] --> L6
+    L6["L6 最终配置树<br/>→ execute_tool"]
+    L6 --> EX["/api/admin/dump-config<br/>完整可 patch JSON"]
+    EX -. 教师一键切换 .-> L2
+```
+
+**图 25 · subagent 生命周期事件（构造 + start/end + hook）**
+
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+sequenceDiagram
+    participant App as server
+    participant WF as workflow
+    participant H as hooks_hub
+    participant SA as subagent
+    App->>SA: 构造（subagent/descriptor 9 个）
+    App->>WF: 触发 teach_materials
+    WF->>H: agent-start (runId=UUID, name=Presenter)
+    H->>SA: .run() 进入
+    SA->>H: hook invoked
+    H->>SA: 执行教学逻辑
+    SA->>H: hook result
+    SA->>H: agent-end (runId 配对, duration_ms)
+    H-->>WF: 续传下个步骤
+```
+
+**图 26 · 物料流水线 material_pipeline**
+
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+flowchart LR
+    IN["主题输入"] --> DAG["teach_materials<br/>DAG 编排"]
+    DAG --> P1["导图 + 讲义"]
+    DAG --> P2["讲稿 + PPT"]
+    DAG --> P3["视频脚本 + manim"]
+    P1 --> GATE{"门控 self-check<br/>≤2 轮重生成"}
+    P2 --> GATE
+    P3 --> GATE
+    GATE -->|通过| OUT["联动下载包<br/>6 类物料"]
+    GATE -->|失败| REGEN["重生成"]
+    REGEN --> GATE
+```
 
 
 ## 第 4 章 关键流程
