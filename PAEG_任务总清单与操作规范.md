@@ -241,27 +241,27 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 
 | # | 优化需求 | 借鉴来源（dsh） | PAEG 落地点 | 优先级 |
 |---|---|---|---|---|
-| 1 | **Subagent Patch 系统**：9 subagent YAML 装扮（persona/prompt/工具/调度全配置可换）| agent.cordis.yml `- id:` 整体替换 | subagents.py → subagent_loader | **P0** |
+| 1 | **Subagent Patch 系统**：9 subagent YAML 装扮（persona/prompt/工具/调度全配置可换）| agent.cordis.yml `- id:` 整体替换 | subagents.py → subagent_loader | **P0 ✅**（§3.46.2，services/subagent_loader.py）|
 | 2 | **Profile Bundle 机制**：`python paeg.py --profile education/minimal/research` | dsh.profile.bundles + --patch | config_hub profile 层 | **P0** |
-| 3 | **Persona 外置**：薇依 persona 拆 `paeg_personas/{id}.yml` | preset.yml name/description | prompts.py 长字符串外置 | **P0** |
+| 3 | **Persona 外置**：薇依 persona 拆 `paeg_personas/{id}.yml` | preset.yml name/description | prompts.py 长字符串外置 | **P0 ✅**（§3.46.2，paeg_personas/weil.yml）|
 | 4 | **!!js 条件启停**：配置支持 JS 表达式 | `disabled: !!js expr` | config_hub SafeLoader | P1 |
 | 5 | **用户家目录 overlay**：`~/.paeg/cordis.patch.yml` 不改代码改默认模型/学科 | $DSH_HOME/cordis.patch.yml | config_hub 加载链 | P1 |
 | 6 | **OS 平台双轨**：TTS/STT/PPT 模板按平台分支 | bash+pwsh 双轨 | config_hub 条件挂载 | P2 |
-| 7 | **教学预设 4 内置+N 自定义**：standard/minimal/code-mode/weil-classical | 4 预设目录 | paeg/presets/ | **P0** |
+| 7 | **教学预设 4 内置+N 自定义**：standard/minimal/code-mode/weil-classical | 4 预设目录 | paeg/presets/ | **P0 ✅**（§3.46.2，services/teaching_presets.py）|
 | 8 | **PresetService**：mount/list/resolve/recompose/copy/remove | ctx.agentPresets | paeg/preset/service.py | **P0** |
 | 9 | **Per-Agent Scope**：每 subagent 独立工具/提示词作用域（shadowing）| dsh-scope agent.ctx | AgentScope 类 | P1 |
 | 10 | **Preset 文件结构标准化**：agent.patch.yml + preset.yml + prompts/ + assets/ | preset 目录规范 | paeg/presets/* | P1 |
 | 11 | **9 Subagent 三角色重构**：Service Definition/Provider/Consumer（RuleDiagnostor vs LLMDiagnostor 等）| ctx.shell 三角色 | subagents.py | **P0** |
-| 12 | **LLM Provider Seam**：切换模型不改业务代码（deepseek/openai_compat）| ctx.llm 多 provider | llm_adapter.py | **P0** |
+| 12 | **LLM Provider Seam**：切换模型不改业务代码（deepseek/openai_compat）| ctx.llm 多 provider | llm_adapter.py | **P0 ✅**（§3.46.2，PROVIDER_REGISTRY+provider_info）|
 | 13 | **Shell/Subprocess Seam**：本地/docker/沙箱执行可换 | ctx.shell + ctx.subprocess | tool 执行层 | **P0** |
 | 14 | **Tool Registry 能力协商**：元数据级先注入 name/desc，按需完整加载 | defer_loading + listChanged | skill_registry.py | P1 |
-| 15 | **Session Event Log**："Model-visible ⟺ logged" 铁律 + deriveMessages 投影 + SessionEventMap 类型化 | core/session | infra/session | P1 |
-| 16 | **Hooks 瀑布链**：waterfall 事件（next() 委托，短路可观测）| Waterfall listeners MUST call next() | hooks_hub | P2 |
+| 15 | **Session Event Log**："Model-visible ⟺ logged" 铁律 + deriveMessages 投影 + SessionEventMap 类型化 | core/session | infra/session | P1 ✅（§3.37 类型层+§3.46.2 H-1 存储层）|
+| 16 | **Hooks 瀑布链**：waterfall 事件（next() 委托，短路可观测）| Waterfall listeners MUST call next() | hooks_hub | P2 ✅（§3.42 W1 4-dispatch + §3.46.2 H-14 tools/* 补全）|
 | 17 | **Subprocess 抽象**：MCP 客户端/ffmpeg/PDF/PPT 统一 spawn 服务 | ctx.subprocess | subprocess service | P2 |
-| 18 | **权限预设系统**：student-safe/tutor-write/researcher-full 三档 | permission-presets | tool_registry PERMISSION_PRESETS 升级 | P1 |
+| 18 | **权限预设系统**：student-safe/tutor-write/researcher-full 三档 | permission-presets | tool_registry PERMISSION_PRESETS 升级 | P1 ✅（v1.1.2 4 档 + §3.46.2 #7 预设联动）|
 | 19 | **Permission 事件入 Session Log**：切换可回放 | permission/preset log-only | session log | P1 |
 | 20 | **Custom 衍生状态**：临时切换显示"自定义"不可保存 | current() 返回 custom | permission service | P2 |
-| 21 | **Subagent Registry Provider 可插拔**：in-process/external-script/llm-call | ctx.subagents 6 providers | subagents.py registry | **P0** |
+| 21 | **Subagent Registry Provider 可插拔**：in-process/external-script/llm-call | ctx.subagents 6 providers | subagents.py registry | **P0 ✅**（§3.42 W3 in-process + §3.46.2 #21 三类 provider）|
 | 22 | **Subagent Report/Continuable 协议**：子代理回报 + 父发消息 | subagent-control/report | subagent 控制 | P1 |
 | 23 | **Fresh-Agent Loop**（tool-ralph）：每轮 fresh child + 共享进度 + 结构化 handoff | tool-ralph | 对应 PAEG RALPH 循环（已有，对照增强）| P2 |
 | 24 | **Web UI 模式化**：shell/wire/slots 拆分，ui-*.js 插件化 | ui-* 插件 ~30 个 | 09_GUI前端 | P1 |
@@ -269,7 +269,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 26 | **客户端 HMR 热刷新**：dev 模式前端自动刷新 | client-hmr | 09_GUI前端 | P2 |
 | 27 | **Self-Update via Patch**：AI 读/写自己 patch 文件（cordis preset 自修改）| tool-cordis | 对应 PAEG self_evolution + tool-cordis 化 | P1 |
 | 28 | **Constitutional AI 补丁化**：反思/门禁/重复检测走 patch 配置 | plan-mode + repeat-tool-reminder | quality_gate 配置化 | P2 |
-| 29 | **用户级 + Profile 级 + 全局级 Skill 目录** | skill-filesystem customSkillDirs | skill_registry 多目录 | P1 |
+| 29 | **用户级 + Profile 级 + 全局级 Skill 目录** | skill-filesystem customSkillDirs | skill_registry 多目录 | P1 ✅（v1.1.4 三层合并）|
 | 30 | **Cordis 式 Service Registry**："一切皆 ctx"（llm/sessions/agents/tools/subagents...）| ctx.<key> Service | runtime/registry.py Context | P1 |
 
 **H 表 ↔ #表 对应关系**：H-1↔#15 · H-2↔#2/#7 · H-3↔文档类(新增扩展点映射) · H-4↔#16 · H-5↔#11/#13 · H-6↔#15(context_inject) · H-7↔#21 · H-8↔#9 · H-9↔#12 · H-10↔dsh tool-jobs(独立项) · H-11↔#24/#25 · H-12↔#15/#19 · H-13↔dsh --dump-config(独立项) · H-14↔#16 · H-15↔#15(fork/resume) · H-16↔#28 · H-17↔#2(bundle) · H-18↔#30(effects unwind)
