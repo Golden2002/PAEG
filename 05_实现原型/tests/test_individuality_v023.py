@@ -7,7 +7,9 @@ Pytest 版 Individuality v0.23.0 端到端测试
 3. Individuality 增量建模（第二次 run 看到已有画像）
 """
 import sys, os, shutil, json
-sys.stdout.reconfigure(encoding='utf-8')
+# v0.69+：reconfigure 移入 __main__——模块级执行会破坏 pytest capsys（收集期副作用）
+if __name__ == '__main__':
+    sys.stdout.reconfigure(encoding='utf-8')
 
 # 让测试可从 tests/ 目录 import 项目模块
 _HERE = os.path.dirname(os.path.abspath(__file__))
