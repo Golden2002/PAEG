@@ -3565,6 +3565,65 @@ answer / chat（纯 LLM 判断，无规则函数）
 - 修复后强制刷新浏览器验证（缓存会掩盖新代码）
 - 真实账号数据验证（如 u3"团聚体"）
 
+### 10.2.21 ⭐ TDD 测试驱动开发具体方法（2026-08-15 用户固定经验）
+
+**TDD = 测试驱动开发（Test-Driven Development），标准流程 Red → Green → Refactor（红→绿→重构）循环**。两张参考图（用户提供）：图1 编号流程版（功能需求→写测试→写代码[Red]→整理代码[Refactor]→迭代）；图2 环形版（Start→Test Fails[Red]→Test Passes[Green]→Refactor→Start）。
+
+**具体操作步骤（PAEG 落地）**：
+
+```python
+# STEP 1 RED：先写一个"一定会失败"的测试（tests/test_xxx.py）
+def test_validate_email_rejects_invalid():
+    from services.validator import validate_email
+    with pytest.raises(ValueError):
+        validate_email("not-an-email")   # 功能未实现 → 必然失败（红）
+
+# STEP 2 运行确认 RED（必须失败于"功能缺失"，非语法/导入错误）
+python -m pytest tests/test_xxx.py -v    # FAILED: ImportError / AssertionError
+
+# STEP 3 GREEN：写最小实现让测试通过
+def validate_email(v):
+    if "@" not in v: raise ValueError("invalid")
+    return v
+
+# STEP 4 验证 GREEN
+python -m pytest tests/test_xxx.py -v    # PASSED
+
+# STEP 5 REFACTOR：测试通过基础上优化（保持绿）
+```
+
+**关键规则**：
+1. **RED 必须在生产代码前**（违反 = 返工）——测试驱动"设计先行"
+2. **RED 断言消息证明失败原因**（"功能缺失"而非"写错了"）
+3. **GREEN 最小改动**（>20 行说明测试太粗，拆细）
+4. **REFACTOR 后测试必须仍绿**（安全网）
+5. **豁免**（无需新测试）：纯格式化/注释/依赖版本无行为变化/重命名
+
+**断言质量**（既测有无也测好坏——memo/010 哲学）：
+- 结构断言（存在性）+ 质量断言（指标下限/相关性）双维度
+- LLM 驱动功能质量必须 mock 确定化（不依赖真实 LLM 稳定性）
+
+### 10.2.22 ⭐ 三层测试架构 + 固定项目经验（2026-08-15 用户固定经验）
+
+**三层测试架构（准入顺序：冒烟 → E2E；开发中：TDD Red 先行）**：
+
+| 层 | 时机 | 对象 | 粒度 | 耗时 | PAEG 落地 |
+|---|---|---|---|---|---|
+| **冒烟测试** | 上线/部署前准入 | 完整打包整套系统 | 粗（"能不能活下来"）| 几分钟 | `smoke_test.py`（27s）+ health + 关键端点 |
+| **TDD Red** | 开发阶段（写代码前）| 单个函数/方法 | 细（最小逻辑单元）| 秒级 | `tests/test_xxx.py` RED→GREEN |
+| **E2E** | 冒烟通过后 | 完整用户全流程 | 极细（每步交互）| 久 | Playwright（§3.39）+ api_sweep + multi_turn_eval |
+
+**执行规则**：
+1. 任何代码改动 → 先 TDD Red → GREEN → 相关回归
+2. 任何上线/部署 → 先冒烟测试准入（不过不放行）
+3. 冒烟通过后 → 才跑 E2E（不颠倒）
+4. 三层互补：冒烟"能活"、TDD"单点对"、E2E"全流程对"
+
+**固定项目经验元约束（用户强调"非常重要"）**：
+- 经验必须**落盘**（踩坑/成功/方法论 → 写文档，不满足于"在脑子里"）
+- 经验必须**固定**（成为可复用约束：纪律/标准/模板，后续自动遵守）
+- 四文档分工：需求=硬约束、技术=方法、元能力=方法论、维护=SOP
+
 ## 10.3 版本历史
 
 > 完整修改日志已拆分至独立文档：**[CHANGELOG.md](./CHANGELOG.md)**（v0.1 → v0.21.4 全部记录）。
