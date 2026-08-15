@@ -249,7 +249,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 6 | **OS 平台双轨**：TTS/STT/PPT 模板按平台分支 | bash+pwsh 双轨 | config_hub 条件挂载 | P2 |
 | 7 | **教学预设 4 内置+N 自定义**：standard/minimal/code-mode/weil-classical | 4 预设目录 | paeg/presets/ | **P0 ✅**（§3.46.2，services/teaching_presets.py）|
 | 8 | **PresetService**：mount/list/resolve/recompose/copy/remove | ctx.agentPresets | paeg/preset/service.py | **P0 ✅**（§3.46.2，services/preset_service.py）|
-| 9 | **Per-Agent Scope**：每 subagent 独立工具/提示词作用域（shadowing）| dsh-scope agent.ctx | AgentScope 类 | P1 |
+| 9 | **Per-Agent Scope**：每 subagent 独立工具/提示词作用域（shadowing）| dsh-scope agent.ctx | AgentScope 类 | P1 ✅（§3.46.2，services/agent_scope.py）|
 | 10 | **Preset 文件结构标准化**：agent.patch.yml + preset.yml + prompts/ + assets/ | preset 目录规范 | paeg/presets/* | P1 |
 | 11 | **9 Subagent 三角色重构**：Service Definition/Provider/Consumer（RuleDiagnostor vs LLMDiagnostor 等）| ctx.shell 三角色 | subagents.py | **P0 ✅ 契约层**（§3.46.2，services/agent_trirole.py；具体三角色化后续迁移）|
 | 12 | **LLM Provider Seam**：切换模型不改业务代码（deepseek/openai_compat）| ctx.llm 多 provider | llm_adapter.py | **P0 ✅**（§3.46.2，PROVIDER_REGISTRY+provider_info）|
@@ -1497,5 +1497,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#11 9 Subagent 三角色契约 ✅（Harness P0，2026-08-16，契约层）**——services/agent_trirole.py 新建：ServiceDefinition（服务契约 name/desc/input_schema/output_schema）+ ServiceProvider（实现基类，execute 契约）+ DEFAULT_SERVICE_DEFINITIONS（9 subagent 契约）+ register_definition/get_definition/make_provider；同一 Definition 可挂多 Provider（Rule vs LLM 语义），Consumer 不感知实现；**低风险增量（ratchet）**：只定义契约类型，不触碰现有 9 subagent 实现——#11 契约层完成，具体三角色化（9 类改挂 Provider）作为后续迁移；与 #1 装扮层（9 名对齐）+ #21 Registry 衔接；dsh 借鉴 ctx.shell 三角色；6 测试全绿 + SURFACE 验证（9 契约/双 Provider/衔接）（commit 新）
   - **#8 PresetService ✅（Harness P0，2026-08-16）**——services/preset_service.py 新建：PresetService 类完整 API（list/get/resolve/mount/copy/recompose/remove）；基于 #7 teaching_presets 扩展为管理服务层；resolve 联动 tool_registry 权限档 + paeg_personas persona 正文（2443 字符）；copy 深拷贝继承 / recompose 覆盖生成 / remove 不存在容错；dsh 借鉴 ctx.agentPresets；7 测试全绿 + SURFACE 验证（S1-S6 完整 API 链路）（commit 新）
   - **#19 Permission 事件入 Session Log ✅（Harness P1，2026-08-16）**——tool_registry.set_permission_preset 接入 infra.session_log：切换成功发射 permission/preset 事件（{from,to,preset}，回放审计）；无效切换不发射（先校验后发射）；日志失败不影响切换（容错）；与 H-1 session_log（seq/deriveMessages）+ #18 权限预设联动——权限变更全链路可审计；dsh 借鉴 permission/preset log-only 事件；3 测试全绿 + SURFACE 验证（切换记录/无效不发射/回放）（commit 新）
+  - **#9 Per-Agent Scope ✅（Harness P1，2026-08-16）**——services/agent_scope.py 新建：AgentScope（allow_tools/block_tools/prompt_override，shadowing 语义——黑名单优先于白名单，默认全工具兼容现状）；DEFAULT_AGENT_SCOPES（9 subagent，与 #1 装扮层/#11 契约层对齐）+ register_scope 可插拔 + is_tool_allowed_for_agent 便捷入口（供 tool_registry 联动）；未知回退默认（容错）；与 #1/#11/#21 形成完整体系（装扮层+契约层+作用域+provider 注册）；dsh 借鉴 dsh-scope agent.ctx 隔离 realm；8 测试全绿 + SURFACE 验证（S1-S5 隔离/联动/回退）（commit 新）
   - **回归验证 ✅**：36 passed（全部新功能测试）+ audit_check 39/39
 
