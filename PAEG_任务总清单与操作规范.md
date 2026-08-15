@@ -1273,10 +1273,86 @@ Interaction / Profile / Diagnosis / Plan / Action / Evaluation / Adaptation / Kn
 | users_data 58（P1）| 31 个测试残留移至 .cleanup_backup_20260815 | ✅ 27 项 |
 | server.py 行数检查 | **按用户指示移除**（行数不是好指标）| ✅ |
 
-#### 3.45.2 架构导向拆分（进行中，Oracle 咨询 bg_ec3dd6fe）
+#### 3.45.2 架构导向拆分方案（✅ Oracle 咨询 bg_ec3dd6fe 已返回，2026-08-15）
 
 - **目标**：提升代码架构（可维护/可测/职责清晰），非减行数
 - **原则**：低风险 + 适合拆分的模块独立成文件（优秀架构）；核心教学流（teach_stream 1222 行）不贸然拆
-- **候选独立域**（59 路由测绘）：voice(59) / threads(80) / admin(40) / conversations(125) / quiz(35) / upload(110)
-- **Oracle 方案**：待 bg_ec3dd6fe 返回后按价值排序实施
+- **目标架构**：`server.py`（组合根：app 装配 / CORS / middleware / RuntimeContext 注入 / register_blueprints / MCP+PeriodicSelfUpdater+app.run）→ `blueprints/`（12 个 HTTP 蓝图）→ `services/`（业务逻辑）→ `infra/`（基础设施）
+
+##### 依赖注入模式（规避循环导入，Oracle 定案）
+
+```python
+# server.py 装配（初始化后）
+app.extensions["paeg"] = {
+    "sessions": SESSIONS, "llm": llm, "paeg": paeg,
+    "skill_registry": SKILL_REGISTRY, "user_store": USER_STORE,
+    "conv_store": CONV_STORE, "periodic_updater": ..., ...
+}
+# blueprints/voice.py 内
+def _rt():
+    return current_app.extensions["paeg"]
+```
+
+**铁律**：`server.SESSIONS is runtime.sessions`、`server.paeg is runtime.paeg`、`server.SKILL_REGISTRY is runtime.skill_registry`（保持**同引用**，保护 test_v037_regressions.py / audit_check.py 的 source-identity 断言）；`_save_teach_turn` / `_FakeSession` / `summary_estimate` / `_is_registered` 被测试直接引用，迁移时须 re-export 保持符号可用。
+
+##### 拆分蓝图清单（三阶段）
+
+| 阶段 | blueprint | 路由（迁移路径） | 依赖注入 | 验证 |
+|---|---|---|---|---|
+| P1-1 | `voice.py` | POST /api/voice/tts、stt（59 行） | runtime.llm、voice_service | 现有 voice 测试 + 行为不变 |
+| P1-2 | `threads.py` | threads 4 路由（80 行） | runtime.sessions、conv_store | 现有 threads 端点测试 |
+| P1-3 | `admin.py` | POST /api/admin/reload、GET dump-config（40 行） | config_hub、hooks_hub、profile_bundle | patch hub 后 reload 成功 |
+| P1-4 | `conversations.py` | conversations 5 路由（125 行） | runtime.sessions、conv_store | 现有 conversations 测试 |
+| P1-5 | `uploads.py` | upload 2 路由（110 行） | runtime.download_dir、file_generator | 现有 upload 测试 |
+| P1-6 | `quiz.py` | POST quiz/next、quiz/answer（35 行） | runtime.sessions、runtime.llm、QUIZ_STORE | services/quiz_service.py 已存在 |
+| P2-1 | `self_update.py` | self-update 3 路由 + batch + meta-log（135 行） | runtime.paeg、llm、sessions、periodic_updater | test_self_update_from_feedback + test_v028 |
+| P2-2 | `resources.py` | POST /api/resources + _generate_ppt_from_outline（112 行） | paeg.resource_librarian、llm、sessions、file_generator | test_v026_resource_pipeline |
+| P2-3 | `modes.py` | POST /api/affection、method、knowledge（85 行） | runtime.sessions、llm、user_store、conv_store、handlers | run_layer1 模式端到端 |
+| P2-4 | `proactive.py` | POST /agent/proactive_greet（72 行） | runtime.sessions、clock 注入 | 固定时钟验证每日问候 |
+| P3-1 | `chat.py` | POST /api/chat/stream、/api/chat（862 行） | runtime.llm、paeg、sessions、agent_engine、evolver | SSE 事件 + schema 字节级一致 |
+| P3-2 | `teaching.py` | POST /api/teach、/api/teach/stream（1576 行） | runtime.llm、paeg、sessions、evolver | test_sse_regression/enhanced/pipeline_integrity/contracts |
+
+##### Watch out（Oracle 提示）
+
+1. **重复 endpoint / URL 冲突**：迁移后不得出现同 URL 双注册；catch-all `/<path:filename>` 保留在 server.py 且优先级最低
+2. **SSE 协议不变**：teach_stream / chat stream 的 `tool/seg/retrieval/doc/done` 事件顺序与 JSON 字段字节级一致；early-return 逻辑随迁
+3. **periodic updater**：`PERIODIC_UPDATER` 只能在装配期初始化一次，blueprint 不得再 new updater
+4. **测试引用符号**：`test_v037_regressions.py` / `audit_check.py` 直接 `from server import _save_teach_turn, _FakeSession, summary_estimate, _is_registered`——迁移后必须 re-export 否则测试崩
+
+##### 拆分后 server.py 职责（组合根）
+
+```text
+server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
+          + 全局单例初始化（SESSIONS/paeg/llm/SKILL_REGISTRY/...）
+          + RuntimeContext 注入 app.extensions
+          + register_blueprints()（12 个）
+          + MCP 启动 + PeriodicSelfUpdater + app.run()
+```
+
+**判断**：只完成 P1（6 个低风险域）后 server.py 减约 439 行且架构显著改善；完成 P2+P3 后 server.py 只剩装配与启动（组合根模式，教学循环逻辑驻留 services/，可单测可替换）。
+
+#### 3.45.3 Phase 1 实施记录（✅ 完成，2026-08-16 · server.py 4488→4412 行）
+
+**设计偏离说明**：Oracle 建议 `app.extensions["paeg"]` 注入 RuntimeContext；实际实现采用**代码库既有机制**——`infra/runtime.py` 懒加载单例（get_conv_store/get_user_store/get_periodic_updater...）+ `infra/sessions.SESSIONS` + `services._learner_session`。理由：audit L521 已强制 server→services/infra 单向依赖，蓝图直接 `from infra.runtime import get_conv_store` 与 server 模块级 `CONV_STORE = get_conv_store()` 同引用（单例缓存），零循环风险、零新机制，且测试可 fake 注入。铁律全部满足（`server.SESSIONS is infra.sessions.SESSIONS` 等）。
+
+| 项 | 完成内容 | 验证 |
+|---|---|---|
+| `blueprints/__init__.py` | 包文档：职责边界 + 拆分纪律（单向依赖/行为不变/__file__ 上溯） | ✅ |
+| `blueprints/voice.py` | tts/stt 2 路由逐字迁出 | ✅ 实测 tts 500=edge-tts 环境（迁移前同路径） |
+| `blueprints/threads.py` | 4 路由迁出（ThreadStore 懒加载） | ✅ 实测 GET /api/threads/u106 200 |
+| `blueprints/admin.py` | reload/dump-config 2 路由迁出 | ✅ 实测 dump-config 200 |
+| `blueprints/conversations.py` | 5 路由迁出（get_conv_store + _is_registered 注入） | ✅ 实测 GET conversations 200 |
+| `blueprints/uploads.py` | upload/avatar 2 路由迁出；**__file__ 上溯 parent.parent 修复**（否则 uploads 落盘目录错位到 blueprints/） | ✅ 实测 chat/library 双路径 200，avatar 400=格式拦截正常 |
+| `blueprints/quiz.py` | quiz/next、answer 2 路由迁出（SESSIONS/_anon_learner_id/ensure_learner_session 注入） | ✅ 实测 quiz/next 200 |
+| `services/_learner_session.py` | `_is_registered` 迁入（依赖改 get_user_store/get_conv_store 懒加载，与 server 模块级 USER_STORE/CONV_STORE 同引用）；server.py 顶部 import 保符号 | ✅ audit L176 `_is_registered in srv` 满足 |
+| server.py | 删除 6 域 17 路由原定义 + `app.register_blueprint` × 6 装配 | ✅ 语法 OK，import OK，路由 59→55+17 蓝图无冲突 |
+| audit_check.py | **双源扫描**：`_backend_route_src()`（server.py + blueprints/*.py 拼接，@bp.route 归一化为 @app.route）；pyright 列表加 6 蓝图；反向依赖检查加 blueprints/ | ✅ 39/39 全绿退出码 0 |
+
+**回归验证**：
+- pytest 关键子集 **92 passed**（avatar/contracts/profile_bundle/self_update_from_feedback/resource_pipeline/v028/v037/pipeline_integrity/sse_enhanced/v027/self_update/trace_id）；1 项 `test_consecutive_streams_stable` 批跑偶发失败、**单独重跑通过**（LLM 时序，非迁移引入，该端点未迁移）
+- audit_check **39/39** 全绿（退出码 0）
+- 服务重启（新代码）health OK；蓝图路由 HTTP 实测 6 域全通
+- 用户纪律："行数不是好指标"——本拆分目的为**架构**（职责分离/可测性/单向依赖），非减行数（4488→4412，76 行净减是路由迁出副作用）
+
+**后续**：Phase 2（self_update/resources/modes/proactive）+ Phase 3（chat/teaching）按 §3.45.2 清单推进；teach_stream 1222 行核心链路不贸然拆（Oracle 判断）。
 

@@ -65,7 +65,9 @@ from utils import (
 
 # v0.42 ⭐ 重构：把 13 处 LearnerProfile 获取/创建内联实现统一到 services 包。
 # 见 services/_learner_session.py docstring 中列出的 13 处原位置。
-from services._learner_session import ensure_learner_session
+# §3.45 ⭐ _is_registered 自 server.py 迁入 services/_learner_session.py（懒加载 getter，
+# 与 server 模块级 USER_STORE/CONV_STORE 同引用）——server.py 改从 services import。
+from services._learner_session import _is_registered, ensure_learner_session
 # v0.43 ⭐ Wave 3 拆分：业务处理函数迁出 server.py。
 # polish/steering/routing 各自负责一段领域逻辑，所有依赖在函数体内懒加载。
 from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
@@ -86,6 +88,16 @@ from infra.runtime import (
     get_user_store,
 )
 from infra.sessions import SESSIONS
+
+# §3.45 ⭐ 架构导向拆分（Oracle 方案 bg_ec3dd6fe）：低风险域迁入 blueprints/，
+# server.py 只保留组合根职责（装配/中间件/runtime 注入/蓝图注册/启动）。
+# 依赖注入：蓝图经 infra.runtime 懒加载单例取依赖（与 server 模块级全局同引用）。
+from blueprints.admin import bp as _admin_bp
+from blueprints.conversations import bp as _conversations_bp
+from blueprints.quiz import bp as _quiz_bp
+from blueprints.threads import bp as _threads_bp
+from blueprints.uploads import bp as _uploads_bp
+from blueprints.voice import bp as _voice_bp
 
 # v0.46 ⭐ P0-6：登录限流状态（IP+账号双维度失败计数，15 分钟窗口）
 import threading as _lt_mod
@@ -109,6 +121,16 @@ except Exception as _e:
 if PAEG_ENV == "production":
     app.config["SESSION_COOKIE_SECURE"] = True
     app.config["SESSION_COOKIE_HTTPONLY"] = True
+
+# §3.45 ⭐ 蓝图注册（组合根职责：app 装配 → 注册蓝图 → 启动）
+# 6 个低风险域已迁至 blueprints/（voice/threads/admin/conversations/uploads/quiz），
+# 行为字节级不变；依赖经 infra.runtime 懒加载单例注入（与 server 模块级全局同引用）。
+app.register_blueprint(_voice_bp)
+app.register_blueprint(_threads_bp)
+app.register_blueprint(_admin_bp)
+app.register_blueprint(_conversations_bp)
+app.register_blueprint(_uploads_bp)
+app.register_blueprint(_quiz_bp)
 
 # ═══════════════════════════════════════════════════════════
 # v0.51 ⭐ P0-3（Oracle）：全局滑动窗口限流
@@ -400,75 +422,7 @@ def modules_status():
 # v0.21.1：Thread/Turn/Item 三层会话（借鉴 OpenAI Codex App Server）
 # ─────────────────────────────────────
 
-@app.route("/api/threads", methods=["POST"])
-@require_module("history")
-def create_thread():
-    # v0.38 内部 API（前端未直接调用；供 MCP/外部 Agent 接入）
-    """创建教学会话 Thread（跨课次持久容器）。"""
-    data = request.get_json(force=True) or {}
-    student_id = data.get("student_id") or data.get("learner_id") or "anonymous"
-    subject = data.get("subject", "general")
-    title = data.get("title", "")
-    try:
-        from session_model import ThreadStore
-        ts = ThreadStore()
-        tid = ts.create(student_id, subject, title)
-        return jsonify({"ok": True, "thread_id": tid}), 201
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-@app.route("/api/threads/<student_id>", methods=["GET"])
-@require_module("history")
-def list_threads(student_id):
-    """列出学生的全部 Thread（不含消息体）。"""
-    try:
-        from session_model import ThreadStore
-        ts = ThreadStore()
-        return jsonify({"ok": True, "threads": ts.list(student_id)})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-@app.route("/api/threads/<student_id>/<tid>/events", methods=["GET"])
-@require_module("history")
-def thread_events(student_id, tid):
-    """SSE 事件流（Codex App Server 的 HTTP 等价物，支持 Last-Event-ID 续传）。"""
-    try:
-        from session_model import ThreadStore
-        ts = ThreadStore()
-        last = int(request.headers.get("Last-Event-ID", 0) or 0)
-        events = ts.events_since(student_id, tid, last)
-
-        def gen():
-            for e in events:
-                yield f"id: {e['event_id']}\n"
-                yield f"data: {json.dumps(e, ensure_ascii=False)}\n\n"
-
-        return Response(gen(), mimetype="text/event-stream",
-                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-@app.route("/api/threads/<student_id>/<tid>", methods=["POST"])
-@require_module("history")
-def thread_action(student_id, tid):
-    """Thread 操作：fork / archive / start_turn。"""
-    data = request.get_json(force=True) or {}
-    action = data.get("action", "")
-    try:
-        from session_model import ThreadStore
-        ts = ThreadStore()
-        if action == "fork":
-            new_tid = ts.fork(student_id, tid)
-            return jsonify({"ok": True, "thread_id": new_tid})
-        if action == "archive":
-            ok = ts.archive(student_id, tid)
-            return jsonify({"ok": ok})
-        if action == "start_turn":
-            trn = ts.start_turn(student_id, tid, data.get("agent", "tutor"))
-            return jsonify({"ok": True, "turn_id": trn})
-        return jsonify({"ok": False, "error": f"未知操作 {action}"}), 400
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+# §3.45 ⭐ threads 4 路由已迁至 blueprints/threads.py（行为字节级不变）
 
 # ─────────────────────────────────────
 # API 端点
@@ -1057,39 +1011,7 @@ def teach():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/teach/quiz/next", methods=["POST"])
-def teach_quiz_next():
-    """v0.67 交互式教学选择题：出题。{learner_id, concept, subject, difficulty}"""
-    data = request.get_json(force=True) or {}
-    learner_id = data.get("learner_id") or _anon_learner_id(data)
-    learner = ensure_learner_session(learner_id, data, SESSIONS)
-    concept = (data.get("concept") or "").strip() or "当前知识点"
-    subject = data.get("subject") or ""
-    difficulty = int(data.get("difficulty", 1) or 1)
-    try:
-        from services.quiz_service import generate_choice
-        result = generate_choice(learner, subject, concept, difficulty)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": "出题失败: %s" % e}), 500
-
-
-@app.route("/api/teach/quiz/answer", methods=["POST"])
-def teach_quiz_answer():
-    """v0.67 交互式教学选择题：判题 + 掌握度更新。{learner_id, quiz_id, selected_idx}"""
-    data = request.get_json(force=True) or {}
-    learner_id = data.get("learner_id") or _anon_learner_id(data)
-    learner = ensure_learner_session(learner_id, data, SESSIONS)
-    quiz_id = (data.get("quiz_id") or "").strip()
-    selected_idx = data.get("selected_idx")
-    if not quiz_id or selected_idx is None:
-        return jsonify({"error": "quiz_id and selected_idx required"}), 400
-    try:
-        from services.quiz_service import grade_answer
-        result = grade_answer(learner, quiz_id, int(selected_idx))
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": "判题失败: %s" % e}), 500
+# §3.45 ⭐ quiz 2 路由已迁至 blueprints/quiz.py（行为字节级不变）
 
 
 @app.route("/api/teach/stream", methods=["POST"])
@@ -2601,44 +2523,7 @@ def skills_list():
             })
     return jsonify({"skills": skills, "total": len(skills), "source": source})
 
-@app.route("/api/admin/reload", methods=["POST"])
-def admin_reload():
-    """v0.68+ P0-4（Step4）：运行时重载 config_hub（MCP/skills/hooks/workflows 配置热更新）。
-    改 config/*.json 后调用此端点即时生效，无需重启服务器。"""
-    try:
-        from config_hub import get_hub
-        _hub = get_hub()
-        if _hub is None:
-            return jsonify({"ok": False, "error": "config_hub 未初始化"}), 500
-        _hub.reload_all()
-        _extra = {}
-        try:
-            from hooks_hub import get_hooks_hub
-            _hh = get_hooks_hub()
-            _extra["hooks"] = [{"id": h.id, "event": h.event, "loaded": h._fn is not None}
-                               for h in getattr(_hh, "hooks", [])]
-        except Exception as _hx:
-            _extra["hooks_error"] = str(_hx)
-        return jsonify({"ok": True,
-                        "message": "config_hub 已重载（MCP/skills/hooks/workflows）",
-                        **_extra})
-    except Exception as _re_e:
-        return jsonify({"ok": False, "error": str(_re_e)}), 500
-
-
-@app.route("/api/admin/dump-config", methods=["GET"])
-def admin_dump_config():
-    """§3.38 H-13 ⭐ 配置树导出（对齐 dsh --dump-config）。
-
-    返回完整可 patch 配置树：profiles/bundles/agents/tools/effective——
-    用于调试、审计、外部 agent 理解 PAEG 配置结构。
-    """
-    try:
-        from services.profile_bundle import dump_config_tree
-        _tree = dump_config_tree()
-        return jsonify(_tree)
-    except Exception as _dc_e:
-        return jsonify({"ok": False, "error": str(_dc_e)}), 500
+# §3.45 ⭐ admin 2 路由已迁至 blueprints/admin.py（行为字节级不变）
 
 
 @app.route("/api/feedback", methods=["POST"])
@@ -2681,134 +2566,9 @@ def submit_feedback():
         return jsonify({"ok": False, "error": str(_fb_e)}), 500
 
 
-@app.route("/api/upload", methods=["POST"])
-def upload_file():
-    """v0.19 P2-10：图片/文件上传 + v0.19.11 资料上传。
+# §3.45 ⭐ uploads 2 路由（upload/avatar）已迁至 blueprints/uploads.py（行为字节级不变）
 
-    请求：multipart/form-data, file + learner_id + purpose(可选: library=资料库)
-          + library_root(可选: "usr_knowledge" 存到 Library/usr_knowledge/<id>/，
-                         默认 "user" 存到 Library/user_<id>/，向后兼容)
-    响应：{"url", "filename"} 或 {"library": 资料列表}
-    """
-    learner_id = request.form.get("learner_id", "anonymous")
-    f = request.files.get("file")
-    purpose = request.form.get("purpose", "chat")
-    # v0.21.4：资料库根目录选择；默认 "usr_knowledge"（规范路径 Library/usr_knowledge/<id>/），
-    # 旧值 "user" 仍兼容（内部统一存到规范路径，读取时双读旧路径保持向后兼容）
-    library_root = request.form.get("library_root", "usr_knowledge")
-
-    # v0.19.11：资料上传 → Library/用户id/
-    if purpose == "library":
-        if not f or not f.filename:
-            return jsonify({"error": "no file"}), 400
-        allowed = (".pdf", ".md", ".txt", ".docx", ".csv", ".json", ".png", ".jpg")
-        import os as _os
-        ext = _os.path.splitext(f.filename)[1].lower()
-        if ext not in allowed:
-            return jsonify({"error": f"不支持的格式 {ext}"}), 400
-        try:
-            # v0.21.4：统一通过 lib.library_store 决定保存目录（规范路径）
-            from lib import library_store
-            lib_root_path = library_store.upload_save_dir(learner_id, library_root)
-            lib_root = str(lib_root_path)
-            sub_dir = library_store.CANONICAL_DIRNAME  # 始终是 "usr_knowledge"
-            note_text = "资料已存入 usr_knowledge，回答时会自动参考"
-            _os.makedirs(lib_root, exist_ok=True)
-            from datetime import datetime
-            safe_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{_os.path.basename(f.filename)}"
-            f.save(_os.path.join(lib_root, safe_name))
-            return jsonify({
-                "ok": True, "filename": safe_name,
-                "url": f"/Library/{sub_dir}/{learner_id}/{safe_name}",
-                "library_root": "usr_knowledge",
-                "library_path": f"Library/{sub_dir}/{learner_id}/{safe_name}",
-                "note": note_text,
-            })
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    if not f or not f.filename:
-        return jsonify({"error": "no file"}), 400
-    # 限制类型（图片为主）
-    allowed = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".md", ".txt")
-    import os as _os
-    ext = _os.path.splitext(f.filename)[1].lower()
-    if ext not in allowed:
-        return jsonify({"error": f"不支持的格式 {ext}"}), 400
-    try:
-        base = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
-                             'uploads', learner_id)
-        _os.makedirs(base, exist_ok=True)
-        from datetime import datetime
-        safe_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{_os.path.basename(f.filename)}"
-        f.save(_os.path.join(base, safe_name))
-        from urllib.parse import quote
-        return jsonify({
-            "ok": True,
-            "filename": safe_name,
-            "url": f"/uploads/{learner_id}/{quote(safe_name)}",
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/avatar", methods=["POST"])
-def upload_avatar():
-    """v0.26 ⭐ 用户自定义头像上传 + v0.36 P0-03 错误响应加 ok:False（前端 `!j.ok` 双重校验更稳）。
-
-    请求：multipart/form-data, avatar(图片) + learner_id
-    响应：{"ok": True, "url": "/uploads/avatar/<learner_id>.<ext>"}
-    覆盖式保存（每用户单头像），存 uploads/avatar/<learner_id>.<ext>。
-    """
-    import os as _os
-    from datetime import datetime as _dt
-    learner_id = (request.form.get("learner_id") or "anonymous").strip()
-    if not learner_id or learner_id in (".", "..") or "/" in learner_id or "\\" in learner_id:
-        return jsonify({"ok": False, "error": "非法用户标识"}), 400
-    f = request.files.get("avatar")
-    if not f or not f.filename:
-        return jsonify({"ok": False, "error": "no avatar file"}), 400
-    ext = _os.path.splitext(f.filename)[1].lower()
-    allowed = (".png", ".jpg", ".jpeg", ".gif", ".webp")
-    if ext not in allowed:
-        return jsonify({"ok": False, "error": f"头像仅支持 {'/'.join(allowed)}"}), 400
-    try:
-        base = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
-                             'uploads', 'avatar')
-        _os.makedirs(base, exist_ok=True)
-        # 覆盖式：固定文件名 avatar_<learner_id><ext>（换头像自动覆盖旧图）
-        fname = f"avatar_{learner_id}{ext}"
-        f.save(_os.path.join(base, fname))
-        # 清理同用户旧扩展名头像（避免残留）
-        for _old_ext in allowed:
-            if _old_ext != ext:
-                _old = _os.path.join(base, f"avatar_{learner_id}{_old_ext}")
-                if _os.path.exists(_old):
-                    try:
-                        _os.remove(_old)
-                    except Exception as _e:
-                        print(f"[PAEG][server.py] upload_avatar 异常忽略: {_e}")
-                        pass
-        from urllib.parse import quote
-        return jsonify({"ok": True, "url": f"/uploads/avatar/{quote(fname)}"})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-@app.route("/api/voice/tts", methods=["POST"])
-@require_module("voice")
-def voice_tts():
-    """v0.36 ⭐ 文本转语音（edge-tts，免 key）。请求 {text, learner_id} → {url}"""
-    data = request.get_json(force=True) or {}
-    text = (data.get("text") or "").strip()[:2000]
-    learner_id = data.get("learner_id") or "anon"
-    if not text:
-        return jsonify({"ok": False, "error": "空文本"}), 400
-    from voice_service import tts_synthesize, voice_available
-    if not voice_available():
-        return jsonify({"ok": False, "error": "语音暂不可用（edge-tts 未安装）"}), 503
-    url = tts_synthesize(text, learner_id=learner_id)
-    if url:
-        return jsonify({"ok": True, "url": url})
-    return jsonify({"ok": False, "error": "语音合成失败"}), 500
+# §3.45 ⭐ voice 2 路由（tts/stt）已迁至 blueprints/voice.py（行为字节级不变）
 
 @app.route("/api/teach/video", methods=["POST"])
 @require_module("voice")
@@ -2858,48 +2618,6 @@ def manim_generate():
     except Exception as e:
         return jsonify({"ok": False, "error": f"数学动画生成异常: {e}"}), 500
 
-
-@app.route("/api/voice/stt", methods=["POST"])
-@require_module("voice")
-def voice_stt():
-    """v0.38 ★ STT (faster-whisper local)."""
-    """POST multipart field "audio" -> "{text: ...}" or 4xx/5xx."""
-    from voice_service import transcribe_audio, stt_available, stt_ready
-    if not stt_available():
-        return jsonify({"error": "语音识别服务不可用，请改用键盘输入"}), 503
-    f = request.files.get("audio")
-    if not f:
-        return jsonify({"error": "缺少音频文件"}), 400
-    # Infer suffix from filename or content_type
-    _fname = (getattr(f, "filename", "") or "").lower()
-    _ct = (f.content_type or "").lower()
-    if _fname.endswith(".webm"):
-        _suffix = ".webm"
-    elif _fname.endswith(".ogg"):
-        _suffix = ".ogg"
-    elif _fname.endswith(".mp3"):
-        _suffix = ".mp3"
-    elif _fname.endswith(".m4a"):
-        _suffix = ".m4a"
-    elif "webm" in _ct or "opus" in _ct:
-        _suffix = ".webm"
-    elif "ogg" in _ct:
-        _suffix = ".ogg"
-    elif "mpeg" in _ct or "mp3" in _ct:
-        _suffix = ".mp3"
-    else:
-        _suffix = ".wav"
-    try:
-        _text = transcribe_audio(f.read(), suffix=_suffix)
-    except Exception:
-        return jsonify({"error": "语音识别服务不可用，请改用键盘输入"}), 500
-    if _text is None:
-        if not stt_ready():
-            return jsonify({"error": "模型加载中，请稍候"}), 503
-        # v0.41 ⭐ 修复：无识别结果（静音/无语音）是正常场景 → 200 + 空文本
-        # 此前返回 500 → 前端误报"服务不可用"，实际是"没识别到语音"
-        return jsonify({"text": "", "ok": False, "error": "未识别到语音内容"})
-    return jsonify({"text": _text, "ok": True})
 
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
@@ -4274,37 +3992,8 @@ def solve_problem_api():
 # ─────────────────────────────────────
 # v0.18：对话历史持久化 API
 # ─────────────────────────────────────
-
-def _is_registered(learner_id: str) -> bool:
-    """v0.32 ⭐ 放宽：注册用户（u 前缀）与匿名用户（web_ 前缀）都允许对话落盘。
-
-    历史问题：此函数只认 u 前缀 → 匿名用户（web_xxx）的对话不落盘也不读取，
-    导致换设备/清缓存后（localStorage 的匿名 ID 丢失，生成新 web_xxx）历史全丢。
-    修复：web_ 前缀同样允许持久化（同浏览器刷新/标签页稳定）；真正跨设备仍需登录。
-    路径安全：仅允许 alnum/下划线/连字符，防止目录穿越。
-    """
-    if USER_STORE is None or CONV_STORE is None:
-        return False
-    sid = str(learner_id)
-    if not re.match(r'^(u|web_)[A-Za-z0-9_\-]+$', sid):
-        return False
-    if sid.startswith('u'):
-        return sid[1:].isdigit()
-    return True
-
-@app.route("/api/conversations/<learner_id>", methods=["GET"])
-@require_module("history")
-def list_conversations(learner_id):
-    """列出用户全部会话（不含消息体，倒序）。"""
-    if not _is_registered(learner_id):
-        return jsonify({"conversations": []})
-    try:
-        if CONV_STORE is None:
-            return jsonify({"conversations": []})
-        convs = CONV_STORE.list_conversations(learner_id)
-        return jsonify({"conversations": convs})
-    except Exception as e:
-        return jsonify({"conversations": [], "error": str(e)}), 500
+# §3.45 ⭐ _is_registered 已迁至 services/_learner_session.py（顶部 import），
+# conversations 5 路由已迁至 blueprints/conversations.py（行为字节级不变）。
 
 def _handle_recommend_query(learner, question, subject, llm_arg):
     """v0.35：推荐类问题（v0.41.8 迁至 services/handlers/recommend.py）。
@@ -4552,53 +4241,6 @@ def _handle_keyword_doc(user_text, reply, learner, data):
     """
     from services.handlers.keyword_doc import handle_keyword_doc as _hkd
     return _hkd(user_text, reply, learner, data)
-
-@app.route("/api/conversations/<learner_id>/<conv_id>", methods=["GET"])
-@require_module("history")
-def get_conversation(learner_id, conv_id):
-    """读取某会话完整消息。"""
-    if not _is_registered(learner_id):
-        return jsonify({"error": "请先登录"}), 401
-    try:
-        conv = CONV_STORE.get_conversation(learner_id, conv_id)
-        if not conv:
-            return jsonify({"error": "会话不存在"}), 404
-        return jsonify(conv)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/conversations/<learner_id>/<conv_id>", methods=["DELETE"])
-@require_module("history")
-def delete_conversation(learner_id, conv_id):
-    """用户删除单个会话。"""
-    if not _is_registered(learner_id):
-        return jsonify({"error": "请先登录"}), 401
-    try:
-        ok = CONV_STORE.delete_conversation(learner_id, conv_id)
-        return jsonify({"ok": ok})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/conversations/<learner_id>", methods=["DELETE"])
-@require_module("history")
-def clear_conversations(learner_id):
-    """用户清空全部会话。"""
-    if not _is_registered(learner_id):
-        return jsonify({"error": "请先登录"}), 401
-    try:
-        ok = CONV_STORE.clear_all(learner_id)
-        return jsonify({"ok": ok})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/conversations/cleanup", methods=["POST"])
-@require_module("history")
-def cleanup_conversations():
-    """定期清理超期会话（可被定时任务调用）。"""
-    if CONV_STORE is None:
-        return jsonify({"ok": False, "error": "存储未初始化"}), 500
-    removed = CONV_STORE.cleanup()
-    return jsonify({"ok": True, "removed": removed})
 
 # ─────────────────────────────────────
 # v0.19.21：周期自我更新调度器
