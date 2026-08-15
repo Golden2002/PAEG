@@ -124,8 +124,47 @@ class SelfEvolution:
             pass
         return None
 
+    def _normalize_node(self, raw: dict) -> dict:
+        """B4 ⭐ 节点标准化：补齐缺省字段、写入 schema_version、确保 content 存在。
+
+        字段兜底（取默认而非覆盖——用户已显式给出的值不会被覆盖）：
+        - tags: list[str]（默认 []）
+        - importance: str（默认 "medium"，供检索权重使用）
+        - grade_level: str（默认 "high_school"）
+        - content: str（缺失时用 definition + " " + intuition 拼接兜底）
+
+        字段注入：
+        - schema_version: "2025.08.v2"（B4 · 自进化 schema 演进标记）
+
+        幂等：normalize(normalize(x)) == normalize(x)
+        """
+        if not isinstance(raw, dict):
+            raw = {}
+        out = dict(raw)  # 不就地修改输入（保留调用方原值）
+        # 1) 默认字段（不覆盖已有）
+        out.setdefault("tags", [])
+        out.setdefault("importance", "medium")
+        out.setdefault("grade_level", "high_school")
+        # 2) content 兜底（若缺则由 definition+intuition 拼接）
+        if not out.get("content"):
+            content = (
+                str(out.get("definition", "")) + " "
+                + str(out.get("intuition", ""))
+            ).strip()
+            out["content"] = content
+        # 3) schema_version 注入（B4 schema 演进标记）
+        out["schema_version"] = "2025.08.v2"
+        # 5) tags 规整：确保为 list[str]（若 LLM 误给 str，拆成单元素 list）
+        if isinstance(out["tags"], str):
+            out["tags"] = [out["tags"]] if out["tags"] else []
+        elif out["tags"] is None:
+            out["tags"] = []
+        return out
+
     def _append_evolved_node(self, node: dict, subject: str):
-        """追加到当日 evolved_*.json（原子写）。"""
+        """追加到当日 evolved_*.json（原子写）。B4：写入前先 _normalize_node 兜底。"""
+        # B4：先标准化（兜底字段 + schema_version）——所有写入路径必经此关
+        node = self._normalize_node(node)
         fname = f"evolved_{datetime.now().strftime('%Y%m%d')}.json"
         fpath = os.path.join(self.evolved_dir, fname)
         data = {}
