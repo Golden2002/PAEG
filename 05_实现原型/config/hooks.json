@@ -39,6 +39,22 @@
       "function": "log_hook",
       "priority": 100,
       "enabled": true
+    },
+    {
+      "id": "log-tools-pre",
+      "event": "tools/pre-execute",
+      "module": "hooks_hub",
+      "function": "log_hook",
+      "priority": 100,
+      "enabled": true
+    },
+    {
+      "id": "log-tools-post",
+      "event": "tools/post-execute",
+      "module": "hooks_hub",
+      "function": "log_hook",
+      "priority": 100,
+      "enabled": true
     }
   ]
 }
