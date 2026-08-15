@@ -1372,11 +1372,67 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 | T4 | Harness 30 项 | 按 P0→P1→P2 分步实施（#1 subagent Patch/#3 Persona 外置/#7 教学预设/#11 三角色/#12 LLM Seam/#13 Shell Seam/#21 Registry/#9 Scope/#15 Session Log/#16 hooks/#18 权限三档/#22 Report/#24-25 UI/#29 多级 Skill） | 🔄 待实施 |
 | T5 | 技术说明文档更新 | 对比 PAEG技术全景文档.md，按更新要求，调用语言规范模块（services/lang_gate.py）refine 后写入 | 🔄 待实施 |
 
-#### 3.46.2 波次规划（⏳ Oracle 咨询 bg_df82a1b2 进行中，返回后细化）
+#### 3.46.2 波次规划（✅ Oracle 咨询 bg_df82a1b2 已返回，2026-08-16 · 10 波次）
 
-- 波次划分/依赖顺序/风险点待 Oracle 输出后填入
+> Oracle 核心判断：**"内功（SEL+dsh 基础设施）→ 装饰（Harness 30 项）→ 架构大手术（Phase 2/3）→ 文档"**；teach_stream 1222 行保持原状直到最后 W10；每波结束回归 92+ 测试 + audit 全绿。
+
+| 波次 | 任务 | 涉及文件 | 验证 | 状态 |
+|---|---|---|---|---|
+| W1 | SEL-1 知识蒸馏深化（JSON Schema+CoT 提炼 prompt / metadata 字段 / embedding 去重+supersession / 失败案例提炼 / 多路召回） | self_evolution.py | TDD 5 项 + 真实蒸馏 + 92/92 | 🔄 待实施 |
+| W2 | SEL-2 工具经验结构化（ExpeL 三段 + 失败模式 LLM 抽象 + 注入工具选择 + use_count 闭环） | self_evolution.py + tool_registry.py | TDD 4 项 + 92/92 | 🔄 待实施 |
+| W3 | H-1 Session Event Log（SessionEvent envelope + deriveMessages 投影 + SESSIONS 双写 + "模型可见⟺已记录"不变量） | infra/session_log.py + observability.py | TDD 6 项 + audit 40/40 + 92/92 | 🔄 待实施 |
+| W4 | H-14 hooks 瀑布补全（llm/stream + tools/* 三事件 next 链）+ H-16 Guard 插件化（guards/ 包） | hooks_hub.py | TDD 8 项 + 92/92 | 🔄 待实施 |
+| W5 | §3.38.2 四模块（compaction 4-event / chunk-rows 56× / checkpoint-policy / runtime-invariants） | compaction.py + infra/cache.py + infra/checkpoint.py + audit_check.py | TDD 8 项 + audit 43/43 + 92/92 | 🔄 待实施 |
+| W6 | PTC-5 主循环可观测+可替换（TeachStrategy 接口 + trace_id + 工具全貌日志 + 插件点） | paeg.py + infra/runtime.py | TDD 5 项 + SSE 字节级一致 + 92/92 | 🔄 待实施 |
+| W7 | Harness P0（#1 subagent Patch 装扮层 + #3 Persona 外置 + #7 教学预设 + #12 LLM Seam + #21 Registry Provider） | config/subagents/ + prompts.py + paeg/presets/ + llm_adapter.py + infra/subagent_registry.py | TDD 12 项 + LLM 真实调用 + 92/92 | 🔄 待实施 |
+| W8 | Harness P0 #11 三角色重构（9 subagent Definition/Provider/Consumer）+ #9 Per-Agent Scope | subagents.py | TDD 6 项 + E2E teach_stream 一致 + 92/92 | 🔄 待实施 |
+| W9 | 架构 Phase 2 拆分（self_update/resources/modes/proactive 4 域 → blueprints/） | server.py + blueprints/ 4 新文件 | audit 双源扩展 + HTTP 实测 + 92/92 + 43/43 | 🔄 待实施 |
+| W10 | 架构 Phase 3 拆分（chat/teaching，SSE 字节级不变）+ T5 技术说明文档 refine（lang_gate） | server.py + blueprints/chat.py + teaching.py + PAEG技术全景文档.md | SSE baseline 对比 + 43/43 + 92/92 + lang_gate refine | 🔄 待实施 |
+
+**关键依赖**：H-1 Session Event Log（W3）是最大依赖枢纽须先行；#1/#21（W7）是 #11（W8）前置；#12 LLM Seam（W7）是 PTC-5（W6 部分）依赖；W9 低风险 4 域先拆验证 pattern 再拆 W10 高风险。
+
+**风险点**：①teach_stream SSE 协议——W10 先做 baseline 录制再逐事件字节 diff，拆 4 子函数（_emit_segment/_emit_tool/_emit_done/_emit_retrieval）后整体迁；②SESSIONS 改造（W3）——server.py 顶部保留 re-export 别名（§3.45.2 Watch out #4 铁律：`from server import _save_teach_turn/_FakeSession/summary_estimate/_is_registered` 不破）；③subagent Patch——不删 subagents.py，先新建 patch.yml + registry 走 fallback，全覆盖后再删旧（Expand-Migrate-Contract）。
+
+**Watch out**：每波结束必跑 smoke + pytest 92/92 + audit（ratchet 铁律）；借鉴来源记录 commit SHA 47f9438 + 文件路径；每波完成即时更新 §3.46.3。
 
 #### 3.46.3 实施记录（逐波次更新）
 
 - （待首波完成）
+
+
+### 3.47 RAG 检索增强优化（2026-08-16 用户指示 · 进行中）
+
+> 用户原话："目前的RAG也有可优化之处，联网检索，咨询oracle，先把需求写入需求文档。然后加入当前ulw循环中"
+
+#### 3.47.1 现有实现调研（✅ 已完成 explore bg_b2ced895，2026-08-16）
+
+**检索三源现状**：
+
+| 源 | 实现 | 检索方式 | 注入位置 |
+|---|---|---|---|
+| 知识库 KB（87+节点） | knowledge_base.py（972 行） | **简化 BM25**（仅关键词命中数加权，无 IDF/长度归一化，L906-926）+ resolve_node 精确解析 + LRU 缓存 | Diagnostor `_pre_retrieve`（top_k=3）+ Presenter system prompt |
+| 用户文件 | lib/ingest/ 完整闭环 | **BM25Okapi + jieba** + 100+ 教育术语词典（retriever.py L151-335）；chunker 中文分块 max_chars=400/overlap=50 **硬编码** | handlers 4 能力（file_qa/explain/quote/restructure） |
+| 联网兜底 | web_search_tool.py（730 行） | Brave→jina→Tavily→Serper→Bing 降级栈 + `web_search_multi` **多查询词 RRF(k=60) 融合**（L605-722）+ `expand_queries` LLM 查询联想（L445-549） | `learner._teach_web_ctx` → Presenter |
+
+**零基础设施确认**：全项目无 embedding/向量库/rerank/hybrid（0 命中）；requirements.txt 17 依赖无 sentence-transformers/faiss；**所有 top_k/chunk_size/overlap 参数硬编码**（无 config/rag.json）；KB search 是简化 BM25 非真 BM25（无 k1/b 参数）；evolved_*.json 节点字段与 KB 节点风格不一致（缺 difficulty/explanation_variants/worldview_fit）。
+
+#### 3.47.2 RAG 最佳实践调研（✅ 已完成 librarian bg_b710780c，2026-08-16）
+
+**2024-2026 生产实践核心结论**：
+- **Hybrid (BM25 + bge-base-zh-v1.5) + RRF(k=60) + bge-reranker-v2-m3(CPU+FP16)** = 收益最高（Recall +10-20%，NDCG@10 +0.10-0.15）
+- **Contextual Chunking**（Anthropic：chunk 前缀面包屑/标题增强）——失败检索 -49%，零 LLM 调用版可用；chunk 512 token ≈ 400-700 汉字
+- **RAGAS + 50 题金标集**（faithfulness/context_precision/answer_relevancy）——量化基线门槛最低，golden set 是资产
+- **HyDE 教育场景慎用**（ACL 2025：收益来自知识泄漏）；Multi-Query 需路由（召回不足才开，强 reranker 下向量融合增益归零）
+- **Prompt 注入**：SOURCES 块 + 强制引用编号 + "无答案路径"（防幻觉）+ 检索内容放前问题放后（Lost in the Middle）
+- 中文分块：标题层级切分 + Recursive fallback；中文分隔符优先 `。！？；`
+
+**参考来源**：Promtable/Prompt20/PremAI/TopReviewed（生产实践）、ACL 2025 HyDE 论文、UTokyo-HitU TREC RAG 2025、BGE 官方文档、Ragas docs、Tencent WeKnora、AI之上中文分块。
+
+#### 3.47.3 优化方案（⏳ Oracle 咨询 bg_b8ecb904 进行中，返回后填充）
+
+- 待 Oracle 返回：优化项排序/落点文件/波次嵌入/依赖顺序/评估先行/风险点
+
+#### 3.47.4 实施记录（逐项更新）
+
+- （待首项完成）
 
