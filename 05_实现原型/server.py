@@ -68,6 +68,8 @@ from utils import (
 # §3.45 ⭐ _is_registered 自 server.py 迁入 services/_learner_session.py（懒加载 getter，
 # 与 server 模块级 USER_STORE/CONV_STORE 同引用）——server.py 改从 services import。
 from services._learner_session import _is_registered, ensure_learner_session
+# §3.46.2 Phase 2 ⭐ 会话辅助函数迁至 services/session_helpers.py（modes 蓝图共用，re-export 保符号）
+from services.session_helpers import _append_chat_hist, _set_constraint_flags
 # v0.43 ⭐ Wave 3 拆分：业务处理函数迁出 server.py。
 # polish/steering/routing 各自负责一段领域逻辑，所有依赖在函数体内懒加载。
 from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
@@ -98,6 +100,11 @@ from blueprints.quiz import bp as _quiz_bp
 from blueprints.threads import bp as _threads_bp
 from blueprints.uploads import bp as _uploads_bp
 from blueprints.voice import bp as _voice_bp
+# §3.46.2 Phase 2 ⭐（W9）：proactive/resources/modes/self_update 4 域迁入 blueprints/
+from blueprints.modes import bp as _modes_bp
+from blueprints.proactive import bp as _proactive_bp
+from blueprints.resources import bp as _resources_bp
+from blueprints.self_update import bp as _self_update_bp
 
 # v0.46 ⭐ P0-6：登录限流状态（IP+账号双维度失败计数，15 分钟窗口）
 import threading as _lt_mod
@@ -131,6 +138,11 @@ app.register_blueprint(_admin_bp)
 app.register_blueprint(_conversations_bp)
 app.register_blueprint(_uploads_bp)
 app.register_blueprint(_quiz_bp)
+# §3.46.2 Phase 2 ⭐（W9）：4 域蓝图注册
+app.register_blueprint(_proactive_bp)
+app.register_blueprint(_resources_bp)
+app.register_blueprint(_modes_bp)
+app.register_blueprint(_self_update_bp)
 
 # ═══════════════════════════════════════════════════════════
 # v0.51 ⭐ P0-3（Oracle）：全局滑动窗口限流
@@ -270,46 +282,8 @@ def _build_remediation(steps, student_answer):
     except Exception:
         return list(steps or [])
 
-def _append_chat_hist(learner_id: str, user_content: str, assistant_content: str = "") -> None:
-    """v0.42.3 ⭐ P0 修复：统一对话历史写回（method/knowledge/affection 三端点共用）。
-
-    - 此前这 3 个端点只读 chat_hist 不写回（或完全不写），续问丢上文（"她"→"妈妈"回指失败）
-    - 统一窗口 20 条（10 轮），与 teach/chat/answer 对齐
-    """
-    try:
-        _ch = SESSIONS.setdefault(f"chat_hist_{learner_id}", [])
-        if isinstance(_ch, list):
-            _ch.append({"role": "user", "content": user_content})
-            if assistant_content:
-                _ch.append({"role": "assistant", "content": assistant_content})
-            SESSIONS[f"chat_hist_{learner_id}"] = _ch[-20:]
-    except Exception as _che:
-        print(f"[PAEG] {learner_id} 写回 chat_hist 失败: {_che}")
-
-def _set_constraint_flags(learner, user_text: str, mode: str, affection: bool = False) -> None:
-    """v0.43 ⭐ 统一设置 learner 的约束掩码（3 位掩码，各端点共用）。
-
-    从用户输入/问卷检测 DIRECT/EMOTION/PREF → 存入 learner._constraint_flags，
-    供 build_presenter_system/build_general_chat_system 的 constraint_flags 消费。
-    """
-    # v0.45 ⭐ E2E 修复：learner 可能为 None（未注册用户，SESSIONS 无该 id）——
-    # 此前 except 分支 learner._constraint_flags=() 对 None 抛 AttributeError → answer 500。
-    if learner is None:
-        return
-    try:
-        from utils.constraint_signals import detect_constraint_flags
-        _cf = detect_constraint_flags(
-            user_text=user_text, key_need="", mode=mode,
-            profile={"questionnaire_answers": getattr(learner, "questionnaire_answers", {}) or {}},
-            affection_signal=affection,
-        )
-        learner._constraint_flags = _cf  # type: ignore[attr-defined]
-    except Exception as _e:
-        logger.warning("约束掩码检测失败: %s", _e)
-        try:
-            learner._constraint_flags = ()  # type: ignore[attr-defined]
-        except Exception as _e2:
-            logger.warning("约束掩码重置失败（learner 不可写）: %s", _e2)
+# §3.46.2 Phase 2 ⭐ _append_chat_hist / _set_constraint_flags 已迁至 services/session_helpers.py
+# （顶部 re-export，行为字节级不变）
 
 
 def _try_file_operation(learner_id: str, text: str, llm):
@@ -475,76 +449,7 @@ def intent_infer():
         return jsonify({"ambiguous": False, "error": str(e)[:100]}), 200
 
 
-@app.route("/agent/proactive_greet", methods=["POST"])
-def proactive_greet():
-    """v0.67 ⭐ 定时主动问候：前端 idle 5-10min 无操作时触发。
-    频率限制：每会话 1 次 + 每日 3 次 + 最短间隔 30min。
-    返回 {ok, content, proactive: True}——前端 addMsg 渲染（老师主动开口）。
-    """
-    data = request.get_json(force=True) or {}
-    uid = data.get("uid") or data.get("learner_id") or _anon_learner_id(data)
-    session_id = data.get("session_id") or uid
-    idle_ms = int(data.get("idle_ms", 0) or 0)
-
-    # 1) 频率限制（SESSIONS 内存计数）
-    try:
-        meta = SESSIONS.setdefault("proactive_meta", {})
-        today = datetime.now().strftime("%Y%m%d")
-        u_meta = meta.setdefault(uid, {"count": 0, "date": today, "last_at": 0})
-        if u_meta.get("date") != today:
-            u_meta["count"] = 0
-            u_meta["date"] = today
-        if u_meta.get("count", 0) >= 3:
-            return jsonify({"ok": False, "error": "daily_limit"}), 429
-        import time as _t
-        if time.time() - u_meta.get("last_at", 0) < 30 * 60:
-            return jsonify({"ok": False, "error": "too_frequent"}), 429
-    except Exception:
-        logger.warning(f"[server] proactive_greet 静默异常已记录 (L548)")
-        pass
-
-    # 2) 学科推断（从最近 chat_hist 提取）
-    subject = "通用"
-    try:
-        hist = SESSIONS.get(f"chat_hist_{uid}", [])
-        if hist:
-            _last = ""
-            for h in reversed(hist[-5:]):
-                if isinstance(h, dict) and h.get("role") == "user":
-                    _last = str(h.get("content", ""))
-                    break
-            for _s in ("数学", "物理", "语文", "英语", "化学", "生物", "历史"):
-                if _s in _last:
-                    subject = _s
-                    break
-    except Exception:
-        logger.warning(f"[server] proactive_greet 静默异常已记录 (L565)")
-        pass
-
-    # 3) 选模板 + 写 chat_hist + 计数
-    try:
-        from proactive_templates import pick_template
-        content = pick_template(subject, idle_ms, session_id=session_id)
-    except Exception:
-        content = "在忙什么呀？有问题随时告诉我。"
-    try:
-        hist = SESSIONS.setdefault(f"chat_hist_{uid}", [])
-        hist.append({"role": "assistant", "content": content, "proactive": True})
-        if len(hist) > 60:
-            SESSIONS[f"chat_hist_{uid}"] = hist[-60:]
-    except Exception:
-        logger.warning(f"[server] proactive_greet 静默异常已记录 (L579)")
-        pass
-    try:
-        meta = SESSIONS.setdefault("proactive_meta", {})
-        u_meta = meta.setdefault(uid, {"count": 0, "date": datetime.now().strftime("%Y%m%d"), "last_at": 0})
-        u_meta["count"] = u_meta.get("count", 0) + 1
-        u_meta["last_at"] = time.time()
-    except Exception:
-        logger.warning(f"[server] proactive_greet 静默异常已记录 (L586)")
-        pass
-
-    return jsonify({"ok": True, "content": content, "proactive": True, "subject": subject})
+# §3.46.2 Phase 2 ⭐ proactive_greet 已迁至 blueprints/proactive.py（行为字节级不变）
 
 
 @app.route("/api/health", methods=["GET"])
@@ -2746,117 +2651,7 @@ def daily_quote():
         return jsonify({"text": "教育不在于往头脑里装东西，而在于点亮对真理的渴望。",
                         "author": "西蒙娜·薇依", "source": "", "error": str(e)})
 
-@app.route("/api/resources", methods=["POST"])
-@require_module("knowledge")
-def resource_lookup():
-    """v0.26 ⭐ 需求C：资料检索（ResourceLibrarian）。
-
-    请求：{learner_id, question, subject, grade_level, scope?, include_web?, for_ppt?}
-    响应：
-      - for_ppt=False（默认）：{"sources": [...], "scope", "keywords", "ppt_outline", "learner_id"}
-      - for_ppt=True：上方 + "ppt": {"ok", "path", "url", "slides"}
-        url 指向 /api/download/&lt;filename&gt;（DOWNLOAD_DIR/ppt/ 子目录）
-    前端可点击链接获取资料，或联动 PPT 制作。
-    """
-    data = request.get_json(force=True)
-    learner_id = data.get("learner_id") or _anon_learner_id(data)
-    # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原 L2582 内联，无 elif）
-    learner = ensure_learner_session(learner_id, data, SESSIONS)
-    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
-    question = (data.get("question") or "").strip()
-    if not question:
-        return jsonify({"error": "question is required"}), 400
-    subject = data.get("subject") or getattr(learner, "_current_subject", "") or "default"
-    for_ppt = bool(data.get("for_ppt", False))
-    try:
-        # v0.43 ⭐ P0-C 提升：复用主 agent 全局持有的 ResourceLibrarian（替代每请求 new）
-        _rl = paeg.resource_librarian
-        _result = _rl.run(
-            question, learner=learner, llm=llm, subject=subject,
-            scope=data.get("scope", "all"),
-            include_web=bool(data.get("include_web", True)),
-            for_ppt=for_ppt,
-        )
-        response = {**_result, "learner_id": learner_id}
-
-        # v0.26 ⭐ 需求C：for_ppt=True 时联动 pptx_mcp_server.generate_ppt 真正生成 PPT
-        if for_ppt:
-            ppt_meta = _generate_ppt_from_outline(
-                question=question,
-                outline=_result.get("ppt_outline") or "",
-                sources=_result.get("sources") or [],
-                learner_id=learner_id,
-            )
-            response["ppt"] = ppt_meta
-
-        return jsonify(response)
-    except Exception as e:
-        return jsonify({"error": f"资料检索失败: {e}", "sources": []}), 500
-
-def _generate_ppt_from_outline(
-    question: str,
-    outline: str,
-    sources: list,
-    learner_id: str,
-) -> dict:
-    """v0.26 ⭐ 需求C：把 ResourceLibrarian 的 ppt_outline 喂给 pptx_mcp_server 生成真实 PPT。
-
-    返回 {"ok": bool, "path": str, "url": str, "slides": int, "error": str}
-    """
-    try:
-        import pptx_mcp_server
-        # 整理 sources 摘要
-        src_titles = [
-            (s.get("title") or "").strip()
-            for s in (sources or [])
-            if (s.get("title") or "").strip()
-        ][:8]
-        sources_blob = "、".join(src_titles) if src_titles else ""
-
-        # 主题：question 截前 30 字符，去掉路径分隔符
-        import re as _re
-        topic = _re.sub(r'[\\/:*?"<>|\r\n]+', " ", question).strip()[:60] or "学习资料"
-
-        ppt_res = pptx_mcp_server.generate_ppt(
-            topic=topic,
-            outline=outline or "",
-            sources=sources_blob,
-            uid=str(learner_id or ""),
-        )
-        if not ppt_res.get("ok"):
-            return {
-                "ok": False,
-                "path": "",
-                "url": "",
-                "slides": 0,
-                "error": ppt_res.get("error") or "生成失败",
-            }
-
-        # path 在 OUT_DIR = .../downloads/ppt/&lt;fname&gt;
-        # 把 ppt 文件路径映射到 /api/download/&lt;rel&gt; —— /api/download/<path:filename>
-        # Flask 下载端点指向 DOWNLOAD_DIR；pptx_mcp 用的是其自身的 OUT_DIR。
-        # 兼容策略：把 pptx 文件复制到全局 DOWNLOAD_DIR（如果不同），并用统一 /api/download 下载。
-        full_path = ppt_res.get("path") or ""
-        slides = int(ppt_res.get("slides") or 0)
-        if not full_path or not os.path.isfile(full_path):
-            return {"ok": False, "path": full_path, "url": "", "slides": slides, "error": "PPT 文件未生成"}
-
-        # 计算相对于 DOWNLOAD_DIR/ppt 的文件名（pptx 自身写到 downloads/ppt/）
-        try:
-            from pathlib import Path as _P
-            url_path = f"/api/download/ppt/{urllib.parse.quote(_P(full_path).name)}"
-        except Exception:
-            url_path = f"/api/download/ppt/{urllib.parse.quote(os.path.basename(full_path))}"
-
-        return {
-            "ok": True,
-            "path": full_path,
-            "url": url_path,
-            "slides": slides,
-            "error": "",
-        }
-    except Exception as e:
-        return {"ok": False, "path": "", "url": "", "slides": 0, "error": f"PPT 生成异常: {e}"}
+# §3.46.2 Phase 2 ⭐ resource_lookup + _generate_ppt_from_outline 已迁至 blueprints/resources.py（行为字节级不变）
 
 @app.route("/api/ppt/generate", methods=["POST"])
 @require_module("file_gen")
@@ -4026,199 +3821,9 @@ def _handle_method_advice(learner, concept, subject, deadline=""):
 # 前端通过 mode 参数选择：method（学科学习方法）/ knowledge（知识库）
 # ─────────────────────────────────────
 
-@app.route("/api/method", methods=["POST"])
-@require_module("method")
-def method_advice():
-    """学科学习方法咨询（独立对话类型）。
-
-    与 teach 模式内置拦截不同：这是用户显式选择"学习方法"模式时的端点，
-    无论输入什么（不必命中 is_method_advice 模式），都走学习方法指导。
-    """
-    data = request.get_json(force=True)
-    learner_id = data.get("learner_id") or _anon_learner_id(data)
-    # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原内联 — 无 elif、无 target_exam）
-    learner = ensure_learner_session(learner_id, data, SESSIONS)
-    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
-    # v0.43 ⭐ P0 修复：method 端点设置约束掩码（与其他模式对齐）
-    _set_constraint_flags(learner, data.get("concept") or data.get("text") or "", "method")
-    concept = data.get("concept") or data.get("text") or ""
-    subject = data.get("subject", "general")
-    # v0.68 ⭐ 学习计划：可选 deadline（"3个月内"），传给 handler 供计划周期计算
-    deadline = data.get("deadline") or ""
-    if not concept:
-        return jsonify({"error": "concept is required"}), 400
-    # v0.20.3：模式自动纠正——选错模式时后端兜底
-    try:
-        _correct = _mode_auto_correct(concept, "method", learner, learner_id, subject)
-        if _correct is not None:
-            return _correct
-    except Exception as _e:
-        print(f"[PAEG][server.py] method_advice 异常忽略: {_e}")
-        pass
-    result = _handle_method_advice(learner, concept, subject, deadline=deadline)
-    # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
-    # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
-    try:
-        if _is_registered(learner_id):
-            cid = SESSIONS.get(f"conv_method_{learner_id}")
-            _content = ""
-            if isinstance(result, dict):
-                _content = (result.get("presentations") or [{}])[0].get("content", "")
-            elif hasattr(result, "get_json"):
-                _rd = result.get_json()
-                _content = (_rd.get("presentations") or [{}])[0].get("content", "")
-            cid = CONV_STORE.add_message(learner_id, "method", concept[:30], "user", concept, conv_id=cid)
-            cid = CONV_STORE.add_message(learner_id, "method", concept[:30], "assistant", _content, conv_id=cid)
-            SESSIONS[f"conv_method_{learner_id}"] = cid
-    except Exception as _e:
-        print(f"[PAEG] method 保存会话失败: {_e}")
-    # v0.42.3 ⭐ P0 修复：method 写回 chat_hist（统一 helper）
-    _m_content = ""
-    if isinstance(result, dict):
-        _m_content = (result.get("presentations") or [{}])[0].get("content", "")
-    elif hasattr(result, "get_json"):
-        _rd = result.get_json()
-        _m_content = (_rd.get("presentations") or [{}])[0].get("content", "")
-    _append_chat_hist(learner_id, concept, _m_content)
-    return result
-
-@app.route("/api/knowledge", methods=["POST"])
-@require_module("knowledge")
-def knowledge_query():
-    """知识库查询（独立对话类型）。
-
-    用户显式选择"知识库"模式时的端点：清点 Library 已收录资料 + 提示上传。
-    """
-    data = request.get_json(force=True)
-    learner_id = data.get("learner_id") or _anon_learner_id(data)
-    # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原内联 — 无 elif、无 target_exam）
-    learner = ensure_learner_session(learner_id, data, SESSIONS)
-    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
-    # v0.43 ⭐ P0 修复：knowledge 端点设置约束掩码（与其他模式对齐）
-    _set_constraint_flags(learner, data.get("text") or data.get("concept") or "", "knowledge")
-    subject = data.get("subject", "general")
-    # v0.20.3：知识库模式若用户实际在倾诉/问方法，自动纠正
-    try:
-        _q = data.get("text") or data.get("concept") or ""
-        if _q:
-            _correct = _mode_auto_correct(_q, "knowledge", learner, learner_id, subject)
-            if _correct is not None:
-                return _correct
-    except Exception as _e:
-        print(f"[PAEG][server.py] knowledge_query 异常忽略: {_e}")
-        pass
-    # v6.0 ⭐ P0 修复：知识库模式下自我指涉问题（"你有哪些功能/你是谁"）应走
-    # 确定性模板而非库清点——与 teach/chat 端点对齐（Cascade 规则优先）
-    try:
-        from self_referential import is_interface_query, handle_interface_query
-        if _q and is_interface_query(_q):
-            _ui_reply = handle_interface_query(_q, learner)
-            return jsonify({
-                "presentations": [{"step_id": 1, "content": _ui_reply, "step_type": "interface"}],
-                "mode": "knowledge",
-                "ok": True,
-            })
-    except Exception as _e:
-        print(f"[PAEG][server.py] knowledge interface 拦截异常忽略: {_e}")
-        pass
-    # v6.0 ⭐ 乱码/无意义输入快速兜底（测试发现 zzz 触发 78s LLM 推理）
-    try:
-        from utils.gibberish import is_gibberish
-        if _q and is_gibberish(_q):
-            _gib_reply = ("好的，我收到你的输入了。刚才那串内容我没能识别成具体的问题——"
-                          "可能是手滑或乱码。你可以重新说一遍想问的，比如「查一下什么是导数」"
-                          "或者「你的知识库里有什么」。我会一直在这儿。")
-            return jsonify({
-                "presentations": [{"step_id": 1, "content": _gib_reply, "step_type": "chat"}],
-                "mode": "knowledge",
-                "ok": True,
-            })
-    except Exception as _e:
-        print(f"[PAEG][server.py] knowledge gibberish 兜底异常忽略: {_e}")
-        pass
-    result = _handle_knowledge_query(learner, subject)
-    # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
-    # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
-    try:
-        if _is_registered(learner_id):
-            _q = data.get("text") or data.get("concept") or "知识库"
-            cid = SESSIONS.get(f"conv_knowledge_{learner_id}")
-            _content = (result.get("presentations") or [{}])[0].get("content", "") \
-                if isinstance(result, dict) else ""
-            cid = CONV_STORE.add_message(learner_id, "knowledge", _q[:30], "user", _q, conv_id=cid)
-            cid = CONV_STORE.add_message(learner_id, "knowledge", _q[:30], "assistant", _content, conv_id=cid)
-            SESSIONS[f"conv_knowledge_{learner_id}"] = cid
-    except Exception as _e:
-        print(f"[PAEG] knowledge 保存会话失败: {_e}")
-    # v0.42.3 ⭐ P0 修复：knowledge 写回 chat_hist（统一 helper）
-    _kq = data.get("text") or data.get("concept") or "知识库"
-    _k_content = (result.get("presentations") or [{}])[0].get("content", "") \
-        if isinstance(result, dict) else ""
-    _append_chat_hist(learner_id, _kq, _k_content)
-    return jsonify(result)
-
-@app.route("/api/affection", methods=["POST"])
-@require_module("affection")
-def affection_support():
-    """情绪与心理支持（独立对话类型 v0.19.29）。
-
-    用户显式选择"倾诉"模式时的端点：走 AffectionSupportor 子代理，
-    以注意力陪伴（胡塞尔悬置 + 薇依注意力 + 尼采自我克服），不教不答不解决。
-    """
-    data = request.get_json(force=True)
-    learner_id = data.get("learner_id") or _anon_learner_id(data)
-    # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原内联 — 无 elif、无 target_exam）
-    learner = ensure_learner_session(learner_id, data, SESSIONS)
-    _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
-    # v0.43 ⭐ P0 修复：affection 端点设置约束掩码（affection 模式本身即情绪信号 → 组B）
-    _set_constraint_flags(learner, data.get("text") or data.get("concept") or "", "affection", affection=True)
-    text = data.get("text") or data.get("concept") or ""
-    if not text:
-        return jsonify({"error": "text is required"}), 400
-    # v0.20.3：模式自动纠正——倾诉模式下若明显是知识/方法/出题，纠正（情绪输入保留）
-    try:
-        _correct = _mode_auto_correct(text, "affection", learner, learner_id, "general")
-        if _correct is not None:
-            return _correct
-    except Exception as _e:
-        print(f"[PAEG][server.py] affection_support 异常忽略: {_e}")
-        pass
-    from subagents import AffectionSupportor
-    _emo = AffectionSupportor()
-    _chat_hist = SESSIONS.get(f"chat_hist_{learner_id}", [])
-    _emo_result = _emo.run(llm, text, learner, history=_chat_hist)
-    _emo_content = _polish_text(_emo_result.get("content", ""), context=f"affection:{text[:30]}")
-    # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
-    # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
-    try:
-        if _is_registered(learner_id):
-            cid = SESSIONS.get(f"conv_affection_{learner_id}")
-            cid = CONV_STORE.add_message(learner_id, "affection", text[:30], "user", text, conv_id=cid)
-            cid = CONV_STORE.add_message(learner_id, "affection", text[:30], "assistant", _emo_content, conv_id=cid)
-            SESSIONS[f"conv_affection_{learner_id}"] = cid
-    except Exception as _e:
-        print(f"[PAEG] affection 保存会话失败: {_e}")
-    # v0.42.3 ⭐ P0 修复：affection 写回 chat_hist（统一 helper）——
-    # 此前只读不写，第二句倾诉看不到第一句，情绪陪伴连贯性断裂。
-    _append_chat_hist(learner_id, text, _emo_content)
-    return jsonify({
-        "session_id": f"affection_{learner_id}",
-        "summary": {"avg_score": 0},
-        "worldview_used": "weil",
-        "tone_ratio": 0,
-        "presentations": [
-            {"step_id": 1, "content": _emo_content,
-             "step_type": "affection"}
-        ],
-        "evaluations": [], "diagnosis": {}, "plan": {"steps": []},
-        "reflections": [],
-        "learner": {
-            "id": learner.id, "nickname": learner.nickname,
-            "grade_level": learner.grade_level,
-            "subjects_mastery": learner.subjects_mastery,
-        },
-        "mode": "affection",
-    })
+# ─────────────────────────────────────
+# §3.46.2 Phase 2 ⭐ modes 3 路由（method/knowledge/affection）已迁至 blueprints/modes.py（行为字节级不变）
+# ─────────────────────────────────────
 
 def _handle_problem_request(learner, concept, subject):
     """v0.19：出题请求处理（v0.41.8 迁至 services/handlers/problem.py）。
@@ -4260,146 +3865,9 @@ def init_periodic_updater() -> None:
     except Exception as _pe:
         print(f"[PAEG] 周期自我更新调度器启动失败（不影响主服务）: {_pe}")
 
-@app.route("/api/self-update/run", methods=["POST"])
-@require_module("self_update")
-def run_self_update():
-    # v0.38 内部 API（自我进化后台任务，由调度器触发）
-    """手动触发一次周度自我更新（洞察提取 + 批处理 + 失败分析）。"""
-    try:
-        result = PERIODIC_UPDATER.run_now()
-        return jsonify({"ok": True, "result": result})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-@app.route("/api/self-update/status", methods=["GET"])
-@require_module("self_update")
-def self_update_status():
-    # v0.38 内部 API（自我进化状态查询，供运维）
-    """查看调度器状态。"""
-    return jsonify({
-        "ok": True,
-        "thread_alive": PERIODIC_UPDATER._thread is not None and PERIODIC_UPDATER._thread.is_alive(),
-        "interval_hours": PERIODIC_UPDATER.interval / 3600,
-        "last_weekly": PERIODIC_UPDATER.last_weekly,
-        "last_activity": PERIODIC_UPDATER.last_activity,
-    })
-
-@app.route("/api/self-update/from-feedback", methods=["POST"])
-@require_module("self_update")
-def self_update_from_feedback():
-    # v0.38 内部 API（自我进化反馈入口，供外部）
-    """v0.21.4：从反馈/反思生成自我更新建议（第 8 个子代理 SelfUpdateAgent）。
-
-    请求：{"text": str, "learner_id": str, "include_insights": bool(默认true),
-            "include_feedback_files": bool(默认true)}
-    流程：读取经过 QualityGate 过滤的洞察（evolve_data/insights.json）+
-          外部反馈文件（users_data/<uid>/feedback/ 或 Library/usr_knowledge/<uid>/feedback/）
-          → SelfUpdateAgent 驱动 LLM 生成结构化更新建议 → 追加到 memory/self_update_suggestions.jsonl
-    响应：{"ok": true, "result": {"suggestions": [...], "summary": str, "sources_used": [...], "mode": "self_update"}}
-    """
-    data = request.get_json(force=True) or {}
-    text = (data.get("text") or "").strip()
-    learner_id = data.get("learner_id") or "anonymous"
-    if not text:
-        return jsonify({"ok": False, "error": "缺少 text 字段"}), 400
-    # v0.37.1 ⭐ Oracle P1-4 修复：任意 learner_id 可触发反馈提取 → 校验注册/匿名合法性
-    if not _is_registered(learner_id):
-        return jsonify({"ok": False, "error": "非法用户标识"}), 401
-
-    try:
-        from subagents import SelfUpdateAgent
-        _su = SelfUpdateAgent()
-
-        # 1) 读取过滤后的反思洞察（QualityGate promote 后落盘的 insights.json）
-        insights = []
-        if data.get("include_insights", True):
-            try:
-                _evolve_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "evolve_data")
-                _ins_path = os.path.join(_evolve_dir, "insights.json")
-                if os.path.exists(_ins_path):
-                    _ins = json.load(open(_ins_path, encoding="utf-8"))
-                    if isinstance(_ins, list):
-                        insights = [{"content": i.get("content", "") if isinstance(i, dict) else str(i),
-                                     "subject": i.get("subject", "") if isinstance(i, dict) else "",
-                                     "helped": i.get("helped", True) if isinstance(i, dict) else True}
-                                    for i in _ins if i]
-            except Exception as _e:
-                print(f"[PAEG] 读取 insights.json 失败: {_e}")
-
-        # 2) 读取外部反馈文件（线下用户测试反馈）
-        # v0.24 增强：
-        #   - 不仅枚举路径，还在 server 侧预读前 2000 字符作为兜底（即使 SelfUpdateAgent 内部读失败也有内容）
-        #   - 在 result 中暴露 feedback_files_preview（运维/测试可见的反馈文本前 200 字）
-        library_paths = []
-        feedback_text_aggregate = ""
-        if data.get("include_feedback_files", True):
-            _base = os.path.dirname(os.path.abspath(__file__))
-            _cands = [
-                os.path.join(_base, "users_data", learner_id, "feedback"),
-                os.path.join(_base, "..", "Library", "usr_knowledge", learner_id, "feedback"),
-            ]
-            for _fd in _cands:
-                _fd = os.path.normpath(_fd)
-                if os.path.isdir(_fd):
-                    for _f in sorted(os.listdir(_fd)):
-                        if _f.endswith((".md", ".txt", ".jsonl", ".json")):
-                            library_paths.append(os.path.join(_fd, _f))
-            # v0.24：预读反馈文件前 2000 字符，给 SelfUpdateAgent 当兜底原料
-            # 同时拼到反馈文本里（避免依赖 subagents 的内部实现细节）
-            for _fp in library_paths[:5]:
-                try:
-                    with open(_fp, encoding='utf-8') as _fb:
-                        _content = _fb.read()[:2000]
-                    if _content:
-                        feedback_text_aggregate += f"\n\n--- 反馈文件: {_fp} ---\n{_content}\n--- end ---\n"
-                except Exception:
-                    continue
-
-        # 3) 调用 SelfUpdateAgent 驱动 LLM
-        # v0.22.1：传 learner + chat_hist（原 learner=None/history=[] 导致画像上下文丢失）
-        # v0.24：把预读的反馈文件内容并入 text（双保险：既传 library_paths 让子代理读，
-        #                  又把内容直接拼到 text 上，避免依赖子代理内部实现细节）
-        _su_learner = SESSIONS.get(f"learner_{learner_id}") if learner_id else None
-        _su_hist = SESSIONS.get(f"chat_hist_{learner_id}", []) if learner_id else []
-        _combined_text = text
-        if feedback_text_aggregate:
-            _combined_text = text + "\n\n## 用户提供的反馈文件原文（v0.24 预读）\n" + \
-                             feedback_text_aggregate
-        result = _su.run(llm, _combined_text, learner=_su_learner, history=_su_hist,
-                         insights=insights, library_paths=library_paths)
-        # v0.24：把预读的反馈原文前 200 字塞到 result，便于运维/测试观察实际读取情况
-        if feedback_text_aggregate:
-            try:
-                result["feedback_files_preview"] = feedback_text_aggregate[:200]
-                result["feedback_files_loaded"] = [
-                    p for p in library_paths
-                    if os.path.isfile(p)
-                ][:5]
-            except Exception as _e:
-                print(f"[PAEG][server.py] self_update_from_feedback 异常忽略: {_e}")
-                pass
-
-        # 4) 追加建议记录（供人工/调度器后续处理）
-        try:
-            _mem_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")
-            os.makedirs(_mem_dir, exist_ok=True)
-            _log_path = os.path.join(_mem_dir, "self_update_suggestions.jsonl")
-            with open(_log_path, "a", encoding="utf-8") as _f:
-                _f.write(json.dumps({
-                    "timestamp": datetime.now().isoformat(),
-                    "learner_id": learner_id,
-                    "text": text,
-                    "library_paths_count": len(library_paths),
-                    "feedback_bytes": len(feedback_text_aggregate),
-                    "suggestions": result.get("suggestions", []),
-                    "sources_used": result.get("sources_used", []),
-                }, ensure_ascii=False) + "\n")
-        except Exception as _e:
-            print(f"[PAEG] 写入 self_update_suggestions.jsonl 失败: {_e}")
-
-        return jsonify({"ok": True, "result": result})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+# ─────────────────────────────────────
+# §3.46.2 Phase 2 ⭐ self-update 3 路由已迁至 blueprints/self_update.py（行为字节级不变）
+# ─────────────────────────────────────
 
 # ─────────────────────────────────────
 # 入口
