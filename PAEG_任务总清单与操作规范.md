@@ -262,7 +262,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 19 | **Permission 事件入 Session Log**：切换可回放 | permission/preset log-only | session log | P1 ✅（§3.46.2，tool_registry 接入 infra/session_log）|
 | 20 | **Custom 衍生状态**：临时切换显示"自定义"不可保存 | current() 返回 custom | permission service | P2 ✅（§3.46.2，tool_registry.py）|
 | 21 | **Subagent Registry Provider 可插拔**：in-process/external-script/llm-call | ctx.subagents 6 providers | subagents.py registry | **P0 ✅**（§3.42 W3 in-process + §3.46.2 #21 三类 provider）|
-| 22 | **Subagent Report/Continuable 协议**：子代理回报 + 父发消息 | subagent-control/report | subagent 控制 | P1 |
+| 22 | **Subagent Report/Continuable 协议**：子代理回报 + 父发消息 | subagent-control/report | subagent 控制 | P1 ✅（§3.46.2，services/subagent_report.py）|
 | 23 | **Fresh-Agent Loop**（tool-ralph）：每轮 fresh child + 共享进度 + 结构化 handoff | tool-ralph | 对应 PAEG RALPH 循环（已有，对照增强）| P2 |
 | 24 | **Web UI 模式化**：shell/wire/slots 拆分，ui-*.js 插件化 | ui-* 插件 ~30 个 | 09_GUI前端 | P1 |
 | 25 | **Preset 即 UI 风格**：预设决定挂哪些 ui-* 模块 | web-app patch | 前端按 preset 挂载 | P1 |
@@ -1502,5 +1502,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#14 Tool Registry 能力协商 ✅（Harness P1，2026-08-16）**——tool_registry.py：get_tool_metadata（轻量 name/desc/risk，不含 parameters）+ get_tool_full_def(name)（按需完整定义，未知→None）+ get_tool_revision() + list_changed_since(seq)；register_external_tools 挂接 _bump_tool_revision()（外部工具注册后版本递增）；metadata 先注入省上下文、完整定义按需取——dsh defer_loading 语义；6 测试全绿 + SURFACE 验证（59 工具 metadata/懒加载/revision/listChanged/容错）（commit 新）
   - **#20 Custom 衍生状态 ✅（Harness P2，2026-08-16）**——tool_registry.set_permission_preset 支持 custom 衍生状态（可切换但不入 PERMISSION_PRESETS 可保存目标）；custom 临时宽松语义（对齐 standard 允许写工具）；切回真实预设（exam 锁写）正常；无效目标仍拒绝；与 #18 权限预设 + #19 事件入 Session Log 衔接（衍生状态全链路）；dsh 借鉴 current() 返回 custom 衍生状态语义；4 测试全绿 + SURFACE 验证（切换/宽松/切回/拒绝）（commit 1fcd23b）
   - **#30 Cordis 式 Service Registry ✅（Harness P1，2026-08-16）**——services/service_registry.py 新建：ServiceRegistry（register/get/has/list/override）+ DEFAULT_SERVICES（12 核心服务懒加载关联 infra.runtime：llm/paeg/conv_store/user_store/evolver/agent_engine/skill_registry/periodic_updater/session_log/file_generator/library/kb）+ get_service_registry() 单例；工厂懒加载（import 期零副作用）、覆盖可替换（dsh 一切皆插件）、未知容错；与 infra/runtime.py 衔接——"一切皆 ctx"统一入口；dsh 借鉴 ctx.key Service；6 测试全绿 + SURFACE 验证（12 服务/懒加载/覆盖/容错）（commit a2bfc6f）
+  - **#22 Subagent Report/Continuable 协议 ✅（Harness P1，2026-08-16）**——services/subagent_report.py 新建：make_report（agent/status/result/ts 契约）+ make_instruction（to/instruction/ts，父发消息 continuable 语义）+ ReportRegistry（线程安全 add_report/get_reports/list_all/clear，未知 agent 容错，保留最近 20 条）；与 #11 契约层衔接（回报即 ServiceProvider.execute 结果），与 #1/#21/#30 形成完整 subagent 体系（装扮层+契约层+provider 注册+服务注册+回报协议）；dsh 借鉴 subagent-control/report；6 测试全绿 + SURFACE 验证（回报/失败/父发消息/注册表/容错）（commit 新）
   - **回归验证 ✅**：36 passed（全部新功能测试）+ audit_check 39/39
 
