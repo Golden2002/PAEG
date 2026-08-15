@@ -1,0 +1,7 @@
+{
+  "_comment": "PAEG 用户级技能配置示例（§3.38 A1 #29）——复制为 ~/.paeg/skills.json 使用。三层优先级：全局（skills/）< 项目（config/skills/）< 用户（~/.paeg/skills/）。skills_dirs 支持 {env:KEY|默认} 环境变量替换。",
+  "skills_dirs": [
+    "{env:PAEG_HOME|~/.paeg}/skills",
+    "config/skills"
+  ]
+}

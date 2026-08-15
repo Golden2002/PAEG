@@ -129,7 +129,7 @@ def is_tool_allowed_by_preset(name: str) -> bool:
 
 def get_tool_defs() -> List[dict]:
     """返回全部工具的 Function Calling 定义。"""
-    return [
+    return _apply_config_meta([
         _make_tool(
             "web_search",
             "搜索网络获取最新/外部信息（新闻、版本、资料推荐、不熟悉的知识）。"
@@ -319,7 +319,86 @@ def get_tool_defs() -> List[dict]:
             ["topic", "subject"],
             risk="write",
         ),
-    ] + _extended_tool_defs()
+    ] + _extended_tool_defs() + _config_tool_defs())
+
+
+def _apply_config_meta(defs: List[dict]) -> List[dict]:
+    """§3.36 ⭐ 配置驱动元数据覆盖：JSON 声明的 description/params 覆盖内置工具。
+
+    - 内置工具（tool_registry 硬编码）默认保留 handler，仅元数据被配置覆盖
+    - 覆盖 handler 需 JSON 显式 override:true（此处只处理元数据层）
+    """
+    try:
+        from mcp_tools_loader import get_loaded_meta
+        meta = get_loaded_meta()
+        if not meta:
+            return defs
+        out = []
+        for d in defs:
+            name = d.get("function", {}).get("name", "")
+            m = meta.get(name)
+            if m:
+                d2 = json.loads(json.dumps(d))  # deep copy
+                d2["function"]["description"] = m.get("description", d2["function"]["description"])
+                if m.get("risk"):
+                    _RISK_LEVELS[name] = m["risk"]
+                # params 覆盖（若配置声明了 params）
+                if m.get("params"):
+                    _props = {}
+                    for k, v in m["params"].items():
+                        if isinstance(v, dict) and "type" in v:
+                            _props[k] = v
+                        elif isinstance(v, str):
+                            _props[k] = {"type": v}
+                        else:
+                            _props[k] = {"type": "string"}
+                    d2["function"]["parameters"]["properties"] = _props
+                    if m.get("required"):
+                        d2["function"]["parameters"]["required"] = m["required"]
+                out.append(d2)
+            else:
+                out.append(d)
+        return out
+    except Exception:
+        return defs
+
+
+def _config_tool_defs() -> List[dict]:
+    """§3.36 ⭐ 配置驱动的外部工具定义（mcp_tools.json 声明、非内置的工具）。"""
+    try:
+        from mcp_tools_loader import get_loaded_defs
+        return get_loaded_defs()
+    except Exception:
+        return []
+
+
+def register_external_tools() -> int:
+    """§3.36 ⭐ 合并配置驱动的外部工具到 _HANDLERS + _WRITE_TOOLS 同步。
+
+    返回本次注册的外部工具数。幂等：重复调用重新同步。
+    - 外部 handler 合入 _HANDLERS（覆盖内置需 override:true）
+    - risk=write 的工具自动加入 _WRITE_TOOLS（exam 模式锁定）
+    - 失败不抛异常（保留现有工具表）
+    """
+    try:
+        from mcp_tools_loader import get_loaded_handlers, get_loaded_meta
+        handlers = get_loaded_handlers()
+        meta = get_loaded_meta()
+        if handlers:
+            for name, fn in handlers.items():
+                _HANDLERS[name] = fn
+                if not callable(_HANDLERS.get(name)):
+                    _HANDLERS.pop(name, None)
+        if meta:
+            for name, m in meta.items():
+                if m.get("risk") == "write":
+                    _WRITE_TOOLS.add(name)
+                if m.get("risk") == "read":
+                    _WRITE_TOOLS.discard(name)
+                _RISK_LEVELS[name] = m.get("risk", "read")
+        return len(handlers)
+    except Exception:
+        return 0
 
 
 _ext_defs_cache = None      # v0.68+ 缓存（避免重复初始化 config_hub）
@@ -697,6 +776,12 @@ _HANDLERS: Dict[str, Callable[..., str]] = {
     "generate_ppt": lambda **kw: _exec_material("ppt", kw),
     "generate_mindmap": lambda **kw: _exec_material("mindmap", kw),
 }
+
+# §3.36 ⭐ 配置驱动：启动即合并外部工具（mcp_tools.json 声明；失败不阻塞）
+try:
+    register_external_tools()
+except Exception:
+    pass
 
 
 def execute_tool(name: str, arguments: Dict[str, Any]) -> str:
