@@ -1,0 +1,6 @@
+{
+  "chunker": {"max_chars": 400, "overlap": 50},
+  "retrieval": {"top_k": 5, "bm25_k1": 1.5, "bm25_b": 0.75, "rrf_k": 60},
+  "dedup": {"key": "subject+concept"},
+  "semantic": {"enabled": false}
+}

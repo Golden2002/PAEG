@@ -22,7 +22,12 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from services.rag_config import get_rag_config
+
 logger = logging.getLogger(__name__)
+
+# B1 配置化兜底：硬兜底常量（get_rag_config 异常时的最后防线）
+_FALLBACK_TOP_K: int = 5
 
 # ---------------------------------------------------------------------------
 # 自定义词典（教育 / 数学 / 物理 / 哲学 / AI 常用术语）
@@ -185,15 +190,17 @@ class BM25Retriever:
         )
         return self
 
-    def search(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
+    def search(self, query: str, top_k: Optional[int] = None) -> List[Dict[str, Any]]:
         """检索 top-k 相关文档块。
 
         Parameters
         ----------
         query : str
             用户查询文本。
-        top_k : int
-            返回的最相关文档块数量。
+        top_k : int, optional
+            返回的最相关文档块数量。None（默认）→ 从
+            ``config/rag.json`` 的 ``retrieval.top_k`` 读取（缺键回退 5）。
+            显式传参优先级最高。
 
         Returns
         -------
@@ -201,6 +208,16 @@ class BM25Retriever:
             每个 dict 形如 ``{doc_name, chunk_index, text, score}``，
             按 score 降序排列；若索引为空则返回空列表。
         """
+        if top_k is None:
+            try:
+                top_k = int(
+                    get_rag_config().get("retrieval", {}).get(
+                        "top_k", _FALLBACK_TOP_K
+                    )
+                )
+            except Exception:
+                top_k = _FALLBACK_TOP_K
+
         if self._bm25 is None or not self._docs:
             logger.warning("BM25 索引未构建或为空，search 返回 []")
             return []
