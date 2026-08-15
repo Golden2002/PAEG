@@ -1471,5 +1471,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **A2 ✅** 确定性去重+supersession——同（subject,concept）二次写入→旧节点 status='superseded'+superseded_by=新 id，新节点 status='live'+.v2 唯一 id，不依赖 embedding；1 测试（commit 0e5dc50）
   - **B3 ✅** `_pre_retrieve` SOURCES 块注入——`SOURCES:`+`[N] source_type=kb|{cid}|{score}`+引用编号与无答案路径指令+`<</UNTRUSTED>>` 显式闭合；检索逻辑不动；6 测试 + 71 相关回归（commit bb0699a）
   - **B1 ✅** config/rag.json 配置化——新建 config/rag.json + services/rag_config.py 懒加载读取器（get_rag_config 深合并+异常兜底）+ chunker max_chars/overlap + BM25Retriever top_k 改读配置；3 测试（commit b74ef27）
+  - **B2 ✅** KnowledgeBase.search 改真 BM25Okapi——rank_bm25.BM25Okapi 真排序（IDF+长度归一化+jieba+自定义词典），懒构建语料（规避缓存失效），小语料库 padding（rank_bm25 corpus<5 IDF=0 已知问题），缺字段兜底+失败降级子串匹配，接口签名不变；14 测试 + 77 既有回归全绿 + audit 39/39（commit 8a13277）
   - **回归验证 ✅**：25 passed（7 新 self_evolution + 3 rag_config + 6 pre_retrieve + 9 既有 self_update）；audit_check 待 W2 后一并跑
 
