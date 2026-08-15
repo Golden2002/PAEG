@@ -19,6 +19,7 @@ P0-1：DeepSeek 原生 Function Calling 的工具定义与执行。
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
@@ -79,9 +80,56 @@ def is_tool_allowed(name: str, action: str = "auto") -> bool:
     return action == "manual_confirm"
 
 
+# v0.68+ ⭐ 权限预设（Step1.5：借鉴 deepseek-harness Permission Presets）
+# 4 档预设：read-only（只读）/ standard（标准，教学默认）/ exam（考试模式，禁写）/ full（全量）
+# 借鉴来源：deepseek-harness packages/bundle/base/cordis.patch.yml permission-presets
+PERMISSION_PRESETS = {
+    "read_only": {"desc": "只读：仅检索/查询类工具，禁止任何写操作",
+                  "allow_write": False, "allow_web": True},
+    "standard": {"desc": "标准：教学默认（读 + 联网 + 文档生成）",
+                 "allow_write": True, "allow_web": True},
+    "exam": {"desc": "考试模式：锁定写工具（禁讲义/PPT/视频/动画生成）",
+             "allow_write": False, "allow_web": True},
+    "full": {"desc": "全量：所有工具开放",
+             "allow_write": True, "allow_web": True},
+}
+
+# 写类工具黑名单（exam/read_only 模式禁用）
+_WRITE_TOOLS = {"save_document", "generate_handout", "generate_ppt", "generate_video",
+                "generate_animation", "mcp__pptx__generate_presentation",
+                "forbidden_words",          # v0.70 §3.28 Phase 4：违禁词维护属写操作
+                "constraint_always_active",  # v0.70 §3.29：永远激活规则维护属写操作
+                "constraint_self_evolve",    # v0.70 §3.29：约束自演化写入属写操作
+                "generate_script",           # v1.1 §3.35：讲稿生成属写操作
+                "generate_mindmap"}          # v1.1 §3.35：知识导图生成属写操作
+
+_active_preset = "standard"  # 当前权限档（运行时可切换）
+
+
+def set_permission_preset(preset: str) -> bool:
+    """v0.68+ ⭐ 运行时切换权限档（如教师切"考试模式"）。"""
+    global _active_preset
+    if preset not in PERMISSION_PRESETS:
+        return False
+    _active_preset = preset
+    return True
+
+
+def get_permission_preset() -> str:
+    return _active_preset
+
+
+def is_tool_allowed_by_preset(name: str) -> bool:
+    """v0.68+ ⭐ 按当前权限档判定工具是否允许（exam 模式锁写工具）。"""
+    _cfg = PERMISSION_PRESETS.get(_active_preset, PERMISSION_PRESETS["standard"])
+    if not _cfg["allow_write"] and name in _WRITE_TOOLS:
+        return False
+    return True
+
+
 def get_tool_defs() -> List[dict]:
     """返回全部工具的 Function Calling 定义。"""
-    return [
+    return _apply_config_meta([
         _make_tool(
             "web_search",
             "搜索网络获取最新/外部信息（新闻、版本、资料推荐、不熟悉的知识）。"
@@ -135,7 +183,295 @@ def get_tool_defs() -> List[dict]:
              "subject": {"type": "string", "description": "学科（可选）"}},
             ["title", "content"],
         ),
-    ]
+        _make_tool(
+            "compose_dynamic_prompt",
+            "获取自我更新的动态提示词补丁（学科教学改进/工具经验/教师笔记）。"
+            "当你需要最新自我改进建议来调整教学时调用——将返回的动态段与当前 system 合并参考。",
+            {},
+            [],
+        ),
+        # v0.70+ §3.28 Phase 4 ⭐ 语言规范 MCP 标准化
+        _make_tool(
+            "normalize_text",
+            "语言规范守门：对生成内容（讲义/讲稿/视频/PPT 文案等）做 L0+L2 双层语言规范处理——"
+            "去除 AI 味、修正省略句/动宾搭配、深度矫正为最规范语言。"
+            "当一段文本将交付给学生/外部使用、且需要保证语言质量时调用。",
+            {"text": {"type": "string", "description": "待规范的文本"},
+             "context": {"type": "string", "description": "上下文（可选）"},
+             "apply_l2": {"type": "boolean", "description": "是否启用 L2 深度矫正（默认 true）"}},
+            ["text"],
+        ),
+        _make_tool(
+            "language_policy_check",
+            "语言政策检查：本地确定性检测文本的 AI 味概率与违禁词命中（不调 LLM）。"
+            "返回 AI 味概率与命中违禁词列表，供判断是否需要改写。",
+            {"text": {"type": "string", "description": "待检查的文本"}},
+            ["text"],
+        ),
+        _make_tool(
+            "forbidden_words",
+            "外部违禁词数据维护（list/add/remove，落盘 data/forbidden_words.json）。"
+            "scope 可选 extra_forbidden（网络用语/AI 腔）、pseudo_empathy_verbs（伪共情）、ai_tells_extra（套话）。"
+            "当需要动态增删语言规范禁词时调用。",
+            {"action": {"type": "string", "description": "操作：list / add / remove"},
+             "word": {"type": "string", "description": "add/remove 的违禁词"},
+             "scope": {"type": "string", "description": "分类：extra_forbidden / pseudo_empathy_verbs / ai_tells_extra"}},
+            ["action"],
+            risk="write",
+        ),
+        # v0.70 §3.29 ⭐ L0-L8 约束系统 MCP 化（constraint_engine 6 API）
+        _make_tool(
+            "constraint_layer_get",
+            "读取 L0-L8 约束层（0-7）当前放开组与规则。"
+            "当需要了解某约束层内容、或确认当前约束状态时调用。",
+            {"layer": {"type": "integer", "description": "层号 0-7（默认 4）"}},
+            [],
+        ),
+        _make_tool(
+            "constraint_layer_set",
+            "动态切换 L0-L8 约束层（教学/考试/自由）。返回该层约束配置段，"
+            "可拼接进 system prompt。当需要按场景调整约束严格度时调用。",
+            {"layer": {"type": "integer", "description": "目标层 0-7（默认 4 标准新授）"},
+             "session": {"type": "string", "description": "会话标识（可选）"},
+             "reason": {"type": "string", "description": "切换原因（记录用）"}},
+            [],
+        ),
+        _make_tool(
+            "constraint_compose",
+            "任意提示词块组合拼接（如 WEIL_CORE+LANGUAGE_STYLE+约束段）。"
+            "当需要把多个提示词块合成一个 system prompt 时调用。",
+            {"parts": {"type": "array", "items": {"type": "string"}, "description": "提示词块列表"},
+             "title": {"type": "string", "description": "组合标题（默认'组合提示词'）"}},
+            ["parts"],
+        ),
+        _make_tool(
+            "constraint_always_active",
+            "永远激活提示词管理（list/add/remove，落盘 always_active.json）。"
+            "这些规则不随约束层放开，任何层都保留。当需要固定某条规则永远生效时调用。",
+            {"action": {"type": "string", "description": "操作：list / add / remove"},
+             "rule": {"type": "string", "description": "add/remove 的规则文本"}},
+            ["action"],
+            risk="write",
+        ),
+        _make_tool(
+            "constraint_self_evolve",
+            "约束系统自我演化：把教学洞察提炼为约束规则写入指定层/组（数据化落盘）。"
+            "当从教学反思中发现可复用的约束改进时调用。",
+            {"insight": {"type": "string", "description": "教学洞察/新规则文本"},
+             "target_layer": {"type": "integer", "description": "目标层 0-7（默认 4）"},
+             "group": {"type": "string", "description": "目标组 M/R/T/D/S/P（默认 D 教学法深度）"}},
+            ["insight"],
+            risk="write",
+        ),
+        _make_tool(
+            "constraint_feedback_adjust",
+            "反馈调强/调弱约束：根据用户反馈（太啰嗦/太直接/太机械/太深等信号）"
+            "给出约束调整建议并记录。当用户对输出风格/深度不满时调用。",
+            {"feedback": {"type": "string", "description": "用户反馈文本"},
+             "target": {"type": "string", "description": "调整目标 layer/group/active（默认 layer）"}},
+            ["feedback"],
+        ),
+        _make_tool(
+            "constraint_layer_scope",
+            "约束层级框架自省：返回当前层范围（L0-Lmax）、内嵌层与外部扩展层来源、"
+            "可用约束组、以及如何扩展（更换层内容/拓展更多层级/新增组）。"
+            "当需要了解约束系统可扩展性或指导他人二次开发时调用。",
+            {},
+            [],
+        ),
+        # v1.1 §3.35 ⭐ 物料流水线 MCP 化（多阶段+门控+自检范式，material_pipeline）
+        _make_tool(
+            "generate_handout",
+            "生成结构化讲义（markdown 双格式，附概念/例题/小结），经语言规范门与门控流水线。"
+            "当学生需要完整讲解材料时调用。",
+            {"topic": {"type": "string", "description": "教学主题"},
+             "subject": {"type": "string", "description": "学科（默认通用）"},
+             "learner_id": {"type": "string", "description": "学习者 ID（可选）"}},
+            ["topic", "subject"],
+            risk="write",
+        ),
+        _make_tool(
+            "generate_script",
+            "生成讲稿（含 TTS 朗读稿，按幕分段），经语言规范门。当学生需要讲解脚本/口播稿时调用。",
+            {"topic": {"type": "string", "description": "教学主题"},
+             "subject": {"type": "string", "description": "学科（默认通用）"},
+             "learner_id": {"type": "string", "description": "学习者 ID（可选）"}},
+            ["topic", "subject"],
+            risk="write",
+        ),
+        _make_tool(
+            "generate_ppt",
+            "生成 PPT 大纲（封面 + 3-6 页正文 + 结尾，供 pptx_mcp_server 排版），经门控流水线。"
+            "当学生需要演示文稿时调用。",
+            {"topic": {"type": "string", "description": "教学主题"},
+             "subject": {"type": "string", "description": "学科（默认通用）"},
+             "learner_id": {"type": "string", "description": "学习者 ID（可选）"}},
+            ["topic", "subject"],
+            risk="write",
+        ),
+        _make_tool(
+            "generate_mindmap",
+            "生成知识导图（中心主题 + 3-5 一级分支 + 2-4 二级节点，markdown 缩进列表），经门控流水线。"
+            "当学生需要知识结构图/思维导图时调用。",
+            {"topic": {"type": "string", "description": "教学主题"},
+             "subject": {"type": "string", "description": "学科（默认通用）"},
+             "learner_id": {"type": "string", "description": "学习者 ID（可选）"}},
+            ["topic", "subject"],
+            risk="write",
+        ),
+    ] + _extended_tool_defs() + _config_tool_defs())
+
+
+def _apply_config_meta(defs: List[dict]) -> List[dict]:
+    """§3.36 ⭐ 配置驱动元数据覆盖：JSON 声明的 description/params 覆盖内置工具。
+
+    - 内置工具（tool_registry 硬编码）默认保留 handler，仅元数据被配置覆盖
+    - 覆盖 handler 需 JSON 显式 override:true（此处只处理元数据层）
+    """
+    try:
+        from mcp_tools_loader import get_loaded_meta
+        meta = get_loaded_meta()
+        if not meta:
+            return defs
+        out = []
+        for d in defs:
+            name = d.get("function", {}).get("name", "")
+            m = meta.get(name)
+            if m:
+                d2 = json.loads(json.dumps(d))  # deep copy
+                d2["function"]["description"] = m.get("description", d2["function"]["description"])
+                if m.get("risk"):
+                    _RISK_LEVELS[name] = m["risk"]
+                # params 覆盖（若配置声明了 params）
+                if m.get("params"):
+                    _props = {}
+                    for k, v in m["params"].items():
+                        if isinstance(v, dict) and "type" in v:
+                            _props[k] = v
+                        elif isinstance(v, str):
+                            _props[k] = {"type": v}
+                        else:
+                            _props[k] = {"type": "string"}
+                    d2["function"]["parameters"]["properties"] = _props
+                    if m.get("required"):
+                        d2["function"]["parameters"]["required"] = m["required"]
+                out.append(d2)
+            else:
+                out.append(d)
+        return out
+    except Exception:
+        return defs
+
+
+def _config_tool_defs() -> List[dict]:
+    """§3.36 ⭐ 配置驱动的外部工具定义（mcp_tools.json 声明、非内置的工具）。"""
+    try:
+        from mcp_tools_loader import get_loaded_defs
+        return get_loaded_defs()
+    except Exception:
+        return []
+
+
+def register_external_tools() -> int:
+    """§3.36 ⭐ 合并配置驱动的外部工具到 _HANDLERS + _WRITE_TOOLS 同步。
+
+    返回本次注册的外部工具数。幂等：重复调用重新同步。
+    - 外部 handler 合入 _HANDLERS（覆盖内置需 override:true）
+    - risk=write 的工具自动加入 _WRITE_TOOLS（exam 模式锁定）
+    - 失败不抛异常（保留现有工具表）
+    """
+    try:
+        from mcp_tools_loader import get_loaded_handlers, get_loaded_meta
+        handlers = get_loaded_handlers()
+        meta = get_loaded_meta()
+        if handlers:
+            for name, fn in handlers.items():
+                _HANDLERS[name] = fn
+                if not callable(_HANDLERS.get(name)):
+                    _HANDLERS.pop(name, None)
+        if meta:
+            for name, m in meta.items():
+                if m.get("risk") == "write":
+                    _WRITE_TOOLS.add(name)
+                if m.get("risk") == "read":
+                    _WRITE_TOOLS.discard(name)
+                _RISK_LEVELS[name] = m.get("risk", "read")
+        return len(handlers)
+    except Exception:
+        return 0
+
+
+_ext_defs_cache = None      # v0.68+ 缓存（避免重复初始化 config_hub）
+_ext_defs_loading = False   # 递归守卫（ConfigHub 初始化链中重入时返回空）
+
+
+def _extended_tool_defs() -> list:
+    """v0.68+ P0-3 修复（Step4）：合并 config_hub 的扩展工具（skills/MCP/workflows），
+    使 LLM 在 run_agent_loop 中真正看到 load_skill__*/mcp__*/run_workflow__*。
+    失败/重入时降级为仅内置（不阻断）。"""
+    global _ext_defs_cache, _ext_defs_loading
+    if _ext_defs_cache is not None:
+        return _ext_defs_cache
+    if _ext_defs_loading:
+        return []  # 递归守卫：get_hub() 初始化链重入时返回空
+    _ext_defs_loading = True
+    try:
+        from config_hub import get_hub
+        _hub = get_hub()
+        _ext = list(_hub.get_all_tool_defs()) if _hub is not None else []
+        # 去重：跳过内置工具（get_tool_defs 已含）——必须与 get_tool_defs 全量同步，
+        # 否则 config_hub 回灌内置定义时产生重复（v0.70 §3.28 Phase 4 修复）
+        _BUILTIN_NAMES = {"web_search", "verify_math", "fetch_page",
+                          "daily_quote", "get_time", "solve_problem", "save_document",
+                          "compose_dynamic_prompt",
+                          "normalize_text", "language_policy_check", "forbidden_words",
+                          "constraint_layer_get", "constraint_layer_set", "constraint_compose",
+                          "constraint_always_active", "constraint_self_evolve",
+                          "generate_handout", "generate_script", "generate_ppt", "generate_mindmap",
+                          "constraint_feedback_adjust", "constraint_layer_scope"}
+        _ext = [d for d in _ext
+                if isinstance(d, dict)
+                and d.get("function", {}).get("name") not in _BUILTIN_NAMES]
+        _seen = {d.get("function", {}).get("name") for d in _ext if isinstance(d, dict)}
+        # 补上 workflows 工具声明（若 config_hub 未含）
+        try:
+            from workflows_hub import get_workflows_hub
+            _wf = get_workflows_hub()
+            _wf_items = []
+            try:
+                _wf_dict = _wf.list() if hasattr(_wf, "list") else {}
+                if isinstance(_wf_dict, dict):
+                    _wf_items = _wf_dict.get("workflows", []) or []
+                elif isinstance(_wf_dict, list):
+                    _wf_items = _wf_dict
+            except Exception:
+                _wf_items = []
+            for _wfd in _wf_items:
+                _wn = _wfd.get("id") if isinstance(_wfd, dict) else str(_wfd)
+                if not _wn:
+                    continue
+                _n = f"run_workflow__{_wn}"
+                if _n not in _seen:
+                    _ext.append({
+                        "type": "function",
+                        "function": {
+                            "name": _n,
+                            "description": f"执行教学工作流 {_wn}（DAG：诊断→计划→实施→评估）",
+                            "parameters": {"type": "object",
+                                           "properties": {"concept": {"type": "string"},
+                                                          "subject": {"type": "string"}},
+                                           "required": ["concept"]},
+                        },
+                    })
+                    _seen.add(_n)
+        except Exception:
+            pass
+        _ext_defs_cache = _ext
+        return _ext
+    except Exception:
+        return []
+    finally:
+        _ext_defs_loading = False
 
 
 # ─────────────────────────────────────
@@ -245,6 +581,172 @@ def _exec_save_document(title: str, content: str, subject: str = "通用") -> st
         return f"文档保存失败: {str(e)[:100]}"
 
 
+def _exec_compose_dynamic_prompt(*args, **kwargs) -> str:
+    """v0.69+ §3.8：动态提示词拼接 tool——返回当前自我更新的动态反思补丁
+    （subject_patches 学科补丁 / tool_lessons 工具经验 / teacher_notes 教师笔记 / 方法论）。
+    LLM 调用后可将动态段与固定 system prompt 合并（每次发送时动态刷新）。"""
+    try:
+        from teaching_memory import load_teaching_memory
+        _mem = load_teaching_memory()
+        if _mem and _mem.strip():
+            return f"[动态提示词补丁（自进化，供合并参考）]\n{_mem[:1800]}"
+        return "[动态提示词补丁] 当前无动态补丁"
+    except Exception as e:
+        return f"[动态提示词补丁] 读取失败: {str(e)[:100]}"
+
+
+# ─────────────────────────────────────
+# v0.70+ §3.28 Phase 4 ⭐ 语言规范 MCP 标准化（三工具）
+#   normalize_text          → 统一语言规范入口（L0+L2，同 lang_gate.gate_content）
+#   language_policy_check   → 违禁词/AI 味本地确定性检测（不调 LLM）
+#   forbidden_words         → 外部违禁词数据维护（add/remove/list，落盘 forbidden_words.json）
+# ─────────────────────────────────────
+
+_FORBIDDEN_WORDS_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "data", "forbidden_words.json")
+
+
+def _load_forbidden_data() -> dict:
+    """读取外部违禁词数据（缺失/损坏 → 空骨架，不抛异常）。"""
+    try:
+        with open(_FORBIDDEN_WORDS_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {"extra_forbidden": [], "pseudo_empathy_verbs": [], "ai_tells_extra": []}
+
+
+def _save_forbidden_data(data: dict) -> bool:
+    """写回外部违禁词数据（保持原有其他键）。"""
+    try:
+        with open(_FORBIDDEN_WORDS_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+
+def _exec_normalize_text(text: str, context: str = "", apply_l2: bool = True) -> str:
+    """v0.70 §3.28 Phase 4：语言规范守门（L0 polish + L2 深度矫正）。
+    生成内容（讲义/讲稿/视频/PPT 等）产出后调用，得到最规范语言。
+    失败静默回退原文（不阻塞生成）。"""
+    if not text or not text.strip():
+        return text
+    try:
+        from services.lang_gate import lang_gate_content
+        return lang_gate_content(text, context=context, apply_l2=bool(apply_l2))
+    except Exception:
+        return text
+
+
+def _exec_language_policy_check(text: str) -> str:
+    """v0.70 §3.28 Phase 4：本地确定性检测违禁词 + AI 味（不调 LLM）。
+    返回 AI 味概率 + 命中的违禁词列表，供外部 agent 自行决定是否重写。"""
+    if not text or not text.strip():
+        return "文本为空"
+    report = []
+    # 1) AI 味概率（ai_taste_detector）
+    ai_prob = 0.0
+    try:
+        from ai_taste_detector import detect_ai_taste
+        sig = detect_ai_taste(text)
+        ai_prob = getattr(sig, "ai_likelihood", 0.0)
+    except Exception:
+        pass
+    report.append(f"AI 味概率: {ai_prob:.2f}（>=0.4 建议改写）")
+    # 2) 违禁词命中（内嵌 AI_TELLS + 外部 forbidden_words.json）
+    hits = []
+    try:
+        from infra.runtime import get_paeg
+        paeg = get_paeg()
+        if paeg is not None and getattr(paeg, "refiner", None) is not None:
+            hits = paeg.refiner.detect_ai_tells(text)
+    except Exception:
+        # 无 paeg 运行时 → 退化：直接加载 LanguageRefiner 类检测
+        try:
+            from language_refiner import LanguageRefiner
+            _r = LanguageRefiner(llm=None)
+            hits = _r.detect_ai_tells(text)
+        except Exception:
+            hits = []
+    if hits:
+        report.append(f"违禁词命中 {len(hits)} 个: {', '.join(hits[:10])}")
+    else:
+        report.append("违禁词命中: 0")
+    return "\n".join(report)
+
+
+def _exec_forbidden_words(action: str, word: str = "", scope: str = "extra_forbidden") -> str:
+    """v0.70 §3.28 Phase 4：外部违禁词数据维护（write 级工具）。
+    action ∈ {list, add, remove}；scope ∈ {extra_forbidden, pseudo_empathy_verbs, ai_tells_extra}。"""
+    data = _load_forbidden_data()
+    if scope not in data or not isinstance(data.get(scope), list):
+        scope = "extra_forbidden"
+    words = data.setdefault(scope, [])
+    action = (action or "list").strip().lower()
+    if action == "add":
+        w = (word or "").strip()
+        if not w:
+            return "参数错误：add 需要 word"
+        if w not in words:
+            words.append(w)
+            if _save_forbidden_data(data):
+                return f"已添加违禁词「{w}」到 {scope}（共 {len(words)} 项）"
+            return f"添加失败：写入 {_FORBIDDEN_WORDS_PATH} 出错"
+        return f"「{w}」已在 {scope} 中（共 {len(words)} 项）"
+    if action == "remove":
+        w = (word or "").strip()
+        if not w:
+            return "参数错误：remove 需要 word"
+        if w in words:
+            words.remove(w)
+            if _save_forbidden_data(data):
+                return f"已移除违禁词「{w}」（剩余 {len(words)} 项）"
+            return f"移除失败：写入 {_FORBIDDEN_WORDS_PATH} 出错"
+        return f"「{w}」不在 {scope} 中"
+    if action == "list":
+        if not words:
+            return f"{scope}: （空）"
+        return f"{scope}（{len(words)} 项）: " + "、".join(words[:30])
+    return f"未知操作: {action}（可用: list / add / remove）"
+
+
+def _exec_constraint(name: str, arguments: dict) -> str:
+    """v0.70 §3.29：转发到 constraint_engine 约束引擎执行。"""
+    try:
+        from constraint_engine import execute as _ce_execute
+        return _ce_execute(name, arguments or {})
+    except Exception as e:
+        return f"约束引擎 {name} 调用失败: {str(e)[:120]}"
+
+
+def _exec_material(material_type: str, arguments: dict) -> str:
+    """v1.1 §3.35 ⭐ 物料流水线执行器：转发到 material_pipeline.run_material_pipeline。
+
+    风险：写盘 + 调 LLM——按权限预设拦截（与 save_document 同策略）。
+    """
+    try:
+        if not is_tool_allowed_by_preset(f"generate_{material_type}"):
+            return f"权限档拦截：当前预设不允许 generate_{material_type}"
+        from material_pipeline import run_material_pipeline
+        from llm_adapter import create_llm
+        llm = create_llm("auto")
+        args = arguments or {}
+        result = run_material_pipeline(
+            llm, material_type,
+            args.get("topic", ""),
+            args.get("subject", "通用"),
+            args.get("learner_id", "anon"),
+        )
+        return json.dumps({"ok": result.get("ok"), "errors": result.get("errors", []),
+                           "output": str(result.get("output", ""))[:500],
+                           "path": result.get("path", "")}, ensure_ascii=False)
+    except Exception as e:
+        return f"物料流水线 {material_type} 调用失败: {str(e)[:120]}"
+
+
 _HANDLERS: Dict[str, Callable[..., str]] = {
     "web_search": _wrap("web_search", _exec_web_search, retries=2),
     "verify_math": _wrap("verify_math", _exec_verify_math, retries=1),
@@ -254,7 +756,32 @@ _HANDLERS: Dict[str, Callable[..., str]] = {
     # v0.19.25：MCP-only 工具同步到 FC 端
     "solve_problem": _exec_solve_problem,
     "save_document": _exec_save_document,
+    # v0.69+ §3.8 ⭐ 动态提示词拼接（用户核心设想）：LLM 主动调取自我更新的动态反思补丁
+    "compose_dynamic_prompt": _exec_compose_dynamic_prompt,
+    # v0.70+ §3.28 Phase 4 ⭐ 语言规范 MCP 标准化（三工具）
+    "normalize_text": _exec_normalize_text,
+    "language_policy_check": _exec_language_policy_check,
+    "forbidden_words": _exec_forbidden_words,
+    # v0.70 §3.29 ⭐ L0-L8 约束系统 MCP 化（constraint_engine 6 API 转发）
+    "constraint_layer_get": lambda **kw: _exec_constraint("constraint_layer_get", kw),
+    "constraint_layer_set": lambda **kw: _exec_constraint("constraint_layer_set", kw),
+    "constraint_compose": lambda **kw: _exec_constraint("constraint_compose", kw),
+    "constraint_always_active": lambda **kw: _exec_constraint("constraint_always_active", kw),
+    "constraint_self_evolve": lambda **kw: _exec_constraint("constraint_self_evolve", kw),
+    "constraint_feedback_adjust": lambda **kw: _exec_constraint("constraint_feedback_adjust", kw),
+    "constraint_layer_scope": lambda **kw: _exec_constraint("constraint_layer_scope", kw),
+    # v1.1 §3.35 ⭐ 物料流水线 MCP 化（handout/script/ppt/mindmap）
+    "generate_handout": lambda **kw: _exec_material("handout", kw),
+    "generate_script": lambda **kw: _exec_material("script", kw),
+    "generate_ppt": lambda **kw: _exec_material("ppt", kw),
+    "generate_mindmap": lambda **kw: _exec_material("mindmap", kw),
 }
+
+# §3.36 ⭐ 配置驱动：启动即合并外部工具（mcp_tools.json 声明；失败不阻塞）
+try:
+    register_external_tools()
+except Exception:
+    pass
 
 
 def execute_tool(name: str, arguments: Dict[str, Any]) -> str:
@@ -266,7 +793,15 @@ def execute_tool(name: str, arguments: Dict[str, Any]) -> str:
     handler = _HANDLERS.get(name)
     if not handler:
         # v0.19.25：fallback 到外部 MCP 工具（mcp__server__tool 形式）
+        # v0.69+ P2-2 统一：优先走 config_hub（触发 hooks/repeat_guard），回退直连
         if name.startswith("mcp__"):
+            try:
+                from config_hub import get_hub
+                _h = get_hub()
+                if _h is not None and getattr(_h, "mcp", None) is not None:
+                    return _h.execute_tool(name, arguments or {})
+            except Exception:
+                pass
             try:
                 from mcp_client import get_mcp_client
                 return get_mcp_client().call_tool(name, arguments or {})
@@ -358,9 +893,16 @@ def _describe_params(name: str) -> str:
 def get_all_tool_defs() -> List[dict]:
     """工具定义 + 技能加载定义 + 外部 MCP 工具（v0.19.25）。
 
-    MCP 工具通过 mcp_client.MCPClientManager 合并进来，
-    LLM 可用 mcp__server__tool 形式的工具名调用外部标准工具。
+    v0.68+ ⭐ 统一配置中心：优先走 config_hub.get_all_tool_defs()
+    （独立成套配置接口：MCP/skills/workflows 统一合并），
+    config_hub 不可用时回退原逻辑（ratchet 铁律：行为不变）。
     """
+    try:
+        from config_hub import get_hub
+        return get_hub().get_all_tool_defs()
+    except Exception:
+        pass
+    # ─── 原逻辑（fallback） ───
     defs = get_tool_defs()
     try:
         from skill_registry import SkillRegistry
@@ -368,7 +910,6 @@ def get_all_tool_defs() -> List[dict]:
         defs += reg.tool_defs()
     except Exception:
         pass
-    # v0.19.25：合并外部 MCP 工具（filesystem/memory 等标准 server）
     try:
         from mcp_client import get_mcp_client
         _mcp = get_mcp_client()
@@ -450,7 +991,13 @@ def run_agent_loop(model, system: str, user_input: str,
                 if name.startswith("load_skill__"):
                     result = _exec_skill_load(name.replace("load_skill__", ""))
                 else:
-                    result = execute_tool(name, args)
+                    # v0.68+ P0-1 修复（Step4）：统一走 config_hub 路由——解锁 hooks(tool.before/after)
+                    # + repeat-tool-reminder Guard + run_workflow__* 路由；失败回退旧路径
+                    try:
+                        from config_hub import get_hub as _get_hub
+                        result = _get_hub().execute_tool(name, args)
+                    except Exception:
+                        result = execute_tool(name, args)
                 calls_log.append({"name": name, "arguments": args, "result": result[:200]})
                 messages.append({"role": "tool", "tool_call_id": tc.get("id", ""),
                                  "content": result})
