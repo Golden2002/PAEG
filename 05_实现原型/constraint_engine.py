@@ -55,8 +55,49 @@ def _save_ext_data(path: str, data: dict) -> bool:
         return False
 
 
+_CONSTRAINT_CONFIG_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "data", "constraint_config.json")
+
+
+def _get_config_from_file() -> Optional[dict]:
+    """v1.1 §3.36 ⭐ 从独立数据文件加载约束配置（不依赖 prompts.py，可移植）。
+    constraint_config.json 含 layers/l0_reserved_rules/group_rules/group_names/mask_to_layer。"""
+    try:
+        with open(_CONSTRAINT_CONFIG_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict) or "layers" not in data:
+            return None
+        layers = {}
+        for k, v in data.get("layers", {}).items():
+            layers[int(k)] = frozenset(v or [])
+        l0 = list(data.get("l0_reserved_rules", []))
+        groups = data.get("group_rules", {})
+        names = data.get("group_names", {})
+        mask_map = {}
+        for k, v in data.get("mask_to_layer", {}).items():
+            try:
+                mask_map[int(k, 2)] = int(v)
+            except Exception:
+                pass
+        return {
+            "layers": layers,
+            "l0": l0,
+            "group_rules": groups,
+            "group_names": names,
+            "mask_to_layer": mask_map,
+            "default_layer": int(data.get("default_layer", 4)),
+            "crisis_layer": int(data.get("crisis_layer", 1)),
+            "build": None,  # 数据文件模式无 _build_constraint_layers（layer_set 自拼）
+        }
+    except Exception:
+        return None
+
+
 def _get_prompts_constants() -> Optional[dict]:
-    """惰性导入 prompts.py 常量（避免启动期循环 import）。"""
+    """v1.1 §3.36 ⭐ 配置优先：先读独立数据文件（可移植），失败回退 prompts.py（兼容）。"""
+    _c = _get_config_from_file()
+    if _c is not None:
+        return _c
     try:
         from prompts import (CONSTRAINT_LAYERS, L0_RESERVED_RULES,
                              _GROUP_RULES, _GROUP_NAMES, _build_constraint_layers)
@@ -126,8 +167,16 @@ def _clamp_layer(layer: int) -> int:
     try:
         layer = int(layer)
     except Exception:
-        layer = 4
+        layer = _default_layer()
     return max(0, min(_max_layer(), layer))
+
+
+def _default_layer() -> int:
+    """默认层：数据文件配置（constraint_config.json default_layer），缺失回退 4。"""
+    c = _get_config_from_file()
+    if c and "default_layer" in c:
+        return int(c["default_layer"])
+    return 4
 
 
 def constraint_layer_scope() -> str:

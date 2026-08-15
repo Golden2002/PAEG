@@ -158,11 +158,19 @@ AI_TELLS = [
 class LanguageRefiner:
     """语言优化 Agent：用薇依语料矫正文本，去除 AI 痕迹。"""
 
-    def __init__(self, llm, corpus_path: Optional[str] = None):
+    def __init__(self, llm, corpus_path: Optional[str] = None, chat_fn=None):
         self.llm = llm
+        # v1.1 §3.36 ⭐ 注入式 chat_fn：缺省用 subagents._safe_chat（PAEG 内），
+        # 其他项目可注入自己的 LLM 调用包装（解耦依赖，可移植）
+        self._chat_fn = chat_fn or self._default_chat
         self.corpus = self._load_corpus(corpus_path)
         self.ai_tells = list(dict.fromkeys(AI_TELLS))  # 内嵌去重（AI_TELLS 含历史重复项）
         self._load_extra_forbidden()
+
+    def _default_chat(self, system, user, max_tokens=800, **kw):
+        """默认 chat 实现：PAEG 的 subagents._safe_chat（兼容原行为）。"""
+        from subagents import _safe_chat
+        return _safe_chat(self.llm, system, user, max_tokens=max_tokens, **kw)
 
     def _load_corpus(self, corpus_path: Optional[str] = None):
         """加载薇依语料。"""
@@ -234,10 +242,10 @@ class LanguageRefiner:
         for round_i in range(max_rounds):
             # 生成反馈（指出具体 AI 味）
             feedback = self._get_feedback(current, context)
-            # 改写
-            refined = _safe_chat(self.llm, system,
-                                 self._build_user(current, context, feedback),
-                                 max_tokens=800)
+            # 改写（v1.1 §3.36 ⭐ 注入式 chat_fn——缺省走 PAEG _safe_chat，可移植）
+            refined = self._chat_fn(system,
+                                    self._build_user(current, context, feedback),
+                                    max_tokens=800)
             if not refined or not refined.strip():
                 break
             current = refined.strip()
