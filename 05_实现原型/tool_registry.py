@@ -378,6 +378,7 @@ def register_external_tools() -> int:
     返回本次注册的外部工具数。幂等：重复调用重新同步。
     - 外部 handler 合入 _HANDLERS（覆盖内置需 override:true）
     - risk=write 的工具自动加入 _WRITE_TOOLS（exam 模式锁定）
+    - §3.42 W5：timeoutMs 字段同步到 _HANDLERS_TIMEOUT_MS（未声明不动）
     - 失败不抛异常（保留现有工具表）
     """
     try:
@@ -396,6 +397,13 @@ def register_external_tools() -> int:
                 if m.get("risk") == "read":
                     _WRITE_TOOLS.discard(name)
                 _RISK_LEVELS[name] = m.get("risk", "read")
+                # §3.42 W5：timeoutMs 同步到 _HANDLERS_TIMEOUT_MS（ratchet：未声明不动）
+                _tms = m.get("timeoutMs")
+                if isinstance(_tms, (int, float)) and _tms > 0:
+                    _HANDLERS_TIMEOUT_MS[name] = int(_tms)
+                elif name in _HANDLERS_TIMEOUT_MS and _tms is None:
+                    # 显式 None/缺失 → 保留默认值（不抹掉）
+                    pass
         return len(handlers)
     except Exception:
         return 0
@@ -778,10 +786,64 @@ _HANDLERS: Dict[str, Callable[..., str]] = {
 }
 
 # §3.36 ⭐ 配置驱动：启动即合并外部工具（mcp_tools.json 声明；失败不阻塞）
+# §3.42 W5 ⭐ 工具超时策略：声明 _HANDLERS_TIMEOUT_MS 在 register_external_tools 之前
+#   （register_external_tools 会把 JSON 声明的 timeoutMs 同步进来）
+_HANDLERS_TIMEOUT_MS: Dict[str, int] = {}
 try:
     register_external_tools()
 except Exception:
     pass
+
+
+# ─────────────────────────────────────
+# §3.42 W5 ⭐ 工具超时策略（tool-timeout-policy）
+# ─────────────────────────────────────
+
+# 工具名 → timeoutMs（毫秒）。声明的工具走 watchdog；未声明的走默认 30s。
+# （声明已在上方 §3.36 块完成，此处不再重复——避免重复定义）
+
+
+def _get_default_timeout_ms() -> int:
+    """§3.42 W5 默认 timeoutMs（毫秒）。可被 config/hooks.json 的
+    `tools.default_timeout_ms` 覆盖（缺失则用 infra.watchdog.DEFAULT_TOOL_TIMEOUT_MS = 30000）。
+    """
+    try:
+        import json as _json
+        import os as _os
+        _path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "config", "hooks.json")
+        if _os.path.isfile(_path):
+            with open(_path, encoding="utf-8") as f:
+                _cfg = _json.load(f)
+            _tools_sec = _cfg.get("tools") if isinstance(_cfg, dict) else None
+            if isinstance(_tools_sec, dict):
+                _v = _tools_sec.get("default_timeout_ms")
+                if isinstance(_v, (int, float)) and _v > 0:
+                    return int(_v)
+    except Exception:
+        pass
+    try:
+        from infra.watchdog import DEFAULT_TOOL_TIMEOUT_MS
+        return DEFAULT_TOOL_TIMEOUT_MS
+    except Exception:
+        return 30_000
+
+
+def _get_timeout_for_tool(name: str) -> int:
+    """返回工具生效的 timeoutMs。优先级：_HANDLERS_TIMEOUT_MS > 默认 30s。
+    返回 <= 0 表示不设超时（ratchet：旧行为完全保留）。
+    """
+    ms = _HANDLERS_TIMEOUT_MS.get(name)
+    if ms is None:
+        return _get_default_timeout_ms()
+    return int(ms)
+
+
+def set_tool_timeout(name: str, timeout_ms: int) -> None:
+    """为工具设置 timeoutMs（毫秒）。<= 0 表示取消超时（走直跑，ratchet 兼容）。"""
+    if timeout_ms is None or int(timeout_ms) <= 0:
+        _HANDLERS_TIMEOUT_MS.pop(name, None)
+    else:
+        _HANDLERS_TIMEOUT_MS[name] = int(timeout_ms)
 
 
 def execute_tool(name: str, arguments: Dict[str, Any]) -> str:
@@ -789,6 +851,9 @@ def execute_tool(name: str, arguments: Dict[str, Any]) -> str:
 
     v0.19.3：确定性工具（daily_quote/get_time/verify_math）走结果缓存，
     命中直接返回（0 延迟 + 省 token）。失败时返回含"修复建议"的错误信息。
+
+    §3.42 W5 ⭐ 新增：工具声明的 timeoutMs 通过 watchdog 强制（不杀进程）。
+    超时 → 返回 TOOL_TIMEOUT 错误（含 trace_id），工具表不变，其他工具可继续执行。
     """
     handler = _HANDLERS.get(name)
     if not handler:
@@ -811,42 +876,69 @@ def execute_tool(name: str, arguments: Dict[str, Any]) -> str:
     if not isinstance(arguments, dict):
         arguments = {}
 
-    # v0.19.3：工具结果缓存（确定性工具高价值缓存目标）
+    # §3.42 W5：解析生效的 timeoutMs（工具声明 > config/hooks.json > 默认 30s）
+    timeout_ms = _get_timeout_for_tool(name)
+
+    # §3.42 W5：超时执行（watchdog 包装；超时 → ToolTimeoutError）
     try:
-        from tool_cache import cached_call
-        if name in ("daily_quote", "get_time", "verify_math"):
-            # 注意：verify_math 失败会自动重试（_retry），缓存只存成功结果
-            result, _from_cache = cached_call(name, arguments, handler)
-            if name == "verify_math" and ("失败" in str(result) or "错误" in str(result)):
+        from infra.watchdog import run_with_timeout, ToolTimeoutError
+    except Exception:
+        # watchdog 不可用时退化（ratchet：不阻断旧路径）
+        run_with_timeout = None
+        ToolTimeoutError = None
+
+    # §3.42 W5 核心路径：用 watchdog 包住 handler 调用。
+    # 内部 _call_impl 仍含缓存 / 重试 / 错误格式化（ratchet：旧行为不变）。
+    def _call_impl():
+        # v0.19.3：工具结果缓存（确定性工具高价值缓存目标）
+        try:
+            from tool_cache import cached_call
+            if name in ("daily_quote", "get_time", "verify_math"):
+                # 注意：verify_math 失败会自动重试（_retry），缓存只存成功结果
+                result, _from_cache = cached_call(name, arguments, handler)
+                if name == "verify_math" and ("失败" in str(result) or "错误" in str(result)):
+                    expr = arguments.get("expr", "")
+                    retried = _retry_verify_math(expr)
+                    if retried:
+                        return retried
+                return str(result)
+        except Exception:
+            pass  # 缓存失败不影响正常执行
+
+        try:
+            result = str(handler(**arguments))
+            # verify_math 失败时自动重试（简化/修正表达式）
+            if name == "verify_math" and ("失败" in result or "错误" in result):
                 expr = arguments.get("expr", "")
                 retried = _retry_verify_math(expr)
                 if retried:
                     return retried
-            return str(result)
-    except Exception:
-        pass  # 缓存失败不影响正常执行
+            return result
+        except TypeError as e:
+            # 参数不匹配：对无参工具（daily_quote/get_time）直接调用；
+            # 有参工具直接给参数建议（不盲目重试，避免返回误导结果）
+            if name in ("daily_quote", "get_time"):
+                try:
+                    return str(handler())
+                except Exception:
+                    pass
+            return (f"工具 {name} 参数错误: {e}。"
+                    f"需要的参数：{_describe_params(name)}。请修正后重试。")
+        except Exception as e:
+            return f"工具 {name} 执行出错: {e}（请换一种方式重试）"
 
-    try:
-        result = str(handler(**arguments))
-        # verify_math 失败时自动重试（简化/修正表达式）
-        if name == "verify_math" and ("失败" in result or "错误" in result):
-            expr = arguments.get("expr", "")
-            retried = _retry_verify_math(expr)
-            if retried:
-                return retried
-        return result
-    except TypeError as e:
-        # 参数不匹配：对无参工具（daily_quote/get_time）直接调用；
-        # 有参工具直接给参数建议（不盲目重试，避免返回误导结果）
-        if name in ("daily_quote", "get_time"):
-            try:
-                return str(handler())
-            except Exception:
-                pass
-        return (f"工具 {name} 参数错误: {e}。"
-                f"需要的参数：{_describe_params(name)}。请修正后重试。")
-    except Exception as e:
-        return f"工具 {name} 执行出错: {e}（请换一种方式重试）"
+    # §3.42 W5：watchdog 包装（不杀进程——超时的线程被丢弃，future GC）
+    # 超时 → 直接抛出 ToolTimeoutError（携带 trace_id + tool_name + timeout_ms），
+    # 由调用方（run_agent_loop / config_hub.execute_tool）决定如何格式化错误。
+    if run_with_timeout is not None and ToolTimeoutError is not None and timeout_ms and timeout_ms > 0:
+        return run_with_timeout(
+            _call_impl, args=(), kwargs={},
+            timeout_ms=timeout_ms,
+            tool_name=name,
+        )
+
+    # 无 watchdog / 无超时 → 走原路径（ratchet）
+    return _call_impl()
 
 
 def _retry_verify_math(expr: str) -> str:
