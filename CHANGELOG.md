@@ -1,3 +1,370 @@
+### v1.1.4 §3.38 subagent 生命周期事件 + 多级 skill 目录（2026-08-15 ⭐）
+
+**本版定位**：落地 §3.38 剩余两项代码需求（A1 #29 多级 skill 目录 + A2 H-4 subagent 生命周期事件），全部 TDD（RED→GREEN）。
+
+**A1 多级 skill 目录（#29，借鉴 deepseek-harness skill-filesystem customSkillDirs）**：
+- skill_registry._load_dirs() 升级为**三层路径合并**：全局（skills/）< 项目（config/skills/）< 用户（~/.paeg/skills/ 或 /skills/）
+- 高优先级层同名覆盖低优先级层（用户可覆盖项目，项目可覆盖全局）
+- 用户配置 ~/.paeg/skills.json 支持 {env:KEY|默认} 变量替换（复用 config_loader 模式，避免循环导入内联实现）
+- 配置缺失 → 静默回退（向后兼容现有 config/skills.json 用户）
+- 新建 config/skills.json.example 示例
+
+**A2 subagent 生命周期事件（H-4，借鉴 deepseek-harness tool-workflow）**：
+- paeg.PAEG.__init__ 构造后发射 subagent/descriptor（9 个 subagent 各一个，name/model/kb_ref）
+- paeg.teach() 用 _subagent_run 包装 5 个核心 subagent 调用（diagnostor/planner/presenter/evaluator/adapter）——	ool-workflow/agent-start + gent-end 成对（runId UUID 配对 + duration_ms）
+- workflows_hub._run_subagent 发射同对（workflow 路径单漏斗覆盖）
+- hooks_hub.run_hook 发射 hook/invoked + hook/result
+- 全部事件过 infra.event_types.make_event() 校验（未知类型拒绝）
+
+**验证（TDD RED→GREEN）**：11 项新测试（skill 5 + lifecycle 6）+ 回归 90/90 全过 + smoke 10/13（3 个 FAIL 为 DEEPSEEK_API_KEY 未设置的环境限制，非代码问题）+ 服务运行正常
+
+**文档**：需求文档 §3.38 状态更新 + 本 CHANGELOG + 技术全景 §10.19 + 元能力 §6.61-§6.62
+
+### v1.1.3 §3.38 Profile Bundle + 配置树导出（2026-08-15 ⭐）
+
+**本版定位**：依据 Harness 调研继续落地 H-2（Profile Bundle 分层）+ H-13（配置树导出 API），并同步技术/元能力/维护三文档（纪律 18）。
+
+**H-2 Profile Bundle 分层（借鉴 boot/app-boot/src/profile.ts）**：
+- 新建 services/profile_bundle.py：Profile = 目录（paeg_profiles/<name>/）+ bundle manifest（patch 声明）
+- **堆叠顺序**（低→高）：默认 → bundle1 → bundle2 → profile.patch → user_overrides（用户最高优先）
+- **稀疏 patch**：深度合并（只改想改的键，其余继承 defaults，非整层覆盖）
+- 内置 bundle：base（基座）/ exam（锁权限）/ weil（薇依人格）——教师一键切场景不改代码
+- ProfileBundleService：切换 profile / 导出生效配置
+
+**H-13 配置树导出 API（对齐 dsh --dump-config）**：
+- GET /api/admin/dump-config：完整可 patch 配置树（profiles/bundles/agents/tools/effective）
+- 实测：profiles=standard、bundles=base/exam/weil、agents=10、tools=96
+
+**文档同步（纪律 18）**：
+- 技术全景文档 §10.17/§10.18（MCP 可移植性 + Harness P1 三项）
+- 元能力文档 §6.57-6.60（配置驱动安全模式 / chain-key 计数 / 双开关权限 / 事件类型化）
+- 维护手册 §18.39-18.41（热重载 SOP / 权限切换 / 事件类型约束）
+- 需求文档 §3.38（综合审查 + 新模块蓝图 + 文档同步计划）
+
+**验证（TDD）**：6 项新测试全过（profile 分层/堆叠/用户优先/稀疏 patch/配置树/端点）+ 最终回归 41/41 + dump-config 端点实测 + 公网 200
+
+### v1.1.2 §3.37 Harness P1 低成本实施三项（2026-08-15 ⭐）
+
+**本版定位**：依据 DeepSeek Harness 调研（ForMaitenance/DeepSeek_Harness最新调研_47f9438.md，HEAD=47f9438）落地 3 个低成本高价值 P1 项——repeat-tool-guard 精确化 / Permission Presets 双开关 / Session Event Log 类型化。全部 TDD（RED→GREEN）。
+
+**H-16 repeat-tool-guard 升级（借鉴 guard/repeat-tool-reminder）**：
+- hooks_hub.repeat_guard_check 升级为 **chain-key 精确计数**：key = JSON.stringify([name, canonicalArgs])（深度键排序）——相同工具**不同参数不算重复**
+- **多级阈值 [3, 5, 8]**：3 温和提醒 / 5+ 详细提醒（含工具名+次数+参数预览）
+- 新增 on_user_message()：用户插话 → 重置 chain（对齐 agent/pre-step 语义）
+- config_hub.execute_tool 传入 tool_args（chain 精确性）
+
+**#18 Permission Presets 双开关（借鉴 interaction/permission-presets）**：
+- 新建 services/permission.py：预设 = sandbox + approval 命名组合（一个选择器管两个开关）
+- 三 knob 事件：permission/preset（意图 log-only）/ sandbox/mode / approval/policy——append-only 可回放
+- **custom 派生状态**：knob 偏离所有预设 → custom（不可作切换目标）
+- 与 tool_registry 4 档兼容（standard/exam/read_only/full → 双 knob 映射）
+
+**H-1/H-12 Session Event Log 类型化（借鉴 core/session）**：
+- 新建 infra/event_types.py：SessionEvent envelope {type, seq, time, data, ignorable?, surfaceOp?} + **56 个已知事件类型**（13 核心 + 28 插件 + 15 PAEG 教学）
+- surface 事件（user/message、assistant/message、tool/result）强制 surfaceOp 校验
+- observability.emit_event_typed：未知类型早失败（ValueError）
+
+**验证（TDD）**：3 项新测试 16/16 全过（guard 5 + permission 6 + event 5）+ 最终回归 47/47 全过 + 真实验证（模块导入/双开关切换/custom 派生/guard 拦截与重置/envelope 构造）+ 服务重启 health OK + 公网 200
+
+**文档**：需求文档 §3.37（新增实施项 + 新模块蓝图）+ 本 CHANGELOG
+
+### v1.1.1 §3.36 MCP 工具可移植性：配置驱动加载器（2026-08-15 ⭐）
+
+**本版定位**：修复 §3.36 断链——config/mcp_tools.json 声明了但无加载器接入，改配置不影响行为（14/14 工具 description 与工具表不一致）。落地"改配置即生效"的可移植工具体系。
+
+**配置驱动加载器（§3.36，Oracle 设计 + librarian 调研）**：
+- 新建 mcp_tools_loader.py：JSON→可注册 (defs, handlers) 翻译器——安全边界四重（模块前缀白名单 tool_registry/constraint_engine/material_pipeline/services/lib/utils + 拒绝危险模块 os/sys/subprocess/importlib/builtins/pickle/yaml/ctypes/socket + 函数名非下划线 identifier + 永不 exec/eval），单条声明损坏跳过不影响其他
+- 	ool_registry.register_external_tools()：外部 handler 合入 _HANDLERS + risk=write 自动同步 _WRITE_TOOLS（exam 模式锁定配置工具）+ _apply_config_meta() 配置元数据覆盖内置工具 description/params + _config_tool_defs() 追加外部工具定义
+- config_hub.reload_all() 链尾追加 mcp_tools 重载（失败保留旧配置）——热重载即生效
+- 新建 config/mcp_tools.example.json（schema 模板 + 3 样例）+ 交付物/MCP工具手册.md 新增"五、加载机制"章节
+
+**验证（TDD RED→GREEN）**：
+- 5 项测试全过：JSON 工具可见（14/14 description 一致）/ 增条目 → 工具表增加 / 删条目 → 下架 / 改 description → 工具表变化 / risk=write → exam 锁定
+- 热重载实证：改配置→reload_all→工具表变化（无重启）；新工具注册 + 删除下架均即时生效
+- 回归 25/25 全过（toolchain + skill registry + 新测试）；audit 34/39（失败项均既有状态，本次零新增）
+
+**文档**：需求文档 §3.36 状态更新 + MCP工具手册.md 加载机制 + 本 CHANGELOG
+
+### v0.71 学段教学模式差异化 + sub agent 模型配置化 + 配置化定制服务（2026-08-14 ⭐）
+
+**学段教学模式差异化（§3.33，用户 ULW + Oracle 两次咨询）**：
+- `GRADE_TEACHING_MODES`：4 学段 × 6 维教学法结构——初中"感官优先·三步可视化"（现象→画面→类比→命名→复述，emoji/生活类比/复述触发）/ 高中"结构优先·五步走"（定义→公式→例题→误区→知识结构图，LaTeX+### 标题）/ 大学"正式 lecture·五步论证"（严格定义→定理→推导→应用→学科视野，学科史/开放问题，绝不把大学课当高中补习讲）/ 考研"考点解剖·五步得分"（考什么→怎么考→套路→真题→易错点，真题编号+⚡⚠️📌⏱标签）
+- `GRADE_SCAFFOLDS`（Oracle 升级）：可执行段序列骨架模板（段名/目的/指令/长度/形式量化）→ render_scaffold_to_system 渲染为【NEXT】逐段强制清单——**结构差异 + 内容深度双落实**（非仅措辞）
+- build_presenter_system 注入 grade_mode_line + scaffold_line（grade_line 后、constraint 前）；get_grade_mode/get_grade_scaffold 未知学段回退高中
+- 与 Presenter easy/normal/deep + L0-L7 约束层正交（四层叠加）
+
+**sub agent 模型配置化（§3.32，用户新指令 + librarian 四项目调研）**：
+- `config_loader.py`：三层合并（DEFAULTS → ~/.paeg/agents.json → config/agents.json）+ {env:KEY|默认}/{file:path} 变量替换 + create_llm_for per-subagent LLM 工厂 + disabled 回退
+- `config/agents.json`：10 subagent 可配（provider/model/temperature/max_tokens/thinking_level/enabled）——用户不改代码即可为每个 subagent 分配不同模型
+- paeg.py：agents_config/use_agents_config 参数——各 LLM subagent 按配置创建独立 LLM，失败回退
+- 借鉴：opencode 多层 merge + DeepSeek Harness 稀疏 patch + Claude Code 文件引用
+
+**配置化定制服务蓝图（面向用户）**：explore 全量盘点可配置化点（SUBJECT_STYLES 外置/Adapter 阈值/温度散落 15 处/教学模式三档/危机关键词等 14 项，含行号）——config/agents.json 已落地，其余为后续
+
+**技术说明 PDF 排版优化（Oracle + visual 双咨询）**：dsf=1 截图（PNG 减半）+ figure 容器化 + 高窄图 .tall 跨页 + 节尾防空白 + 修复 figcaption 误判既有标题
+
+**文档治理**：需求文档即工作流中枢（元能力 §5.9 + 技术说明附录 D + 维护 18.36）
+
+### v0.70 语言规范 MCP 标准化 + L0-L8 约束引擎 MCP 化 + Harness 深调研（2026-08-14 ⭐）
+
+**本版定位**：①语言规范模块 MCP 化（统一入口 + 违禁词数据化 + 三工具）②L0-L8 约束系统 MCP 化（constraint_engine 6 API）③DeepSeek Harness 架构深调研（30 项优化需求记录）。
+
+**语言规范 MCP 标准化（§3.28，用户 ULW）**：
+- Phase 1-2：13 处 `_polish_text` 收敛为 `lang_gate_content` 统一入口（9 文件）+ 补 /api/solve 与知识导图漏洞
+- Phase 3：违禁词数据化 `data/forbidden_words.json`（extra_forbidden/pseudo_empathy_verbs/ai_tells_extra）——language_refiner 启动合并加载（内嵌 AI_TELLS 577 项去重 555 + 外部 18，dict.fromkeys 去重，文件缺失容错）
+- Phase 4：MCP 三工具双层注册（tool_registry + mcp_gateway）——`normalize_text`（L0+L2 统一守门）/ `language_policy_check`（AI 味概率 + 违禁词命中，不调 LLM）/ `forbidden_words`（list/add/remove 幂等落盘）
+- 修复 `_BUILTIN_NAMES` 去重漏洞（config_hub 回灌内置定义导致 compose_dynamic_prompt 等 4 工具重复 → 54 工具无重复）
+
+**L0-L8 约束引擎 MCP 化（§3.29，Oracle 设计）**：
+- 新建 `constraint_engine.py`：6 API——layer_get（读层放开组/规则）/ layer_set（动态切换层，复用 _build_constraint_layers）/ compose（任意提示词块拼接）/ always_active（永远激活管理，内嵌 L0 11 条 + 外部）/ self_evolve（洞察写入层组，数据化落盘）/ feedback_adjust（信号词映射：啰嗦→loosen_m、太直接→tighten_t、太机械→loosen_s、太浅→loosen_d、太深→tighten_d）
+- 双层注册 6 工具（always_active/self_evolve 标 write 风险入 exam 黑名单）+ 数据化（constraint_layers.json/always_active.json/constraint_feedback_log.jsonl）
+- 验证：6 API 全测 + MCP 网关真实调用 + 42 测试全过
+
+**DeepSeek Harness 深调研（§二 Step 2，用户要求 ≥16 项）**：
+- 官方架构文档全文 + Cordis 原语（Service/Inject/4 事件模式/Effect/Scope）+ 4 预设差异 + patch 加载顺序 + capability seams + 权限预设 + 子代理 provider
+- 产出 30 项 PAEG 优化需求（9 P0 + 14 P1 + 7 P2，含 H-1~H-18 速查表）+ 4 阶段实施路线（6-10 周）+ 30+ permalinks
+- 技术说明图 9/15 深色文字+深色背景不可见问题记录（待技术说明任务修复）
+
+**测试修复**：skill 断言更新为 11 技能（含 teaching-capability）+ MCP stats() 更新为 connect_all/list_tool_defs 实际 API——42 工具相关测试全过。
+
+### v0.69 自我更新闭环 + 配置体系运行时接入 + 哲学专项 + 防幻觉（2026-08-14 ⭐）
+
+**本版定位**：①自我更新闭环全链路修复（G1 流式蒸馏/G2 门禁澄清/G3 热加载/G5 教学记忆/G6 工具经验 LLM 提炼）②独立配置体系（config_hub/hooks/workflows）真正接入运行时（Step4 P0 断链修复）③哲学学科专项教学能力 ④防幻觉底线（TRUTH_GROUNDING）覆盖全模式 ⑤10 条执行纪律固化。
+
+**防幻觉底线（NEW-9，用户最高优先）**：
+- prompts.py 新增 TRUTH_GROUNDING（10 条：绝不编造/信源为绝对命令/先证据后结论/允许说不知道/区分确定与推测）
+- 注入 build_presenter_system + build_general_chat_system + AffectionSupportor（v0.69 补）——全模式幂等覆盖
+
+**AffectionSupportor 人格统一（用户要求）**：
+- 倾诉模式引入完整 WEIL_CORE（身份三层/薇依底色/核心信念，2461 字符）+ TRUTH_GROUNDING
+- 与教学/闲聊模式人格一致，倾诉不教不答不解决约束不受影响
+
+**哲学学科专项（§3.10，用户要求）**：
+- SUBJECT_STYLES[philosophy] 新增 method_guide（文献论证结构分析 A 六步 + 概念分析 B 六步，反教条句式）+ worked_example（柏拉图洞穴寓言完整论证解构）
+- SUBJECT_GRADES 解锁 graduate_exam 考研档；SUBFIELD_TREE 新增三学段二级学科（高中 2/本科 6/考研 4）
+- 端到端验证：洞穴寓言教学输出含论证结构导向 + 概念对子分析
+
+**自我更新闭环修复（Explore 审查 G1-G11）**：
+- G1 ✅ 流式蒸馏：teach_stream done 后从完整对话历史抓取 → SimpleNamespace 构造 session → distill_knowledge（用户方案：自我更新与流式无关）
+- G2 ✅ 门禁澄清：L3 LLM factuality 事实评分始终执行，skip_sandbox 仅跳过 L4 证据累积（纠正误导注释）
+- G3 ✅ 热加载：evolved_*.json 写入后 reload_library（KB 即时可见）
+- G5 ✅ 教学记忆：Presenter.run 注入 load_teaching_memory
+- G6 ✅ 工具经验 LLM 提炼（适用场景/要点/误区/替代方案，模板兜底）
+
+**配置体系运行时接入（Step4 P0 断链修复，explore 12 处断链）**：
+- P0-1 ✅ run_agent_loop 工具执行统一走 config_hub.execute_tool（hooks/repeat_guard/workflows 路由解锁）
+- P0-2 ✅ hooks 触发点：内置 log_hook + config/hooks.json 5 个 hook + teach_stream 入口触发 session.start/message.before_user + done 后 message.after_assistant
+- P0-3 ✅ get_tool_defs 合并扩展工具（内置7+skills10+MCP25+workflows2=44 无重复；修复递归守卫+list()dict 解析+内置去重）
+- P0-4 ✅ /api/admin/reload 端点（config 热更新，返回 hooks 加载状态）
+- P1-1 ✅ hooks.json 填充（5 log hook）
+
+**Step1.5 Harness 借鉴**：
+- Permission Preset 4 档（read_only/standard/exam/full——exam 锁写工具，借鉴 deepseek-harness）
+- repeat-tool-reminder Guard（连续 3 次同工具拦截提醒，借鉴 deepseek-harness）
+
+**执行纪律固化（用户执行标准）**：
+- 操作纪律 14→19 条：git 操作铁律（15）/批量重构正则 AST 铁律（16）/checkout 备份+禁 reset --hard（17）/更新及时记文档（18）/subagent 结果及时移入项目（19）
+- 历史 bug report 档案 4 份（§D：画像缓存/学习体验/倾诉语言/agent 智能化，用户报告→根因→修复→验证）
+
+**九模块底座评估（Step4 Oracle）**：Diagnosis 最弱（诊断未驱动计划）、Profile 未消费（画像未驱动下游）——§3.12 固化，后续实施诊断→计划闭环 + 画像驱动。
+
+版本号：v0.68.0 → v0.69.0。
+
+**RALPH 循环子系统（T5 同日）**：新增 ralph/ 任务执行循环器（Oracle 设计）——围绕改进任务迭代"执行→验证→承诺→续触"直到达标；三层完成判定（L0 门禁/L1 指标/L2 证据）+ 五道防呆防线；端到端验证 DONE。记录：技术/维护/元能力/README/亮点总览。
+
+**SEL 系列补充（同日）**：SEL-7 知识老化归档（evolved>90 天→Archive，保留历史）+ SEL-8 用户反馈接口（/api/feedback→feedback_log.jsonl）+ G8 工具经验限长截断（40KB 保留 30 条）+ 动态提示词拼接 tool（compose_dynamic_prompt，用户核心设想）+ 自我更新链路真实端到端验证（蒸馏→写入→热加载→检索命中）。G1-G11 自我更新 11 缺口全闭环；SEL-1~10/NEW-1~8 全部完成或核实。.gitignore 补充运行时产物防误提交。全量回归 7/7 通过。
+
+
+
+### v0.68 学习计划工作流 + v4-flash 思考修复（2026-08-13 ⭐）
+
+**本版定位**：学习方法模式集成"制定学习计划"功能（Oracle 架构：method 子意图 + LM 优先）——用户对某领域感兴趣时生成分阶段+资源+时长的学习计划；同时修复 deepseek-v4-flash 思考型模型的空响应 bug。
+
+**学习计划工作流（Oracle 设计）**：
+- 意图路由：study_plan 作为第 15 个意图加入 meta_router VALID_INTENTS + INTENT_PROMPT（LLM 判断），is_study_plan_intent 正则兜底
+- services/planner.py：StudyPlan/Phase/Milestone/Resource 数据类 + 5 阶段工作流（提取参数→聚合资源→阶段划分→个性化→结构化输出）
+- 阶段骨架确定性（阶段数/模板/周数：基础→强化→实战），里程碑内容 LLM 个性化（LM 优先）
+- services/handlers/study_plan.py：端点处理器（复用 services.polish 语言规范）
+- method.py 分流：is_study_plan_intent 命中 → study_plan 子流程（teach 拦截同步）
+- 资源连通：复用 collect_all_resources（用户物料/知识库/facts/联网 4 路）
+- 前端 renderStudyPlan 卡片渲染（阶段折叠+里程碑+检验+teach 跳转按钮）+ 快速开始文案
+- 版本号 v0.46.0 → v0.68.0
+
+**v4-flash 思考模型空响应修复（重要根因）**：
+- **现象**：普通 chat 调用返回空（content=""），学习计划走兜底、部分模式输出异常
+- **根因**：deepseek-v4-flash 是思考型模型——即使普通 chat 不带 thinking 参数，API 也先输出 reasoning_content；max_tokens 被思考链占满 → content 为空（finish_reason=length）
+- **修复1**：OpenAICompatModelAPI.chat 显式 `thinking: {"type": "disabled"}`（普通/OFF/B 路径），只有 ReasonerModelAPI（A 路径）开 thinking——严格匹配 SUBAGENT_THINKING_LEVELS 矩阵设计
+- **修复2**：max_tokens 默认 2000 → 4000（思考模型需 token 空间，用户要求放开）
+- **验证**：连续 5 次 _safe_chat 全返回（此前全空）；3 个学习计划测试全部 LLM 高质量生成
+
+**测试**：POST /api/method「我想学习生命现象学，该怎么样入门」→ step_type=study_plan + 3 阶段 LLM 生成（悬置/意向性/知觉现象学/身体图式等专业内容）+ teach 跳转按钮
+
+**推荐学习资料附录（v0.68+）**：
+- 学习计划 summary_md 末尾追加"### 📚 推荐学习资料"（来自 collect_all_resources 4 路检索结论：用户资料库/知识库/facts/联网）
+- 全确定性渲染（不调 LLM），按 source 分组 + 200 字截断 + 空路省略 + has_any=False 兜底文案
+- 前端 renderStudyPlan 加折叠卡片（resources 字段），点击里程碑 teach 衔接
+- 修复 library.py web_search_multi 调用参数 bug（n=2 → max_total=2，此前 TypeError 被吞致 web_hits 恒空）
+
+**联网检索增强（v0.68+ Oracle 方案）**：
+- web_search_tool 降级栈升级：Brave MCP → s.jina.ai → Tavily → Serper → Bing
+- 新增 _brave_mcp_search（MCP brave 调用，需 BRAVE_API_KEY；无 key 静默返回 [] 回退）
+- 修复 s.jina.ai 未接入降级栈的历史 bug
+- 根因：原只有 Bing 可用（Tavily/Serper/Jina 无 key），Bing 中文分词差（"生命现象学"被拆成"生命"）
+- 用户填 BRAVE_API_KEY 到 mcp_servers.json 后自动启用（免改代码）
+
+**文档**：技术 §10.14（v4-flash 修复 + 学习计划）+ 维护 §18.26（学习计划 + 空响应根因）+ 元能力 §6.54
+
+**残留进程排查实录（维护 §18.28 + 元能力 §6.55）**：
+- 现象：planner 加附录后函数级测试通过但 HTTP 无附录，反复重启无效
+- 根因：**残留进程 PID=1060 一直占着 5000 端口**（启动时间早于我最后"启动"27 秒），我的"重启"实际都失败，health 来自旧进程
+- 教训：**先查端口进程 PID+启动时间，用 PID 杀残留，确认端口释放再启动**；函数级 vs HTTP 差异 = 进程版本差异；DEBUG 打印终极诊断
+- `Get-Process python | Stop-Process` 可能漏杀 cmd start 子进程——用端口反查 PID 最可靠
+
+**DeepSeek Harness 借鉴 + 架构优化（v0.68+ ⭐）**：
+- **参考项目研究**：DeepSeek_Harness经验文档.md（patch 层/事件模型/workflow DSL/preset/权限 九章节）+ 技术 §10.15 + 教材附录 C
+- **Oracle 架构检视**：PAEG架构优化需求清单.md（P0-6 优先级）
+- **P0-2 mcp_client session 复用**：缓存 transport（npx 进程复用），MCP 调用延迟 -80%（此前每次新建）
+- **P0-1 workflows_hub MVP**：教学流水线声明化（diagnose→plan→present→evaluate DAG）+ run_workflow__ 接入 config_hub
+- **P1-7 hooks timeout**：ThreadPoolExecutor 实现，超时跳过不卡主流程（4 测试全过）
+- **P1-6 skill frontmatter PyYAML**：支持多行/列表/嵌套 frontmatter，PyYAML 兜底（7 测试全过）
+
+### v0.67 交互教学选择题 + 定时主动问候（2026-08-13 ⭐）
+
+**本版定位**：主动提问 question 功能（教学选择题推动教学）+ 定时主动问候（老师式关心）+ 倾诉语病修复。
+
+**交互教学选择题（Oracle 设计）**：
+- /api/teach/quiz/next + /api/teach/quiz/answer 双端点
+- services/quiz_service.py：LLM 出题（4 选项 JSON）+ 内置题库兜底（真实知识点题：极限/导数/二次函数/矩阵/概率/向量）
+- 前端 showQuizCard 弹窗：题干+4 选项点选 + 自定义回答输入框 + 反馈
+- 判题：过渡语（"太棒了，回答正确！""很可惜，选错了"）+ 掌握度 EMA 更新 + chat_hist 写回（衔接下一次教学）
+- 一题一答防重 + 10min TTL
+
+**定时主动问候（Oracle 设计）**：
+- 前端 idle 检测（5-10min 无操作，**指数分布概率延迟**——非固定时间，模拟真实"随机想起"）
+- proactive_templates.py 模板字典（学科×idle 时长×时段，15+ 条示例）
+- /agent/proactive_greet 端点 + 频率限制（每会话 1 次/每日 3 次/30min 间隔）
+- 渲染标记"（老师主动问候）"，非打扰式
+
+**倾诉语病修复**：AffectionSupportor 提示词加"语法铁律"（主谓宾完整/用词准确/禁缺宾语——修复"驳"应为"反驳"、"一句真实的"缺宾语），输出过语言规范
+
+**交付物**：交付物/v0.66_自检评估报告.md（对照技术手册 21 类承诺逐项核对 + 连通性 + 测试结果）
+
+**文档**：技术 §10.10 + 维护 §18.22 + 元能力 §6.49 + README 翻新（TOC + v0.67 版本）
+
+### v0.66 架构连通性重构 + 授课式讲义讲稿 + 短指令补全（2026-08-13 ⭐）
+
+**本版定位**：Oracle 连通性诊断（B1-B10）修复 + 用户核心需求落地（讲义/讲稿/视频/PPT/manim 全链路联通 + 授课式质量 + 短指令补全 + 情绪学习双轨 + 语言规范 L0-L3 接入生成链路）。
+
+**架构连通性修复（Oracle B1-B10）**：
+- B1: /api/teach/video 统一走 produce_lesson_video 融合管线（带 outline 也含 manim 讲稿）
+- B2: 思维导图前端按钮（第 6 个功能按钮）+ kmapChat 显式触发 + LLM 重试
+- B3: PPT 与讲稿同一事实源（key_points 并入 PPT）
+- B4: 思维导图注入三路资源（用户物料 + KB + 网络检索）
+- B7: 找答案模式注入统一资源门面（联网 + 知识库 + Library）
+- 统一资源门面 collect_all_resources：manim/讲义/讲稿/找答案 接入 KB+物料+facts+联网
+
+**授课式讲义+讲稿（用户核心需求）**：
+- file_generator.generate_handout：完整教学讲义（6 段：教学目标/导入/新授/巩固/小结/作业）
+- script_service 授课式讲稿：称呼/引导提问/过桥句/互动标记（"同学们…注意看…你发现规律了吗"），废弃"标题+逗号拼接"兜底
+- 链路：讲义→讲稿→PPT→manim→视频（讲义为单一事实源）
+
+**短指令补全层（用户核心需求）**：
+- services/intent_inference.py：短输入（"极限"）→ 自动推断学段/学科/深度/时长 + 假设清单
+- 端到端验证：输入"极限"两字 → 72s 完整融合视频
+
+**情绪+学习双轨（教学模式）**：
+- teach_stream 混合输入（情绪+学习）→ 先情绪回应 + 学习衔接语（不截断教学）
+- AffectionSupportor 提示词新增"情绪+学习并存"衔接指令
+
+**语言规范 L0-L3 接入生成链路**：
+- services/lang_gate.py：统一守门（L0 polish + L2 refiner 薇依语料矫正）
+- 讲义/讲稿/manim 讲稿全部过语言规范；L1 提示词约束注入生成 system
+
+**测试**：
+- tests/test_chain_integration.py：6 项全链路集成测试 6/6 通过
+- 实测：教学模式（单步教学循环）、倾诉模式（注意力陪伴）、情绪+学习双轨、短指令视频生成
+
+**文档**：技术全景 §10.9 + 维护手册 §18.21 + 元能力 §6.48 + 亮点总览 待追加
+
+### v0.65 Manim 三档分级速度规范（2026-08-12）
+- 快 1.2s（重复动作）/ 中 1.8s（中间态）/ 慢 3.0s（关键）+ Aha 2.5s+3.0s
+- manim_speed.py 固定化常量 + 提示词注入，用户无需调速度
+- venv 重建（D 盘 py3.9 + manim 0.19.0）
+
+### v0.63.1 Manim 动画降速（2026-08-12）
+- run_time 提高到 2-4s 教学节奏（后调整为三档分级）
+
+### v0.63 Manim 意图层 + 动画用心版 + 欢迎语精简（2026-08-12）
+- manim_prompts.py：简单话→场景 prompt（9 场景，验证 9/9）
+- 圆面积扇形切分重组动画；欢迎语精简（快速开始指南）
+- 个体性动态性哲学入元能力 §6.47
+
+### v0.62 融合视频管线 + 制作功能工具条 + 深度思考按钮（2026-08-12）
+
+**本版定位**：视频制作从"PPT 讲解视频"升级为**融合视频**——把 manim 动画和 Library 资源剪辑进时间轴；前端 5 个制作功能按钮（无 emoji SVG）；深度思考 per-turn 按钮。
+
+**融合视频管线（Oracle 方案 + 用户学科分派）**：
+- outline_ir.py：`[[manim: 主题]]` / `[[asset: 类型: 路径]]` 占位标记解析 → 结构化 IR
+- asset_loader.py：Library/usr_knowledge 用户物料加载（realpath 防穿越）+ PPT 模板主色
+- video_service.compose_with_slots：PPT 帧 + TTS + manim 片段 + 资源叠图 → ffmpeg concat（同规格归一化）
+- services/production_pipeline.py：编排器（IR→manim 预渲染→资源解析→视频合成→PPT 同步）
+- **学科类型分派**：数学/物理/几何等可视化类才插 manim；语文/历史等自动忽略占位降级纯讲解（is_manim_subject 门控，11/11 验证）
+
+**前端制作工具条**（无 emoji，Lucide SVG）：
+- 5 按钮：讲义 / PPT / 授课视频 / 数学动画 / 深度思考（cmd-trigger + cmd-tag 悬浮标签模式）
+- 深度思考 per-turn：点一次仅下一条消息启用（payload deep_think=true，发送后自动重置，后端请求级 env 恢复）
+- emoji 清理：📐🎬📝🔊🔒 → SVG/文字（TTS 用 volume-2.svg，PPT 新建 presentation.svg）
+
+**实测**：二次函数融合视频 30.7s（PPT 3 页 + manim 抛物线动画剪辑，27s 生成）；语文主题降级验证（manim_count=0 正常出片）
+
+**文档**：维护手册 §18.20 + 元能力 §6.46 待追加
+
+### v0.55.0 深度思考模式接入（DeepSeek V4 thinking + 能力分级矩阵）（2026-08-12）
+
+**本版定位**：接入 DeepSeek V4 深度思考（thinking 模式），按"任务分型"分级启用——生成型深度思考、混合型轻引导、分类型不思考。调研（librarian）+ 架构（Oracle）+ 用户分级原则。
+
+**能力分级矩阵**（SUBAGENT_THINKING_LEVELS）：
+- **A 路径**（reasoner 真思考链）：Presenter 教学讲解、AnswerSolver 复杂解答——开放式长文本，受益最大
+- **B 路径**（_THINK_PREFIX prompt 引导，零成本）：Diagnostor 诊断、SelfUpdate 反思、Individuality 建模——混合型，防 JSON 污染
+- **OFF**（纯普通调用）：meta_router 意图路由、Adapter 选项选择、retrieval_scope——分类/识别型，思考干扰决策 + 延迟敏感
+- **用户原则**：思考接口可留但不连接前端；分类/选择型任务不需要深度思考
+
+**技术实现**：
+- llm_api.py：新增 ReasonerModelAPI（`thinking:{"type":"enabled"}` + `reasoning_effort` + `reasoning_content` 提取 + reasoning_tokens 统计）；chat() 保持原契约（返回 content 字符串）零破坏
+- 模型名迁移：deepseek-chat/deepseek-reasoner（2026-07-24 下线别名）→ deepseek-v4-flash 自动迁移
+- subagents.py：_safe_reason_chat（A 双阶段：reasoner 思考→flash 落地；B prompt 引导；OFF 纯调用）+ 三态 enable_reasoning（None=查矩阵/True=强制A/False=强制OFF）+ _summarize_thinking 思考摘要（防 token 爆）
+- 门控：PAEG_REASONING=on 总开关（默认 off 零影响）；PAEG_REASONING_FORCE=on 强制全 A；PAEG_THINK_MAX_CHARS 思考注入上限
+- reasoner 不支持 tools → 有工具需求的调用自动降级 B 路径
+
+**验证**（直接调用，未跑 pytest）：
+- 能力矩阵 9/9 通过；ReasonerModelAPI 3/3（解析/兼容/tools 拒绝）；全文件 py_compile 通过
+- 思考链注入带 `<<UNTRUSTED trust=internal>>` 标记 + 泄漏检测（防思考内容外泄/注入污染）
+
+**文档**：维护手册 §18.19 + 元能力 §6.45 待追加
+
+### v0.54.0 掌握度真实化 + Affection 判读层 + SSE 重构工具（2026-08-12）
+
+**本版定位**：修复"掌握度恒定 0.84"根因（讲解段数伪信号）→ 改用学生真实回复信号；Affection 模块引入 Oracle 方案 A 结构化判读层；SSE 重构 P0 基线工具就绪。
+
+**掌握度真实化（Oracle 审查）**：
+- 根因：teach_stream 兜底评分 `score = 0.6 + 0.08 × 讲解段数`（3 段恒 0.84，与学习零相关）
+- 修复：从 chat_hist 取最近学生消息 → Evaluator._student_signal 浅层语义分析（理解/困惑/参与度）→ 真实信号评分（"懂了"涨、"太难了"降；无数据中性 0.55）
+- 前端：修复 STATE.masteries 从未赋值 bug（stat-avg 恒"-"）；stat-avg 透明化"N科·均值"+hover 各科明细；完成播报语义化（理解反馈良好/一般/偏弱）
+- 收尾：LearnerProfile.masteries 别名属性 + 清理 _student_signal 冗余 isinstance
+
+**Affection 判读层（Oracle 方案 A）**：
+- 新增 `_analyze_turn()` 结构化判读层（subagents.py）：危机硬规则 → 情绪词典 → 反问密度 → 决策映射，输出 emotion/intensity/need/stage/response_mode/confidence
+- 6 种回应模式（acknowledge/reframe/ground/anchor/explore/clarify）注入 system prompt（confidence≥0.5 硬约束，<0.5 软引导）
+- 与 RiskClassifier 正交：判读层只决定回应模式，风险等级仍由安全分类器负责，不破坏危机协议
+- 实测 6/6 case：危机→acknowledge+0.85、拒绝→anchor、反问→clarify、挫败→reframe、正反馈→explore、普通烦躁→acknowledge 软引导
+
+**SSE 重构 P0（Oracle 方案）**：
+- tests/baselines/record_teach_stream.py 基线录制脚本（5 场景）
+- tests/baselines/test_sse_regression.py 字节级回归断言（事件顺序/JSON 契约）
+- P1-P4（协议层/阶段处理器/编排器）按计划后续推进
+
+**文档**：维护手册 + 元能力 + 技术全景 §10 待追加
+
 ### v0.53.0 视频生成升级 + 8 层约束确认 + 路演 PPT v3（2026-08-11）
 
 **本版定位**：视频生成从"标题+要点拼接"升级为"演讲稿驱动"（Oracle pipeline）+ 8 层约束实现确认 + 路演 PPT 详实版。
@@ -2011,3 +2378,5 @@ SECRET_KEY 生产强制；ResourceLibrarian 全局持有；文件操作能力扩
 - 乱码快速兜底（utils/gibberish.py）：78s → 0.2s
 - 测试框架资产化（stress_parallel.py 可复用）
 **文档**：技术全景 12.4/12.5 + 维护手册 18.13/18.14 + 元能力 6.41
+**数学可视化脚本生成器（§3.26 同日）**：Manim 生成升级"提示词→脚本"——对话+轮询收集信息 → script.json（单一真相源）→ 7 铁律校验 → 5 资产联动（Manim 视频/讲稿/PPT/讲义/思维导图全部可下载）；方法来源 3B1B 8 原则 + manim_skill + Oracle。P0：visual_script_generator + validator。
+**workflow 增强教学物料制作（§3.27 同日）**：新增 teach_materials workflow（7 步 DAG：主题→大纲→知识导图/讲义/PPT/脚本→讲稿→资产包）；workflows_hub 占位符替换补丁（_run_subagent/_run_llm 支持 {step_id}/{param}）；教学物料全部可下载。
