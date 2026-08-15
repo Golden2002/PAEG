@@ -253,7 +253,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 10 | **Preset 文件结构标准化**：agent.patch.yml + preset.yml + prompts/ + assets/ | preset 目录规范 | paeg/presets/* | P1 |
 | 11 | **9 Subagent 三角色重构**：Service Definition/Provider/Consumer（RuleDiagnostor vs LLMDiagnostor 等）| ctx.shell 三角色 | subagents.py | **P0** |
 | 12 | **LLM Provider Seam**：切换模型不改业务代码（deepseek/openai_compat）| ctx.llm 多 provider | llm_adapter.py | **P0 ✅**（§3.46.2，PROVIDER_REGISTRY+provider_info）|
-| 13 | **Shell/Subprocess Seam**：本地/docker/沙箱执行可换 | ctx.shell + ctx.subprocess | tool 执行层 | **P0** |
+| 13 | **Shell/Subprocess Seam**：本地/docker/沙箱执行可换 | ctx.shell + ctx.subprocess | tool 执行层 | **P0 ✅**（§3.46.2，services/subprocess_service.py）|
 | 14 | **Tool Registry 能力协商**：元数据级先注入 name/desc，按需完整加载 | defer_loading + listChanged | skill_registry.py | P1 |
 | 15 | **Session Event Log**："Model-visible ⟺ logged" 铁律 + deriveMessages 投影 + SessionEventMap 类型化 | core/session | infra/session | P1 ✅（§3.37 类型层+§3.46.2 H-1 存储层）|
 | 16 | **Hooks 瀑布链**：waterfall 事件（next() 委托，短路可观测）| Waterfall listeners MUST call next() | hooks_hub | P2 ✅（§3.42 W1 4-dispatch + §3.46.2 H-14 tools/* 补全）|
@@ -1493,5 +1493,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#7 教学预设 ✅（Harness P0，2026-08-16）**——services/teaching_presets.py 新建：4 内置预设（standard/minimal/code-mode/weil-classical）+ register_teaching_preset 自定义注册 + resolve_preset() 联动 tool_registry.PERMISSION_PRESETS（权限档）与 paeg_personas（persona 正文）；minimal→read_only（禁写）/ code-mode→full / standard+weil-classical→standard，默认 standard 兼容现状；dsh 借鉴 agent-presets 4 预设目录；8 测试全绿 + SURFACE 联动验证（allow_write/模式/persona 2443 字符）（commit 341095a）
   - **#1 Subagent Patch 系统 ✅（Harness P0，2026-08-16）**——services/subagent_loader.py 新建：DEFAULT_AGENT_PATCHES（9 subagent：diagnostor/planner/presenter/evaluator/adapter/answer_solver/affection_supportor/self_update_agent/individuality）+ get/register/apply/load_yaml_patch；apply_subagent_patch 与 config/agents.json（§3.32 Provider 层）合并（patch 覆盖缺省继承）；persona 字段链接 paeg_personas（#3 衔接，2443 字符注入）；load_yaml_patch 可选扩展（config/subagents/*.patch.yml，无 yaml 依赖容错）；dsh 借鉴 agent.cordis.yml `- id:` 整体替换；6 测试全绿 + SURFACE 验证（9 补丁/agents.json 合并/persona 链接）（commit 新）
   - **#21 Subagent Registry Provider 可插拔 ✅（Harness P0，2026-08-16）**——infra/subagent_registry.py 追加：PROVIDER_TYPES（in-process/external-script/llm-call 三类）+ EXTERNAL_PROVIDERS + LLM_CALL_PROVIDERS 注册表 + register/get_external_provider + register/get_llm_call_provider + get_provider（统一入口，未知类型容错）；与既有 Registry（in-process，W3 完成）互补——Registry 管"类"注册，此处管"provider 类型"；dsh 借鉴 packages/subagent spawn/fork provider；6 测试全绿 + SURFACE 验证（3 类型/注册/统一入口/容错）（commit 新）
+  - **#13 Shell/Subprocess Seam ✅（Harness P0，2026-08-16）**——services/subprocess_service.py 新建：RunResult + SUBPROCESS_PROVIDERS 注册表 + run_command（统一入口，替代散落 13+ 处 subprocess.run——manim/video 等）+ get_provider（未知回退 local 容错）+ python_cmd（跨平台）；本地/docker/沙箱执行可换（provider 可注册可替换）；dsh 借鉴 packages/shell/executor seam；7 测试全绿 + SURFACE 验证（统一入口/超时保护/回退/失败码）（commit 新）
   - **回归验证 ✅**：36 passed（全部新功能测试）+ audit_check 39/39
 
