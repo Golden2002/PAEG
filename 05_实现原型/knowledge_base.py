@@ -5,7 +5,7 @@ v0.5 用内存存储；v1.0 替换为 PostgreSQL + 向量库。
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 
 # §3.42 W12 ⭐ 接入 LRU+TTL 缓存（行为透明——返回节点 dict 或 None）
 try:
@@ -14,6 +14,129 @@ try:
 except Exception:  # noqa: BLE001 — infra.cache 不可用时回退到原始 dict 缓存
     _W12_CACHE_ENABLED = False
     _LRUCache = None  # type: ignore[assignment]
+
+
+# ---------------------------------------------------------------------------
+# v0.42 ⭐ Oracle RAG 优化项 #2：search() 改用 BM25Okapi + jieba 真排序
+# ---------------------------------------------------------------------------
+# 复用 lib/ingest/retriever 的 jieba 自定义词典（80+ 教育/数学/物理/AI 术语）
+# —— 这里只定义 fallback 词表，防止 lib/ingest 不可用时完全没词典可用。
+_FALLBACK_JIEBA_TERMS = (
+    "瞬时变化率", "切线斜率", "曲边梯形", "定积分", "不定积分", "导数", "积分", "极限",
+    "微积分", "微分", "偏导", "全微分", "洛必达", "泰勒展开", "麦克劳林", "傅里叶",
+    "勾股定理", "余弦定理", "正弦定理", "向量", "矩阵", "行列式", "特征值",
+    "二次方程", "一元二次", "二元一次", "方程组", "对数函数", "指数函数", "幂函数",
+    "概率", "条件概率", "贝叶斯", "期望", "方差", "标准差", "正态分布", "排列组合",
+    "等差数列", "等比数列", "椭圆", "双曲线", "抛物线", "圆锥曲线", "球面",
+    "量子力学", "量子纠缠", "薛定谔", "波函数", "相对论", "狭义相对论", "广义相对论",
+    "时空弯曲", "光速不变", "热力学", "热力学第一定律", "热力学第二定律", "熵增", "熵",
+    "电磁感应", "麦克斯韦方程", "光电效应", "牛顿第二定律", "动量守恒", "能量守恒",
+    "万有引力", "加速度", "波粒二象性", "驻波", "多普勒效应", "现象学", "存在主义",
+    "建构主义", "最近发展区", "支架式教学", "形成性评价", "终结性评价", "布鲁姆",
+    "元认知", "工作记忆", "长时记忆", "图式",
+)
+
+
+def _ensure_kb_jieba_dict() -> bool:
+    """确保 jieba 自定义词典已注册到 knowledge_base 上下文（幂等）。
+
+    优先复用 lib/ingest/retriever.ensure_custom_dict()（80+ 术语）；
+    不可用时退化用 _FALLBACK_JIEBA_TERMS。
+    Returns True 表示已注册（成功或已存在）。
+    """
+    try:
+        from lib.ingest.retriever import ensure_custom_dict  # type: ignore
+        ensure_custom_dict()
+        return True
+    except Exception:
+        pass
+    # 退化：本地 fallback 词典
+    try:
+        import jieba  # type: ignore
+        for term in sorted(set(_FALLBACK_JIEBA_TERMS), key=lambda x: -len(x)):
+            try:
+                jieba.add_word(term, freq=10000, tag="n")
+            except Exception:
+                pass
+        return True
+    except Exception:
+        return False
+
+
+# 模块加载时即注册一次（行为可预测，与 retriever 模块一致）
+_ensure_kb_jieba_dict()
+
+
+def _kb_tokenize(text: str) -> List[str]:
+    """jieba 中文分词 + 过滤纯标点 / 空白（参考 lib/ingest/retriever._tokenize）。
+
+    - 优先用 jieba.lcut（精确模式）。模块加载时已注册 80+ 教育/学术术语自定义
+      词典——如"导数"/"瞬时变化率"/"熵"等术语不会被切碎。
+    - jieba 不可用时退化：中文逐字 + 英文按字符，保留可索引性。
+    - 过滤纯标点 / 空白 token。
+    """
+    text = (text or "").strip()
+    if not text:
+        return []
+    try:
+        import jieba  # type: ignore
+        tokens = [t for t in jieba.lcut(text, cut_all=False) if t.strip()]
+    except Exception:  # noqa: BLE001 — jieba 不可用时退化
+        tokens = [ch for ch in text if not ch.isspace()]
+    # 过滤纯标点 token（必须含至少一个 alnum 字符）
+    out: List[str] = []
+    for tok in tokens:
+        if any(ch.isalnum() for ch in tok):
+            out.append(tok)
+    return out
+
+
+def _kb_substring_fallback(
+    query: str, candidates: list, subject: Optional[str], top_k: int
+) -> list:
+    """当 BM25Okapi / jieba 不可用或 query token 为空时的降级路径。
+
+    简化为子串匹配计数（不依赖任何外部库），保证 search() 永不抛异常且返回
+    schema 与真 BM25 路径完全一致。
+    """
+    q = (query or "").lower().strip()
+    scored = []
+    for nid, node in candidates:
+        haystack = " ".join([
+            nid,
+            str(node.get("definition", "") or ""),
+            str(node.get("intuition", "") or ""),
+            str(node.get("core_question", "") or ""),
+            str(node.get("concept", "") or ""),
+            str(node.get("name", "") or ""),
+        ]).lower()
+        # 整句命中 +2；逐 token 命中 +1
+        token_hits = sum(1 for tok in _kb_tokenize(query) if tok and tok.lower() in haystack)
+        score = (2 if q and q in haystack else 0) + token_hits
+        if score > 0:
+            scored.append((score, nid, node))
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    results = []
+    for sc, nid, node in scored[: max(1, int(top_k))]:
+        snippet = (node.get("definition") or node.get("core_question") or "")[:120]
+        results.append({
+            "concept_id": nid,
+            "title": nid,
+            "snippet": snippet,
+            "relevance_score": float(sc),
+            "difficulty": node.get("difficulty", 5),
+        })
+    return results
+
+
+# 延迟导入：get_rag_config 在 search() 内调用，避免模块加载时强制读盘
+def get_rag_config():
+    """延迟导入 services.rag_config.get_rag_config（避免 knowledge_base 顶层 import）。"""
+    try:
+        from services.rag_config import get_rag_config as _grc
+        return _grc()
+    except Exception:  # noqa: BLE001 — 配置不可用兜底
+        return {}
 
 
 class KnowledgeBase:
@@ -904,26 +1027,135 @@ class KnowledgeBase:
         return [n for n in self.subjects.values() if n.get("subject") == subject]
 
     def search(self, query: str, subject: str = None, top_k: int = 5) -> list:
-        """关键词检索（简化 BM25）：按概念/定义/直觉字段匹配度返回节点。"""
-        q = query.lower()
-        scored = []
+        """关键词检索（真 BM25Okapi 排序 + jieba 中文分词）。
+
+        v0.42 ⭐ Oracle RAG 优化项 #2：从"简化 BM25"（token 命中计数，无 IDF / 无
+        长度归一化）升级为 ``rank_bm25.BM25Okapi`` 真排序（含 IDF + 长度归一化 +
+        jieba 中文分词 + 自定义词典），预期 Recall +10~20%。
+
+        设计要点：
+        - **懒构建语料**：每次 search 重建 BM25Okapi 语料。KB 节点数 ~100 量级，
+          重建开销可接受；避免 ``_search_cache``（v0.15 raw dict，语义可能与新
+          BM25 不一致——Oracle 风险提示）带来的缓存失效问题。
+        - **缺字段兜底**：节点缺 definition / intuition 等字段不崩（用 ``.get``
+          兜底，生成空字符串。B4 后 evolved 节点字段齐全，但未 schema 节点仍需
+          防御）。
+        - **降级路径**：BM25Okapi / jieba 不可用时，回退为简单子串匹配（保证
+          永不抛异常）。
+        - **保留签名与返回 schema**：``(query, subject=None, top_k=5)`` →
+          ``[{concept_id, title, snippet, relevance_score, difficulty}, ...]``。
+
+        Parameters
+        ----------
+        query : str
+            用户查询文本（中文/英文混合均可）。
+        subject : str, optional
+            学科过滤（math / physics / chemistry / ...）。None 时不过滤。
+        top_k : int, default 5
+            返回的最相关节点数；候选不足时返回全部（不补空）。
+
+        Returns
+        -------
+        list of dict
+            按 ``relevance_score`` 降序排列的相关节点；无匹配返回 ``[]``。
+        """
+        # ---- 1) subject 过滤：构造候选节点列表 + 保留 nid 顺序 ----
+        candidates: list = []  # [(nid, node)]
         for nid, node in {**self.subjects, **self.humanities, **self.skills}.items():
-            if subject and node.get("subject") != subject and node.get("dimension") != subject \
-               and node.get("category") != subject:
+            if subject:
+                # subjects 用 "subject" 键，humanities 用 "dimension"，
+                # skills 用 "category"——三处都要兼容
+                if (node.get("subject") != subject
+                        and node.get("dimension") != subject
+                        and node.get("category") != subject):
+                    continue
+            candidates.append((nid, node))
+
+        if not candidates:
+            return []
+
+        # ---- 2) 构造语料：每节点拼成一个文本 + tokenize ----
+        def _node_text(nid: str, node: dict) -> str:
+            """把节点的"语义相关字段"拼成一段可索引文本。缺字段自动兜底为空串。"""
+            perspectives = node.get("tradition_perspectives", {}) or {}
+            return " ".join([
+                nid,
+                str(node.get("definition", "") or ""),
+                str(node.get("intuition", "") or ""),
+                str(node.get("core_question", "") or ""),
+                str(node.get("concept", "") or ""),
+                str(node.get("name", "") or ""),
+                " ".join(str(v) for v in perspectives.values()),
+            ])
+
+        corpus_texts = [_node_text(nid, node) for nid, node in candidates]
+
+        # ---- 3) jieba 分词（参考 lib/ingest/retriever._tokenize） ----
+        q_tokens = _kb_tokenize(query)
+
+        # 无 token（纯标点/空白/无法分词）→ 回退子串匹配（防崩溃）
+        if not q_tokens:
+            return _kb_substring_fallback(query, candidates, subject=subject, top_k=top_k)
+
+        # ---- 4) 懒构建 BM25Okapi 语料索引 ----
+        try:
+            from rank_bm25 import BM25Okapi  # type: ignore
+
+            # 读取 BM25 参数（k1 / b）—— 配置化（B1：config/rag.json）
+            try:
+                _cfg = get_rag_config().get("retrieval", {})
+                _k1 = float(_cfg.get("bm25_k1", 1.5))
+                _b = float(_cfg.get("bm25_b", 0.75))
+            except Exception:  # pragma: no cover - 配置不可用兜底
+                _k1, _b = 1.5, 0.75
+
+            tokenized_corpus = [_kb_tokenize(t) for t in corpus_texts]
+            # rank_bm25 已知小语料库问题：corpus_size < 5 时 IDF 容易为 0，
+            # 导致 BM25 分数全为 0 → 排序失效。修复：填充"通用语料" dummy docs
+            # 到语料库（无关领域词），让 IDF 计算正常；最后只对真实候选取 scores。
+            _BM25_PAD_TEXTS = (
+                "雨伞 雨鞋 雨衣 防雨 衣物 穿着 户外 旅行 包 背包 行李 工具 锤子 钉子 螺丝",
+                "音乐 钢琴 吉他 小提琴 鼓 乐器 演奏 音符 节拍 旋律 作曲 唱歌 演唱会",
+                "水果 苹果 香蕉 橙子 西瓜 葡萄 草莓 樱桃 桃子 梨 菠萝 芒果",
+                "运动 篮球 足球 排球 网球 跑步 游泳 健身 瑜伽 舞蹈 比赛 体育",
+                "电影 导演 演员 剧本 摄影 剪辑 特效 影院 票房 观众 评分",
+                "宠物 狗 猫 鸟 鱼 仓鼠 兔子 饲养 兽医 训练 玩具",
+                "汽车 轮胎 引擎 方向盘 刹车 油 电动 充电 驾驶 公路 高速",
+            )
+            if len(tokenized_corpus) < len(_BM25_PAD_TEXTS) + 1:
+                # 仅在候选较少时填充（避免在 ~100 doc 真实语料库下污染）
+                while len(tokenized_corpus) < 5:
+                    pad_text = _BM25_PAD_TEXTS[len(tokenized_corpus) % len(_BM25_PAD_TEXTS)]
+                    tokenized_corpus.append(_kb_tokenize(pad_text))
+
+            bm25 = BM25Okapi(tokenized_corpus, k1=_k1, b=_b)
+            # 只取真实候选对应的 scores（padding 不进入结果）
+            scores = bm25.get_scores(q_tokens)[: len(candidates)]
+        except Exception as exc:  # pragma: no cover - rank_bm25 不可用兜底
+            # BM25 构建失败（如 rank_bm25 未装 / jieba 不可用）→ 降级子串匹配
+            return _kb_substring_fallback(query, candidates, subject=subject, top_k=top_k)
+
+        # ---- 5) 排序 + 截断 top_k ----
+        # 按 score 降序（同分按 nid 升序，保证稳定性）
+        indexed = sorted(
+            enumerate(scores),
+            key=lambda x: (-x[1], candidates[x[0]][0]),
+        )
+        results = []
+        for idx, sc in indexed[: max(1, int(top_k))]:
+            # BM25Okapi 对完全无命中的 doc 返回 0 分；过滤掉 0 分结果（保持原行为）
+            if sc <= 0:
                 continue
-            haystack = " ".join([
-                nid, node.get("definition", ""), node.get("intuition", ""),
-                node.get("core_question", ""), node.get("concept", ""), node.get("name", ""),
-                " ".join(node.get("tradition_perspectives", {}).values()),
-            ]).lower()
-            score = sum(1 for token in q.replace("?", "").replace("？", "").split()
-                        if token and token in haystack)
-            if score > 0 or q in nid:
-                scored.append((score + (2 if q in nid else 0), nid, node))
-        scored.sort(key=lambda x: -x[0])
-        return [{"concept_id": nid, "title": nid, "snippet": (node.get("definition") or node.get("core_question") or "")[:120],
-                 "relevance_score": sc, "difficulty": node.get("difficulty", 5)}
-                for sc, nid, node in scored[:top_k]]
+            nid, node = candidates[idx]
+            snippet = (node.get("definition") or node.get("core_question") or "")[:120]
+            results.append({
+                "concept_id": nid,
+                "title": nid,
+                "snippet": snippet,
+                "relevance_score": float(sc),
+                "difficulty": node.get("difficulty", 5),
+            })
+        return results
 
     def subject_catalog(self) -> dict:
         """返回学科目录（CLI 用）。"""
