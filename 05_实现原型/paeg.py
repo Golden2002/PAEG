@@ -42,6 +42,12 @@ class LearnerProfile:
     # 兼容旧 _crisis_opt_out(bool)：读取时优先 _crisis_state，缺失则迁移旧值
     _crisis_state: Optional[dict] = field(default=None)
 
+    # v0.47 ⭐ 掌握度别名（Oracle 审查）：前端/调用方用 learner.masteries 恒可读，
+    # 后端字段名切换（subjects_mastery）不破坏调用方。
+    @property
+    def masteries(self) -> dict:
+        return getattr(self, "subjects_mastery", {}) or {}
+
 
 @dataclass
 class SessionContext:
@@ -63,20 +69,40 @@ class PAEG:
     """PAEG 主类。"""
 
     def __init__(self, model_api, knowledge_base: KnowledgeBase, enable_self_update=True,
-                 verbose: bool = False, enable_refiner: bool = True):
+                 verbose: bool = False, enable_refiner: bool = True,
+                 agents_config: Optional[dict] = None, use_agents_config: bool = True):
+        """PAEG 主类。
+
+        v0.71 §3.32 ⭐ sub agent 模型配置化：
+        - agents_config: 合并后配置（load_agents_config() 结果）；None 时若 use_agents_config=True 自动加载
+        - use_agents_config: 是否启用 config/agents.json per-subagent 模型分配（默认 True）
+        - 各 LLM subagent 按配置创建独立 LLM（provider/model 可不同）；配置缺失/失败回退 model_api
+        """
         self.model = model_api
         self.kb = knowledge_base
+        # v0.71 §3.32：per-subagent 模型注入（配置驱动；失败静默回退主 model_api）
+        self._agents_cfg = None
+        if use_agents_config:
+            try:
+                from config_loader import load_agents_config, create_llm_for
+                self._agents_cfg = agents_config if agents_config is not None else load_agents_config()
+                self._llm_for = lambda name: create_llm_for(name, self._agents_cfg, fallback=model_api)
+            except Exception:
+                self._llm_for = lambda name: model_api
+        else:
+            self._llm_for = lambda name: model_api
+
         # v0.24 ⭐ 持有全部 9 个 subagent
         # 1. 诊断
-        self.diagnostor = Diagnostor(model_api, knowledge_base)
+        self.diagnostor = Diagnostor(self._llm_for("diagnostor"), knowledge_base)
         # 2. 计划
-        self.planner = Planner(model_api, knowledge_base)
+        self.planner = Planner(self._llm_for("planner"), knowledge_base)
         # 3. 呈现
-        self.presenter = Presenter(model_api, knowledge_base)
+        self.presenter = Presenter(self._llm_for("presenter"), knowledge_base)
         # 4. 评估（v0.24：区分 presentation_quality 与 learner_state）
-        self.evaluator = Evaluator(model_api, knowledge_base)
+        self.evaluator = Evaluator(self._llm_for("evaluator"), knowledge_base)
         # 5. 调整（v0.24：决策携带可执行 override_system_line）
-        self.adapter = Adapter(model_api, knowledge_base)
+        self.adapter = Adapter(self._llm_for("adapter"), knowledge_base)
         # 6. 答案（找答案模式）
         self.answer_solver = AnswerSolver()
         # 7. 情绪支持（危机信号时走这条而非教学）
@@ -93,7 +119,8 @@ class PAEG:
         # 10. 资料检索员（v0.43 ⭐ P0-C 提升：从"按请求构造"升级为全局持有）
         # ResourceLibrarian 构造无状态（仅绑定 model/kb），用户隔离靠 run(learner=...) 参数，
         # 因此全局持有完全安全——真正实现"9+1 全持有"，不再每请求 new 实例。
-        self.resource_librarian = ResourceLibrarian(model=model_api, kb=knowledge_base)
+        self.resource_librarian = ResourceLibrarian(model=self._llm_for("resource_librarian"),
+                                                    kb=knowledge_base)
         self.self_updater = SelfUpdater(knowledge_base) if enable_self_update else None
         # v0.12：语言优化 Agent（薇依语料矫正，去除 AI 痕迹）
         self.refiner = None
@@ -112,9 +139,57 @@ class PAEG:
             print(f"[PAEG] 自我更新模块初始化失败（跳过）: {_e}")
         self.verbose = verbose
 
+        # §3.38 A2 ⭐ H-4：构造完成后发射 subagent/descriptor（每个 subagent 一个）
+        try:
+            for _name, _agent in [
+                ("diagnostor", getattr(self, "diagnostor", None)),
+                ("planner", getattr(self, "planner", None)),
+                ("presenter", getattr(self, "presenter", None)),
+                ("evaluator", getattr(self, "evaluator", None)),
+                ("adapter", getattr(self, "adapter", None)),
+                ("answer_solver", getattr(self, "answer_solver", None)),
+                ("affection_supportor", getattr(self, "affection_supportor", None)),
+                ("individuality", getattr(self, "individuality", None)),
+                ("resource_librarian", getattr(self, "resource_librarian", None)),
+            ]:
+                if _agent is not None:
+                    self._emit("subagent/descriptor",
+                               name=_name,
+                               model=getattr(getattr(self, "_llm_for", lambda n: self.model)(_name), "model", None) or "",
+                               kb_ref="knowledge_base",
+                               descriptor_path=f"subagents.{_name}")
+        except Exception:
+            pass
+
     def _log(self, msg: str):
         if self.verbose:
             print(msg)
+
+    # §3.38 A2 ⭐ H-4 subagent 生命周期事件（v1.1.4，借鉴 deepseek-harness tool-workflow）
+    # 事件发射统一走 observability.emit_event_typed（类型校验 + JSONL 落盘），失败静默不阻塞教学。
+    @staticmethod
+    def _emit(event_type: str, **payload):
+        try:
+            from observability import emit_event_typed
+            emit_event_typed(event_type, **payload)
+        except Exception:
+            pass
+
+    def _subagent_run(self, name: str, fn, run_id: str, **kwargs):
+        """包一层 subagent 调用：start → run → end（runId 配对 + 时长）。"""
+        import time as _t
+        _t0 = _t.time()
+        self._emit("tool-workflow/agent-start",
+                   agent=name, run_id=run_id, learner_id=str(getattr(kwargs.get("learner"), "id", "anon")),
+                   subject=kwargs.get("subject", ""), ts=_t.time())
+        try:
+            _res = fn(**kwargs)
+            return _res
+        finally:
+            _dur = round((_t.time() - _t0) * 1000, 1)
+            self._emit("tool-workflow/agent-end",
+                       agent=name, run_id=run_id, duration_ms=_dur,
+                       stop_reason="completed")
 
     def _get_self_update_agent(self):
         """v0.42 ⭐ P1 修复：懒创建 SelfUpdateAgent（替代僵尸实例）。
@@ -204,10 +279,10 @@ class PAEG:
 
         # 1. 诊断
         self._log(f"\n[1/5] 诊断子代理：评估 {learner.nickname} 的当前水平...")
-        session.diagnosis = self.diagnostor.run(
-            learner=learner,
-            question=question,
-            subject=subject
+        _run_id = f"{session.session_id}-diag-{datetime.now().strftime('%H%M%S%f')}"
+        session.diagnosis = self._subagent_run(
+            "diagnostor", self.diagnostor.run, _run_id,
+            learner=learner, question=question, subject=subject,
         )
         self._log(f"   OK 诊断完成：ready_to_teach={session.diagnosis.get('ready_to_teach', True)}"
               f"（{session.diagnosis.get('diagnosed_by', 'rule')}）")
@@ -220,11 +295,11 @@ class PAEG:
 
         # 2. 计划
         self._log(f"\n[2/5] 计划子代理：设计教学路径...")
-        session.plan = self.planner.run(
-            learner=learner,
-            diagnosis=session.diagnosis,
-            subject=subject,
-            concept=question
+        _run_id = f"{session.session_id}-plan-{datetime.now().strftime('%H%M%S%f')}"
+        session.plan = self._subagent_run(
+            "planner", self.planner.run, _run_id,
+            learner=learner, diagnosis=session.diagnosis,
+            subject=subject, concept=question,
         )
         # v0.26 ⭐ subtopic 注入每个 plan step（二级学科锚定；空则不注入）
         if subtopic:
@@ -328,13 +403,11 @@ class PAEG:
                         individuality_control=individuality_control if individuality_control else None,
                         individuality_profile_prompt=individuality_profile_prompt,
                     )
-                presentation = self.presenter.run(
-                    step=step,
-                    learner=learner,
-                    previous=session.history,
-                    tone_info=tone_info,
-                    concept=question,
-                    subject=subject,
+                presentation = self._subagent_run(
+                    "presenter", self.presenter.run,
+                    f"{session.session_id}-pres-{i}-{datetime.now().strftime('%H%M%S%f')}",
+                    step=step, learner=learner, previous=session.history,
+                    tone_info=tone_info, concept=question, subject=subject,
                 )
             except TypeError:
                 # 兼容老 Presenter.run 签名
@@ -374,10 +447,10 @@ class PAEG:
 
             # 4. 评估（每个呈现步骤后）—— v0.24 真正评估学生
             self._log(f"   -> 评估子代理：检查学生理解...")
-            evaluation = self.evaluator.run(
-                step=step,
-                learner=learner,
-                presentation=presentation
+            evaluation = self._subagent_run(
+                "evaluator", self.evaluator.run,
+                f"{session.session_id}-eval-{i}-{datetime.now().strftime('%H%M%S%f')}",
+                step=step, learner=learner, presentation=presentation,
             )
             session.evaluations.append(evaluation)
             self._log(f"   OK 评估分数：{evaluation['score']}（讲解质量 "
@@ -396,10 +469,10 @@ class PAEG:
             # 5. 调整（必要时）—— v0.24 真正执行
             if not evaluation.get('ready_to_advance', True):
                 self._log(f"   -> 调整子代理：触发调整...")
-                adjustment = self.adapter.run(
-                    evaluation=evaluation,
-                    learner=learner,
-                    step=step
+                adjustment = self._subagent_run(
+                    "adapter", self.adapter.run,
+                    f"{session.session_id}-adpt-{i}-{datetime.now().strftime('%H%M%S%f')}",
+                    evaluation=evaluation, learner=learner, step=step,
                 )
                 decision = adjustment.get('decision', 'continue')
                 params = (adjustment.get('action') or {}).get('parameters') or {}
