@@ -68,7 +68,7 @@ from utils import (
 from services._learner_session import ensure_learner_session
 # v0.43 ⭐ Wave 3 拆分：业务处理函数迁出 server.py。
 # polish/steering/routing 各自负责一段领域逻辑，所有依赖在函数体内懒加载。
-from services.polish import _polish_text
+from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
 from services.steering import _steer_subject, _steer_unknown_response
 from services.routing import _mode_auto_correct
 from infra.runtime import (
@@ -104,8 +104,8 @@ CORS(app, resources={r"/api/*": {"origins": CORS_ORIGINS}})
 try:
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-except Exception:
-    pass
+except Exception as _e:
+    print(f"[PAEG][server.py] ProxyFix 不可用（生产环境 HTTPS 反代受影响）: {_e}")
 if PAEG_ENV == "production":
     app.config["SESSION_COOKIE_SECURE"] = True
     app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -154,7 +154,8 @@ def _assign_request_id():
     try:
         from infra.sessions import session_cleanup
         session_cleanup()
-    except Exception:
+    except Exception as _e:
+        print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
         pass
     # v0.51 ⭐ P0-3（Oracle）：全局滑动窗口限流（防 LLM 资源耗尽）
     if not _rate_limit_allow(request):
@@ -219,22 +220,33 @@ def _inject_skill_catalog(system: str) -> str:
 
     - SKILL_REGISTRY 未初始化（None）或扫描结果为空 → 原样返回（容错）
     - 已有 system 含相同 catalog_prompt 标记时跳过重复注入
+    - v0.69+ P1-3：统一走 SkillRegistry.inject_catalog（与 subagents 共享实现）
     """
     if not system:
         return system
     if SKILL_REGISTRY is None:
         return system
     try:
-        catalog = SKILL_REGISTRY.catalog_prompt()
+        return SKILL_REGISTRY.inject_catalog(system)
     except Exception as _e:
-        logger.warning("skill catalog 读取失败: %s", _e)
-        catalog = ""
-    if not catalog:
+        logger.warning("skill catalog 注入失败: %s", _e)
         return system
-    # 幂等性：避免 stream 多次进入 generate 时重复注入
-    if "## 可用技能" in system:
-        return system
-    return system + "\n\n" + catalog
+
+def _build_remediation(steps, student_answer):
+    """v0.69+ §3.20 深入版互动：困惑时在剩余步骤前插入回应+换个方式重讲引导步骤。"""
+    try:
+        _resp = str(student_answer or "")[:100]
+        _lead = {
+            "type": "present",
+            "topic": "回应学生理解检查（温柔回应 + 换个方式重讲核心）",
+            "subtopic": ("学生说：" + _resp + "——先肯定其回答中合理的部分，再用更简单的例子或类比重讲刚才的核心概念，然后温和确认是否清楚"),
+            "duration_min": 2,
+            "is_remediation": True,
+            "bloom": "understand",
+        }
+        return [_lead] + list(steps or [])
+    except Exception:
+        return list(steps or [])
 
 def _append_chat_hist(learner_id: str, user_content: str, assistant_content: str = "") -> None:
     """v0.42.3 ⭐ P0 修复：统一对话历史写回（method/knowledge/affection 三端点共用）。
@@ -468,6 +480,115 @@ def thread_action(student_id, tid):
 # v0.43 ⭐ _mode_auto_correct 已迁出至 services/routing.py。
 # `from services.routing import _mode_auto_correct` 见 L61。
 
+@app.route("/api/intent/infer", methods=["POST"])
+def intent_infer():
+    """v0.66 ⭐ 需求7：短指令模糊检测——前端弹选择题细化。
+
+    请求：{text, grade?, subject?}
+    响应：{ambiguous: bool, topic, subject, grade, depth, options: [...]}
+    模糊时 options 提供可选主题/学科，前端弹选择题。
+    """
+    data = request.get_json(force=True) or {}
+    text = (data.get("text") or "").strip()
+    grade = data.get("grade") or ""
+    subject = data.get("subject") or ""
+    if not text:
+        return jsonify({"ambiguous": True, "topic": "", "options": [],
+                        "error": "empty input"}), 200
+    try:
+        from services.intent_inference import infer_context
+        ctx = infer_context(text, explicit_grade=grade, explicit_subject=subject)
+        options = []
+        if ctx.get("ambiguous"):
+            # 提供常见主题+学科组合让用户选
+            options = [
+                {"label": "数学：极限入门", "topic": "极限", "subject": "数学"},
+                {"label": "数学：行列式与线性代数", "topic": "行列式", "subject": "数学"},
+                {"label": "物理：牛顿运动定律", "topic": "牛顿运动定律", "subject": "物理"},
+                {"label": "语文：文言文实词", "topic": "文言文实词", "subject": "语文"},
+                {"label": "英语：现在完成时", "topic": "现在完成时", "subject": "英语"},
+            ]
+        return jsonify({
+            "ambiguous": bool(ctx.get("ambiguous")),
+            "topic": ctx.get("topic", ""),
+            "subject": ctx.get("subject", ""),
+            "grade": ctx.get("grade", ""),
+            "depth": ctx.get("depth", ""),
+            "options": options,
+            "assumptions": ctx.get("assumptions", []),
+        })
+    except Exception as e:
+        return jsonify({"ambiguous": False, "error": str(e)[:100]}), 200
+
+
+@app.route("/agent/proactive_greet", methods=["POST"])
+def proactive_greet():
+    """v0.67 ⭐ 定时主动问候：前端 idle 5-10min 无操作时触发。
+    频率限制：每会话 1 次 + 每日 3 次 + 最短间隔 30min。
+    返回 {ok, content, proactive: True}——前端 addMsg 渲染（老师主动开口）。
+    """
+    data = request.get_json(force=True) or {}
+    uid = data.get("uid") or data.get("learner_id") or _anon_learner_id(data)
+    session_id = data.get("session_id") or uid
+    idle_ms = int(data.get("idle_ms", 0) or 0)
+
+    # 1) 频率限制（SESSIONS 内存计数）
+    try:
+        meta = SESSIONS.setdefault("proactive_meta", {})
+        today = datetime.now().strftime("%Y%m%d")
+        u_meta = meta.setdefault(uid, {"count": 0, "date": today, "last_at": 0})
+        if u_meta.get("date") != today:
+            u_meta["count"] = 0
+            u_meta["date"] = today
+        if u_meta.get("count", 0) >= 3:
+            return jsonify({"ok": False, "error": "daily_limit"}), 429
+        import time as _t
+        if time.time() - u_meta.get("last_at", 0) < 30 * 60:
+            return jsonify({"ok": False, "error": "too_frequent"}), 429
+    except Exception:
+        pass
+
+    # 2) 学科推断（从最近 chat_hist 提取）
+    subject = "通用"
+    try:
+        hist = SESSIONS.get(f"chat_hist_{uid}", [])
+        if hist:
+            _last = ""
+            for h in reversed(hist[-5:]):
+                if isinstance(h, dict) and h.get("role") == "user":
+                    _last = str(h.get("content", ""))
+                    break
+            for _s in ("数学", "物理", "语文", "英语", "化学", "生物", "历史"):
+                if _s in _last:
+                    subject = _s
+                    break
+    except Exception:
+        pass
+
+    # 3) 选模板 + 写 chat_hist + 计数
+    try:
+        from proactive_templates import pick_template
+        content = pick_template(subject, idle_ms, session_id=session_id)
+    except Exception:
+        content = "在忙什么呀？有问题随时告诉我。"
+    try:
+        hist = SESSIONS.setdefault(f"chat_hist_{uid}", [])
+        hist.append({"role": "assistant", "content": content, "proactive": True})
+        if len(hist) > 60:
+            SESSIONS[f"chat_hist_{uid}"] = hist[-60:]
+    except Exception:
+        pass
+    try:
+        meta = SESSIONS.setdefault("proactive_meta", {})
+        u_meta = meta.setdefault(uid, {"count": 0, "date": datetime.now().strftime("%Y%m%d"), "last_at": 0})
+        u_meta["count"] = u_meta.get("count", 0) + 1
+        u_meta["last_at"] = time.time()
+    except Exception:
+        pass
+
+    return jsonify({"ok": True, "content": content, "proactive": True, "subject": subject})
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
     """健康检查（v0.24 修复 3 ⭐）：增加 mcp_connected / skill_count / agent_engine 字段。"""
@@ -518,7 +639,7 @@ def health():
 
     return jsonify({
         "status": "ok",
-        "version": "0.46.0",
+        "version": "0.69.0",
         "llm_provider": LLM_PROVIDER,
         "llm_model": LLM_MODEL,
         "llm_ok": llm_ok,
@@ -731,9 +852,10 @@ def teach():
         pass  # 元问题路由失败不影响正常教学
 
     # v0.19.7：学习方法咨询拦截——"如何学习线性代数"不应被当概念教学或出题
+    # v0.68 ⭐ 学习计划：is_study_plan_intent 命中也拦截（用户"想系统学X"）
     try:
-        from meta_router import is_method_advice
-        if is_method_advice(concept):
+        from meta_router import is_method_advice, is_study_plan_intent
+        if is_study_plan_intent(concept, learner) or is_method_advice(concept):
             return _handle_method_advice(learner, concept, subject)
     except Exception as _e:
         print(f"[PAEG][server.py] teach 异常忽略: {_e}")
@@ -931,6 +1053,41 @@ def teach():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/teach/quiz/next", methods=["POST"])
+def teach_quiz_next():
+    """v0.67 交互式教学选择题：出题。{learner_id, concept, subject, difficulty}"""
+    data = request.get_json(force=True) or {}
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
+    learner = ensure_learner_session(learner_id, data, SESSIONS)
+    concept = (data.get("concept") or "").strip() or "当前知识点"
+    subject = data.get("subject") or ""
+    difficulty = int(data.get("difficulty", 1) or 1)
+    try:
+        from services.quiz_service import generate_choice
+        result = generate_choice(learner, subject, concept, difficulty)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": "出题失败: %s" % e}), 500
+
+
+@app.route("/api/teach/quiz/answer", methods=["POST"])
+def teach_quiz_answer():
+    """v0.67 交互式教学选择题：判题 + 掌握度更新。{learner_id, quiz_id, selected_idx}"""
+    data = request.get_json(force=True) or {}
+    learner_id = data.get("learner_id") or _anon_learner_id(data)
+    learner = ensure_learner_session(learner_id, data, SESSIONS)
+    quiz_id = (data.get("quiz_id") or "").strip()
+    selected_idx = data.get("selected_idx")
+    if not quiz_id or selected_idx is None:
+        return jsonify({"error": "quiz_id and selected_idx required"}), 400
+    try:
+        from services.quiz_service import grade_answer
+        result = grade_answer(learner, quiz_id, int(selected_idx))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": "判题失败: %s" % e}), 500
+
+
 @app.route("/api/teach/stream", methods=["POST"])
 @require_module("teach")
 def teach_stream():
@@ -939,6 +1096,27 @@ def teach_stream():
     与 /api/teach 相同请求，但响应是 Server-Sent Events 流。
     """
     data = request.get_json(force=True)
+
+    # v0.69+ §3.20 ⭐ 深入版互动：strict_checkpoint 模式（交互式教学请求启用——每步后挂起等学生回答）
+    _strict_checkpoint = bool(data.get("strict_checkpoint")) or bool(data.get("interactive"))
+
+
+    # v0.68+ P0-2（Step4）：hooks 事件触发（session.start / message.before_user），永不阻断
+    try:
+        from hooks_hub import get_hooks_hub
+        _hh = get_hooks_hub()
+        _lid_hook = str(data.get("learner_id") or "anon")
+        _hh.run_hook("session.start", {"learner_id": _lid_hook, "ts": time.time()})
+        _hh.run_hook("message.before_user", {"learner_id": _lid_hook, "text": str(data.get("concept") or "")[:200]})
+    except Exception as _hook_e:
+        print(f"[PAEG][hooks] teach_stream 触发失败: {_hook_e}")
+
+    # v0.66+ ⭐ Bug2 修复：teach_stream 加 deep_think（per-turn，模式与 chat_stream 一致）
+    # 前端按钮 → 本次教学临时启用 reasoner；生成结束自动恢复默认（不污染后续对话）
+    _dt_requested = bool(data.get("deep_think"))
+    _dt_prev_env = os.environ.get("PAEG_REASONING")
+    if _dt_requested:
+        os.environ["PAEG_REASONING"] = "on"
 
     learner_id = data.get("learner_id") or _anon_learner_id(data)
     # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原 L1091 内联，无 elif / 无 target_exam）
@@ -987,7 +1165,8 @@ def teach_stream():
             _ri = route_intent(concept, llm=llm, use_cache=True)
             if not (_crisis or _emotion_only) and (_ri or {}).get("intent") == "emotion":
                 _emotion_only = True
-        except Exception:
+        except Exception as _e:
+            print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
             pass
         if _crisis or _emotion_only:
             print(f"[PAEG] teach_stream 情绪支持钩子触发（crisis={_crisis}, emotion_only={_emotion_only}）")
@@ -1031,9 +1210,10 @@ def teach_stream():
                     pass
                 # v0.46.1 ⭐ 语言规范收口：grade_blocked 分支的 LLM 内容过 polish
                 try:
-                    from services.polish import _polish_text
+                    from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
                     _gb_content = _polish_text(_gb_content, context="teach:grade_blocked")
-                except Exception:
+                except Exception as _e:
+                    print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
                     pass
                     pass
 
@@ -1051,9 +1231,10 @@ def teach_stream():
             _unk_content = _unk.get("presentations", [{}])[0].get("content", "")
             # v0.46.1 ⭐ 语言规范收口：unknown 分支的 LLM 内容过 polish
             try:
-                from services.polish import _polish_text
+                from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
                 _unk_content = _polish_text(_unk_content, context="teach:unknown")
-            except Exception:
+            except Exception as _e:
+                print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
                 pass
 
             def gen_unknown():
@@ -1232,6 +1413,14 @@ def teach_stream():
         if _llm_intent == "knowledge_map" or (_llm_intent is None and is_knowledge_map_request(concept)):
             _map_result = handle_knowledge_map(concept, subject, learner, llm, history=SESSIONS.get(f"chat_hist_{learner_id}", []))
             _map_content = _map_result.get("content", "")
+            # v0.70+ §3.28 Phase 2：知识导图补语言规范（此前漏洞不过 polish）
+            try:
+                from services.lang_gate import lang_gate_content
+                _map_polished = lang_gate_content(_map_content, context=f"knowledge_map:{concept[:20]}")
+                if _map_polished:
+                    _map_content = _map_polished
+            except Exception:
+                pass
 
             def gen_map():
                 _save_teach_turn("knowledge_map", _map_content)  # v0.36.2 早退分支补保存
@@ -1294,9 +1483,10 @@ def teach_stream():
                 "做演示文稿我建议用课程备课流程——把你的素材和大纲给我，我帮你组织成 PPT。"
             # v0.46.1 ⭐ 语言规范收口：PPT 分支的 LLM 内容也过 polish
             try:
-                from services.polish import _polish_text
+                from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
                 _ppt_reply = _polish_text(_ppt_reply, context="teach:ppt")
-            except Exception:
+            except Exception as _e:
+                print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
                 pass
 
             def gen_ppt():
@@ -1388,9 +1578,10 @@ def teach_stream():
         pass
 
     # v0.19.7：学习方法咨询拦截（流式版本）——v0.35 ⭐ LLM 优先
+    # v0.68 ⭐ 学习计划：_llm_intent == "study_plan" 也拦截（LM 判断"用户要学习计划"）
     try:
         from meta_router import is_method_advice
-        if _llm_intent == "method" or (_llm_intent is None and is_method_advice(concept)):
+        if _llm_intent in ("method", "study_plan") or (_llm_intent is None and is_method_advice(concept)):
             _ma = _handle_method_advice(learner, concept, subject)
             _ma_content = _ma.get_json().get("presentations", [{}])[0].get("content", "")
 
@@ -1585,6 +1776,27 @@ def teach_stream():
             plan = {"steps": _pending_steps}
             SESSIONS.pop(f"teach_plan_{learner_id}", None)  # 取走即清（本轮再存新的）
             SESSIONS.pop(f"teach_plan_done_{learner_id}", None)  # v0.46.2 修复：同步清 done 标志
+            # v0.69+ §3.20 ⭐ 深入版互动：续讲轮评估学生回答（concept=学生对上一步检查问题的回答）
+            # ——用 Evaluator._student_signal 判断理解度，困惑/部分时注入"回应+重讲引导"，
+            #   让 Presenter 在续讲前先温和回应学生，而非直接讲下一步
+            try:
+                _stu_signal = None
+                from subagents import Evaluator as _Ev
+                _sig = _Ev._student_signal(str(concept)[:200])
+                if _sig.get("quality") == "none":
+                    pass  # 无回答文本（学生新提问），正常续讲
+                elif _sig.get("confusion", 0) >= 0.3 or _sig.get("understanding", 0) < 0.4:
+                    _stu_signal = "confused"
+                    plan["steps"] = _build_remediation(plan.get("steps") or [], concept)
+                elif _sig.get("understanding", 0) >= 0.7:
+                    _stu_signal = "understood"
+                else:
+                    _stu_signal = "partial"
+                if _stu_signal:
+                    plan["_student_signal"] = _stu_signal
+                    plan["_student_answer"] = str(concept)[:200]
+            except Exception:
+                pass
             # 续讲轮：不重复诊断（诊断已在首轮完成），只推进剩余步骤
             yield f"event: plan\ndata: {json.dumps({'status': 'continuing', 'steps_left': len(_pending_steps)}, ensure_ascii=False)}\n\n"
         else:
@@ -1734,6 +1946,15 @@ def teach_stream():
             _steps_this_round = _steps_all
         for i, step in enumerate(_steps_this_round):
             yield f"event: step\ndata: {json.dumps({'step_id': i + 1, 'status': 'presenting'})}\n\n"
+            # v0.66 ⭐ 统一资源门面：教学每步注入 KB+facts+用户物料+联网 完整资源块
+            try:
+                from services.library import collect_all_resources
+                _res_all = collect_all_resources(learner_id, concept, llm=llm,
+                                                 subject=subject, include_web=False)
+                if _res_all.get("has_any"):
+                    learner._teach_res_block = _res_all["block"]  # type: ignore[attr-defined]
+            except Exception:
+                pass
             presentation = paeg.presenter.run(
                 step=step,
                 learner=learner,
@@ -1756,13 +1977,14 @@ def teach_stream():
             # v0.46.1 ⭐ 语言规范兜底：教学讲解也过 L2/L3 polish（refiner 侧重薇依语料，
             # polish 保证主谓宾/词法/介词规范——用户要求"所有生成内容都经语言规范控制"）
             try:
-                from services.polish import _polish_text
+                from services.lang_gate import lang_gate_content as _polish_text  # v0.70+ §3.28 统一入口 L0+L2
                 _teach_text = presentation.get("content") or ""
                 if _teach_text:
                     _polished_t = _polish_text(_teach_text, context=f"teach:{concept[:30]}")
                     if _polished_t and _polished_t != _teach_text:
                         presentation["content"] = _polished_t
-            except Exception:
+            except Exception as _e:
+                print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
                 pass
             _assistant_parts.append(presentation.get("content") or "")  # v0.21.3
             _prev_presentations.append(presentation)  # v0.21.8：累积讲解供下一轮参考
@@ -1776,6 +1998,27 @@ def teach_stream():
                     _t_split.sleep(0.02)  # 与 chat_stream 同节奏
             else:
                 yield f"event: presentation\ndata: {json.dumps(presentation, ensure_ascii=False)}\n\n"
+
+            # v0.69+ U3 ⭐ 交互式检查点：每步教学完成后发理解检查问题（前端可答可忽略，不挂起流）
+            try:
+                _cp_q = (f"刚才讲的「{concept}」这部分，你能用自己的话复述一下核心要点吗？"
+                         f"（如果还没跟上，也可以告诉我哪一步不太清楚，我换个方式讲）")
+                _cp_payload = json.dumps({'step_id': presentation.get('step_id', i + 1),
+                                          'question': _cp_q, 'concept': concept,
+                                          'timeout_seconds': 60}, ensure_ascii=False)
+                yield "event: checkpoint\ndata: " + _cp_payload + "\n\n"
+                # v0.69+ §3.20 ⭐ 深入版互动：strict_checkpoint 模式（用户请求"交互式教学"时启用）
+                # ——checkpoint 后结束当前流，等待学生回答；学生回答走 quickAnswer→teach→续讲分支
+                # （teach_plan_{learner_id} 剩余步骤已被存下，新请求自动命中续讲，见行 1746）
+                if _strict_checkpoint:
+                    yield (f"event: done\ndata: "
+                           + json.dumps({'status': 'completed',
+                                         'checkpoint_pending': True,
+                                         'resume_at_step': presentation.get('step_id', i + 1)},
+                                        ensure_ascii=False) + "\n\n")
+                    return
+            except Exception:
+                pass
 
             # 评估
             evaluation = paeg.evaluator.run(step, learner, presentation)
@@ -1817,12 +2060,38 @@ def teach_stream():
         # v0.37.1 ⭐ Oracle P1-2 修复：共享一个 _FakeSession（此前构造 3 次，
         # summary 基于空 evaluations → avg_score 恒 0 → 触发噪声"提示词自进化"）
         _fs_shared = _FakeSession(learner, concept, subject, plan, [])
-        # 用真实教学步数估算掌握度（无 Evaluator 时的合理兜底，避免恒 0）
+        # v0.47 ⭐ 掌握度真实化：旧公式 `0.6 + 0.08 * 讲解段数` 是"AI 输出长度"伪信号
+        # （3 段讲解恒 = 0.84 → EMA 收敛 → 侧边栏永远 0.84，与学生真实掌握零相关）。
+        # 新信号：从 chat_hist 取最近学生消息，用 Evaluator._student_signal 做浅层语义分析
+        # （理解词/困惑词/参与度）→ 分数随真实学习状态波动："懂了"涨、"太难了"降。
         try:
             if _assistant_parts:
+                _std_text = ""
+                try:
+                    _hist_chat = SESSIONS.get(f"chat_hist_{learner_id}", []) or []
+                    for _hh in reversed(_hist_chat[-10:]):
+                        if isinstance(_hh, dict) and _hh.get("role") == "user":
+                            _cc = _hh.get("content")
+                            if isinstance(_cc, str) and _cc.strip():
+                                _std_text = _cc.strip()
+                                break
+                except Exception as _e:
+                    print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
+                    pass
+                try:
+                    if _std_text:
+                        _sig = paeg.evaluator._student_signal(_std_text)
+                        _est = 0.5 + 0.3 * _sig["understanding"] \
+                            - 0.2 * _sig["confusion"] + 0.1 * _sig["engagement"]
+                    else:
+                        # 无学生反馈：中性保守（不虚高 0.84）
+                        _est = 0.55
+                except Exception:
+                    _est = 0.55
                 _fs_shared.evaluations.append({
-                    "score": min(0.95, 0.6 + 0.08 * len(_assistant_parts)),
+                    "score": round(min(0.95, max(0.2, _est)), 3),
                     "step": "summary_estimate",
+                    "signal_source": "student_reply" if _std_text else "no_student_data",
                 })
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
@@ -1975,6 +2244,44 @@ def teach_stream():
         _done_payload = {"status": "completed"}
         _done_payload.update(_done_extra)
         yield f"event: done\ndata: {json.dumps(_done_payload, ensure_ascii=False)}\n\n"
+        # v0.68+ P0-2（Step4）：hooks 事件触发（message.after_assistant），永不阻断
+        try:
+            from hooks_hub import get_hooks_hub
+            _hh = get_hooks_hub()
+            _hh.run_hook("message.after_assistant", {
+                "learner_id": str(learner_id), "text": str(_done_payload.get("reply") or "")[:200]})
+        except Exception:
+            pass
+        # v0.68+ ⭐ G1 修复：流式教学也从完整对话历史蒸馏知识点（2026-08-14 用户方案：
+        # 自我更新与流式无关——蒸馏模块从完整输出后的对话历史抓取，不修改流式循环本体）
+        try:
+            _hist_now = SESSIONS.get(f"chat_hist_{learner_id}", [])[-20:]
+            _ds_history = [{"content": m.get("content", "")} for m in _hist_now
+                           if isinstance(m, dict) and m.get("content")]
+            if _ds_history and getattr(_fs_shared, "evaluations", None):
+                import types as _types_mod
+                import time as _time_mod
+                _ds_session = _types_mod.SimpleNamespace(
+                    concept=concept, subject=subject,
+                    history=_ds_history,
+                    evaluations=_fs_shared.evaluations or [],
+                    session_id=f"stream_{int(_time_mod.time() * 1000)}",
+                )
+                _ds_out = EVOLVER.distill_knowledge(_ds_session)
+                if _ds_out.get("distilled"):
+                    print(f"[PAEG][G1] 流式教学蒸馏入库: {concept} ({subject})")
+        except Exception as _dk_e:
+            print(f"[PAEG][G1] teach_stream distill_knowledge 跳过: {_dk_e}")
+        # v0.66+ ⭐ 深度思考 per-turn：生成结束恢复 env（不污染后续对话）
+        if _dt_requested:
+            try:
+                if _dt_prev_env is None:
+                    os.environ.pop("PAEG_REASONING", None)
+                else:
+                    os.environ["PAEG_REASONING"] = _dt_prev_env
+            except Exception as _e:
+                print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
+                pass
 
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -2276,6 +2583,85 @@ def skills_list():
                 "source": "knowledge_base.skills",
             })
     return jsonify({"skills": skills, "total": len(skills), "source": source})
+
+@app.route("/api/admin/reload", methods=["POST"])
+def admin_reload():
+    """v0.68+ P0-4（Step4）：运行时重载 config_hub（MCP/skills/hooks/workflows 配置热更新）。
+    改 config/*.json 后调用此端点即时生效，无需重启服务器。"""
+    try:
+        from config_hub import get_hub
+        _hub = get_hub()
+        if _hub is None:
+            return jsonify({"ok": False, "error": "config_hub 未初始化"}), 500
+        _hub.reload_all()
+        _extra = {}
+        try:
+            from hooks_hub import get_hooks_hub
+            _hh = get_hooks_hub()
+            _extra["hooks"] = [{"id": h.id, "event": h.event, "loaded": h._fn is not None}
+                               for h in getattr(_hh, "hooks", [])]
+        except Exception as _hx:
+            _extra["hooks_error"] = str(_hx)
+        return jsonify({"ok": True,
+                        "message": "config_hub 已重载（MCP/skills/hooks/workflows）",
+                        **_extra})
+    except Exception as _re_e:
+        return jsonify({"ok": False, "error": str(_re_e)}), 500
+
+
+@app.route("/api/admin/dump-config", methods=["GET"])
+def admin_dump_config():
+    """§3.38 H-13 ⭐ 配置树导出（对齐 dsh --dump-config）。
+
+    返回完整可 patch 配置树：profiles/bundles/agents/tools/effective——
+    用于调试、审计、外部 agent 理解 PAEG 配置结构。
+    """
+    try:
+        from services.profile_bundle import dump_config_tree
+        _tree = dump_config_tree()
+        return jsonify(_tree)
+    except Exception as _dc_e:
+        return jsonify({"ok": False, "error": str(_dc_e)}), 500
+
+
+@app.route("/api/feedback", methods=["POST"])
+def submit_feedback():
+    """v0.69+ SEL-8：用户反馈收集（点赞/👎）——写入 memory/feedback_log.jsonl 供自我更新消费。
+
+    请求：{"learner_id", "rating": "good|bad|neutral", "message"?  , "context"?}
+    """
+    try:
+        _data = request.get_json(force=True) or {}
+        _lid = str(_data.get("learner_id") or "anon")
+        _rating = str(_data.get("rating") or "")
+        if _rating not in ("good", "bad", "neutral"):
+            return jsonify({"ok": False, "error": "rating 需为 good/bad/neutral"}), 400
+        _msg = str(_data.get("message") or "")[:500]
+        _ctx = str(_data.get("context") or "")[:200]
+        _mem = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")
+        os.makedirs(_mem, exist_ok=True)
+        _log_path = os.path.join(_mem, "feedback_log.jsonl")
+        with open(_log_path, "a", encoding="utf-8") as _f:
+            _f.write(json.dumps({
+                "ts": datetime.now().isoformat(),
+                "learner_id": _lid, "rating": _rating,
+                "message": _msg, "context": _ctx,
+            }, ensure_ascii=False) + "\n")
+        # 画像侧轻量累计（不扩展 dataclass——反馈先沉淀日志，自我更新按需消费）
+        try:
+            _lr = SESSIONS.get(f"learner_{_lid}")
+            if _lr is not None and hasattr(_lr, "self_description"):
+                _stats = getattr(_lr, "_feedback_stats", None)
+                if _stats is None:
+                    _stats = {"good": 0, "bad": 0, "neutral": 0}
+                    _lr._feedback_stats = _stats  # type: ignore[attr-defined]
+                _stats[_rating] = _stats.get(_rating, 0) + 1
+        except Exception:
+            pass
+        return jsonify({"ok": True, "recorded": True, "rating": _rating})
+    except Exception as _fb_e:
+        return jsonify({"ok": False, "error": str(_fb_e)}), 500
+
 
 @app.route("/api/upload", methods=["POST"])
 def upload_file():
@@ -2892,6 +3278,12 @@ def general_chat_stream():
     """
     data = request.get_json(force=True)
     text = (data.get("text") or "").strip()
+    # v0.62 ⭐ 深度思考（per-turn）：前端按钮 → 本条消息临时启用 reasoner，
+    # 生成器结束自动恢复默认（不污染后续对话）。
+    _dt_requested = bool(data.get("deep_think"))
+    _dt_prev_env = os.environ.get("PAEG_REASONING")
+    if _dt_requested:
+        os.environ["PAEG_REASONING"] = "on"
     if not text:
         # v0.40.5 ⭐ 修复：空输入返回 200 + 友好提示（此前 400，混沌测试要求 200）
         def gen_empty_chat():
@@ -2941,6 +3333,13 @@ def general_chat_stream():
     # 取最近 10 轮（20 条）格式化为"学生/老师"交替文本注入。
     try:
         _hist_ctx = SESSIONS.get(f"chat_hist_{learner_id}", [])
+        # v0.69+ §3.22 ⭐ compaction：历史超限时压缩早期为摘要（防长会话上下文撑爆，借鉴 deepseek-harness）
+        try:
+            if len(_hist_ctx) > 24:
+                from compaction import maybe_compact
+                _hist_ctx = maybe_compact(_hist_ctx, llm=None)
+        except Exception:
+            pass
         if _hist_ctx:
             _hist_lines = []
             for _m in _hist_ctx[-20:]:
@@ -3341,10 +3740,16 @@ def general_chat_stream():
             try:
                 for tc in (tool_log or [])[:5]:
                     if isinstance(tc, dict) and tc.get("name"):
+                        # v0.69+ G4：success 判定增强（失败信号词集，不止"错误"）
+                        _r60 = str(tc.get("result", ""))[:80]
+                        _ok = bool(tc.get("result")) and not any(
+                            _k in _r60 for _k in
+                            ("错误", "失败", "无法", "不存在", "未找到", "异常",
+                             "error", "failed", "not found", "unable", "超时", "timeout"))
                         EVOLVER.learn_tool_lesson(
                             tool_name=tc.get("name", ""),
                             question=text,
-                            success=bool(tc.get("result")) and "错误" not in str(tc.get("result", ""))[:60],
+                            success=_ok,
                             note=str(tc.get("result", ""))[:100],
                         )
             except Exception as _e:
@@ -3362,6 +3767,16 @@ def general_chat_stream():
                 pass
 
         yield f"event: done\ndata: {json.dumps({'ok': True}, ensure_ascii=False)}\n\n"
+        # v0.62 ⭐ 深度思考 per-turn：生成结束恢复 env（不污染后续对话）
+        if _dt_requested:
+            try:
+                if _dt_prev_env is None:
+                    os.environ.pop("PAEG_REASONING", None)
+                else:
+                    os.environ["PAEG_REASONING"] = _dt_prev_env
+            except Exception as _e:
+                print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
+                pass
 
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -3525,14 +3940,19 @@ def general_chat():
     _use_agent_engine = bool(data.get("mode") == "agent") or bool(data.get("agent_engine"))
     try:
         from tool_registry import run_agent_loop
-        _agent_sys = (
-            system
-            + "\n\n## 工具使用\n"
-            + "你可以调用以下工具来辅助回答：web_search（联网查资料）、verify_math（验证数学表达式）、"
-            + "fetch_page（抓网页全文）、daily_quote（每日一句）、get_time（当前时间）。\n"
-            + "规则：需要最新/外部信息时用 web_search；数学答案可先用 verify_math 验证再回答；"
-            + "其余情况直接回答，不要滥用工具。"
-        )
+        # v0.69+ P1-5：动态生成工具提示（不再硬编码 5 工具——FC schema 已含 mcp/skills/workflows 44 工具）
+        _tool_hint = ""
+        try:
+            from tool_registry import get_tool_defs
+            _tnames = [d.get("function", {}).get("name", "") for d in get_tool_defs()]
+            _builtin = [n for n in _tnames if not n.startswith(("mcp__", "load_skill__", "run_workflow__"))]
+            _tool_hint = ("\n\n## 工具使用\n"
+                          + "你可以调用以下工具辅助回答：" + "、".join(_builtin[:6]) + "。\n"
+                          + "另有联网检索（mcp__*）、技能（load_skill__*）、工作流（run_workflow__*）等扩展工具——"
+                          + "按需调用，不要滥用；数学答案可先用 verify_math 验证再回答。")
+        except Exception:
+            pass
+        _agent_sys = system + _tool_hint
         if _use_agent_engine and AGENT_ENGINE is not None:
             # Plan→Act→Observe→Reflect 显式循环（最多 3 次迭代 + 2 次 replan）
             try:
@@ -3882,14 +4302,15 @@ def _handle_knowledge_query(learner, subject):
     from services.handlers.knowledge import _handle_knowledge_query as _hkq
     return _hkq(learner, subject)
 
-def _handle_method_advice(learner, concept, subject):
+def _handle_method_advice(learner, concept, subject, deadline=""):
     """v0.19.7：学习方法咨询（v0.41.8 迁至 services/handlers/method.py）。
 
     "如何学习X/怎么复习"走学习指导而非教学/出题——结合学段/学科/用户画像，
     给出针对性的学习方法建议（像一位有经验的老师在谈怎么学这门课）。
+    v0.68 ⭐ 新增 deadline 透传（学习计划周期计算）。
     """
     from services.handlers.method import _handle_method_advice as _hma
-    return _hma(learner, concept, subject)
+    return _hma(learner, concept, subject, deadline=deadline)
 
 # ─────────────────────────────────────
 # v0.19.25：独立对话类型端点——学习方法 / 知识库
@@ -3913,6 +4334,8 @@ def method_advice():
     _set_constraint_flags(learner, data.get("concept") or data.get("text") or "", "method")
     concept = data.get("concept") or data.get("text") or ""
     subject = data.get("subject", "general")
+    # v0.68 ⭐ 学习计划：可选 deadline（"3个月内"），传给 handler 供计划周期计算
+    deadline = data.get("deadline") or ""
     if not concept:
         return jsonify({"error": "concept is required"}), 400
     # v0.20.3：模式自动纠正——选错模式时后端兜底
@@ -3923,7 +4346,7 @@ def method_advice():
     except Exception as _e:
         print(f"[PAEG][server.py] method_advice 异常忽略: {_e}")
         pass
-    result = _handle_method_advice(learner, concept, subject)
+    result = _handle_method_advice(learner, concept, subject, deadline=deadline)
     # v0.21.7：保存会话到 CONV_STORE（前端历史会话可恢复）
     # v0.32 ⭐ 匿名对话落盘：放宽为 _is_registered（允许 web_ 前缀）
     try:
