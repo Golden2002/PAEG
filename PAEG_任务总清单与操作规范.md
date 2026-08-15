@@ -245,7 +245,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 2 | **Profile Bundle 机制**：`python paeg.py --profile education/minimal/research` | dsh.profile.bundles + --patch | config_hub profile 层 | **P0 ✅**（§3.38.1 H-2，services/profile_bundle.py v1.1.3）|
 | 3 | **Persona 外置**：薇依 persona 拆 `paeg_personas/{id}.yml` | preset.yml name/description | prompts.py 长字符串外置 | **P0 ✅**（§3.46.2，paeg_personas/weil.yml）|
 | 4 | **!!js 条件启停**：配置支持 JS 表达式 | `disabled: !!js expr` | config_hub SafeLoader | P1 |
-| 5 | **用户家目录 overlay**：`~/.paeg/cordis.patch.yml` 不改代码改默认模型/学科 | $DSH_HOME/cordis.patch.yml | config_hub 加载链 | P1 |
+| 5 | **用户家目录 overlay**：`~/.paeg/cordis.patch.yml` 不改代码改默认模型/学科 | $DSH_HOME/cordis.patch.yml | config_hub 加载链 | P1 ✅（§3.46.2，config_loader.py）|
 | 6 | **OS 平台双轨**：TTS/STT/PPT 模板按平台分支 | bash+pwsh 双轨 | config_hub 条件挂载 | P2 |
 | 7 | **教学预设 4 内置+N 自定义**：standard/minimal/code-mode/weil-classical | 4 预设目录 | paeg/presets/ | **P0 ✅**（§3.46.2，services/teaching_presets.py）|
 | 8 | **PresetService**：mount/list/resolve/recompose/copy/remove | ctx.agentPresets | paeg/preset/service.py | **P0 ✅**（§3.46.2，services/preset_service.py）|
@@ -1498,5 +1498,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#8 PresetService ✅（Harness P0，2026-08-16）**——services/preset_service.py 新建：PresetService 类完整 API（list/get/resolve/mount/copy/recompose/remove）；基于 #7 teaching_presets 扩展为管理服务层；resolve 联动 tool_registry 权限档 + paeg_personas persona 正文（2443 字符）；copy 深拷贝继承 / recompose 覆盖生成 / remove 不存在容错；dsh 借鉴 ctx.agentPresets；7 测试全绿 + SURFACE 验证（S1-S6 完整 API 链路）（commit 新）
   - **#19 Permission 事件入 Session Log ✅（Harness P1，2026-08-16）**——tool_registry.set_permission_preset 接入 infra.session_log：切换成功发射 permission/preset 事件（{from,to,preset}，回放审计）；无效切换不发射（先校验后发射）；日志失败不影响切换（容错）；与 H-1 session_log（seq/deriveMessages）+ #18 权限预设联动——权限变更全链路可审计；dsh 借鉴 permission/preset log-only 事件；3 测试全绿 + SURFACE 验证（切换记录/无效不发射/回放）（commit 新）
   - **#9 Per-Agent Scope ✅（Harness P1，2026-08-16）**——services/agent_scope.py 新建：AgentScope（allow_tools/block_tools/prompt_override，shadowing 语义——黑名单优先于白名单，默认全工具兼容现状）；DEFAULT_AGENT_SCOPES（9 subagent，与 #1 装扮层/#11 契约层对齐）+ register_scope 可插拔 + is_tool_allowed_for_agent 便捷入口（供 tool_registry 联动）；未知回退默认（容错）；与 #1/#11/#21 形成完整体系（装扮层+契约层+作用域+provider 注册）；dsh 借鉴 dsh-scope agent.ctx 隔离 realm；8 测试全绿 + SURFACE 验证（S1-S5 隔离/联动/回退）（commit 新）
+  - **#5 用户家目录 overlay ✅（Harness P1，2026-08-16）**——config_loader.py：DEFAULT_OVERLAY_PATH（默认 ~/.paeg/cordis.patch.yml）+ load_yaml_overlay() + load_agents_config 增 overlay_path 参数；四层合并（defaults → user agents.json → project agents.json → YAML overlay 最高优先）；无 yaml 依赖/文件缺失/解析失败 → 空 dict（容错），未覆盖字段继承下层；对齐 dsh $DSH_HOME/cordis.patch.yml 语义——不改代码改默认模型/学科；5 测试全绿 + SURFACE 验证（覆盖默认模型/温度/继承/容错/默认路径）（commit 新）
   - **回归验证 ✅**：36 passed（全部新功能测试）+ audit_check 39/39
 
