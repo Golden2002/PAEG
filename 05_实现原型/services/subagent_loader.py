@@ -164,8 +164,53 @@ def load_yaml_patch(name: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def save_yaml_patch(name: str, config: Dict[str, Any]) -> bool:
+    """AI 修改 preset → 写入 config/subagents/{name}.patch.yml（#27 Self-Update via Patch）。
+
+    dsh tool-cordis 语义（cordis preset 可修改，commit 47f9438）：
+    AI 可读写自身 preset 配置，无需人工改代码。
+
+    Args:
+        name: subagent 名
+        config: {desc?, persona?, prompt_override?, enabled?}
+
+    返回：是否写入成功（yaml 依赖缺失/写入异常 → False）
+    """
+    _f = PATCH_DIR / f"{name}.patch.yml"
+    try:
+        import yaml  # type: ignore
+        PATCH_DIR.mkdir(parents=True, exist_ok=True)
+        with open(_f, "w", encoding="utf-8") as fh:
+            yaml.safe_dump(config, fh, allow_unicode=True, sort_keys=False)
+        return True
+    except Exception:
+        return False
+
+
+def read_yaml_patch(name: str) -> Optional[Dict[str, Any]]:
+    """AI 读回自己写入的 patch 文件（无 → None，不抛异常）。"""
+    return load_yaml_patch(name)
+
+
+def list_yaml_patches() -> List[str]:
+    """枚举已有 YAML patch 清单（AI 可列出自己可修改的 preset）。
+
+    返回：patch 文件名列表（不含 .patch.yml 后缀，按名称排序）
+    """
+    if not PATCH_DIR.is_dir():
+        return []
+    try:
+        return sorted(
+            p.name[:-len(".patch.yml")]
+            for p in PATCH_DIR.glob("*.patch.yml")
+        )
+    except Exception:
+        return []
+
+
 __all__ = [
     "PATCH_DIR", "DEFAULT_AGENT_PATCHES",
     "get_subagent_patch", "register_subagent_patch",
     "apply_subagent_patch", "load_yaml_patch",
+    "save_yaml_patch", "read_yaml_patch", "list_yaml_patches",
 ]
