@@ -29,6 +29,8 @@ EXPECTED_SKILLS = [
     "xlsx",
     "doc-coauthoring",
     "teach",
+    # v0.69+ §3.11：教学专业能力判断库
+    "teaching-capability",
 ]
 
 
@@ -38,10 +40,10 @@ def _make_registry():
 
 
 def test_all_skills_loaded():
-    """stats() 应返回 10 个 skill,名字集合与 EXPECTED_SKILLS 完全一致"""
+    """stats() 应返回 11 个 skill（v0.69+ 含 teaching-capability）,名字集合与 EXPECTED_SKILLS 完全一致"""
     reg = _make_registry()
     st = reg.stats()
-    assert st["count"] == 10, f"count 应为 10,实际 {st['count']}"
+    assert st["count"] == 11, f"count 应为 10,实际 {st['count']}"
     names = set(st["skills"])
     expected = set(EXPECTED_SKILLS)
     assert names == expected, (
@@ -67,11 +69,11 @@ def test_each_skill_has_valid_frontmatter():
 
 
 def test_skill_tool_defs():
-    """tool_defs() 应返回 10 个 load_skill__* 工具定义,每个含 name/description"""
+    """tool_defs() 应返回 11 个 load_skill__* 工具定义（v0.69+ 含 teaching-capability）,每个含 name/description"""
     reg = _make_registry()
     defs = reg.tool_defs()
     assert isinstance(defs, list), "tool_defs() 应返回 list"
-    assert len(defs) == 10, f"tool_defs 数量应为 10,实际 {len(defs)}"
+    assert len(defs) == 11, f"tool_defs 数量应为 11（v0.69+ 含 teaching-capability）,实际 {len(defs)}"
 
     seen_names = set()
     for d in defs:
