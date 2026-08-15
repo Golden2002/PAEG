@@ -35,11 +35,14 @@ from typing import Any, Callable, Dict, List, Optional
 
 
 # 合法钩子事件（约束配置准确性）
+# H-14 ⭐（§3.46.2）对齐 dsh waterfall 事件命名：新增 tools/pre-execute、tools/post-execute
+# （与既有 tool.before/tool.after 并存，双命名兼容——hooks.json 可用任一套）
 VALID_EVENTS = {
     "session.start", "session.end",
     "message.before_user", "message.after_user",
     "message.before_assistant", "message.after_assistant",
     "tool.before", "tool.after",
+    "tools/pre-execute", "tools/post-execute",
     "llm.before", "llm.after",
 }
 
