@@ -12,6 +12,36 @@ from __future__ import annotations
 
 from typing import Any
 
+# §3.46.2 Phase 3 ⭐ LLM trait 规范化符号自 server.py 下沉（chat/teach_stream 共用）
+# 教训：LLM 建模直接输出英文枚举（visual/neutral 等）或越界长句，
+# 原样写入 user_modeling → 前端显示"风 visual / 情 neutral"等奇怪词。
+# 统一在写入端规范化：枚举→中文映射，长句截断（≤16 字）。
+_TRAIT_LS_CN = {
+    "visual": "视觉型", "auditory": "听觉型", "reading": "读写型",
+    "kinesthetic": "动觉型", "mixed": "混合型",
+}
+_TRAIT_EMO_CN = {
+    "anxious": "焦虑", "engaged": "投入", "neutral": "平静",
+    "withdrawn": "退缩", "unknown": "未知",
+}
+
+
+def _norm_trait_scalar(value, mapping):
+    """LLM trait 标量规范化：英文枚举→中文；未知/空→''；长句截断 16 字。"""
+    if not isinstance(value, str):
+        return ""
+    v = value.strip()
+    if not v or v in ("unknown", "null", "None"):
+        return ""
+    if v in mapping:
+        return mapping[v]
+    # v0.42.1 ⭐ P1 修复：LLM 可能输出组合值（如 "neutral_curiosity"）——
+    # 精确映射失败时做子串匹配（含 "neutral" → "平静"），杜绝英文枚举残留进 meta-log。
+    for k, cn in mapping.items():
+        if k in v:
+            return cn
+    return v[:16] + ("…" if len(v) > 16 else "")
+
 
 def _append_chat_hist(learner_id: str, user_content: str, assistant_content: str = "") -> None:
     """v0.42.3 ⭐ P0 修复：统一对话历史写回（method/knowledge/affection 三端点共用）。
@@ -56,4 +86,5 @@ def _set_constraint_flags(learner: Any, user_text: str, mode: str, affection: bo
             pass
 
 
-__all__ = ["_append_chat_hist", "_set_constraint_flags"]
+__all__ = ["_append_chat_hist", "_set_constraint_flags",
+           "_norm_trait_scalar", "_TRAIT_LS_CN", "_TRAIT_EMO_CN"]
