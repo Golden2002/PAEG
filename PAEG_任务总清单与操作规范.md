@@ -254,7 +254,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 11 | **9 Subagent 三角色重构**：Service Definition/Provider/Consumer（RuleDiagnostor vs LLMDiagnostor 等）| ctx.shell 三角色 | subagents.py | **P0 ✅ 契约层**（§3.46.2，services/agent_trirole.py；具体三角色化后续迁移）|
 | 12 | **LLM Provider Seam**：切换模型不改业务代码（deepseek/openai_compat）| ctx.llm 多 provider | llm_adapter.py | **P0 ✅**（§3.46.2，PROVIDER_REGISTRY+provider_info）|
 | 13 | **Shell/Subprocess Seam**：本地/docker/沙箱执行可换 | ctx.shell + ctx.subprocess | tool 执行层 | **P0 ✅**（§3.46.2，services/subprocess_service.py）|
-| 14 | **Tool Registry 能力协商**：元数据级先注入 name/desc，按需完整加载 | defer_loading + listChanged | skill_registry.py | P1 |
+| 14 | **Tool Registry 能力协商**：元数据级先注入 name/desc，按需完整加载 | defer_loading + listChanged | skill_registry.py | P1 ✅（§3.46.2，tool_registry.py）|
 | 15 | **Session Event Log**："Model-visible ⟺ logged" 铁律 + deriveMessages 投影 + SessionEventMap 类型化 | core/session | infra/session | P1 ✅（§3.37 类型层+§3.46.2 H-1 存储层）|
 | 16 | **Hooks 瀑布链**：waterfall 事件（next() 委托，短路可观测）| Waterfall listeners MUST call next() | hooks_hub | P2 ✅（§3.42 W1 4-dispatch + §3.46.2 H-14 tools/* 补全）|
 | 17 | **Subprocess 抽象**：MCP 客户端/ffmpeg/PDF/PPT 统一 spawn 服务 | ctx.subprocess | subprocess service | P2 |
@@ -1499,5 +1499,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#19 Permission 事件入 Session Log ✅（Harness P1，2026-08-16）**——tool_registry.set_permission_preset 接入 infra.session_log：切换成功发射 permission/preset 事件（{from,to,preset}，回放审计）；无效切换不发射（先校验后发射）；日志失败不影响切换（容错）；与 H-1 session_log（seq/deriveMessages）+ #18 权限预设联动——权限变更全链路可审计；dsh 借鉴 permission/preset log-only 事件；3 测试全绿 + SURFACE 验证（切换记录/无效不发射/回放）（commit 新）
   - **#9 Per-Agent Scope ✅（Harness P1，2026-08-16）**——services/agent_scope.py 新建：AgentScope（allow_tools/block_tools/prompt_override，shadowing 语义——黑名单优先于白名单，默认全工具兼容现状）；DEFAULT_AGENT_SCOPES（9 subagent，与 #1 装扮层/#11 契约层对齐）+ register_scope 可插拔 + is_tool_allowed_for_agent 便捷入口（供 tool_registry 联动）；未知回退默认（容错）；与 #1/#11/#21 形成完整体系（装扮层+契约层+作用域+provider 注册）；dsh 借鉴 dsh-scope agent.ctx 隔离 realm；8 测试全绿 + SURFACE 验证（S1-S5 隔离/联动/回退）（commit 新）
   - **#5 用户家目录 overlay ✅（Harness P1，2026-08-16）**——config_loader.py：DEFAULT_OVERLAY_PATH（默认 ~/.paeg/cordis.patch.yml）+ load_yaml_overlay() + load_agents_config 增 overlay_path 参数；四层合并（defaults → user agents.json → project agents.json → YAML overlay 最高优先）；无 yaml 依赖/文件缺失/解析失败 → 空 dict（容错），未覆盖字段继承下层；对齐 dsh $DSH_HOME/cordis.patch.yml 语义——不改代码改默认模型/学科；5 测试全绿 + SURFACE 验证（覆盖默认模型/温度/继承/容错/默认路径）（commit 新）
+  - **#14 Tool Registry 能力协商 ✅（Harness P1，2026-08-16）**——tool_registry.py：get_tool_metadata（轻量 name/desc/risk，不含 parameters）+ get_tool_full_def(name)（按需完整定义，未知→None）+ get_tool_revision() + list_changed_since(seq)；register_external_tools 挂接 _bump_tool_revision()（外部工具注册后版本递增）；metadata 先注入省上下文、完整定义按需取——dsh defer_loading 语义；6 测试全绿 + SURFACE 验证（59 工具 metadata/懒加载/revision/listChanged/容错）（commit 新）
   - **回归验证 ✅**：36 passed（全部新功能测试）+ audit_check 39/39
 
