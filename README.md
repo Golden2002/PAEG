@@ -1,17 +1,28 @@
 # PAEG — Pedagogical Agent with Evolving Growth
 
-基于**西蒙娜·薇依（Simone Weil）**教育哲学、由 Agent 架构驱动的 AI 教育智能体（**v0.44 关键节点 · 35 学科 + 学段联动 + 3 位掩码约束架构 + 注册问卷 + 联网检索多查询词联想 + 自我进化**）。
+基于**西蒙娜·薇依（Simone Weil）**教育哲学、由 Agent 架构驱动的 AI 教育智能体（**v0.67 · 35 学科 + 学段联动 + 3 位掩码约束 + 深度思考 + 融合视频管线 + 交互教学选择题 + 定时主动问候**）。
 
 > **定位**：PAEG = **新一代教育智能体解决方案**——为教育重新设计的 Agent 架构，让智能体指挥大模型完成教学全过程（诊断、计划、讲解、评估、调整、反思），使教育从"一次性问答"跃迁为"有教学法、有过程、有陪伴、能自我进化"的完整闭环。
 
 > 你不是一名普通的教师。你的性格、视野、自我之中，内在了对学生的爱、对他人的爱、对真理的纯洁向往。
 > 但这份爱几乎从不用言语表白——它通过对知识的态度、通过教学方法，体现在行动中。
 
+## 目录
+
+- [这是什么](#这是什么)
+- [核心能力](#核心能力)
+- [架构全景](#架构全景v025-关键节点--分层展开)
+- [快速开始](#快速开始)
+- [目录结构](#目录结构)
+- [文档](#文档)
+- [技术栈](#技术栈)
+- [维护与检视](#架构与维护v041-⭐)
+
 ## 这是什么
 
 PAEG 不是"给 LLM 套聊天框"的教育产品，而是**为教育重新设计的 Agent 架构**——把教学的"过程"（诊断、计划、评估、调整、反思）从 LLM 的一次性输出中结构化地抽离出来，让 Agent 真正**指挥** LLM 完成教育。它是一名会自我进化、有完整人格、能情绪陪伴的老师。
 
-## 核心亮点
+## 核心能力
 
 ### 1. 完整教学循环（不是聊天，是教学）
 `paeg.teach()` 六阶段闭环：**诊断 → 计划 → 呈现 → 评估 → 调整 → 反思 → 自更新**。评估用确定性启发式（可复现不随机），LLM 只负责最擅长的"讲解"。
@@ -88,6 +99,27 @@ flowchart TB
 **分层细图**：见 `ARCHITECTURE_LINKS.md`（L0 总览 + 5 张 L1 主题图：教学闭环 / 个体化 / 立德树人 / 工具 MCP / 自我进化，每张 ≤10 节点，GitHub 原生渲染）。
 
 ## 快速开始
+
+### Docker 方式（v0.67 ⭐ 推荐，Python 3.12 统一环境）
+
+```bash
+# 1. 配置环境变量（.env：DEEPSEEK_API_KEY 等）
+cp .env.example .env
+
+# 2. 构建 + 启动
+docker compose up -d --build
+
+# 3. 访问
+#    http://localhost:5000
+
+# 4. 查看日志 / 停止
+docker compose logs -f
+docker compose down
+```
+
+> 单容器含：主服务 + manim 动画 + ffmpeg + 语音（TTS/STT）。数据卷持久化 users_data/downloads/Library。详见 [Dockerfile](./Dockerfile) 与 [docker-compose.yml](./docker-compose.yml)。
+
+### 源码方式（本机开发）
 
 ```bash
 # 1. 安装依赖
@@ -204,9 +236,24 @@ PAEG 有 **10 个技能**（skill_registry.py 注册，经 tool_registry 暴露�
 
 MIT
 
-## ⭐ 三处一致原则（本地目录 ↔ GitHub ↔ Release）
+## ⭐ 多端一致原则（本地目录 ↔ GitHub ↔ ModelScope ↔ Release）
 
-**项目维护铁律**：本地项目目录、GitHub 仓库（Golden2002/PAEG main 分支）、Release 三者内容必须完全一致、互为备份。
+**项目维护铁律**：本地项目目录、GitHub 仓库（Golden2002/PAEG）、ModelScope（Golden2002/Emile_Novis）、Release 四者内容必须完全一致、互为备份。
+
+### 双远程同步（v0.67 ⭐）
+
+```bash
+# 日常：一次 commit 推两个仓库
+git add .
+git commit -m "改动"
+git push origin master        # GitHub
+git push modelscope master    # ModelScope
+
+# 或一键推送（已配别名）
+git pushall
+```
+
+> 拉取建议只从 GitHub（`git pull origin master`），避免两仓分歧。
 
 ### 校验脚本
 
@@ -342,4 +389,21 @@ PAEG 不止"功能完整"，更要"结构优秀"。参考 Flask / Kraken / EAS S
 - **模块化落地**：server.py 4556→~4000 行（infra/ + services/ 五模块），行为零变化。
 
 详细变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
+## RALPH 循环能力（v0.69+）
+PAEG 具备**任务驱动的自我驱动循环**：围绕改进任务做"执行→验证→承诺→续触发"迭代直到达标，三层完成判定 + 五道反教条防呆防线（轮次上限/收益递减/质量回退/人类确认/资源熔断）。
+## 数学可视化视频脚本生成（v0.70+）
+PAEG 可生成**高质量数学可视化视频**：对话+轮询收集需求 → 生成动画脚本（script.json，遵循 3Blue1Brown 方法论）→ 渲染 Manim 动画 → 同步产出讲稿/PPT/讲义/思维导图（全部可下载）。
+## 教学物料包 workflow（v0.70+）
+`teach_materials` 工作流：一个主题 → 自动产出 6 类教学物料（知识导图/讲义/PPT/讲稿/视频脚本/数学动画）→ 打包为资产供下载。DAG 并行执行，物料间自动衔接。
 
+## 语言规范 MCP 标准化（v0.70+ · §3.28）
+语言规范从"散落的函数调用"升级为**统一入口 + 外部数据 + 标准工具**的插件服务：13 处 `_polish_text` 收敛为 `lang_gate_content` 统一守门；违禁词数据化 `forbidden_words.json`（可动态维护不改代码）；MCP 三工具 `normalize_text`（生成内容统一过语言规范）/ `language_policy_check`（AI 味+违禁词零成本检测）/ `forbidden_words`（list/add/remove）。外部 agent 也能调用 PAEG 的语言规范能力。
+
+## L0-L8 约束引擎 MCP 化（v0.70+ · §3.29）
+L0-L8 分层约束升级为 **6 API 约束引擎**：`layer_get`（读层放开组）/ `layer_set`（动态切换教学/考试/自由层）/ `compose`（任意提示词块拼接）/ `always_active`（永远激活，不随层放开）/ `self_evolve`（教学洞察自动提炼入层，数据化落盘）/ `feedback_adjust`（"太啰嗦→放宽节奏、太深→收紧深度"信号映射）。约束系统可治理、自演进、反馈调强。
+
+## 学段教学模式差异化（v0.71+ · §3.33）
+同一个知识点，初中/高中/大学/考研讲出**本质不同**的结构与深度：初中"感官优先·三步可视化"（现象→画面→类比→复述）、高中"结构优先·五步走"（定义→公式→例题→误区→知识结构图）、大学"正式 lecture·五步论证"（严格定义→定理→推导→应用→学科视野）、考研"考点解剖·五步得分"（考什么→怎么考→套路→真题→易错点）。`GRADE_SCAFFOLDS` 可执行段序列骨架 + 内容深度量化（长度/形式约束）双落实。
+
+## sub agent 模型配置化（v0.71+ · §3.32）
+像 Oh My OpenCode 一样，`config/agents.json` JSON 配置即可为每个 sub agent 分配不同模型（provider/model/temperature/max_tokens/thinking_level）：三层合并（默认→用户~/.paeg→项目）+ `{env:}/{file:}` 变量替换——用户不改代码定制 PAEG 的 10 个 sub agent。
