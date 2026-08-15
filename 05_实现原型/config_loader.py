@@ -28,6 +28,9 @@ from typing import Any, Dict, Optional
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_CONFIG = os.path.join(_BASE_DIR, "config", "agents.json")
 _USER_CONFIG = os.path.join(os.path.expanduser("~"), ".paeg", "agents.json")
+# #5 ⭐ 用户家目录 overlay（Harness 30 项 P1，§3.46.2）：~/.paeg/cordis.patch.yml
+# 对齐 dsh $DSH_HOME/cordis.patch.yml——用户可 YAML patch 默认模型/学科，不改项目代码
+DEFAULT_OVERLAY_PATH = os.path.join(os.path.expanduser("~"), ".paeg", "cordis.patch.yml")
 
 
 # ─────────────────────────────────────
@@ -119,12 +122,42 @@ def _deep_merge(base: dict, override: dict) -> dict:
 # 加载（三层合并 + 变量替换）
 # ─────────────────────────────────────
 
+def load_yaml_overlay(path: Optional[str] = None) -> dict:
+    """#5 ⭐ 加载用户家目录 YAML overlay（~/.paeg/cordis.patch.yml）。
+
+    对齐 dsh $DSH_HOME/cordis.patch.yml——用户可 YAML patch 默认模型/学科等配置，
+    无需改项目代码。无 yaml 依赖/文件缺失/解析失败 → 空 dict（容错）。
+
+    Args:
+        path: overlay 文件路径；None 用默认 ~/.paeg/cordis.patch.yml
+
+    Returns:
+        dict（overlay 配置）；失败 → {}
+    """
+    fp = path or DEFAULT_OVERLAY_PATH
+    if not fp or not os.path.isfile(fp):
+        return {}
+    try:
+        import yaml  # type: ignore
+        with open(fp, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        print(f"[config_loader] YAML overlay 加载失败（忽略）: {e}")
+        return {}
+
+
 def load_agents_config(project_path: Optional[str] = None,
-                       user_path: Optional[str] = None) -> dict:
-    """加载并合并三层配置（defaults → user → project）。返回解析后 dict。"""
+                       user_path: Optional[str] = None,
+                       overlay_path: Optional[str] = None) -> dict:
+    """加载并合并配置（defaults → user → project → overlay）。返回解析后 dict。
+
+    #5 ⭐ overlay_path：用户家目录 YAML patch（~/.paeg/cordis.patch.yml 默认），
+    优先级最高——不改代码改默认模型/学科（dsh $DSH_HOME 语义）。
+    """
     merged = _deep_merge({}, DEFAULTS)
 
-    # Layer 2: 用户全局
+    # Layer 2: 用户全局（~/.paeg/agents.json）
     up = user_path or _USER_CONFIG
     if os.path.exists(up):
         try:
@@ -133,7 +166,7 @@ def load_agents_config(project_path: Optional[str] = None,
         except Exception as e:
             print(f"[config_loader] 用户配置加载失败（忽略）: {e}")
 
-    # Layer 3: 项目级
+    # Layer 3: 项目级（config/agents.json）
     pp = project_path or _PROJECT_CONFIG
     if os.path.exists(pp):
         try:
@@ -141,6 +174,11 @@ def load_agents_config(project_path: Optional[str] = None,
                 merged = _deep_merge(merged, json.load(f))
         except Exception as e:
             print(f"[config_loader] 项目配置加载失败（忽略）: {e}")
+
+    # Layer 4: #5 ⭐ 用户家目录 YAML overlay（优先级最高）
+    _ov = load_yaml_overlay(overlay_path)
+    if _ov:
+        merged = _deep_merge(merged, _ov)
 
     # 变量替换
     merged = _resolve_vars(merged)
