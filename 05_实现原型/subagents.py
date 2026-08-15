@@ -121,33 +121,37 @@ def _safe_chat(model, system: str, user: str = None, messages: list = None,
     if not messages:
         return None
     try:
-        # v0.69+ §3.22 ⭐ llm-retry（借鉴 deepseek-harness llm-retry）：偶发失败重试 2 次（短等待）
-        _reply_ok = False
-        for _attempt in range(3):
-            try:
-                if tools:
-                    reply = model.chat(
-                        system=system, messages=messages, max_tokens=max_tokens,
-                        temperature=0.7, tools=tools,
-                        tool_choice=tool_choice or "auto",
-                    )
-                else:
-                    reply = model.chat(
-                        system=system, messages=messages, max_tokens=max_tokens,
-                        temperature=0.7,
-                    )
-                _reply_ok = True
-                break
-            except Exception as _retry_e:
-                _retry_kind = str(getattr(_retry_e, "kind", ""))
-                if _attempt < 2 and _retry_kind in ("rate_limit", "timeout", "network", ""):
-                    import time as _t_retry
-                    _t_retry.sleep(1.0 * (_attempt + 1))  # 1s/2s 退避
-                    print(f"[PAEG][llm-retry] 第 {_attempt + 1} 次失败({_retry_kind})，重试...")
-                else:
-                    raise _retry_e
-        if not _reply_ok:
-            raise RuntimeError("LLM 重试 3 次均失败")
+        # §3.42 W4 ⭐ 分类错误码重试（升级 v0.69+ 简单 1s/2s 退避）：
+        # 6 类错误（rate_limit / transient_5xx / auth / context_overflow /
+        # tool_validation / unknown）每类不同退避曲线 + 预算；trace_id 透传。
+        from infra.retry_policy import retry_with_policy, classify_error
+        try:
+            from obs_trace import get_trace_id as _get_tid
+            _trace_id = _get_tid()
+        except Exception:
+            _trace_id = None
+
+        def _do_chat():
+            if tools:
+                return model.chat(
+                    system=system, messages=messages, max_tokens=max_tokens,
+                    temperature=0.7, tools=tools,
+                    tool_choice=tool_choice or "auto",
+                )
+            return model.chat(
+                system=system, messages=messages, max_tokens=max_tokens,
+                temperature=0.7,
+            )
+
+        def _on_retry(_attempt, _err, _code, _tid):
+            # 失败重试日志（保留旧 [PAEG][llm-retry] 风格便于日志检索）
+            print(f"[PAEG][llm-retry] 第 {_attempt + 1} 次失败({_code})，重试... trace_id={_tid}")
+
+        reply = retry_with_policy(
+            _do_chat,
+            trace_id=_trace_id,
+            on_retry=_on_retry,
+        )
     except Exception as _safe_e:
         # v0.50 ⭐ Oracle：异常语义化日志（此前吞掉掩盖限流/超时/网络）
         try:
@@ -1025,6 +1029,13 @@ class Presenter:
             try:
                 from services.prereq_graph import inject_graph_into_system
                 system = inject_graph_into_system(system, self.kb, concept=concept, subject=subject or "")
+            except Exception:
+                pass
+            # §3.43 P0 ⭐ 学段学科 profile 注入（v1.1.5）：深度阶梯 + 收尾模板 + 考研风格
+            try:
+                from services.grade_subject_profiles import inject_grade_profiles
+                _g = str(getattr(learner, "grade_level", "") or "high_school")
+                system = inject_grade_profiles(system, subject=subject or "", grade=_g)
             except Exception:
                 pass
             # v0.26 ⭐ 教学模式识别（agent 引导 LLM 判断 easy/normal/deep，不靠关键词）
