@@ -125,6 +125,20 @@ class ConfigHub:
                 register_external_tools()
             except Exception as _e:
                 print(f"[config_hub] tool_registry 外部工具同步失败: {_e}")
+            # §3.42 W12 ⭐ 缓存热重载失效（profile_bundle / knowledge_base / 其他
+            # 注册到 CacheRegistry 的 namespace）。配置变更后旧缓存值已过期，
+            # 必须失效以保证下次读取拿到最新数据。
+            try:
+                from infra.cache import get_cache_registry as _get_cache_registry
+                _reg = _get_cache_registry()
+                for _ns in ("profile_bundle", "knowledge_base.resolve_node"):
+                    try:
+                        _reg.invalidate_namespace(_ns)
+                    except Exception:
+                        pass
+            except Exception:
+                # infra.cache 不可用时静默跳过（ratchet：行为兼容）
+                pass
 
     # ─── LLM 工具列表（统一出口 1） ───
     def get_all_tool_defs(self) -> List[dict]:
