@@ -1,11 +1,13 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.38 关键节点（2026-08-09）· 多用户扩展 + 情绪哲学重构
+> **版本**：v0.72+ 关键节点（2026-08-16）· 架构组合根化（server.py 2601 行/31 路由/12 蓝图）+ RAG 检索增强（真 BM25Okapi/多路召回）+ 自我进化深化（Schema+CoT/失败案例/去重）+ dsh Harness 借鉴落地（H-1 会话日志/PTC-5 策略/LLM Seam）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
 >
 > **v0.25 关键节点**：新增语言学/大气科学/量子场论 3 学科 + 学段-学科联动 + PPT MCP；v0.24 完成架构断链修复（教学闭环 / 个体化闭环 / 工具链 / 路由自更新），20 项连接逐一验证通过，详见 §1.6.11。
+>
+> **v0.72+ 关键节点（2026-08-16）**：§3.45/§3.46 架构导向拆分——server.py 4780→2601 行（12 蓝图 42+ 路由迁出，组合根模式）；§3.46 ULW 多波次——自我更新优化（Schema+CoT 提炼/确定性去重/supersession/failure_case）+ RAG 优化（真 BM25Okapi/SOURCES 注入/config 化/多路召回）+ dsh Harness 借鉴（H-1 会话事件日志/PTC-5 主循环策略/H-14 hooks 瀑布/#12 LLM Seam）。详见需求文档 §3.45-3.47。
 
 ---
 
@@ -2373,18 +2375,34 @@ s["skill.cooking.egg"] = {
 │   ├── llm_adapter.py    兼容层
 │   ├── safety.py         安全中间件
 │   ├── cli.py            命令行交互
-│   ├── server.py         Flask 组合根（v0.43 §3.45 架构拆分后：仅 app 装配/CORS/middleware/蓝图注册/启动）
-│   ├── blueprints/       ⭐ HTTP 蓝图（§3.45 Phase 1：voice/threads/admin/conversations/uploads/quiz，17 路由）
+│   ├── server.py         Flask 组合根（v0.43 §3.45/§3.46 架构拆分后：仅 app 装配/CORS/middleware/蓝图注册/启动，2601 行）
+│   ├── blueprints/       ⭐ HTTP 蓝图（§3.45 Phase 1 + §3.46 Phase 2/3：12 个蓝图，42+ 路由迁出 server.py）
 │   │   ├── voice.py          /api/voice/tts、stt
 │   │   ├── threads.py        /api/threads 4 路由（ThreadStore 会话容器）
 │   │   ├── admin.py          /api/admin/reload、dump-config（配置热重载/配置树导出）
 │   │   ├── conversations.py  /api/conversations 5 路由（对话历史持久化）
 │   │   ├── uploads.py        /api/upload、/api/avatar（资料/图片/头像上传）
-│   │   └── quiz.py           /api/teach/quiz/next、answer（交互式选择题）
+│   │   ├── quiz.py           /api/teach/quiz/next、answer（交互式选择题）
+│   │   ├── proactive.py      /agent/proactive_greet（定时主动问候，Phase 2）
+│   │   ├── resources.py      /api/resources + PPT 生成（ResourceLibrarian，Phase 2）
+│   │   ├── modes.py          /api/method、knowledge、affection（独立对话类型，Phase 2）
+│   │   ├── self_update.py    /api/self-update 3 路由（自我进化，Phase 2）
+│   │   ├── chat.py           /api/chat + /api/chat/stream（一般对话同步+SSE，Phase 3）
+│   │   └── teaching.py       /api/teach（同步教学，Phase 3；teach_stream SSE 保留 server.py 核心链路）
 │   ├── prompts.py        ⭐ 教师画像（薇依）+ 语言风格 + 学科×学段提示词
 │   ├── pedagogy.py       ⭐ 教学策略库（苏格拉底/支架/掌握/费曼，v0.9）
 │   ├── subjects_ext.py   15 学科扩展节点
-│   ├── tests/            27 个测试
+│   ├── services/         ⭐ 业务逻辑层（§3.45/§3.46 拆分后下沉）
+│   │   ├── session_helpers.py 会话辅助（_append_chat_hist/_set_constraint_flags/_norm_trait_scalar）
+│   │   ├── file_operation.py  用户文件 4 能力统一入口（_try_file_operation）
+│   │   ├── teach_strategy.py  PTC-5 教学主循环可替换策略（TeachStrategy/STRATEGY_REGISTRY）
+│   │   ├── retrieval/         KnowledgeRetriever 多路召回（BM25+Tag RRF，semantic 钩子预留）
+│   │   └── ...（_learner_session/lang_gate/steering/routing/handlers/quiz_service 等 20+）
+│   ├── infra/            ⭐ 基础设施层（runtime 懒加载单例 + session_log 事件日志）
+│   │   ├── session_log.py     H-1 会话事件日志（seq 连续性/deriveMessages 增量投影/JSONL 持久化）
+│   │   ├── runtime.py         12+ 懒加载单例（get_llm/get_paeg/get_session_log/...）
+│   │   └── sessions.py        SESSIONS（server 同引用铁律）
+│   ├── tests/            65+ 测试文件（含基线 SSE 回归）
 │   └── data/             画像/反思持久化
 ├── 06_测试与验证/         测试用例 + 验收报告
 ├── 07_参考与勘误/         API 契约、自检报告
@@ -4364,6 +4382,15 @@ PPT 大纲 ≥ 3 章节且围绕提问。**"能用就行"不算完成，质量�
   - 审计配套：audit_check 双源扫描（`_backend_route_src()` 归一化 `@bp.route`）+ pyright 列表 + 反向依赖检查含 blueprints/
   - 验证：92 项测试通过 + audit 39/39 + 服务重启实测蓝图路由全通；pytest 2 批 + 活服务 HTTP 验证
   - 📋 后续：Phase 2/3 剩余（self_update/resources/modes/proactive + chat/teaching）按需求文档 §3.45.2 清单推进
+- ✅ **§3.46 Phase 2（2026-08-16）**：`blueprints/` 落地 4 低风险域 9 路由（proactive/resources/modes/self_update），server.py 3928 行
+  - `services/session_helpers.py` 新建：`_append_chat_hist`/`_set_constraint_flags` 下沉（modes 消除对 server 反向依赖，audit L521 单向依赖守）
+  - `__file__` 上溯 parent.parent 修复（self_update insights/memory 路径）；验证：56 路由 + audit 40/40 + 47 测试全绿
+- ✅ **§3.46 Phase 3（2026-08-16）**：`blueprints/` 落地 chat/teaching（chat 同步+SSE 516 行 + teach 同步 357 行），server.py 2601 行/31 路由/12 蓝图
+  - `services/file_operation.py` 新建：`_try_file_operation` 下沉（chat_stream 依赖）；`_norm_trait_scalar`/`_TRAIT_LS_CN`/`_TRAIT_EMO_CN` 下沉 session_helpers（chat/teach_stream 共用）
+  - **teach_stream（SSE 1222 行）按 Oracle 判断保留 server.py**（核心链路不贸然拆）
+  - 修复既有潜伏 bug：模块级缺 `import time` → teach_stream hooks `time.time()` NameError 被吞（H-14 hooks 从未真实触发），修复 + SURFACE 验证
+  - 验证：56 路由 + audit 40/40 + 34 测试全绿 + SSE diagnosis 事件可达
+- ✅ **#12 LLM Provider Seam（2026-08-16）**：llm_adapter.py 重写——PROVIDER_REGISTRY 注册表（deepseek/openai/anthropic/mock 可插拔）+ `register_provider()` + `PAEG_LLM_PROVIDER` env 驱动 + `provider_info()` 可观测（暴露实际 provider/model）；auto 模式自动发现降级 mock；7 测试 + 真实调用 0.7s + audit 40/40
 - 📋 Phase 4：`agents/` 重新导出（subagent 类已在 subagents.py）
 
 
