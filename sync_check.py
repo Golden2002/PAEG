@@ -45,6 +45,12 @@ def build_local_map():
         p = os.path.join(proto, fn)
         if os.path.isfile(p) and (fn.endswith(".py") or fn.endswith(".json") or fn.endswith(".txt") or fn.endswith(".md")):
             m[f"05_实现原型/{fn}"] = p
+    # §3.45 ⭐ 架构拆分后新增 blueprints/ 子目录——递归纳入备份（仅代码，排除运行时数据）
+    bp = os.path.join(proto, "blueprints")
+    if os.path.isdir(bp):
+        for fn in os.listdir(bp):
+            if fn.endswith(".py") and fn != "__pycache__":
+                m[f"05_实现原型/blueprints/{fn}"] = os.path.join(bp, fn)
     tdir = os.path.join(proto, "tests")
     if os.path.isdir(tdir):
         for fn in os.listdir(tdir):
@@ -77,17 +83,21 @@ def main():
             diff.append(gpath); print(f"  [差异] {gpath}")
     print(f"\n=== 本地↔GitHub: 一致 {ok} / GH缺失 {len(missing)} / 差异 {len(diff)} ===")
     if missing: print(f"GitHub缺失: {missing}")
-    if diff and FIX_MODE and TOKEN:
-        print("[FIX] 推送差异文件（本地为权威）...")
-        for gpath in diff:
-            path = urllib.parse.quote(gpath, safe="")
-            cur = api(f"https://api.github.com/repos/{REPO}/contents/{path}?ref={BRANCH}")
-            raw = open(local[gpath], "rb").read()
-            text = raw.decode("utf-8-sig") if raw[:3] == b"\xef\xbb\xbf" else raw.decode("utf-8")
-            body = {"message": "sync: 三处一致性备份", "content": base64.b64encode(text.encode("utf-8")).decode("ascii"), "branch": BRANCH}
-            if cur.get("sha"): body["sha"] = cur["sha"]
-            r = api(f"https://api.github.com/repos/{REPO}/contents/{path}", method="PUT", body=body)
-            print(f"  {'OK' if 'error' not in r else 'FAIL'} {gpath}")
+    if FIX_MODE and TOKEN:
+        # §3.45 ⭐ 修复：--fix 同时推送"差异"与"缺失"（此前只推差异——
+        # 新增文件永远不被 API 推送 → 54 个文件长期漂移的根因）
+        _to_push = (diff if diff else []) + (missing if missing else [])
+        if _to_push:
+            print(f"[FIX] 推送差异+缺失文件（本地为权威）: {len(_to_push)} 个 ...")
+            for gpath in _to_push:
+                path = urllib.parse.quote(gpath, safe="")
+                cur = api(f"https://api.github.com/repos/{REPO}/contents/{path}?ref={BRANCH}")
+                raw = open(local[gpath], "rb").read()
+                text = raw.decode("utf-8-sig") if raw[:3] == b"\xef\xbb\xbf" else raw.decode("utf-8")
+                body = {"message": "sync: 三处一致性备份", "content": base64.b64encode(text.encode("utf-8")).decode("ascii"), "branch": BRANCH}
+                if cur.get("sha"): body["sha"] = cur["sha"]
+                r = api(f"https://api.github.com/repos/{REPO}/contents/{path}", method="PUT", body=body)
+                print(f"  {'OK' if 'error' not in r else 'FAIL'} {gpath}")
     rel = api(f"https://api.github.com/repos/{REPO}/releases/tags/v0.26")
     if "error" not in rel:
         print(f"=== Release: {rel['name']} (tag v0.26) ===")
