@@ -242,7 +242,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | # | 优化需求 | 借鉴来源（dsh） | PAEG 落地点 | 优先级 |
 |---|---|---|---|---|
 | 1 | **Subagent Patch 系统**：9 subagent YAML 装扮（persona/prompt/工具/调度全配置可换）| agent.cordis.yml `- id:` 整体替换 | subagents.py → subagent_loader | **P0 ✅**（§3.46.2，services/subagent_loader.py）|
-| 2 | **Profile Bundle 机制**：`python paeg.py --profile education/minimal/research` | dsh.profile.bundles + --patch | config_hub profile 层 | **P0** |
+| 2 | **Profile Bundle 机制**：`python paeg.py --profile education/minimal/research` | dsh.profile.bundles + --patch | config_hub profile 层 | **P0 ✅**（§3.38.1 H-2，services/profile_bundle.py v1.1.3）|
 | 3 | **Persona 外置**：薇依 persona 拆 `paeg_personas/{id}.yml` | preset.yml name/description | prompts.py 长字符串外置 | **P0 ✅**（§3.46.2，paeg_personas/weil.yml）|
 | 4 | **!!js 条件启停**：配置支持 JS 表达式 | `disabled: !!js expr` | config_hub SafeLoader | P1 |
 | 5 | **用户家目录 overlay**：`~/.paeg/cordis.patch.yml` 不改代码改默认模型/学科 | $DSH_HOME/cordis.patch.yml | config_hub 加载链 | P1 |
