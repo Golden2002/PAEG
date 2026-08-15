@@ -1474,5 +1474,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **B2 ✅** KnowledgeBase.search 改真 BM25Okapi——rank_bm25.BM25Okapi 真排序（IDF+长度归一化+jieba+自定义词典），懒构建语料（规避缓存失效），小语料库 padding（rank_bm25 corpus<5 IDF=0 已知问题），缺字段兜底+失败降级子串匹配，接口签名不变；14 测试 + 77 既有回归全绿 + audit 39/39（commit 8a13277）
   - **A4 ✅** KnowledgeRetriever 多路召回——services/retrieval/knowledge_retriever.py 新建（578 行）：BM25+Tag 双通道 RRF(k=60) 融合 + semantic 通道预留钩子（enabled=False 不调用，B8 embedding 接入点）+ 排除 status="superseded" 节点 + from_evolved_and_kb() 聚合 KB+evolved 184 节点；6 测试全绿 + SURFACE 实测 recall 正常（commit 新 A4）
   - **H-1 ✅** SessionEventLog 存储层——infra/session_log.py 新建：seq 连续性分配 + derive_messages 增量投影 + JSONL 持久化（重启续接）+ 线程安全；类型层（event_types §3.37 已存在）+ 发射层（emit_event_typed §3.37 已存在）+ 存储层（本项）三件套齐备；runtime.get_session_log 单例；audit_check 新增"模型可见⟺已记录"不变量（39→40 项）；8 测试 + SURFACE 端到端 3 事件 seq 1-3
+  - **PTC-5 ✅** 主循环可观测+可替换策略——services/teach_strategy.py 新建：TeachStrategy 抽象基类 + DefaultTeachStrategy（委托 paeg.teach 原逻辑行为不变）+ STRATEGY_REGISTRY（register/get/build，未注册回退默认）+ paeg.teach 入口策略分派（learner._teach_strategy 或默认）；观测复用既有 _subagent_run 事件（W7）+ tool_observability（PTC-3）+ trace_id（W2）；5 测试 + SURFACE 端到端；**PTC-1~5 系列全部完成**
   - **回归验证 ✅**：36 passed（全部新功能测试）+ audit_check 39/39
 
