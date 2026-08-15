@@ -1,0 +1,162 @@
+{
+ "_comment": "PAEG MCP 标准化工具注册表（v1.1 §3.36）——配置驱动：改此文件可调整工具声明，不改代码。参考 DeepSeek Harness '一切皆插件'（cordis.patch.yml 行级覆盖）。",
+ "tools": [
+  {
+   "name": "normalize_text",
+   "description": "语言规范守门（L0+L2）：去除 AI 味/修正省略句/深度矫正。",
+   "risk": "read",
+   "module": "tool_registry",
+   "function": "normalize_text",
+   "params": {
+    "text": "string",
+    "context": "string",
+    "apply_l2": "boolean"
+   }
+  },
+  {
+   "name": "language_policy_check",
+   "description": "语言政策检查：AI 味概率 + 违禁词命中（不调 LLM）。",
+   "risk": "read",
+   "module": "tool_registry",
+   "function": "language_policy_check",
+   "params": {
+    "text": "string"
+   }
+  },
+  {
+   "name": "forbidden_words",
+   "description": "外部违禁词维护（list/add/remove）。",
+   "risk": "write",
+   "module": "tool_registry",
+   "function": "forbidden_words",
+   "params": {
+    "action": "string",
+    "word": "string",
+    "scope": "string"
+   }
+  },
+  {
+   "name": "constraint_layer_get",
+   "description": "约束层读取（L0-Lmax 放开组/规则）。",
+   "risk": "read",
+   "module": "tool_registry",
+   "function": "constraint_layer_get",
+   "params": {
+    "layer": "integer"
+   }
+  },
+  {
+   "name": "constraint_layer_set",
+   "description": "动态切换约束层（教学/考试/自由）。",
+   "risk": "read",
+   "module": "tool_registry",
+   "function": "constraint_layer_set",
+   "params": {
+    "layer": "integer",
+    "session": "string",
+    "reason": "string"
+   }
+  },
+  {
+   "name": "constraint_compose",
+   "description": "任意提示词块组合拼接。",
+   "risk": "read",
+   "module": "tool_registry",
+   "function": "constraint_compose",
+   "params": {
+    "parts": "array",
+    "title": "string"
+   }
+  },
+  {
+   "name": "constraint_always_active",
+   "description": "永远激活提示词管理（list/add/remove）。",
+   "risk": "write",
+   "module": "tool_registry",
+   "function": "constraint_always_active",
+   "params": {
+    "action": "string",
+    "rule": "string"
+   }
+  },
+  {
+   "name": "constraint_self_evolve",
+   "description": "约束系统自我演化（洞察写入层组）。",
+   "risk": "write",
+   "module": "tool_registry",
+   "function": "constraint_self_evolve",
+   "params": {
+    "insight": "string",
+    "target_layer": "integer",
+    "group": "string"
+   }
+  },
+  {
+   "name": "constraint_feedback_adjust",
+   "description": "反馈调强/调弱约束（信号词映射）。",
+   "risk": "read",
+   "module": "tool_registry",
+   "function": "constraint_feedback_adjust",
+   "params": {
+    "feedback": "string",
+    "target": "string"
+   }
+  },
+  {
+   "name": "constraint_layer_scope",
+   "description": "约束层级框架自省（层范围/来源/扩展指南）。",
+   "risk": "read",
+   "module": "tool_registry",
+   "function": "constraint_layer_scope",
+   "params": {}
+  },
+  {
+   "name": "generate_handout",
+   "description": "生成结构化讲义（markdown，门控流水线）。",
+   "risk": "write",
+   "module": "tool_registry",
+   "function": "generate_handout",
+   "params": {
+    "topic": "string",
+    "subject": "string",
+    "learner_id": "string"
+   }
+  },
+  {
+   "name": "generate_script",
+   "description": "生成讲稿（TTS 朗读稿）。",
+   "risk": "write",
+   "module": "tool_registry",
+   "function": "generate_script",
+   "params": {
+    "topic": "string",
+    "subject": "string",
+    "learner_id": "string"
+   }
+  },
+  {
+   "name": "generate_ppt",
+   "description": "生成 PPT 大纲（供 pptx 排版）。",
+   "risk": "write",
+   "module": "tool_registry",
+   "function": "generate_ppt",
+   "params": {
+    "topic": "string",
+    "subject": "string",
+    "learner_id": "string"
+   }
+  },
+  {
+   "name": "generate_mindmap",
+   "description": "生成知识导图（markdown 缩进列表）。",
+   "risk": "write",
+   "module": "tool_registry",
+   "function": "generate_mindmap",
+   "params": {
+    "topic": "string",
+    "subject": "string",
+    "learner_id": "string"
+   }
+  }
+ ]
+}

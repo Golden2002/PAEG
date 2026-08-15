@@ -139,9 +139,57 @@ class PAEG:
             print(f"[PAEG] 自我更新模块初始化失败（跳过）: {_e}")
         self.verbose = verbose
 
+        # §3.38 A2 ⭐ H-4：构造完成后发射 subagent/descriptor（每个 subagent 一个）
+        try:
+            for _name, _agent in [
+                ("diagnostor", getattr(self, "diagnostor", None)),
+                ("planner", getattr(self, "planner", None)),
+                ("presenter", getattr(self, "presenter", None)),
+                ("evaluator", getattr(self, "evaluator", None)),
+                ("adapter", getattr(self, "adapter", None)),
+                ("answer_solver", getattr(self, "answer_solver", None)),
+                ("affection_supportor", getattr(self, "affection_supportor", None)),
+                ("individuality", getattr(self, "individuality", None)),
+                ("resource_librarian", getattr(self, "resource_librarian", None)),
+            ]:
+                if _agent is not None:
+                    self._emit("subagent/descriptor",
+                               name=_name,
+                               model=getattr(getattr(self, "_llm_for", lambda n: self.model)(_name), "model", None) or "",
+                               kb_ref="knowledge_base",
+                               descriptor_path=f"subagents.{_name}")
+        except Exception:
+            pass
+
     def _log(self, msg: str):
         if self.verbose:
             print(msg)
+
+    # §3.38 A2 ⭐ H-4 subagent 生命周期事件（v1.1.4，借鉴 deepseek-harness tool-workflow）
+    # 事件发射统一走 observability.emit_event_typed（类型校验 + JSONL 落盘），失败静默不阻塞教学。
+    @staticmethod
+    def _emit(event_type: str, **payload):
+        try:
+            from observability import emit_event_typed
+            emit_event_typed(event_type, **payload)
+        except Exception:
+            pass
+
+    def _subagent_run(self, name: str, fn, run_id: str, **kwargs):
+        """包一层 subagent 调用：start → run → end（runId 配对 + 时长）。"""
+        import time as _t
+        _t0 = _t.time()
+        self._emit("tool-workflow/agent-start",
+                   agent=name, run_id=run_id, learner_id=str(getattr(kwargs.get("learner"), "id", "anon")),
+                   subject=kwargs.get("subject", ""), ts=_t.time())
+        try:
+            _res = fn(**kwargs)
+            return _res
+        finally:
+            _dur = round((_t.time() - _t0) * 1000, 1)
+            self._emit("tool-workflow/agent-end",
+                       agent=name, run_id=run_id, duration_ms=_dur,
+                       stop_reason="completed")
 
     def _get_self_update_agent(self):
         """v0.42 ⭐ P1 修复：懒创建 SelfUpdateAgent（替代僵尸实例）。
@@ -231,10 +279,10 @@ class PAEG:
 
         # 1. 诊断
         self._log(f"\n[1/5] 诊断子代理：评估 {learner.nickname} 的当前水平...")
-        session.diagnosis = self.diagnostor.run(
-            learner=learner,
-            question=question,
-            subject=subject
+        _run_id = f"{session.session_id}-diag-{datetime.now().strftime('%H%M%S%f')}"
+        session.diagnosis = self._subagent_run(
+            "diagnostor", self.diagnostor.run, _run_id,
+            learner=learner, question=question, subject=subject,
         )
         self._log(f"   OK 诊断完成：ready_to_teach={session.diagnosis.get('ready_to_teach', True)}"
               f"（{session.diagnosis.get('diagnosed_by', 'rule')}）")
@@ -247,11 +295,11 @@ class PAEG:
 
         # 2. 计划
         self._log(f"\n[2/5] 计划子代理：设计教学路径...")
-        session.plan = self.planner.run(
-            learner=learner,
-            diagnosis=session.diagnosis,
-            subject=subject,
-            concept=question
+        _run_id = f"{session.session_id}-plan-{datetime.now().strftime('%H%M%S%f')}"
+        session.plan = self._subagent_run(
+            "planner", self.planner.run, _run_id,
+            learner=learner, diagnosis=session.diagnosis,
+            subject=subject, concept=question,
         )
         # v0.26 ⭐ subtopic 注入每个 plan step（二级学科锚定；空则不注入）
         if subtopic:
@@ -355,13 +403,11 @@ class PAEG:
                         individuality_control=individuality_control if individuality_control else None,
                         individuality_profile_prompt=individuality_profile_prompt,
                     )
-                presentation = self.presenter.run(
-                    step=step,
-                    learner=learner,
-                    previous=session.history,
-                    tone_info=tone_info,
-                    concept=question,
-                    subject=subject,
+                presentation = self._subagent_run(
+                    "presenter", self.presenter.run,
+                    f"{session.session_id}-pres-{i}-{datetime.now().strftime('%H%M%S%f')}",
+                    step=step, learner=learner, previous=session.history,
+                    tone_info=tone_info, concept=question, subject=subject,
                 )
             except TypeError:
                 # 兼容老 Presenter.run 签名
@@ -401,10 +447,10 @@ class PAEG:
 
             # 4. 评估（每个呈现步骤后）—— v0.24 真正评估学生
             self._log(f"   -> 评估子代理：检查学生理解...")
-            evaluation = self.evaluator.run(
-                step=step,
-                learner=learner,
-                presentation=presentation
+            evaluation = self._subagent_run(
+                "evaluator", self.evaluator.run,
+                f"{session.session_id}-eval-{i}-{datetime.now().strftime('%H%M%S%f')}",
+                step=step, learner=learner, presentation=presentation,
             )
             session.evaluations.append(evaluation)
             self._log(f"   OK 评估分数：{evaluation['score']}（讲解质量 "
@@ -423,10 +469,10 @@ class PAEG:
             # 5. 调整（必要时）—— v0.24 真正执行
             if not evaluation.get('ready_to_advance', True):
                 self._log(f"   -> 调整子代理：触发调整...")
-                adjustment = self.adapter.run(
-                    evaluation=evaluation,
-                    learner=learner,
-                    step=step
+                adjustment = self._subagent_run(
+                    "adapter", self.adapter.run,
+                    f"{session.session_id}-adpt-{i}-{datetime.now().strftime('%H%M%S%f')}",
+                    evaluation=evaluation, learner=learner, step=step,
                 )
                 decision = adjustment.get('decision', 'continue')
                 params = (adjustment.get('action') or {}).get('parameters') or {}

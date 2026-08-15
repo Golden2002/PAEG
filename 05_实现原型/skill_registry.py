@@ -7,8 +7,14 @@ P1-4：对标 Anthropic Agent Skills（SKILL.md 开放标准）的三级渐进�
 - L2 指令：模型判断匹配后，加载完整 SKILL.md 正文
 - L3 资源：按需读取技能目录下的脚本/参考文件
 
+§3.38 A1 ⭐ #29 多级 skill 目录（v1.1.4，借鉴 deepseek-harness skill-filesystem）：
+- 三层优先级：全局（skills/）< 项目（config/skills/）< 用户（~/.paeg/skills/ 或 $PAEG_HOME/skills/）
+- 高优先级层同名覆盖低优先级层（用户可覆盖项目，项目可覆盖全局）
+- 用户配置 ~/.paeg/skills.json（或 $PAEG_HOME/skills.json）支持 {env:KEY|默认} 变量替换
+- 配置缺失 → 静默回退（不抛错，向后兼容现有 config/skills.json 用户）
+
 用法：
-    reg = SkillRegistry()                     # 扫描 skills/ 目录
+    reg = SkillRegistry()                     # 扫描 skills/ + config/skills/ + 用户层
     catalog = reg.catalog_prompt()            # L1 注入 system
     body = reg.activate("math-step-solver")   # L2 加载完整指令
 """
@@ -116,33 +122,95 @@ class SkillRegistry:
         base = os.path.dirname(os.path.abspath(__file__))
         self.skills_dirs = list(skills_dirs or self._load_dirs(base))
         self.skills: Dict[str, Skill] = {}
+        self._skill_origin: Dict[str, int] = {}  # §3.38 A1：name → 目录索引（优先级）
         self.reload()
 
     def _load_dirs(self, base: str) -> list:
-        """读 config/skills.json 的 skills_dirs；缺省用内置目录。"""
+        """§3.38 A1 ⭐ #29 三层路径合并（全局 < 项目 < 用户）。
+
+        合并顺序（低→高优先级）：
+        1. 全局默认：{base}/skills
+        2. 项目配置：{base}/config/skills.json 的 skills_dirs（现有行为，向后兼容）
+        3. 用户层：$PAEG_HOME/skills.json 或 ~/.paeg/skills.json（若存在），
+           skills_dirs 支持 {env:KEY|默认} 变量替换（复用 config_loader._resolve_vars 模式）
+
+        同名技能：先扫（低优先级层）的目录先注册，后扫（高优先级层）的同名不覆盖
+        ——但 reload() 中高优先级目录排在后面会优先……实际语义：列表顺序即优先级，
+        高优先级目录放**后面**，reload 时同名先扫优先（列表前者优先注册），
+        因此高优先级层目录必须排在列表**前面**才能覆盖同名。
+        """
+        _dirs: list = []
+        # 1. 全局默认（始终在最底层）
+        _dirs.append(os.path.join(base, "skills"))
+
+        # 2. 项目配置（config/skills.json，向后兼容）
         _cfg = os.path.join(base, "config", "skills.json")
         try:
             import json as _json
             with open(_cfg, encoding="utf-8") as _f:
                 _d = _json.load(_f)
-            _dirs = _d.get("skills_dirs") or []
-            if isinstance(_dirs, list):
-                return [os.path.join(base, d) for d in _dirs]
+            _proj_dirs = _d.get("skills_dirs") or []
+            if isinstance(_proj_dirs, list):
+                for _d_ in _proj_dirs:
+                    _p = os.path.join(base, _d_)
+                    if os.path.isdir(_p) and _p not in _dirs:
+                        _dirs.append(_p)
         except Exception:
             pass
-        return [os.path.join(base, "skills")]
+
+        # 3. 用户层（$PAEG_HOME/skills.json 或 ~/.paeg/skills.json）
+        _home = os.environ.get("PAEG_HOME") or os.path.expanduser("~")
+        _user_cfg = os.path.join(_home, ".paeg", "skills.json")
+        try:
+            import json as _json2
+            if os.path.isfile(_user_cfg):
+                with open(_user_cfg, encoding="utf-8") as _f2:
+                    _ud = _json2.load(_f2)
+                _user_dirs = _ud.get("skills_dirs") or []
+                if isinstance(_user_dirs, list):
+                    for _ud_ in _user_dirs:
+                        # {env:KEY|默认} 变量替换（复用 config_loader 模式）
+                        _resolved = self._resolve_vars(_ud_)
+                        _p2 = _resolved if os.path.isabs(_resolved) else os.path.join(_home, _resolved)
+                        if os.path.isdir(_p2) and _p2 not in _dirs:
+                            _dirs.append(_p2)
+        except Exception:
+            pass
+
+        # 用户层目录放**前面**（最高优先级，reload 同名先扫优先）
+        return _dirs
+
+    @staticmethod
+    def _resolve_vars(value: str) -> str:
+        """{env:KEY|默认} 变量替换（与 config_loader._resolve_vars 同模式，避免循环导入）。"""
+        import re as _re
+        if not value or not isinstance(value, str):
+            return value or ""
+        def _sub(m):
+            key, default = m.group(1), m.group(2)
+            return os.environ.get(key, default or "")
+        return _re.sub(r"\{env:([^}|]+)(?:\|([^}]*))?\}", _sub, value)
 
     def reload(self):
-        """遍历所有目录扫描 SKILL.md（同名先扫优先）。"""
+        """遍历所有目录扫描 SKILL.md（§3.38 A1 ⭐ 同名高优先级覆盖低优先级）。
+
+        优先级：用户层 > 项目层 > 全局层（skills_dirs 列表越靠后优先级越高）。
+        同一目录内同名冲突：取先扫到的（目录内去重）。
+        """
         self.skills.clear()
-        for _dir in self.skills_dirs:
+        for _idx, _dir in enumerate(self.skills_dirs):
             if not os.path.isdir(_dir):
                 continue
             for name in os.listdir(_dir):
                 sdir = os.path.join(_dir, name)
                 if os.path.isdir(sdir) and os.path.isfile(os.path.join(sdir, "SKILL.md")):
-                    if name not in self.skills:  # 同名先扫优先（内置 > 用户私有）
+                    # 高优先级层（列表靠后）覆盖低优先级层（列表靠前）
+                    if name not in self.skills or _idx > self._skill_origin_idx(name):
                         self.skills[name] = Skill(name, sdir)
+                        self._skill_origin[name] = _idx
+
+    def _skill_origin_idx(self, name: str) -> int:
+        return self._skill_origin.get(name, -1)
 
     def add_dir(self, path: str):
         """运行时添加扫描目录（独立配置接口：丢目录即加载）。"""

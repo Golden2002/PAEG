@@ -89,6 +89,17 @@ class ConfigHub:
                     self.workflows.reload()
                 except Exception:
                     pass
+            # §3.36 ⭐ 配置驱动工具重载（mcp_tools.json → 工具表；失败保留旧配置）
+            try:
+                from mcp_tools_loader import reload_config_tools
+                reload_config_tools()
+            except Exception as _e:
+                print(f"[config_hub] MCP tools reload 失败: {_e}")
+            try:
+                from tool_registry import register_external_tools
+                register_external_tools()
+            except Exception as _e:
+                print(f"[config_hub] tool_registry 外部工具同步失败: {_e}")
 
     # ─── LLM 工具列表（统一出口 1） ───
     def get_all_tool_defs(self) -> List[dict]:
@@ -135,10 +146,13 @@ class ConfigHub:
             except Exception:
                 pass
         # v0.68+ ⭐ repeat-tool-reminder Guard（Step1.5：连续同工具调用超阈值 → 拦截提醒）
+        # §3.37 H-16 ⭐ 升级：传入 tool_args（chain-key 精确计数，同工具不同参数不算重复）
         if self.hooks is not None:
             try:
                 _lid = arguments.get("learner_id") if isinstance(arguments, dict) else "_global"
-                _rg = self.hooks.repeat_guard_check(name, learner_id=str(_lid or "_global"))
+                _rg = self.hooks.repeat_guard_check(
+                    name, learner_id=str(_lid or "_global"),
+                    tool_args=arguments if isinstance(arguments, dict) else None)
                 if _rg.get("blocked"):
                     return _rg["message"]
             except Exception:

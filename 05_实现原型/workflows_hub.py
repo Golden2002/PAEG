@@ -20,6 +20,7 @@ v0.68+ ⭐ MVP（借鉴 deepseek-harness plain-JS workflow 思想，声明式 JS
 """
 from __future__ import annotations
 
+import datetime
 import importlib
 import json
 import os
@@ -171,7 +172,10 @@ class WorkflowsHub:
             return f"步骤 {st.id} 失败: {e}"
 
     def _run_subagent(self, st: WorkflowStep, args: dict, results: dict) -> str:
-        """调 9 个子代理（diagnostor/planner/presenter/evaluator/adapter/...）。"""
+        """调 9 个子代理（diagnostor/planner/presenter/evaluator/adapter/...）。
+
+        §3.38 A2 ⭐ H-4（v1.1.4）：tool-workflow/agent-start + agent-end 生命周期事件。
+        """
         from infra.runtime import get_llm, get_paeg
         _llm = get_llm()
         _paeg = get_paeg()
@@ -191,11 +195,22 @@ class WorkflowsHub:
         # 调用子代理（presenter.run / diagnostor.run 等）
         _cfg = dict(st.config or {})
         _input = str(_cfg.get("input") or args.get("concept") or args.get("topic") or "")
+        # §3.38 A2：agent-start 事件（runId UUID 配对）
+        _run_id = f"wf-{id(self)}-{_agent_name}-{datetime.datetime.now().strftime('%H%M%S%f')}"
+        try:
+            from observability import emit_event_typed
+            emit_event_typed("tool-workflow/agent-start",
+                             agent=_agent_name, run_id=_run_id,
+                             learner_id=str(getattr(args.get("learner"), "id", "anon")),
+                             subject=args.get("subject") or "general")
+        except Exception:
+            pass
         try:
             _r = _sub.run(_llm, _input, learner=args.get("learner"),
                           subject=args.get("subject") or "general")
             if isinstance(_r, dict):
-                return str(_r.get("content") or _r.get("presentation") or json.dumps(_r, ensure_ascii=False)[:200])
+                return str(_r.get("content") or _r.get("presentation")
+                           or json.dumps(_r, ensure_ascii=False)[:300])
             return str(_r)[:300]
         except TypeError:
             # 子代理签名不同：尝试通用调用
@@ -204,6 +219,15 @@ class WorkflowsHub:
                 return str(_r)[:300]
             except Exception as e:
                 return f"子代理 {_agent_name} 调用失败: {e}"
+        finally:
+            # §3.38 A2：agent-end 事件
+            try:
+                from observability import emit_event_typed
+                emit_event_typed("tool-workflow/agent-end",
+                                 agent=_agent_name, run_id=_run_id,
+                                 stop_reason="completed")
+            except Exception:
+                pass
 
     def _run_tool(self, st: WorkflowStep, args: dict, results: dict) -> str:
         from tool_registry import execute_tool

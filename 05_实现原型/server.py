@@ -2609,6 +2609,21 @@ def admin_reload():
         return jsonify({"ok": False, "error": str(_re_e)}), 500
 
 
+@app.route("/api/admin/dump-config", methods=["GET"])
+def admin_dump_config():
+    """§3.38 H-13 ⭐ 配置树导出（对齐 dsh --dump-config）。
+
+    返回完整可 patch 配置树：profiles/bundles/agents/tools/effective——
+    用于调试、审计、外部 agent 理解 PAEG 配置结构。
+    """
+    try:
+        from services.profile_bundle import dump_config_tree
+        _tree = dump_config_tree()
+        return jsonify(_tree)
+    except Exception as _dc_e:
+        return jsonify({"ok": False, "error": str(_dc_e)}), 500
+
+
 @app.route("/api/feedback", methods=["POST"])
 def submit_feedback():
     """v0.69+ SEL-8：用户反馈收集（点赞/👎）——写入 memory/feedback_log.jsonl 供自我更新消费。

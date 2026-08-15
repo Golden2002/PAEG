@@ -233,12 +233,23 @@ class HooksHub:
 
         构造闭包链（逆序），每个 listener 调 next_fn(ctx) 才让出；
         不调 = 短路（blocking）。most-restrictive 合并结果。
+
+        §3.38 A2 ⭐ H-4（v1.1.4）：hook/invoked + hook/result 生命周期事件发射。
         """
         ctx = {**ctx, "__verdict": "allow", "__sticky_deny": False}
         with self._lock:
             _listeners = [h for h in self.hooks
                           if h.enabled and h.event == event and _matches(h.match, ctx)]
         _listeners.sort(key=lambda h: h.priority)
+
+        # §3.38 A2：hook/invoked 事件
+        try:
+            from observability import emit_event_typed
+            emit_event_typed("hook/invoked",
+                             event=event, source=str(ctx.get("tool") or ctx.get("learner_id") or ""),
+                             matched=len(_listeners))
+        except Exception:
+            pass
 
         def _terminal(c: dict) -> dict:
             return c
@@ -248,7 +259,17 @@ class HooksHub:
             _prev = _chain
             _chain = (lambda c, _h2=_h, _p=_prev: self._invoke(_h2, c, _p))
 
-        return _chain(ctx)
+        _result = _chain(ctx)
+
+        # §3.38 A2：hook/result 事件
+        try:
+            from observability import emit_event_typed
+            emit_event_typed("hook/result",
+                             event=event, listener_count=len(_listeners),
+                             verdict=str(_result.get("__verdict", "allow")))
+        except Exception:
+            pass
+        return _result
 
     def _invoke(self, h: Hook, ctx: dict, next_fn: Callable[[dict], dict]) -> dict:
         """执行单个钩子；永不抛（异常降级为透传）。
@@ -302,33 +323,80 @@ class HooksHub:
             })
 
     # v0.68+ ⭐ repeat-tool-reminder Guard（Step1.5：借鉴 deepseek-harness guard/repeat-tool-reminder）
-    # 追踪同一工具连续调用次数，超过阈值 → 返回拦截提醒（防 LLM 陷入重复工具循环）。
-    def repeat_guard_check(self, tool_name: str, learner_id: str = "_global",
-                           max_repeat: int = 3) -> dict:
-        """检测工具连续重复调用。
+    # §3.37 H-16 ⭐ 升级（2026-08-15，commit 47f9438 源码模式）：
+    #   - chain key = name + canonical(args)（深度键排序）——相同工具不同参数不算重复
+    #   - 多级阈值 [3, 5, 8]：3 温和提醒 / 5+ 详细提醒（含工具名+次数+参数预览）
+    #   - on_user_message() 用户插话 → 重置 chain（对齐 agent/pre-step 语义）
+    # 追踪同一工具+同参数连续调用次数，超过阈值 → 返回拦截提醒（防 LLM 陷入重复工具循环）。
+    _REPEAT_THRESHOLDS = (3, 5, 8)
 
-        返回 {"repeat": int, "blocked": bool, "message": str}：
-        - repeat < max_repeat：放行（仅计数）
-        - repeat >= max_repeat：blocked=True，message 含提醒（建议合并查询/换工具）
+    def _canonical_args(self, args) -> str:
+        """canonical 化工具参数：深度键排序 → JSON（chain key 组成部分）。"""
+        try:
+            if not args:
+                return "{}"
+            if not isinstance(args, dict):
+                args = {"v": args}
+            def _sort_key(v):
+                if isinstance(v, dict):
+                    return {k: _sort_key(v[k]) for k in sorted(v.keys())}
+                if isinstance(v, (list, tuple)):
+                    return [_sort_key(x) for x in v]
+                return v
+            return json.dumps(_sort_key(args), sort_keys=True, ensure_ascii=False)[:500]
+        except Exception:
+            return str(args)[:500]
+
+    def repeat_guard_check(self, tool_name: str, learner_id: str = "_global",
+                           tool_args: Optional[dict] = None,
+                           max_repeat: Optional[int] = None) -> dict:
+        """检测工具连续重复调用（chain-key 精确计数）。
+
+        Args:
+            tool_name: 工具名
+            learner_id: 学习者
+            tool_args: 工具参数（参与 chain key，同工具不同参数不算重复）
+            max_repeat: 触发拦截的阈值（默认取 _REPEAT_THRESHOLDS 第一档 3）
+
+        返回 {"repeat": int, "blocked": bool, "message": str, "key": str}。
         """
+        thresholds = self._REPEAT_THRESHOLDS
+        limit = max_repeat if max_repeat is not None else thresholds[0]
+        key = json.dumps([tool_name, self._canonical_args(tool_args)],
+                         ensure_ascii=False, sort_keys=True)
         with self._lock:
             st = self._agent_state.setdefault(str(learner_id), {"repeat_guard": {}, "tool_calls": []})
             rg = st.setdefault("repeat_guard", {})
-            # 只追踪"连续"序列：换工具即清掉其他工具计数（保留当前工具累加）
-            for _k in [k for k in rg if k != tool_name]:
+            # chain 语义：只保留当前 key 的计数；key 变化即重置（同工具不同参数也算新 chain）
+            for _k in [k for k in rg if k != key]:
                 rg.pop(_k, None)
-            rg[tool_name] = rg.get(tool_name, 0) + 1
+            rg[key] = rg.get(key, 0) + 1
             st.setdefault("tool_calls", []).append(tool_name)
             st["tool_calls"] = st["tool_calls"][-50:]
-            _n = rg[tool_name]
-        if _n >= max_repeat:
-            return {
-                "repeat": _n, "blocked": True,
-                "message": (f"[repeat-tool-reminder] 工具 {tool_name} 已连续调用 {_n} 次——"
-                            "疑似陷入重复调用循环。请检查：①是否已有足够信息可停止检索 ②如需多次检索，"
-                            "合并为一次查询 ③或改用其他工具（如 fetch_page/知识库）。"),
-            }
-        return {"repeat": _n, "blocked": False, "message": ""}
+            _n = rg[key]
+        # 多级阈值：达到任一阈值才提醒；3 温和 / 5+ 详细（含参数预览）
+        if _n in thresholds and _n >= limit:
+            _args_preview = str(tool_args or {})[:200]
+            if _n >= 5:
+                _msg = (f"[repeat-tool-reminder] 工具 {tool_name} 已连续调用 {_n} 次"
+                        f"（参数: {_args_preview}）——疑似陷入重复调用循环。"
+                        "请检查：①是否已有足够信息可停止检索 ②如需多次检索，合并为一次查询 "
+                        "③或改用其他工具（如 fetch_page/知识库）。")
+            else:
+                _msg = (f"[repeat-tool-reminder] 工具 {tool_name} 已连续调用 {_n} 次——"
+                        "疑似陷入重复调用循环。请检查：①是否已有足够信息可停止检索 ②如需多次检索，"
+                        "合并为一次查询 ③或改用其他工具（如 fetch_page/知识库）。")
+            return {"repeat": _n, "blocked": True, "message": _msg, "key": key}
+        return {"repeat": _n, "blocked": False, "message": "", "key": key}
+
+    def on_user_message(self, learner_id: str = "_global") -> None:
+        """§3.37 H-16：用户插话 → 重置该 learner 的 repeat chain（对齐 agent/pre-step）。"""
+        with self._lock:
+            st = self._agent_state.get(str(learner_id))
+            if st:
+                st["repeat_guard"] = {}
+                st.setdefault("tool_calls", []).append("__user_message__")
+                st["tool_calls"] = st["tool_calls"][-50:]
 
 
     # ─── 动态管理 ───

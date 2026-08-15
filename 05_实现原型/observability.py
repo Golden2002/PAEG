@@ -110,6 +110,28 @@ def emit_event(event_type: str, **payload):
         pass
 
 
+def emit_event_typed(event_type: str, **payload):
+    """§3.37 H-1/H-12 ⭐ 类型化事件发射（对齐 Harness SessionEvent envelope）。
+
+    - event_type 必须在 KNOWN_EVENT_TYPES（非法 → ValueError，早失败）
+    - surface 事件需带 surface_op='append'
+    - 与 emit_event 同 JSONL 落盘（兼容既有消费方）
+
+    Raises:
+        ValueError: 未知事件类型 / surface 事件缺 surface_op
+    """
+    from infra.event_types import make_event, is_surface_event
+    seq = payload.pop("seq", None)
+    surface_op = payload.pop("surface_op", None)
+    data = payload.pop("data", {})
+    if data is None:
+        data = {}
+    data = dict(data)
+    data.update({k: v for k, v in payload.items() if v is not None})
+    ev = make_event(event_type, data, seq=seq, surface_op=surface_op)
+    emit_event(ev["type"], seq=ev["seq"], ts=ev["time"] / 1000.0, data=ev["data"])
+
+
 # ─── v0.26 D1 ⭐ SessionTranscript：课堂记录可回放（学自 Codex JSONL Transcript） ───
 
 _TRANSCRIPT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'transcripts')
