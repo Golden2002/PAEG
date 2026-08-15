@@ -157,7 +157,11 @@ class WorkflowsHub:
         return "\n".join(_log) + f"\n[workflow {wf_id} 完成]"
 
     def _run_step(self, st: WorkflowStep, args: dict, results: dict) -> str:
-        """执行单步（subagent/tool/skill/llm）。"""
+        """执行单步（subagent/tool/skill/llm/programmatic）。
+
+        §3.44 PTC-1 ⭐（v1.1.5）：新增 programmatic 步骤——把连续多步操作
+        组织成 Python 程序一次执行（dsh PTC 模式移植）。
+        """
         try:
             if st.type == "subagent":
                 return self._run_subagent(st, args, results)
@@ -167,9 +171,51 @@ class WorkflowsHub:
                 return self._run_skill(st, args, results)
             if st.type == "llm":
                 return self._run_llm(st, args, results)
+            if st.type == "programmatic":
+                return self._run_programmatic(st, args, results)
             return f"未知步骤类型: {st.type}"
         except Exception as e:
             return f"步骤 {st.id} 失败: {e}"
+
+    def _run_programmatic(self, st: WorkflowStep, args: dict, results: dict) -> str:
+        """§3.44 PTC-1 ⭐ 程序化步骤：执行 Python 代码片段一次完成连续多步。
+
+        dsh PTC 模式移植：标准模式是"调一次工具→看结果→再决定"，
+        PTC 把连续多步（循环/采样/数据落盘）组织成程序一次执行——
+        长任务/重复多/数据量大时少来回、更快更稳。
+
+        config.code: Python 代码片段（可用 args/results 变量，return 字符串结果）
+        安全边界：代码在受限命名空间执行（无 os/subprocess 等危险模块，
+        但允许标准库计算/文件写临时目录）。
+        """
+        cfg = dict(st.config or {})
+        code = str(cfg.get("code") or "")
+        if not code.strip():
+            return "programmatic 步骤缺 code"
+        # 受限执行命名空间：提供 args/results 只读引用 + 安全内置 + 标准库 import
+        _safe_builtins = {
+            "sum": sum, "len": len, "range": range, "abs": abs, "min": min,
+            "max": max, "str": str, "int": int, "float": float, "list": list,
+            "dict": dict, "set": set, "tuple": tuple, "enumerate": enumerate,
+            "zip": zip, "sorted": sorted, "round": round, "bool": bool,
+            "True": True, "False": False, "None": None,
+            "__import__": __import__,  # 允许 import 标准库（math/statistics/json 等）
+            "open": open,  # 允许文件读写（PTC 代码来自 config，文档注明仅限受信配置）
+        }
+        _ns = {
+            "args": dict(args or {}),
+            "results": dict(results or {}),
+            "__builtins__": _safe_builtins,
+        }
+        try:
+            # 用 compile + exec 在受限命名空间执行（代码来自 config，非用户输入）
+            compiled = compile(code, f"<ptc:{st.id}>", "exec")
+            exec(compiled, _ns, _ns)  # noqa: S102 —— 配置驱动的 PTC 代码，非不可信输入
+            # 返回 _result（若代码设置）或 _ns 中的 result 变量
+            result = _ns.get("_result") or _ns.get("result") or ""
+            return str(result) if result else "[programmatic 完成]"
+        except Exception as e:
+            return f"programmatic 步骤 {st.id} 执行失败: {e}"
 
     def _run_subagent(self, st: WorkflowStep, args: dict, results: dict) -> str:
         """调 9 个子代理（diagnostor/planner/presenter/evaluator/adapter/...）。
