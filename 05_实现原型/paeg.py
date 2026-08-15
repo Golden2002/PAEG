@@ -247,7 +247,22 @@ class PAEG:
 
         v0.24 ⭐：在 teach 起点注入 Individuality（在 system 上叠加个体化指令），
         AffectionSupportor 仅在危机信号或纯情绪表达时短路到情绪支持而非教学。
+
+        PTC-5 ⭐（§3.46.2）：主循环可替换——通过 services.teach_strategy 注册的
+        策略类执行（默认 DefaultTeachStrategy 委托本方法原逻辑，行为字节级不变）。
         """
+        # PTC-5 ⭐ 策略分派：注册了自定义策略则走策略，否则默认（本方法原逻辑）
+        try:
+            from services.teach_strategy import get_strategy
+            _strategy_cls = get_strategy(getattr(learner, "_teach_strategy", None))
+            if _strategy_cls.__name__ != "DefaultTeachStrategy":
+                _strat = _strategy_cls(paeg=self)
+                _strat_run = getattr(_strat, "run", None)
+                if _strat_run is not None:
+                    return _strat_run(self, learner, question, subject, subtopic=subtopic)
+        except Exception as _strat_e:
+            self._log(f"   (策略分派跳过: {_strat_e})")
+
         # v0.24 ★ AffectionSupportor 检查钩子：危机信号或纯情绪输入时
         # 走情绪支持（teacher.not_teaching），不再走诊断/计划/呈现。
         try:
