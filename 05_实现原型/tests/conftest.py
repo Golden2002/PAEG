@@ -30,6 +30,11 @@ from pathlib import Path
 
 import pytest
 
+# v0.69+：确保 05_实现原型 根目录在 sys.path（从任意目录跑 pytest 均可 import 项目模块）
+_PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJ_ROOT not in sys.path:
+    sys.path.insert(0, _PROJ_ROOT)
+
 
 # ────────────────────────────────────────────────────────────
 # 关键：在 pytest 开始收集 test_* 前，先把"原始"模块符号快照下来
