@@ -213,6 +213,17 @@ def get_periodic_updater() -> Any:
     return _periodic_updater
 
 
+def get_session_log() -> Any:
+    """H-1 ⭐ 会话事件日志单例（infra/session_log，§3.46.2 H-1）。
+
+    追加式 SessionEvent 日志 + deriveMessages 投影；"模型可见⟺已记录"。
+    惰性初始化（import 期零副作用）。
+    """
+    from infra.session_log import get_session_log as _gsl
+
+    return _gsl()
+
+
 def reload_library() -> int:
     """v0.68+ ⭐ G3 热加载修复：重扫 Library 增量注册 evolved_*.json 到 KnowledgeBase。
 
