@@ -18,6 +18,26 @@ import os
 import threading
 from typing import Any, Dict, List, Optional
 
+# §3.42 W12 ⭐ LRU+TTL 缓存接入（行为透明——相同 profile_name 返回相同结果）
+try:
+    from infra.cache import cached as _cached
+except Exception:  # noqa: BLE001 — infra.cache 不可用时回退到无缓存版本
+    _cached = None  # type: ignore[assignment]
+
+
+def _make_cached_get_effective_config():
+    """构造带缓存的 get_effective_config（infra.cache 不可用时回退到直传）。"""
+    def _impl(profile_name: str = "standard") -> dict:
+        prof = load_profile(profile_name)
+        bundles = load_bundles(prof.get("bundles", []))
+        user_patch = load_user_patch()
+        return compose_profile(prof, bundles=bundles, user_patch=user_patch)
+    if _cached is None:
+        return _impl
+    # §3.42 W12：profile_bundle 命名空间，TTL 5 分钟（profile 切换稀疏）
+    return _cached(namespace="profile_bundle", ttl=300.0)(_impl)
+
+
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PROFILES_DIR = os.path.join(_BASE_DIR, "paeg_profiles")
 
@@ -150,8 +170,16 @@ def compose_profile(profile_cfg: dict, bundles: Optional[Dict[str, dict]] = None
     return merged
 
 
-def get_effective_config(profile_name: str = "standard") -> dict:
-    """便捷入口：加载 profile → 组合 → 返回生效配置树。"""
+# §3.42 W12 ⭐ get_effective_config 接入 LRU+TTL 缓存
+get_effective_config = _make_cached_get_effective_config()
+
+
+def get_effective_config_uncached(profile_name: str = "standard") -> dict:
+    """get_effective_config 的无缓存版本（测试 / 调试 / 配置热重载旁路用）。
+
+    与 get_effective_config 行为完全一致，只是不走缓存——便于在 invalidate 后
+    强制重新计算，或在单测里做"无缓存基线"对照（性能测试）。
+    """
     prof = load_profile(profile_name)
     bundles = load_bundles(prof.get("bundles", []))
     user_patch = load_user_patch()
@@ -225,6 +253,7 @@ def get_profile_service() -> ProfileBundleService:
 
 __all__ = [
     "ProfileBundleService", "get_profile_service", "get_effective_config",
+    "get_effective_config_uncached",
     "list_profiles", "load_profile", "load_bundles", "load_user_patch",
     "compose_profile", "dump_config_tree", "DEFAULT_PROFILE_CFG",
 ]
