@@ -1097,6 +1097,13 @@ def teach_stream():
     """
     data = request.get_json(force=True)
 
+    # §3.42 W2 ⭐ trace_id 全链路：请求入口生成（events 自动携带）
+    try:
+        from obs_trace import begin_trace
+        begin_trace("teach_stream")
+    except Exception:
+        pass
+
     # v0.69+ §3.20 ⭐ 深入版互动：strict_checkpoint 模式（交互式教学请求启用——每步后挂起等学生回答）
     _strict_checkpoint = bool(data.get("strict_checkpoint")) or bool(data.get("interactive"))
 

@@ -115,6 +115,7 @@ def emit_event_typed(event_type: str, **payload):
 
     - event_type 必须在 KNOWN_EVENT_TYPES（非法 → ValueError，早失败）
     - surface 事件需带 surface_op='append'
+    - §3.42 W2 ⭐ 自动附加当前 trace_id（obs_trace contextvars；无 trace 则为 None）
     - 与 emit_event 同 JSONL 落盘（兼容既有消费方）
 
     Raises:
@@ -128,6 +129,14 @@ def emit_event_typed(event_type: str, **payload):
         data = {}
     data = dict(data)
     data.update({k: v for k, v in payload.items() if v is not None})
+    # §3.42 W2 ⭐ trace_id 注入
+    try:
+        from obs_trace import get_trace_id
+        _tid = get_trace_id()
+        if _tid:
+            data.setdefault("trace_id", _tid)
+    except Exception:
+        pass
     ev = make_event(event_type, data, seq=seq, surface_op=surface_op)
     emit_event(ev["type"], seq=ev["seq"], ts=ev["time"] / 1000.0, data=ev["data"])
 
