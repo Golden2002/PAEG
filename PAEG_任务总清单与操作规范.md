@@ -1397,7 +1397,9 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 
 #### 3.46.3 实施记录（逐波次更新）
 
-- （待首波完成）
+- **W1 SEL-1 知识蒸馏深化 ✅ 已完成（2026-08-16）**：B4 normalize_node+A1 Schema+CoT+A3 failure_case+A2 确定性去重（见 §3.47.4），4 commit（910f08c/b8617eb/4e63da3/0e5dc50），7 测试
+- **RAG W-N 首批 ✅ 已完成（2026-08-16）**：B3 SOURCES 注入+B1 rag.json 配置化（见 §3.47.4），2 commit（bb0699a/b74ef27），9 测试
+- （待 W2）
 
 
 ### 3.47 RAG 检索增强优化（2026-08-16 用户指示 · 进行中）
@@ -1462,5 +1464,12 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 
 #### 3.47.4 实施记录（逐项更新）
 
-- （待首项完成）
+- **W-N 首批（2026-08-16 ✅ 完成）**：
+  - **B4 ✅** `_normalize_node`+schema_version（self_evolution.py）——写入前字段兜底（tags/importance/grade_level/content）+schema_version='2025.08.v2' 幂等；3 测试（commit 910f08c）
+  - **A1 ✅** `_extract_knowledge` Schema+CoT 升级——prompt 前置类型/学科/难度思考+JSON Schema 扩展（type/grade/tags/importance）+旧 schema 兜底不报错；2 测试（commit b8617eb）
+  - **A3 ✅** `_failure_case_distill` 失败案例提炼——anti-pattern 节点（type='failure_case'/importance='high'/failure_reason+corrective_strategy）+QualityGate 入库；1 测试（commit 4e63da3）
+  - **A2 ✅** 确定性去重+supersession——同（subject,concept）二次写入→旧节点 status='superseded'+superseded_by=新 id，新节点 status='live'+.v2 唯一 id，不依赖 embedding；1 测试（commit 0e5dc50）
+  - **B3 ✅** `_pre_retrieve` SOURCES 块注入——`SOURCES:`+`[N] source_type=kb|{cid}|{score}`+引用编号与无答案路径指令+`<</UNTRUSTED>>` 显式闭合；检索逻辑不动；6 测试 + 71 相关回归（commit bb0699a）
+  - **B1 ✅** config/rag.json 配置化——新建 config/rag.json + services/rag_config.py 懒加载读取器（get_rag_config 深合并+异常兜底）+ chunker max_chars/overlap + BM25Retriever top_k 改读配置；3 测试（commit b74ef27）
+  - **回归验证 ✅**：25 passed（7 新 self_evolution + 3 rag_config + 6 pre_retrieve + 9 既有 self_update）；audit_check 待 W2 后一并跑
 
