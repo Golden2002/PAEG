@@ -1190,7 +1190,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
   - Oracle：3 执行层硬伤（32 学科缺 method_guide/考研分键缺/收尾模板缺/深度阶梯缺）+ 6 维差异化护城河 + 4 个对话差异化机制
   - librarian（18 权威来源）：Wharton -17% AI 悖论 + Khan Academy 6.1% + Durlak SEL +11 百分位 + 5 道护城河
   - 落盘：ForMaitenance/PAEG差异化定位文档_Step1.6.md + 质量文档_智能性.md 9.1-9.4
-  - P0 实施中：补 method_guide + 考研分键 + 收尾模板 + SUBJECT_GRADE_DEPTH
+  - P0 ✅ 已完成：services/grade_subject_profiles.py（考研分键+收尾模板4学段+SUBJECT_GRADE_DEPTH 20条+注入钩子）+ Presenter 接入 + 6 测试 + 回归 69
 
 #### Step 2：每维度质量文档 → ForMaitenance 文件夹（进行中）
 - 代码结构 ✅ / 功能完善 ✅ / 实施质量 ✅ / 智能性 ✅（补充 9.1-9.4）
@@ -1220,7 +1220,7 @@ Interaction / Profile / Diagnosis / Plan / Action / Evaluation / Adaptation / Kn
 - 存档：ForMaitenance/优秀回答案例_奥德赛深度导读.md
 - 特征：专业文本视角/非线性叙事结构/核心概念深层主题/人物复杂性/辩证对照/影视对照
 
-### 3.44 dsh PTC 模式与一切皆插件借鉴（2026-08-15 用户提供文章 · 待实施）
+### 3.44 dsh PTC 模式与一切皆插件借鉴（2026-08-15 用户提供文章 · ✅ PTC-1~4 已完成）
 
 > 来源：微信公众号文章《实测DeepSeek Harness，原来PTC模式和Cordis插件才是隐藏大招》（2026-08-15 用户提供）
 > 核心洞察：**Agent = 模型 × Harness**（乘法关系）——模型决定上限，Harness 决定能力发挥多少；便宜模型性价比被重新放大。PAEG 应移植 dsh 的 PTC 模式与可观测性。
@@ -1237,13 +1237,16 @@ Interaction / Profile / Diagnosis / Plan / Action / Evaluation / Adaptation / Kn
 
 | # | 需求 | 对应 PAEG 现状 | 优先级 |
 |---|---|---|---|
-| PTC-1 | **PTC 模式移植**：workflows_hub 加"程序化步骤"（把连续多步组织成脚本一次执行，支持循环/采样/数据落盘）| workflows_hub 有 DAG 但缺程序化执行（§二 P2-1 tool-presentation 同源）| P0 |
-| PTC-2 | **模式决定工具集 + 运行时锁定**：4 档权限预设升级为"模式选择器"（会话开始后不能切模式，因模式决定工具集）| tool_registry PERMISSION_PRESETS 4 档已有，缺会话级锁定 | P1 |
+| PTC-1 | **PTC 模式移植**：workflows_hub 加"程序化步骤"（把连续多步组织成脚本一次执行，支持循环/采样/数据落盘）| workflows_hub 有 DAG 但缺程序化执行（§二 P2-1 tool-presentation 同源）| ✅ v1.1.5 |
+| PTC-2 | **模式决定工具集 + 运行时锁定**：4 档权限预设升级为"模式选择器"（会话开始后不能切模式，因模式决定工具集）| tool_registry PERMISSION_PRESETS 4 档已有，缺会话级锁定 | ✅ v1.1.5 |
 | PTC-3 | **工具调用全貌可观测**：log 显示每次调用（工具名/参数/缓存命中/耗时），对齐 dsh log | observability + trace_id 已有，缺"工具调用视图" | P1 |
-| PTC-4 | **任务复杂度→模型选择路由**：简单任务用 v4-flash（快/便宜），复杂任务用 v4-pro（强推理）——按任务类型自动选模型 | config/agents.json per-subagent 配置已有，缺运行时复杂度路由 | P1 |
+| PTC-4 | **任务复杂度→模型选择路由**：简单任务用 v4-flash（快/便宜），复杂任务用 v4-pro（强推理）——按任务类型自动选模型 | config/agents.json per-subagent 配置已有，缺运行时复杂度路由 | ✅ v1.1.5 |
 | PTC-5 | **主循环可观测 + 可替换性**：9 subagent 的调度主循环（paeg.teach）升级为"可替换策略"（对齐 dsh 主循环插件化）| subagent registry 已有（W3），主循环仍硬编码 | P2 |
 
 #### 3.44.3 实施记录
 
-（待实施后填充）
+- **PTC-1 ✅（v1.1.5，2026-08-15）**：workflows_hub 新增 programmatic 步骤类型（_run_programmatic）——受限命名空间执行 Python 代码（安全内置+标准库 import+args/results 参数访问），支持循环采样/数据落盘/错误安全；6 测试全过
+- **PTC-2 ✅（v1.1.5）**：services/session_mode_lock.py 会话级模式锁定（绑定/切换/活动后锁定/dsh"模式决定工具集"语义）；5 测试
+- **PTC-3 ✅（v1.1.5）**：services/tool_observability.py 工具调用全貌（记录工具/参数/耗时/缓存命中 + 聚合统计 + 命中率）；5 测试
+- **PTC-4 ✅（v1.1.5）**：services/model_routing.py 任务复杂度→模型路由（简单→flash/复杂→reasoner，可配置覆盖）；5 测试
 
