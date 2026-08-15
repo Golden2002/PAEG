@@ -267,7 +267,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 24 | **Web UI 模式化**：shell/wire/slots 拆分，ui-*.js 插件化 | ui-* 插件 ~30 个 | 09_GUI前端 | P1 |
 | 25 | **Preset 即 UI 风格**：预设决定挂哪些 ui-* 模块 | web-app patch | 前端按 preset 挂载 | P1 |
 | 26 | **客户端 HMR 热刷新**：dev 模式前端自动刷新 | client-hmr | 09_GUI前端 | P2 |
-| 27 | **Self-Update via Patch**：AI 读/写自己 patch 文件（cordis preset 自修改）| tool-cordis | 对应 PAEG self_evolution + tool-cordis 化 | P1 |
+| 27 | **Self-Update via Patch**：AI 读/写自己 patch 文件（cordis preset 自修改）| tool-cordis | 对应 PAEG self_evolution + tool-cordis 化 | P1  ✅（§3.46.2 AI 读写闭环）|
 | 28 | **Constitutional AI 补丁化**：反思/门禁/重复检测走 patch 配置 | plan-mode + repeat-tool-reminder | quality_gate 配置化 | P2  ✅（§3.46.2 quality_gate 配置化）|
 | 29 | **用户级 + Profile 级 + 全局级 Skill 目录** | skill-filesystem customSkillDirs | skill_registry 多目录 | P1 ✅（v1.1.4 三层合并）|
 | 30 | **Cordis 式 Service Registry**："一切皆 ctx"（llm/sessions/agents/tools/subagents...）| ctx.<key> Service | runtime/registry.py Context | P1 ✅（§3.46.2，services/service_registry.py）|
@@ -1508,5 +1508,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#6 OS 平台双轨 ✅（Harness P2，2026-08-16）**——services/platform_dual_track.py 新建：get_platform（win32/posix）+ get_command_template（双轨模板）+ resolve_platform_value（平台感知配置：平台特定值优先、common 回退、未知回退 default 容错）；应用：ffmpeg/python/脚本命令在 win32/posix 不同（ffmpeg.exe vs ffmpeg）——TTS/STT/PPT 按平台分支；dsh 借鉴 bash+pwsh 双轨；4 测试全绿 + SURFACE 验证（平台检测/双轨模板/common 回退/未知回退）（commit be8e540）
   - **#23 Fresh-Agent Loop 对照验证 ✅（Harness P2，2026-08-16）**——对照验证测试 test_fresh_agent_loop.py（4 项）：确认 RALPH 循环（§3.42 T5）已具备 dsh tool-ralph 语义——每轮 fresh child（executor 注入）+ 共享进度（history/prev 传递）+ 结构化 handoff（RoundOutput snapshot + LoopResult.promise + 状态快照落盘）；对照增强无缺口，以测试锁定能力；dsh 借鉴 tool-ralph；4 测试全绿 + SURFACE 验证（DONE/fresh child/prev 传递/handoff 快照）（commit 新）
   - **#28 Constitutional AI 补丁化 ✅（Harness P2，2026-08-16）**——services/quality_gate_config.py 新建：get_gate_config（阈值/最小长度/宪法条款，缺省回退内置）+ apply_to_gate（注入 QualityGate THRESHOLDS/MIN_CONTENT_LEN/MIN_WORDS）+ reset_cache；config/quality_gate.json patch 配置（不改代码调门禁）；与 self_evolution 衔接（蒸馏/工具经验过门禁可配置化）；ratchet：无配置行为不变；dsh 借鉴 plan-mode + repeat-tool-reminder 走 patch 配置；5 测试全绿 + SURFACE 验证（默认回退/配置注入/门禁生效）（commit 新）
-  - **回归验证 ✅**：169 passed（全部新功能测试）+ audit_check 40/40
+  - **#27 Self-Update via Patch ✅（Harness P1，2026-08-16）**——subagent_loader.py 新增 AI 读写闭环：save_yaml_patch（AI 修改 preset 落盘 config/subagents/{name}.patch.yml）+ read_yaml_patch（AI 读回）+ list_yaml_patches（AI 枚举）；tool-cordis 语义（AI 可读写自身 preset 配置，无需人工改代码）；与 #1 Subagent Patch 系统衔接（#1 装载已有，#27 补 AI 读写闭环）；写后 load_yaml_patch 装载生效；dsh 借鉴 tool-cordis preset 可修改；5 测试全绿 + SURFACE 验证（落盘/读回/枚举/装载生效）（commit 新）
+  - **回归验证 ✅**：174 passed（全部新功能测试）+ audit_check 40/40
 
