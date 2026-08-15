@@ -5469,3 +5469,87 @@ Start-Process cmd -ArgumentList '/c','start /b python server.py > server_run.log
 > **v0.70+ PDF 渲染与 Mermaid 图经验（2026-08-14）**：技术文档 PDF 渲染（render_pdf.py）关键经验——①Mermaid 图：Chromium 打印 SVG 空白 → 用 Playwright（channel=msedge 系统 Edge）元素截图 PNG 嵌入（device_scale_factor=2 高清）②图限高 170mm + page-break-inside:avoid 防跨页截断 ③图与文字 margin 8mm ④mermaid.js 本地化（file:// 相对加载）⑤正则匹配换行用非 raw 字符串。详见 交付物/文档模板/README.md 渲染生成经验 + 元能力 §5.6。
 > **v0.70+ 数学可视化脚本生成器（§3.26）**：对话+轮询→script.json（单一真相源）→7 铁律校验→5 资产联动（Manim 视频/讲稿/PPT/讲义/思维导图全部可下载）。方法：3B1B 8 原则 + manim_skill + Oracle。P0 已实施（generator+validator）。
 > **v0.70+ workflow 教学物料包（§3.27）**：`config/workflows/teach_materials.json`（7 步 DAG：outline→{knowledge_map/keyword_doc/ppt/script}→lecture→package）；workflows_hub 占位符统一替换（_resolve_placeholders）+ 物料联动；并行增强 P1。
+
+
+## 10.17 MCP 工具可移植性：配置驱动加载器（v1.1.1 §3.36 ⭐ 2026-08-15）
+
+**问题**：config/mcp_tools.json 声明 14 个工具但无加载器接入——改配置不影响行为（14/14 description 与工具表不一致，断链）。
+
+**方案**（Oracle 架构咨询 + librarian 调研：LangFlow GHSA-2wcq-pvw2-xh7v + MCP SEP-986 + importlib 安全模式）：
+
+`
+config/mcp_tools.json（声明：name/description/risk/module/function/params/enabled）
+   │
+   ▼
+mcp_tools_loader.py（校验→解析→安全动态导入→(defs, handlers)）
+   ├─► tool_registry.get_tool_defs()       （内置+配置工具合并）
+   ├─► register_external_tools()           （handler 合入 _HANDLERS）
+   ├─► _apply_config_meta()                （配置元数据覆盖内置 description/params）
+   ├─► _WRITE_TOOLS 自动同步               （risk=write 入黑名单，exam 锁定）
+   └─► config_hub.reload_all()             （热重载，失败保留旧配置）
+`
+
+**安全边界**（四重）：①模块前缀白名单（tool_registry/constraint_engine/material_pipeline/services/lib/utils）②拒绝危险模块（os/sys/subprocess/importlib/builtins/pickle/yaml/ctypes/socket）③函数名非下划线 identifier ④永不 exec/eval。
+
+**生效规则**（ratchet）：改 description/params → 工具表立即反映；新增条目 → 注册；删除条目 → 下架；enabled:false → 不注册；内置冲突 → 内置优先（override:true 才覆盖）；risk=write → exam 锁定。
+
+**验证**：5 项测试 + 热重载实证（14/14 一致、增删条目即时生效）+ 回归 25/25。
+
+## 10.18 Harness P1 低成本实施三项（v1.1.2 §3.37 ⭐ 2026-08-15）
+
+### 10.18.1 H-16 repeat-tool-guard 升级（借鉴 guard/repeat-tool-reminder）
+
+hooks_hub.repeat_guard_check 升级为 **chain-key 精确计数**：
+- chain key = JSON.stringify([name, canonicalArgs])（深度键排序）——同工具**不同参数不算重复**
+- 多级阈值 [3, 5, 8]：3 温和提醒 / 5+ 详细提醒（含工具名+次数+参数预览）
+- on_user_message() 用户插话 → 重置 chain（对齐 agent/pre-step 语义）
+- config_hub.execute_tool 传入 tool_args
+
+### 10.18.2 #18 Permission Presets 双开关（借鉴 interaction/permission-presets）
+
+新建 services/permission.py：
+- 预设 = sandbox + approval 命名组合（一个选择器管两个开关）
+- 三 knob 事件：permission/preset（意图 log-only）/ sandbox/mode / approval/policy——append-only 可回放
+- **custom 派生状态**：knob 偏离所有预设 → custom（不可作切换目标）
+- 与 tool_registry 4 档兼容（standard/exam/read_only/full → 双 knob 映射）
+
+### 10.18.3 H-1/H-12 Session Event Log 类型化（借鉴 core/session）
+
+新建 infra/event_types.py：
+- SessionEvent envelope {type, seq, time, data, ignorable?, surfaceOp?}
+- **56 个已知事件类型**（13 核心 + 28 插件 + 15 PAEG 教学）
+- surface 事件（user/message、assistant/message、tool/result）强制 surfaceOp 校验
+- observability.emit_event_typed：未知类型早失败（ValueError）
+
+**验证**：16 项新测试全过 + 回归 47/47 + 真实验证（模块导入/双开关/custom 派生/guard 拦截重置/envelope 构造）。
+
+
+## 10.19 subagent 生命周期事件 + 多级 skill 目录（v1.1.4 §3.38 ⭐ 2026-08-15）
+
+### 10.19.1 多级 skill 目录（#29，借鉴 deepseek-harness skill-filesystem）
+
+`
+三层路径合并（低→高优先级）：
+1. 全局默认：{base}/skills
+2. 项目配置：{base}/config/skills.json 的 skills_dirs（向后兼容）
+3. 用户层：~/.paeg/skills.json（或 /skills.json）的 skills_dirs，
+   支持 {env:KEY|默认} 变量替换
+同名覆盖：高优先级层覆盖低优先级层（reload 时后扫覆盖先扫）
+配置缺失 → 静默回退（不抛错）
+`
+
+实现：skill_registry._load_dirs() + 
+eload()（_skill_origin 记录目录索引，同名高优先级覆盖）。
+
+### 10.19.2 subagent 生命周期事件（H-4，借鉴 deepseek-harness tool-workflow）
+
+| 事件 | 触发点 | 数据 |
+|---|---|---|
+| subagent/descriptor | PAEG.__init__ 构造后（9 个）| name/model/kb_ref/descriptor_path |
+| 	ool-workflow/agent-start | 每个 subagent .run() 前 | agent/run_id/learner_id/subject/ts |
+| 	ool-workflow/agent-end | 每个 subagent .run() 后 | agent/run_id/duration_ms/stop_reason |
+| hook/invoked | hooks_hub.run_hook 前 | event/source/matched |
+| hook/result | hooks_hub.run_hook 后 | event/listener_count/verdict |
+
+包装点：paeg._subagent_run()（teach 5 个核心）+ workflows_hub._run_subagent() + hooks_hub.run_hook()。
+runId UUID 配对 start/end（对齐 dsh SubagentRunInfo 模式）。

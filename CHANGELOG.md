@@ -1,3 +1,90 @@
+### v1.1.4 §3.38 subagent 生命周期事件 + 多级 skill 目录（2026-08-15 ⭐）
+
+**本版定位**：落地 §3.38 剩余两项代码需求（A1 #29 多级 skill 目录 + A2 H-4 subagent 生命周期事件），全部 TDD（RED→GREEN）。
+
+**A1 多级 skill 目录（#29，借鉴 deepseek-harness skill-filesystem customSkillDirs）**：
+- skill_registry._load_dirs() 升级为**三层路径合并**：全局（skills/）< 项目（config/skills/）< 用户（~/.paeg/skills/ 或 /skills/）
+- 高优先级层同名覆盖低优先级层（用户可覆盖项目，项目可覆盖全局）
+- 用户配置 ~/.paeg/skills.json 支持 {env:KEY|默认} 变量替换（复用 config_loader 模式，避免循环导入内联实现）
+- 配置缺失 → 静默回退（向后兼容现有 config/skills.json 用户）
+- 新建 config/skills.json.example 示例
+
+**A2 subagent 生命周期事件（H-4，借鉴 deepseek-harness tool-workflow）**：
+- paeg.PAEG.__init__ 构造后发射 subagent/descriptor（9 个 subagent 各一个，name/model/kb_ref）
+- paeg.teach() 用 _subagent_run 包装 5 个核心 subagent 调用（diagnostor/planner/presenter/evaluator/adapter）——	ool-workflow/agent-start + gent-end 成对（runId UUID 配对 + duration_ms）
+- workflows_hub._run_subagent 发射同对（workflow 路径单漏斗覆盖）
+- hooks_hub.run_hook 发射 hook/invoked + hook/result
+- 全部事件过 infra.event_types.make_event() 校验（未知类型拒绝）
+
+**验证（TDD RED→GREEN）**：11 项新测试（skill 5 + lifecycle 6）+ 回归 90/90 全过 + smoke 10/13（3 个 FAIL 为 DEEPSEEK_API_KEY 未设置的环境限制，非代码问题）+ 服务运行正常
+
+**文档**：需求文档 §3.38 状态更新 + 本 CHANGELOG + 技术全景 §10.19 + 元能力 §6.61-§6.62
+
+### v1.1.3 §3.38 Profile Bundle + 配置树导出（2026-08-15 ⭐）
+
+**本版定位**：依据 Harness 调研继续落地 H-2（Profile Bundle 分层）+ H-13（配置树导出 API），并同步技术/元能力/维护三文档（纪律 18）。
+
+**H-2 Profile Bundle 分层（借鉴 boot/app-boot/src/profile.ts）**：
+- 新建 services/profile_bundle.py：Profile = 目录（paeg_profiles/<name>/）+ bundle manifest（patch 声明）
+- **堆叠顺序**（低→高）：默认 → bundle1 → bundle2 → profile.patch → user_overrides（用户最高优先）
+- **稀疏 patch**：深度合并（只改想改的键，其余继承 defaults，非整层覆盖）
+- 内置 bundle：base（基座）/ exam（锁权限）/ weil（薇依人格）——教师一键切场景不改代码
+- ProfileBundleService：切换 profile / 导出生效配置
+
+**H-13 配置树导出 API（对齐 dsh --dump-config）**：
+- GET /api/admin/dump-config：完整可 patch 配置树（profiles/bundles/agents/tools/effective）
+- 实测：profiles=standard、bundles=base/exam/weil、agents=10、tools=96
+
+**文档同步（纪律 18）**：
+- 技术全景文档 §10.17/§10.18（MCP 可移植性 + Harness P1 三项）
+- 元能力文档 §6.57-6.60（配置驱动安全模式 / chain-key 计数 / 双开关权限 / 事件类型化）
+- 维护手册 §18.39-18.41（热重载 SOP / 权限切换 / 事件类型约束）
+- 需求文档 §3.38（综合审查 + 新模块蓝图 + 文档同步计划）
+
+**验证（TDD）**：6 项新测试全过（profile 分层/堆叠/用户优先/稀疏 patch/配置树/端点）+ 最终回归 41/41 + dump-config 端点实测 + 公网 200
+
+### v1.1.2 §3.37 Harness P1 低成本实施三项（2026-08-15 ⭐）
+
+**本版定位**：依据 DeepSeek Harness 调研（ForMaitenance/DeepSeek_Harness最新调研_47f9438.md，HEAD=47f9438）落地 3 个低成本高价值 P1 项——repeat-tool-guard 精确化 / Permission Presets 双开关 / Session Event Log 类型化。全部 TDD（RED→GREEN）。
+
+**H-16 repeat-tool-guard 升级（借鉴 guard/repeat-tool-reminder）**：
+- hooks_hub.repeat_guard_check 升级为 **chain-key 精确计数**：key = JSON.stringify([name, canonicalArgs])（深度键排序）——相同工具**不同参数不算重复**
+- **多级阈值 [3, 5, 8]**：3 温和提醒 / 5+ 详细提醒（含工具名+次数+参数预览）
+- 新增 on_user_message()：用户插话 → 重置 chain（对齐 agent/pre-step 语义）
+- config_hub.execute_tool 传入 tool_args（chain 精确性）
+
+**#18 Permission Presets 双开关（借鉴 interaction/permission-presets）**：
+- 新建 services/permission.py：预设 = sandbox + approval 命名组合（一个选择器管两个开关）
+- 三 knob 事件：permission/preset（意图 log-only）/ sandbox/mode / approval/policy——append-only 可回放
+- **custom 派生状态**：knob 偏离所有预设 → custom（不可作切换目标）
+- 与 tool_registry 4 档兼容（standard/exam/read_only/full → 双 knob 映射）
+
+**H-1/H-12 Session Event Log 类型化（借鉴 core/session）**：
+- 新建 infra/event_types.py：SessionEvent envelope {type, seq, time, data, ignorable?, surfaceOp?} + **56 个已知事件类型**（13 核心 + 28 插件 + 15 PAEG 教学）
+- surface 事件（user/message、assistant/message、tool/result）强制 surfaceOp 校验
+- observability.emit_event_typed：未知类型早失败（ValueError）
+
+**验证（TDD）**：3 项新测试 16/16 全过（guard 5 + permission 6 + event 5）+ 最终回归 47/47 全过 + 真实验证（模块导入/双开关切换/custom 派生/guard 拦截与重置/envelope 构造）+ 服务重启 health OK + 公网 200
+
+**文档**：需求文档 §3.37（新增实施项 + 新模块蓝图）+ 本 CHANGELOG
+
+### v1.1.1 §3.36 MCP 工具可移植性：配置驱动加载器（2026-08-15 ⭐）
+
+**本版定位**：修复 §3.36 断链——config/mcp_tools.json 声明了但无加载器接入，改配置不影响行为（14/14 工具 description 与工具表不一致）。落地"改配置即生效"的可移植工具体系。
+
+**配置驱动加载器（§3.36，Oracle 设计 + librarian 调研）**：
+- 新建 mcp_tools_loader.py：JSON→可注册 (defs, handlers) 翻译器——安全边界四重（模块前缀白名单 tool_registry/constraint_engine/material_pipeline/services/lib/utils + 拒绝危险模块 os/sys/subprocess/importlib/builtins/pickle/yaml/ctypes/socket + 函数名非下划线 identifier + 永不 exec/eval），单条声明损坏跳过不影响其他
+- 	ool_registry.register_external_tools()：外部 handler 合入 _HANDLERS + risk=write 自动同步 _WRITE_TOOLS（exam 模式锁定配置工具）+ _apply_config_meta() 配置元数据覆盖内置工具 description/params + _config_tool_defs() 追加外部工具定义
+- config_hub.reload_all() 链尾追加 mcp_tools 重载（失败保留旧配置）——热重载即生效
+- 新建 config/mcp_tools.example.json（schema 模板 + 3 样例）+ 交付物/MCP工具手册.md 新增"五、加载机制"章节
+
+**验证（TDD RED→GREEN）**：
+- 5 项测试全过：JSON 工具可见（14/14 description 一致）/ 增条目 → 工具表增加 / 删条目 → 下架 / 改 description → 工具表变化 / risk=write → exam 锁定
+- 热重载实证：改配置→reload_all→工具表变化（无重启）；新工具注册 + 删除下架均即时生效
+- 回归 25/25 全过（toolchain + skill registry + 新测试）；audit 34/39（失败项均既有状态，本次零新增）
+
+**文档**：需求文档 §3.36 状态更新 + MCP工具手册.md 加载机制 + 本 CHANGELOG
+
 ### v0.71 学段教学模式差异化 + sub agent 模型配置化 + 配置化定制服务（2026-08-14 ⭐）
 
 **学段教学模式差异化（§3.33，用户 ULW + Oracle 两次咨询）**：

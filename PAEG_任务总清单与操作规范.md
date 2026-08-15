@@ -47,6 +47,16 @@
 
 23. **⭐ 技术说明文档整体性与融贯性规范（2026-08-15 用户插播指令）**：技术说明文档要求**整体性和融贯性**——新增内容应**首先分析确认将其写入技术说明文档的方式**（判断应并入哪个章节/以何种形式融入，而非单独堆叠），再按技术说明文档的规范（**格式、内容、语言**）写入。**语言必须调用我们最强的语言规范模块检测和 refine**（lang_gate 统一入口 + LanguageRefiner 薇依语料矫正），确保新增文字与全文语言风格一致、无 AI 腔。
 
+25. **⭐ 升级改造铁律（2026-08-15 用户执行标准）**：**升级改造是优化功能实现方式、提升功能的实现效果**；**不得降低甚至使原功能无法实现**——任何升级必须在改前验证原功能基线（测试/真实调用），改后回归确认功能不退化、效果提升。若升级与旧行为冲突，保留回退机制（如数据文件优先、prompts.py 回退）。
+
+26. **⭐ 服务启动命令执行标准（2026-08-15 用户实测反馈：启动命令容易卡住）**：用 PowerShell `Start-Process` 启动 PAEG server / cloudflared 时**禁止把 stdout/stderr 重定向到工作区文件后立即同步轮询**——曾出现：进程已启动（端口 LISTENING）但 stdout 日志文件为空、health 检查在 8 秒内失败误判"未启动"。**正确姿势**：
+   1. **启动分离**：`Start-Process -FilePath python -ArgumentList @("...\server.py") -WorkingDirectory "...\05_实现原型" -WindowStyle Hidden -PassThru`（**不要** `-RedirectStandardOutput`，重定向会让 PowerShell 句柄持有易卡住；日志用 server 自身落盘或后续按需重定向）
+   2. **验证用端口反查而非日志**：`netstat -ano | findstr ":5000"` 见 LISTENING + PID = 启动成功；health 检查**至少等 15-20 秒**（server 启动含 MCP 网关初始化，8 秒不够）
+   3. **cloudflared 隧道 URL 在 stderr**：公网 URL（`https://xxx.trycloudflare.com`）打印在 stderr 流而非 stdout——重定向要 `2>` 或查 err 日志；`Get-Content <log> | Select-String "trycloudflare"` 取 URL
+   4. **进程存活判断**：`Get-Process <name>` 有记录 ≠ 一定健康，要再验证端口/HTTP；cloudflared 环境预检（QUIC/UDP/TCP）通过即正常工作（http2 降级可接受）
+   5. **操作顺序**：先端口反查确认残留 → 杀残留 → 启动 → 15-20s 后 health → 起隧道 → 公网验证（Invoke-WebRequest 隧道 URL /api/health）
+   6. **改代码后重启**：按技术文档 §10.16 进程 SOP（端口反查 PID → 精确杀 → 确认释放 → 清 pyc → touch → 启动 → 验证启动时间），杜绝残留进程假重启
+
 ## 一、ULW Loop 大任务（进行中，5 步）
 
 ### Step 1：五维度评估基线 ✅
@@ -807,7 +817,12 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 - **执行**：先列入需求文档 → Oracle 咨询 → 完成；markdown 和 pdf 都保存项目文件夹；渲染完成后微信发 PDF
 - **优先级**：P0
 
-### 3.31 DeepSeek Harness 继续调研（2026-08-14 用户 ULW · 待执行）
+### 3.31 DeepSeek Harness 继续调研（2026-08-14 用户 ULW · ✅ 已完成 2026-08-15）
+- **调研结果（2026-08-15，librarian 全量调研落盘 ForMaitenance/DeepSeek_Harness最新调研_47f9438.md）**：
+  - 仓库 HEAD=47f9438（0 新 commit），最新发布 dsh@0.1.0-rc.5（npm），**无新架构模块**
+  - 5 个 P1 项源码细节已捕获：Session Event Log（43 event types+append/deriveMessages）/ Profile Bundle（bundles 堆叠顺序）/ Guard 插件化（chain key=name+canonical args）/ Permission Presets（sandbox+approval 双开关）/ Service Registry（ctx.<key> 注册）
+  - 新增 13 个值得借鉴模块：compaction 4-event / tool-workflow 4-event / chunk-rows 56× 压缩 / session-checkpoint-policy / runtime-diagnostics invariants 等
+  - 最小可行切入点：H-1/H-12（1.5天）/ H-2（1天）/ H-16（1天）/ #18（1天）低优先；H-15/H-7/H-6 大改（>2天）待规划
 - **需求**：继续调研 DeepSeek Harness github 库（新发布内容）→ 为需求文档更新需求
 
 ### 3.32 sub agent 模型配置化 + 面向用户配置化定制服务（2026-08-14 用户新指令 · ✅ 已完成 v0.71）
@@ -865,7 +880,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
   - `manim_service.generate_manim_video` 接入：script.json 流水线优先（回退单段兼容）
   - 验证：manim_pipeline 7 项测试全过（含 Phase2B 真实渲染 mp4）+ material_pipeline 5 项全过（含语言门实际检测 AI 味 0.60）
 
-### 3.35 MaterialPipeline MCP 标准化 + 亮点记录（2026-08-15 用户新指令 · 待实施）
+### 3.35 MaterialPipeline MCP 标准化 + 亮点记录（2026-08-15 用户新指令 · ✅ MCP 标准化已完成 v1.1）
 - **背景**：material_pipeline.py（§3.34 产出）已把"多 Agent 分阶段+门控+自检"范式用于讲义/PPT/讲稿/知识导图。用户要求进一步优化并 MCP 标准化。
 - **需求（用户三点）**：
   1. **咨询 Oracle + 联网检索优秀项目架构** → 提出全面需求继续优化 material_pipeline → **MCP 标准化开发**，使其成为**模块化工具**（完美接入 PAEG + 便于复用）
@@ -873,4 +888,130 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
   3. **完整实施需求文档中记录的其他未来需求**
 - **执行**：先记录入需求文档 → Oracle 咨询 + librarian 检索 → 方案 → 实施 MCP 标准化 → 记录亮点 → 完整实施未来需求
 - **优先级**：P1
+- **实施记录（v1.1，commit 31e3afe）**：
+  - **MCP 标准化**：material_pipeline 4 工具（generate_handout/generate_script/generate_ppt/generate_mindmap）双层注册（tool_registry 内置 + mcp_gateway 外部）+ 风险分级（risk=write 入 _WRITE_TOOLS，exam 模式锁定）+ _BUILTIN_NAMES 去重
+  - **Oracle 架构评审**：5 缺口（无 MCP 接口/阶段函数无 schema/无风险分级/无热更新/修复回路无降级）——前 3 项已修，后 2 项列入 §3.36
+  - **librarian 检索**：LangGraph StateGraph/Magentic-One 双 Ledger/CrewAI JSONC/pluggy 插件/RAGAS 质量门控——长期优化蓝图（§3.36）
+  - 验证：MCP 4 工具注册 + 去重 + exam 拦截 + MCP 网关真实调用全过
+- **待办**：亮点记录入技术说明附录 + 亮点文档（随技术说明更新）；查询 MCP 标准化是否已计入元能力/技术/维护文档
+
+### 3.36 MCP 工具可移植性提升（2026-08-15 用户新指令 · ✅ 核心已完成 v1.1.1）
+- **背景**：用户评估"是否我们开发的每一个 MCP 标准化工具都如 DeepSeek Harness 平台一样，能够方便地为其他项目移植。如果不够优秀，提出需求，记录入需求文档，实施完善"
+- **评估结论（对照 Harness"一切皆插件"标准）**：当前 12 个 MCP 工具可调用但不完全可移植——5 项核心差距：
+  1. **非独立包**：无 plugin 分发格式（Harness 是 npm 包可 install 即用；PAEG 是进程内模块）
+  2. **无配置驱动**：工具行为硬编码，不能 cordis.patch.yml 式外部覆盖
+  3. **强耦合 PAEG 上下文**：_safe_chat/画像/知识库/llm_adapter 依赖
+  4. **无文档/示例**：其他项目不知如何移植
+  5. **无热替换**：不能运行时卸载/替换工具实现
+- **优化需求（按价值排序）**：
+  1. **配置驱动**：新建 config/mcp_tools.json——每个 MCP 工具的 {name, description, risk, params, module, function} 声明，加载器按配置注册（改配置不改代码）
+  2. **依赖解耦**：工具核心函数抽离为"纯 Python + 可选注入"（LLM/上下文通过参数传入，不硬依赖 subagents/infra），便于其他项目复用
+  3. **独立文档**：新建 交付物/MCP工具手册.md——每个工具的 {用途/参数/示例/依赖/移植指南}
+  4. **配置示例**：提供 mcp_tools.example.json + 移植 README（其他项目如何接入）
+  5. **热替换**（长期）：config_hub 支持运行时 reload 工具配置（对齐 /api/admin/reload）
+- **执行**：先记录入需求文档 → 评估（已做）→ 实施配置驱动 + 文档 → 验证
+- **优先级**：P1
+- **实施记录（v1.1.1，2026-08-15）**：
+  - **新建 mcp_tools_loader.py**：配置驱动加载器（Oracle 架构咨询 + librarian 生产级调研：LangFlow GHSA 教训 + MCP SEP-986 + importlib 安全模式）——白名单前缀（tool_registry/constraint_engine/material_pipeline/services/lib/utils）+ 拒绝危险模块（os/sys/subprocess/importlib/builtins/pickle/yaml/ctypes/socket）+ 函数名非下划线 identifier + 永不 exec/eval；单条失败跳过不影响其他
+  - **接入 tool_registry.py**：register_external_tools() 合并外部 handler 到 _HANDLERS + _apply_config_meta() 配置元数据覆盖内置工具 description/params + _config_tool_defs() 追加外部工具定义 + risk=write 自动同步 _WRITE_TOOLS（exam 模式锁定）
+  - **接入 config_hub.py**：reload_all() 链尾追加 mcp_tools 重载 + register_external_tools（失败保留旧配置）
+  - **新建 config/mcp_tools.example.json**：schema 模板（allowed_module_prefixes + 3 样例工具）
+  - **更新 交付物/MCP工具手册.md**：新增"五、加载机制"（架构图/生效规则/安全边界/热重载/移植示例）
+  - **验证（TDD RED→GREEN）**：5 项测试全过（JSON 工具可见/增条目/删条目/改描述/写工具 exam 锁定）+ 热重载实证（改配置→工具表变化 14/14 一致、新工具注册、删除下架）+ 回归 25/25 全过 + audit 34/39（失败项均为既有状态，本次零新增）
+  - **断链修复**：此前 mcp_tools.json 声明了但无加载器（14/14 工具 description 与工具表不一致）——现已配置驱动生效
+
+### 3.37 Harness P1 低成本实施项（2026-08-15 调研落盘 · ✅ 前 3 项已完成 v1.1.2）
+- **实施记录（v1.1.2，2026-08-15）**：
+  - H-16 ✅：hooks_hub.repeat_guard_check 升级 chain-key 精确计数（key=name+canonicalArgs）+ 多级阈值 [3,5,8] + on_user_message 重置；5/5 测试
+  - #18 ✅：新建 services/permission.py 双开关（sandbox+approval 组合 + permission/preset 意图事件 + custom 派生 + 可回放）；6/6 测试
+  - H-1/H-12 ✅：新建 infra/event_types.py（SessionEvent envelope + 56 已知类型 + surfaceOp 校验）+ observability.emit_event_typed；5/5 测试
+  - 回归 47/47 全过 + 真实验证 + 服务重启 health OK + 公网 200
+
+
+> 依据：ForMaitenance/DeepSeek_Harness最新调研_47f9438.md（librarian 全量调研，含 permalink + 源码模式）
+> 定位：从 §二/§3.31 的 30 项需求中选取**低成本高价值**的 5 项先行落地（每项 <1 天），再评估中等项。
+
+#### 3.37.1 优先级清单（Oracle 确认排序）
+
+| 序 | 需求 | 对应 H/# | 工作量 | 价值 | 状态 |
+|---|---|---|---|---|---|
+| 1 | **repeat-tool-guard 插件化**（连续同工具调用拦截提醒）| H-16 | ~0.5d | ★★★★ 防 subagent 死循环 | ✅ v1.1.2 |
+| 2 | **Permission Presets 双开关**（sandbox + approval 独立 setter + 权限事件记录）| #18 | ~0.5d | ★★★★ 教师/家长可切换权限档 | ✅ v1.1.2 |
+| 3 | **Session Event Log 类型化**（infra/event_types.py discriminated union + observability 接入）| H-1/H-12 | ~1d | ★★★★ 会话可观测性 | ✅ v1.1.2 |
+| 4 | **Profile Bundle 分层**（教学预设/用户覆盖两层，config_loader 扩展）| H-2 | ~1d | ★★★ 教学场景预设化 | ⏳ |
+| 5 | **配置树导出 API**（/api/admin/dump-config 对齐 dsh --dump-config）| H-13 | ~0.5d | ★★★ 可观测性/调试 | ⏳ |
+
+#### 3.37.2 H-16 repeat-tool-guard 实施要点（源码模式已捕获）
+
+- **chain key** = JSON.stringify([name, canonicalArgs])；canonical = 深度键排序后 JSON
+- **阈值**：[3, 5, 8]（3 温和提醒 / 5+ 详细提醒含工具名+次数+参数预览）
+- **监听**：	ools/post-execute（计数，denied 也走同管道）+ gent/pre-step（用户插话重置）
+- **PAEG 落地点**：gents/repeat_tool_guard.py → config_hub execute_tool 链（已有 repeat_guard_check 雏形，升级为 chain-key 精确计数）
+- **借鉴来源**：packages/guard/repeat-tool-reminder/src/index.ts（commit 47f9438）
+
+#### 3.37.3 #18 Permission Presets 强化要点
+
+- **三个 knob event**：permission/preset（意图，log-only）+ sandbox/mode（执行）+ approval/policy（审批）
+- **默认 preset**：workspace-write={sandbox:workspace-write, approval:ask} / danger-full-access={sandbox:full, approval:never}
+- **custom 派生**：knob 与所有 preset 不匹配 → UI 显示 custom（不落 event）
+- **PAEG 落地点**：tool_registry PERMISSION_PRESETS（已有 4 档）→ 升级为双 knob 语义 + observability 记录 permission/preset 事件
+- **借鉴来源**：packages/interaction/permission-presets/src/index.ts（commit 47f9438）
+
+#### 3.37.4 H-1/H-12 Session Event Log 要点
+
+- **SessionEvent envelope**：{type, seq, time, data, ignorable?, surfaceOp?}，seq=log.length 连续性
+- **三类 surface event**：user/message、assistant/message、tool/result（必须带 surfaceOp）
+- **deriveMessages 投影**：增量折叠（O(new nodes)），空 assistant/message 跳过
+- **PAEG 落地点**：infra/event_types.py（Python Literal union）+ observability.py log_event 签名升级
+- **借鉴来源**：packages/core/session/src/types.ts + index.ts（commit 47f9438）
+
+#### 3.37.5 新增值得借鉴模块（调研新发现，进长期蓝图）
+
+- compaction/{start,end,summary,prune} 4-event → PAEG context_bundle 压缩生命周期可观测
+- tool-workflow/{agent-start,agent-end,run-start,run-end} 4-event → subagent 组合追踪
+- chunk-rows.ts 56× 压缩 → 长流式教学会话 log 存储
+- session-checkpoint-policy → infra/db.py checkpoint 策略分层
+- runtime-diagnostics/invariants → audit_check.py 运行时不变式强化
+
+### 3.38 综合审查 + Harness 剩余实施项（2026-08-15 用户指示 · ✅ 全部完成 v1.1.4）
+
+> 依据：§3.36/§3.37 已完成实施 + ForMaitenance/DeepSeek_Harness最新调研_47f9438.md
+> 本批从 Harness 30 项需求中选取剩余低成本项落地，并同步技术/元能力/维护文档。
+
+#### 3.38.1 本轮实施范围（已确认）
+
+| 序 | 需求 | 对应 | 工作量 | 状态 |
+|---|---|---|---|---|
+| 1 | **H-2 Profile Bundle 分层**（paeg_profiles/ 目录 + profile.json bundles + user_overrides.yaml patch 层）| H-2/#2 | ~1d | ✅ v1.1.3 |
+| 2 | **H-13 配置树导出 API**（/api/admin/dump-config 对齐 dsh --dump-config）| H-13 | ~0.5d | ✅ v1.1.3 |
+| 3 | **#29 多级 skill 目录**（用户级/项目级/全局级 skill 搜索路径）| #29 | ~0.5d | ✅ v1.1.4 |
+| 4 | **H-4 agent 生命周期事件**（subagent start/end 事件发射，接入 event_types）| H-4 | ~1d | ✅ v1.1.4 |
+- **实施记录（v1.1.3，2026-08-15）**：
+  - H-2 ✅：services/profile_bundle.py（bundle 堆叠 + 稀疏 patch + 用户最高优先 + ProfileBundleService）；6 测试含端点
+  - H-2 后追加 A1/A2（v1.1.4）：
+    - A1 ✅ #29 多级 skill：skill_registry 三层合并（全局<项目<用户 + env 替换 + config/skills.json.example）；5 测试
+    - A2 ✅ H-4 生命周期：paeg/workflows_hub/hooks_hub 事件发射（descriptor/start-end 成对 + hook invoked/result + runId）；6 测试
+    - 回归 90/90 + smoke 10/13（3 个 FAIL 为缺 DEEPSEEK_API_KEY 环境限制）
+  - H-13 ✅：GET /api/admin/dump-config 端点（profiles/bundles/agents/tools/effective）；实测 200
+  - 文档同步 ✅：技术 §10.17/10.18 + 元能力 §6.57-6.60 + 维护 §18.39-18.41 + CHANGELOG v1.1.3
+  - 回归 41/41 全过 + 服务重启 health OK + 公网 200
+
+#### 3.38.2 新模块引入计划（调研发现，长期蓝图）
+
+| 模块 | 借鉴来源 | PAEG 落地点 | 优先级 |
+|---|---|---|---|
+| compaction 4-event | core/session known-events | context_bundle 压缩生命周期可观测 | P2 |
+| tool-workflow 4-event | core/session known-events | subagent 组合追踪 | P2 |
+| chunk-rows 56× 压缩 | core/session chunk-rows.ts | 长流式教学会话 log 存储 | P2 |
+| session-checkpoint-policy | session-checkpoint-policy | infra/db.py checkpoint 策略分层 | P2 |
+| runtime-diagnostics invariants | runtime-diagnostics | audit_check.py 运行时不变式强化 | P2 |
+
+#### 3.38.3 文档同步计划（纪律 18：改动必须同步入各文档）
+
+| 文档 | 更新点 |
+|---|---|
+| PAEG技术全景文档.md | §10.17 MCP 可移植性（v1.1.1）+ §10.18 Harness P1 三项（v1.1.2）|
+| 元能力文档.md | §6.57 配置驱动加载器安全模式 / §6.58 chain-key guard / §6.59 双开关权限 / §6.60 事件类型化 |
+| 维护手册.md | §18.39 热重载验证 SOP / §18.40 权限切换 / §18.41 事件类型约束 |
+| CHANGELOG.md | v1.1.3（H-2/H-13 实施）|
 
