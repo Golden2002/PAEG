@@ -176,11 +176,20 @@ class PAEG:
             pass
 
     def _subagent_run(self, name: str, fn, run_id: str, **kwargs):
-        """包一层 subagent 调用：start → run → end（runId 配对 + 时长）。"""
+        """包一层 subagent 调用：run-start → agent-start → run → agent-end → run-end。
+
+        §3.42 W7 ⭐（v1.1.5）：补齐 run-start/run-end——run 粒度比 agent 细，
+        与 agent-start/end 用 workflow_id 配对（四事件完备）。
+        """
         import time as _t
         _t0 = _t.time()
+        self._emit("tool-workflow/run-start",
+                   agent=name, workflow_id=run_id,
+                   learner_id=str(getattr(kwargs.get("learner"), "id", "anon")),
+                   subject=kwargs.get("subject", ""), ts=_t.time())
         self._emit("tool-workflow/agent-start",
-                   agent=name, run_id=run_id, learner_id=str(getattr(kwargs.get("learner"), "id", "anon")),
+                   agent=name, run_id=run_id, workflow_id=run_id,
+                   learner_id=str(getattr(kwargs.get("learner"), "id", "anon")),
                    subject=kwargs.get("subject", ""), ts=_t.time())
         try:
             _res = fn(**kwargs)
@@ -188,8 +197,11 @@ class PAEG:
         finally:
             _dur = round((_t.time() - _t0) * 1000, 1)
             self._emit("tool-workflow/agent-end",
-                       agent=name, run_id=run_id, duration_ms=_dur,
-                       stop_reason="completed")
+                       agent=name, run_id=run_id, workflow_id=run_id,
+                       duration_ms=_dur, stop_reason="completed")
+            self._emit("tool-workflow/run-end",
+                       agent=name, workflow_id=run_id,
+                       duration_ms=_dur, stop_reason="completed")
 
     def _get_self_update_agent(self):
         """v0.42 ⭐ P1 修复：懒创建 SelfUpdateAgent（替代僵尸实例）。
