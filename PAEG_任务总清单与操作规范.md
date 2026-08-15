@@ -1356,3 +1356,27 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 
 **后续**：Phase 2（self_update/resources/modes/proactive）+ Phase 3（chat/teaching）按 §3.45.2 清单推进；teach_stream 1222 行核心链路不贸然拆（Oracle 判断）。
 
+
+### 3.46 多波次任务：自我更新优化 + Harness 新需求 + 架构 Phase 2/3 + Harness 30 项（2026-08-16 用户指示 · 进行中）
+
+> 用户原话："咨询oracle，进行plan，规划实施多波次任务，完成：1. 自我更新优化 2. dsh HARNESS新需求 3. 架构级任务phase 2和phase 3 4. 最后Harness 30项，分布实施完成。所有更新完成后，对比当前技术说明文档，按照技术说明文档的更新要求，以适宜的内容和组织方式（语言要专门调用本项目的语言规范模块实施refine），更新文档"
+> 用户提醒："记得即时更新需求文档！"
+
+#### 3.46.1 任务范围（4 大项）
+
+| # | 任务 | 内容 | 状态 |
+|---|---|---|---|
+| T1 | 自我更新优化 | SEL-1 知识蒸馏（JSON Schema+CoT/metadata 字段/三阶段门禁/失败案例提炼/embedding 去重/多路召回/use_count 闭环）+ SEL-2 工具经验（ExpeL 结构化：tool/scenario/lesson+失败模式 LLM 抽象+注入工具选择） | 🔄 待实施 |
+| T2 | dsh Harness 新需求 | PTC-5（主循环可观测+可替换）+ H-1 Session Event Log + H-14 hooks 瀑布补全 + H-16 Guard 插件化 + §3.38.2（compaction 4-event/chunk-rows/checkpoint-policy/runtime-invariants） | 🔄 待实施 |
+| T3 | 架构级 Phase 2+3 | Phase 2：self_update/resources/modes/proactive 4 域迁 blueprints/；Phase 3：chat/teaching（teach_stream 1576 行最高风险） | 🔄 待实施 |
+| T4 | Harness 30 项 | 按 P0→P1→P2 分步实施（#1 subagent Patch/#3 Persona 外置/#7 教学预设/#11 三角色/#12 LLM Seam/#13 Shell Seam/#21 Registry/#9 Scope/#15 Session Log/#16 hooks/#18 权限三档/#22 Report/#24-25 UI/#29 多级 Skill） | 🔄 待实施 |
+| T5 | 技术说明文档更新 | 对比 PAEG技术全景文档.md，按更新要求，调用语言规范模块（services/lang_gate.py）refine 后写入 | 🔄 待实施 |
+
+#### 3.46.2 波次规划（⏳ Oracle 咨询 bg_df82a1b2 进行中，返回后细化）
+
+- 波次划分/依赖顺序/风险点待 Oracle 输出后填入
+
+#### 3.46.3 实施记录（逐波次更新）
+
+- （待首波完成）
+
