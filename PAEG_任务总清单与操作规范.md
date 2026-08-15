@@ -1148,3 +1148,23 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 4. **新经验先入需求文档**（纪律 1/30），再按分工同步到对应文档
 5. **本轮固定**：TDD 三层测试架构（§3.41）+ TDD 铁律（纪律 31）+ 本纪律（固定经验元约束）
 
+
+### 3.42 16+ 波次 ULW 更新计划（2026-08-15 用户指示 · 进行中）
+
+> 用户原话："继续下一轮ULW，根据需求文档的记载，完成至少16波次的更新"
+> 依据：§3.38.2 新模块蓝图 + §二 Step 1.5 Harness 插件 + §3.35 待办 + 合理扩展面
+
+**波次规划（plan agent 18 波设计完成，执行中）**：
+- W1 ✅ hooks_hub 4-dispatch（parallel/serial/emit/waterfall，6 测试 + 回归 28/28）
+- W2 ⏳ observability trace_id（依赖 W1）
+- W3 ⏳ subagent provider registry
+- W1-W2：§3.38.2 事件补齐（compaction 4-event + tool-workflow run-start/end）
+- W3-W4：Harness 插件（hooks 4 dispatch + trace_id）
+- W5-W6：§3.38.2 存储/诊断（chunk-rows 压缩 + session-checkpoint-policy）
+- W7-W8：runtime-diagnostics invariants + llm-retry 增强
+- W9-W10：timeout-policy + subagent provider registry
+- W11-W12：§3.35 亮点记录 + 技术说明附录更新
+- W13-W14：配置体系深化 + 可观测性完善
+- W15-W16：性能/安全/测试完善 + 文档同步
+- 每波：TDD（RED→GREEN）+ 回归 + 需求文档状态更新（纪律 30）
+
