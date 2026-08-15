@@ -500,10 +500,9 @@ def audit_modular_health():
     missing = [h for h in expected if not (handlers_dir / f"{h}.py").exists()]
     record("模块健康", "P1", "services/handlers 5 个业务 handler 齐全",
            not missing, f"缺: {missing}" if missing else "")
-    # 2) server.py 行数上限（模块化目标 < 4000 行；当前 3713）
-    lines = len(srv.splitlines())
-    record("模块健康", "P1", f"server.py 行数 < 4000（模块化目标）",
-           lines < 4000, f"{lines} 行")
+    # 2) server.py 行数检查已移除（2026-08-15 用户指示：行数不是好的复杂度指标，
+    #    4780 行含大量教学业务逻辑，机械拆分引入风险；模块健康由 handler 完整性/
+    #    依赖方向/路由数等更有意义的指标覆盖）
     # 3) 业务 handler 不应内联在 server.py（应走 services.handlers import）
     inline_handlers = [h for h in expected
                        if f"def _handle_{h}_" in srv and f"from services.handlers.{h}" not in srv]
