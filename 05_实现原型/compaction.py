@@ -6,16 +6,39 @@
 
 与 memory_system 摘要压缩的区别：compaction 是"注入前强制守卫"（每次组上下文时检查），
 memory_system 是"会话内自动压缩"（超阈值触发）。
+
+§3.42 W6 ⭐ 4-event 可观测：compaction 生命周期发 4 事件
+- compaction/start    {bytes_before, strategy}
+- compaction/measure  {ratio, pruned_chars}
+- compaction/apply    {bytes_after, method}
+- compaction/end      {duration_ms, turns_kept}
+全部事件通过 emit_event_typed 自动挂 trace_id（§3.42 W2 全链路）。
 """
 from __future__ import annotations
 
 import os
+import time
 from typing import Any, Dict, List, Optional
 
 # 阈值：超过则压缩（消息对条数）
 MAX_HISTORY_PAIRS = 10
 # 保留最近原文条数
 KEEP_RECENT = 6
+
+
+def _emit(event_type: str, data: Dict[str, Any]) -> None:
+    """类型化事件发射（§3.42 W2 trace 自动挂载；失败静默，不影响压缩主流程）。"""
+    try:
+        from observability import emit_event_typed
+        emit_event_typed(event_type, data=data)
+    except Exception:
+        # 可观测性是辅助；压缩主流程绝不能因事件失败而中断
+        pass
+
+
+def _bytes_of(messages: list) -> int:
+    """计算 messages 的总字符数（bytes 的代理，避免误以为精确字节数）。"""
+    return sum(len(str(m.get("content", ""))) for m in messages)
 
 
 def maybe_compact(history: list, llm=None, max_pairs: int = MAX_HISTORY_PAIRS,
@@ -25,17 +48,74 @@ def maybe_compact(history: list, llm=None, max_pairs: int = MAX_HISTORY_PAIRS,
     history: list[dict]（role/content 消息对，可能含 user/assistant 交替）
     超过 max_pairs 对时：早期消息用 LLM（或规则）压缩为摘要，保留最近 keep_recent 条原文。
     返回压缩后的历史（始终含最近原文 + 可选的早期摘要）。
+
+    §3.42 W6：压缩执行时发 4 事件（start → measure → apply → end），全程 trace_id 关联。
     """
     if not history or len(history) <= max_pairs * 2:
         return history
+
+    # §3.42 W6 ⭐ 4-event lifecycle
+    _t0 = time.time()
+    bytes_before = _bytes_of(history)
+    _emit("compaction/start", {
+        "bytes_before": bytes_before,
+        "strategy": "summary+keep_recent",
+        "max_pairs": max_pairs,
+        "keep_recent": keep_recent,
+        "input_turns": len(history),
+    })
+
     try:
         _early = history[:-(keep_recent * 2)]
         _recent = history[-(keep_recent * 2):]
+        early_bytes = _bytes_of(_early)
         _summary = _summarize(_early, llm)
+        pruned_chars = early_bytes - len(_summary or "")
+
+        # compaction/measure（早期 vs 摘要 的压缩比）
+        ratio = round(len(_summary or "") / max(early_bytes, 1), 4)
+        _emit("compaction/measure", {
+            "ratio": ratio,
+            "pruned_chars": max(pruned_chars, 0),
+            "early_bytes": early_bytes,
+            "summary_len": len(_summary or ""),
+        })
+
         if _summary:
-            return [{"role": "system", "content": f"【早期对话摘要（compaction）】{_summary}"}] + _recent
-        return _recent  # 摘要失败则只保留最近（安全降级）
+            result = [{"role": "system", "content": f"【早期对话摘要（compaction）】{_summary}"}] + _recent
+            method = "summary_with_recent"
+        else:
+            result = _recent  # 摘要失败则只保留最近（安全降级）
+            method = "fallback_recent_only"
+
+        bytes_after = _bytes_of(result)
+        # compaction/apply
+        _emit("compaction/apply", {
+            "bytes_after": bytes_after,
+            "ratio": round(bytes_after / max(bytes_before, 1), 4),
+            "method": method,
+            "summary_ok": bool(_summary),
+        })
+
+        # compaction/end
+        _emit("compaction/end", {
+            "duration_ms": round((time.time() - _t0) * 1000, 2),
+            "turns_kept": len(_recent),
+            "input_turns": len(history),
+            "output_turns": len(result),
+            "bytes_before": bytes_before,
+            "bytes_after": bytes_after,
+        })
+        return result
     except Exception:
+        # §3.42 W6：异常时仍发 end（标记失败），主路径安全降级
+        _emit("compaction/end", {
+            "duration_ms": round((time.time() - _t0) * 1000, 2),
+            "turns_kept": min(keep_recent * 2, len(history)),
+            "input_turns": len(history),
+            "output_turns": len(history[-keep_recent * 2:]),
+            "error": True,
+        })
         return history[-keep_recent * 2:]
 
 

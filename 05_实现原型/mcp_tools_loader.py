@@ -129,6 +129,11 @@ def _parse_entry(entry: dict) -> dict:
         function = name  # 内置工具名即函数名（_HANDLERS 用 name 查）
     _validate_module(module)
     _validate_function(function)
+    # §3.42 W5 ⭐ timeoutMs 字段解析（毫秒，> 0 生效；None/缺失 = 不声明）
+    _tms_raw = entry.get("timeoutMs")
+    if _tms_raw is not None and not isinstance(_tms_raw, (int, float)):
+        raise ToolConfigError(f"timeoutMs 必须为数字（毫秒），实际 {_tms_raw!r}")
+    _tms = int(_tms_raw) if (_tms_raw is not None and _tms_raw > 0) else None
     return {
         "name": name,
         "description": str(entry.get("description", "")),
@@ -139,6 +144,7 @@ def _parse_entry(entry: dict) -> dict:
         "override": bool(entry.get("override", False)),
         "enabled": bool(entry.get("enabled", True)),
         "required": list(entry.get("required", [])) or [],
+        "timeoutMs": _tms,  # §3.42 W5：None 表示未声明（ratchet：默认 30s）
     }
 
 
