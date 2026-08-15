@@ -99,10 +99,54 @@ def all_metric_stats() -> Dict[str, Dict[str, float]]:
 
 _EVENTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'events.jsonl')
 
+# §3.42 W8 ⭐ 长流式会话日志分块批写入（opt-in）
+# 默认关闭：PAEG_LOG_CHUNK_ROWS 未设 → 走原 verbatim 路径（ratchet 兼容）
+# 启用方式：export PAEG_LOG_CHUNK_ROWS=1（chunk 编码 + 56x 压缩）
+# 读侧：infra.log_writer.decode_storage_records() 自动展开 chunk 行
+_CHUNK_WRITER = None  # 单例：模块级缓存，避免每次 emit_event 重建
+_CHUNK_WRITER_LOAD_FAILED = False  # 单次加载失败后短路，防每次调用都 import 失败
+
+
+def _chunk_writer_enabled() -> bool:
+    """§3.42 W8：检查是否启用 chunk-rows 压缩（默认 False，ratchet 兼容）。"""
+    return os.environ.get("PAEG_LOG_CHUNK_ROWS") == "1"
+
+
+def _get_chunk_writer():
+    """懒加载 ChunkWriter 单例（仅启用时构造）。失败一次后短路。"""
+    global _CHUNK_WRITER, _CHUNK_WRITER_LOAD_FAILED
+    if not _chunk_writer_enabled():
+        return None
+    if _CHUNK_WRITER is not None:
+        return _CHUNK_WRITER
+    if _CHUNK_WRITER_LOAD_FAILED:
+        return None
+    try:
+        from infra.log_writer import ChunkWriter
+        _CHUNK_WRITER = ChunkWriter(_EVENTS_FILE)
+        return _CHUNK_WRITER
+    except Exception:
+        # 加载失败：记标志位，后续直接走 verbatim（不抛错影响主流程）
+        _CHUNK_WRITER_LOAD_FAILED = True
+        return None
+
 
 def emit_event(event_type: str, **payload):
-    """写 JSONL 事件（thread/turn/item/tool 等，供测试契约）。"""
+    """写 JSONL 事件（thread/turn/item/tool 等，供测试契约）。
+
+    §3.42 W8 ⭐：当 PAEG_LOG_CHUNK_ROWS=1 时走 ChunkWriter 压缩路径；
+    默认关闭时保持原 verbatim 行为（行级兼容）。
+    """
     entry = {"ts": time.time(), "type": event_type, **payload}
+    # §3.42 W8：chunk-rows 压缩路径（opt-in）
+    cw = _get_chunk_writer()
+    if cw is not None:
+        try:
+            cw.append_event(entry)
+        except Exception:
+            pass
+        return
+    # 原 verbatim 路径（ratchet：默认行为不变）
     try:
         with open(_EVENTS_FILE, 'a', encoding='utf-8') as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")

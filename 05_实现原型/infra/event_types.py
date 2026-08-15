@@ -47,6 +47,8 @@ PLUGIN_EVENT_TYPES = frozenset({
     "tool-workflow/agent-end", "tool-workflow/agent-start",
     "tool-workflow/run-end", "tool-workflow/run-start",
     "tool/code-dispatch", "tool/code-dispatch-start",
+    # §3.42 W9 ⭐ session-checkpoint-policy（infra/checkpoint.py）
+    "checkpoint/saved", "checkpoint/failed", "checkpoint/recovered",
 })
 
 # PAEG 自有事件（教学闭环）

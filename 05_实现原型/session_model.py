@@ -144,6 +144,26 @@ class ThreadStore:
                 self._save(student_id, data)
                 self.add_item(student_id, tid, trn_id, "turn_completed",
                               {"token_input": token_input, "token_output": token_output})
+                # §3.42 W9 ⭐ session-checkpoint-policy：turn 完成触发 checkpoint
+                try:
+                    from infra.checkpoint import checkpoint_session
+                    checkpoint_session(
+                        tid,
+                        payload={
+                            "thread_id": tid,
+                            "student_id": student_id,
+                            "subject": t.get("subject", "general"),
+                            "title": t.get("title", ""),
+                            "status": t.get("status", "active"),
+                            "turn_count": len(t.get("turns", [])),
+                            "token_input": token_input,
+                            "token_output": token_output,
+                            "updated_at": t["updated_at"],
+                        },
+                    )
+                except Exception:
+                    # checkpoint 是辅助层，绝不能影响教学主流程
+                    pass
                 return True
         return False
 

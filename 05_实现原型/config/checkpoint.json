@@ -1,0 +1,8 @@
+{
+  "mode": "hybrid",
+  "max_events": 10,
+  "interval_sec": 60,
+  "max_retries": 3,
+  "base_dir": "users_data/checkpoints",
+  "enabled": true
+}
