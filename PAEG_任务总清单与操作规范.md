@@ -244,7 +244,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 1 | **Subagent Patch 系统**：9 subagent YAML 装扮（persona/prompt/工具/调度全配置可换）| agent.cordis.yml `- id:` 整体替换 | subagents.py → subagent_loader | **P0 ✅**（§3.46.2，services/subagent_loader.py）|
 | 2 | **Profile Bundle 机制**：`python paeg.py --profile education/minimal/research` | dsh.profile.bundles + --patch | config_hub profile 层 | **P0 ✅**（§3.38.1 H-2，services/profile_bundle.py v1.1.3）|
 | 3 | **Persona 外置**：薇依 persona 拆 `paeg_personas/{id}.yml` | preset.yml name/description | prompts.py 长字符串外置 | **P0 ✅**（§3.46.2，paeg_personas/weil.yml）|
-| 4 | **!!js 条件启停**：配置支持 JS 表达式 | `disabled: !!js expr` | config_hub SafeLoader | P1 |
+| 4 | **!!js 条件启停**：配置支持 JS 表达式 | `disabled: !!js expr` | config_hub SafeLoader | P1  ✅（§3.46.2 安全子集 ast 白名单）|
 | 5 | **用户家目录 overlay**：`~/.paeg/cordis.patch.yml` 不改代码改默认模型/学科 | $DSH_HOME/cordis.patch.yml | config_hub 加载链 | P1 ✅（§3.46.2，config_loader.py）|
 | 6 | **OS 平台双轨**：TTS/STT/PPT 模板按平台分支 | bash+pwsh 双轨 | config_hub 条件挂载 | P2 ✅（§3.46.2，services/platform_dual_track.py）|
 | 7 | **教学预设 4 内置+N 自定义**：standard/minimal/code-mode/weil-classical | 4 预设目录 | paeg/presets/ | **P0 ✅**（§3.46.2，services/teaching_presets.py）|
@@ -1509,5 +1509,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#23 Fresh-Agent Loop 对照验证 ✅（Harness P2，2026-08-16）**——对照验证测试 test_fresh_agent_loop.py（4 项）：确认 RALPH 循环（§3.42 T5）已具备 dsh tool-ralph 语义——每轮 fresh child（executor 注入）+ 共享进度（history/prev 传递）+ 结构化 handoff（RoundOutput snapshot + LoopResult.promise + 状态快照落盘）；对照增强无缺口，以测试锁定能力；dsh 借鉴 tool-ralph；4 测试全绿 + SURFACE 验证（DONE/fresh child/prev 传递/handoff 快照）（commit 新）
   - **#28 Constitutional AI 补丁化 ✅（Harness P2，2026-08-16）**——services/quality_gate_config.py 新建：get_gate_config（阈值/最小长度/宪法条款，缺省回退内置）+ apply_to_gate（注入 QualityGate THRESHOLDS/MIN_CONTENT_LEN/MIN_WORDS）+ reset_cache；config/quality_gate.json patch 配置（不改代码调门禁）；与 self_evolution 衔接（蒸馏/工具经验过门禁可配置化）；ratchet：无配置行为不变；dsh 借鉴 plan-mode + repeat-tool-reminder 走 patch 配置；5 测试全绿 + SURFACE 验证（默认回退/配置注入/门禁生效）（commit 新）
   - **#27 Self-Update via Patch ✅（Harness P1，2026-08-16）**——subagent_loader.py 新增 AI 读写闭环：save_yaml_patch（AI 修改 preset 落盘 config/subagents/{name}.patch.yml）+ read_yaml_patch（AI 读回）+ list_yaml_patches（AI 枚举）；tool-cordis 语义（AI 可读写自身 preset 配置，无需人工改代码）；与 #1 Subagent Patch 系统衔接（#1 装载已有，#27 补 AI 读写闭环）；写后 load_yaml_patch 装载生效；dsh 借鉴 tool-cordis preset 可修改；5 测试全绿 + SURFACE 验证（落盘/读回/枚举/装载生效）（commit 新）
-  - **回归验证 ✅**：174 passed（全部新功能测试）+ audit_check 40/40
+  - **#4 !!js 条件启停 ✅（Harness P1，2026-08-16，安全子集）**——services/condition_eval.py 新建：evaluate_condition(expr, ctx) ast 白名单受限求值器；支持布尔/比较/算术 + 白名单函数 platform()/env('VAR')/module('id')；安全边界：不引入真 JS 引擎（quickjs 重依赖 + AI 已可写 patch（#27）→ JS 求值=任意代码执行风险），import/属性链/下标/任意调用/推导式/lambda 全部拒绝 → False；module('id') 与 module_registry.is_enabled 一致（未知模块防御性默认启用，ratchet）；dsh 借鉴 config disabled: !!js expr；7 测试全绿 + SURFACE 验证（条件真实生效/环境变量/安全边界全拒/语法容错）（commit 新）
+  - **回归验证 ✅**：181 passed（全部新功能测试）+ audit_check 40/40
 
