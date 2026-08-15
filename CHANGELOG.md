@@ -1,3 +1,27 @@
+### v1.2.0 ULW 深化循环：16+ 波次 + 学段学科优化 + PTC 借鉴（2026-08-15 ⭐）
+
+**本版定位**：16+ 波次基础设施升级（18 波全完成）+ §3.43 ULW 深化循环（六维度自检达"出众"）+ §3.44 dsh PTC 模式借鉴。测试新增 111+，全量回归绿。
+
+**16+ 波次基础设施（§3.42，18 波）**：
+- W1 hooks 4-dispatch（parallel/serial/emit/waterfall）/ W2 trace_id 全链路 / W3 subagent registry（9 可插拔）/ W4 llm-retry 分类错误码（6 类×退避）/ W5 timeout-policy / W6 compaction 4-event / W7 tool-workflow run-start/end / W8 chunk-rows 压缩（1000x）/ W9 checkpoint 策略分层 / W10 runtime invariants / W11 config schema 校验 / W12 缓存层（LRU+TTL+热重载失效）
+
+**§3.43 ULW 深化循环**：
+- Oracle 学段学科咨询：3 执行层硬伤 + 6 维差异化护城河 + 4 对话机制
+- librarian 差异化调研（18 权威来源）：Wharton -17% AI 悖论 + Khan Academy 6.1% + Durlak SEL +11 百分位
+- P0 落地：services/grade_subject_profiles.py（考研分键 + 收尾模板 4 学段 + SUBJECT_GRADE_DEPTH 20 条 + Presenter 注入）
+- 优秀回答案例（奥德赛深度导读）存档为实施质量标杆
+- 六维度自检：5 优秀 + 1 良好，**判定"出众"**
+
+**§3.44 dsh PTC 借鉴**：
+- PTC-1 programmatic 步骤（workflows_hub 程序化执行，循环采样/数据落盘）
+- PTC-2 会话模式锁定（模式决定工具集，活动后不可切换）
+- PTC-3 工具调用全貌可观测（工具/参数/耗时/缓存命中/聚合）
+- PTC-4 任务复杂度→模型路由（简单→flash/复杂→reasoner）
+
+**验证**：新增 111 测试全过（18 波 90 + PTC 21 + 学段 profile 12）+ 全量回归绿 + TDD 三层（冒烟/Red/E2E）
+
+**文档**：需求 §3.42/§3.43/§3.44 + 质量文档_智能性 9.1-9.4 + 差异化定位文档 + 六维度自检 + 本 CHANGELOG
+
 ### v1.1.5 Playwright 全功能测试 + 架构图集扩充 + TDD 方法论 + 画像/知识图补缺（2026-08-15 ⭐）
 
 **本版定位**：用户 ULW 指示执行——①Playwright 全功能前端测试 ②架构图集扩充 ③TDD 三层测试架构方法论固定 ④§3.12 真实缺口补全（画像陈旧诊断 + 知识依赖图注入）。
