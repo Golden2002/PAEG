@@ -109,11 +109,14 @@ _active_preset = "standard"  # 当前权限档（运行时可切换）
 def set_permission_preset(preset: str) -> bool:
     """v0.68+ ⭐ 运行时切换权限档（如教师切"考试模式"）。
 
+    #20 ⭐（§3.46.2 Harness P2）：custom 是衍生状态（临时宽松组合），
+    允许切换但不作为可保存目标——PERMISSION_PRESETS 中无 custom（dsh current() 语义）。
+
     #19 ⭐（§3.46.2 Harness P1）：切换成功后向 session_log 发射 permission/preset
     事件（记录 from→to），可回放审计——dsh permission/preset log-only 事件语义。
     """
     global _active_preset
-    if preset not in PERMISSION_PRESETS:
+    if preset not in PERMISSION_PRESETS and preset != "custom":
         return False
     _prev = _active_preset
     _active_preset = preset
