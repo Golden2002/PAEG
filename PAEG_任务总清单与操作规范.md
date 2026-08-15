@@ -259,7 +259,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 16 | **Hooks 瀑布链**：waterfall 事件（next() 委托，短路可观测）| Waterfall listeners MUST call next() | hooks_hub | P2 ✅（§3.42 W1 4-dispatch + §3.46.2 H-14 tools/* 补全）|
 | 17 | **Subprocess 抽象**：MCP 客户端/ffmpeg/PDF/PPT 统一 spawn 服务 | ctx.subprocess | subprocess service | P2 |
 | 18 | **权限预设系统**：student-safe/tutor-write/researcher-full 三档 | permission-presets | tool_registry PERMISSION_PRESETS 升级 | P1 ✅（v1.1.2 4 档 + §3.46.2 #7 预设联动）|
-| 19 | **Permission 事件入 Session Log**：切换可回放 | permission/preset log-only | session log | P1 |
+| 19 | **Permission 事件入 Session Log**：切换可回放 | permission/preset log-only | session log | P1 ✅（§3.46.2，tool_registry 接入 infra/session_log）|
 | 20 | **Custom 衍生状态**：临时切换显示"自定义"不可保存 | current() 返回 custom | permission service | P2 |
 | 21 | **Subagent Registry Provider 可插拔**：in-process/external-script/llm-call | ctx.subagents 6 providers | subagents.py registry | **P0 ✅**（§3.42 W3 in-process + §3.46.2 #21 三类 provider）|
 | 22 | **Subagent Report/Continuable 协议**：子代理回报 + 父发消息 | subagent-control/report | subagent 控制 | P1 |
@@ -1496,5 +1496,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#13 Shell/Subprocess Seam ✅（Harness P0，2026-08-16）**——services/subprocess_service.py 新建：RunResult + SUBPROCESS_PROVIDERS 注册表 + run_command（统一入口，替代散落 13+ 处 subprocess.run——manim/video 等）+ get_provider（未知回退 local 容错）+ python_cmd（跨平台）；本地/docker/沙箱执行可换（provider 可注册可替换）；dsh 借鉴 packages/shell/executor seam；7 测试全绿 + SURFACE 验证（统一入口/超时保护/回退/失败码）（commit 新）
   - **#11 9 Subagent 三角色契约 ✅（Harness P0，2026-08-16，契约层）**——services/agent_trirole.py 新建：ServiceDefinition（服务契约 name/desc/input_schema/output_schema）+ ServiceProvider（实现基类，execute 契约）+ DEFAULT_SERVICE_DEFINITIONS（9 subagent 契约）+ register_definition/get_definition/make_provider；同一 Definition 可挂多 Provider（Rule vs LLM 语义），Consumer 不感知实现；**低风险增量（ratchet）**：只定义契约类型，不触碰现有 9 subagent 实现——#11 契约层完成，具体三角色化（9 类改挂 Provider）作为后续迁移；与 #1 装扮层（9 名对齐）+ #21 Registry 衔接；dsh 借鉴 ctx.shell 三角色；6 测试全绿 + SURFACE 验证（9 契约/双 Provider/衔接）（commit 新）
   - **#8 PresetService ✅（Harness P0，2026-08-16）**——services/preset_service.py 新建：PresetService 类完整 API（list/get/resolve/mount/copy/recompose/remove）；基于 #7 teaching_presets 扩展为管理服务层；resolve 联动 tool_registry 权限档 + paeg_personas persona 正文（2443 字符）；copy 深拷贝继承 / recompose 覆盖生成 / remove 不存在容错；dsh 借鉴 ctx.agentPresets；7 测试全绿 + SURFACE 验证（S1-S6 完整 API 链路）（commit 新）
+  - **#19 Permission 事件入 Session Log ✅（Harness P1，2026-08-16）**——tool_registry.set_permission_preset 接入 infra.session_log：切换成功发射 permission/preset 事件（{from,to,preset}，回放审计）；无效切换不发射（先校验后发射）；日志失败不影响切换（容错）；与 H-1 session_log（seq/deriveMessages）+ #18 权限预设联动——权限变更全链路可审计；dsh 借鉴 permission/preset log-only 事件；3 测试全绿 + SURFACE 验证（切换记录/无效不发射/回放）（commit 新）
   - **回归验证 ✅**：36 passed（全部新功能测试）+ audit_check 39/39
 
