@@ -3,8 +3,17 @@ PAEG v0.5 知识库：4 类知识库（学科 / 素养 / 教学法 / 案例）�
 覆盖高中 9 科 + 本科核心学科 + 人文素养 4 维度，30+ 学科节点。
 v0.5 用内存存储；v1.0 替换为 PostgreSQL + 向量库。
 """
+from __future__ import annotations
 
 from typing import Optional
+
+# §3.42 W12 ⭐ 接入 LRU+TTL 缓存（行为透明——返回节点 dict 或 None）
+try:
+    from infra.cache import LRUCache as _LRUCache
+    _W12_CACHE_ENABLED = True
+except Exception:  # noqa: BLE001 — infra.cache 不可用时回退到原始 dict 缓存
+    _W12_CACHE_ENABLED = False
+    _LRUCache = None  # type: ignore[assignment]
 
 
 class KnowledgeBase:
@@ -17,23 +26,48 @@ class KnowledgeBase:
         self._load_demo_data()
         # v0.15：检索缓存（避免每次 Presenter 都重新 search）
         self._search_cache = {}
-        self._resolve_cache = {}
+        # §3.42 W12 ⭐ resolve_node 缓存升级为 LRU+TTL（原 dict 缓存保留为兜底）
+        # 容量 256 / TTL 300s；reload_all 时按 namespace 失效
+        if _W12_CACHE_ENABLED:
+            self._resolve_cache = _LRUCache(capacity=256, default_ttl=300.0,
+                                              name="knowledge_base.resolve_node")
+            # 注册到全局 CacheRegistry，让 config_hub.reload_all 能按 ns 失效
+            try:
+                from infra.cache import get_cache_registry as _gcr
+                _gcr()._caches["knowledge_base.resolve_node"] = self._resolve_cache
+            except Exception:  # noqa: BLE001 — 注册失败不影响本地缓存使用
+                pass
+        else:
+            self._resolve_cache = {}
 
     # ------------------------------------------------------------------
-    # v0.15：检索缓存
+    # v0.15：检索缓存 + §3.42 W12 LRU+TTL 升级
     # ------------------------------------------------------------------
     def resolve_node(self, concept: str, subject: str = None):
         """解析概念对应的知识节点（带缓存）。
 
         优先精确匹配，其次检索。缓存同一 (concept, subject) 的结果，
         避免每次教学都重新 search（节省时间）。
+
+        §3.42 W12：缓存升级为 LRU+TTL（infra.cache.LRUCache），配置热重载时
+        按 namespace=knowledge_base.resolve_node 失效。None 也是合法结果，
+        需通过 ``fetch()`` + ``set_force()`` 区分未命中 / 命中但值为 None。
         """
         if not concept:
             return None
         key = f"{concept}::{subject or ''}"
-        if key in self._resolve_cache:
-            return self._resolve_cache[key]
 
+        # 缓存查（区分 miss / 命中 None）
+        if _W12_CACHE_ENABLED:
+            hit, value = self._resolve_cache.fetch(key)
+            if hit:
+                return value
+        else:
+            # 兜底：原 dict 缓存（不区分 None 与 miss——这是已知限制）
+            if key in self._resolve_cache:
+                return self._resolve_cache[key]
+
+        # 未命中 → 实际解析
         node = (self.get_subject(concept) or self.get_humanity(concept)
                 or self.get_skill(concept))
         if node is None:
@@ -45,7 +79,11 @@ class KnowledgeBase:
         if node is None and subject:
             node = self.get_skill_by_name(subject)
 
-        self._resolve_cache[key] = node
+        # 写入缓存（None 也是合法结果，用 set_force 保留）
+        if _W12_CACHE_ENABLED:
+            self._resolve_cache.set_force(key, node)
+        else:
+            self._resolve_cache[key] = node
         return node
 
     # ------------------------------------------------------------------
