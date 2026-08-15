@@ -10,7 +10,9 @@ v0.24 教学闭环修复测试。
 """
 
 import sys, os
-sys.stdout.reconfigure(encoding="utf-8")
+# v0.69+：reconfigure 移入 __main__——模块级执行会破坏 pytest capsys（收集期副作用）
+if __name__ == '__main__':
+    sys.stdout.reconfigure(encoding='utf-8')
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
@@ -256,6 +258,12 @@ class TestPAEGV024:
         ]:
             assert hasattr(paeg, name), f"PAEG 缺少 {name}"
             obj = getattr(paeg, name)
+            # v0.71：self_update_agent 是懒初始化（_ensure_self_update_agent 调用才建）——
+            # 允许其为 None（懒加载设计），其余 8 个必须非 None
+            if name == "self_update_agent":
+                if obj is not None:
+                    assert isinstance(obj, cls), f"PAEG.{name} 类型错误"
+                continue
             assert obj is not None, f"PAEG.{name} 为 None"
             assert isinstance(obj, cls), \
                 f"PAEG.{name} 不是 {cls.__name__} 实例（{type(obj).__name__}）"
