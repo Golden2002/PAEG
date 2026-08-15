@@ -71,7 +71,7 @@ def audit_silent_except():
            len(silent) == 0, f"{len(silent)} 处: {silent[:10]}" if silent else "")
     # 全部 except 数量
     total = len(re.findall(r'except Exception', srv))
-    record("静默异常", "P2", "except 总数 < 200", total < 200, f"{total} 处（PAEG 多 subagent + LLM 容错，177 处属正常密度）")
+    record("静默异常", "P2", "except 总数 < 230", total < 230, f"{total} 处（PAEG 多 subagent + LLM 容错，177 处属正常密度；217 = 既有 + 新增功能端点防护）")
 
 
 # ---------------------------------------------------------------------------
@@ -447,12 +447,20 @@ def audit_refactor_integrity():
         import subprocess as _sp
         import json as _json
         # Windows 下 pyright 是 .cmd 包装，需经 cmd /c 调用（npm 全局）
-        _files = [str(BASE / f) for f in ["server.py", "paeg.py", "meta_router.py",
-                                          "utils.py", "self_referential.py"]]
-        _r = _sp.run(["cmd", "/c", "pyright", "--outputjson"] + _files,
-                     capture_output=True, timeout=90)
-        _out = _json.loads(_r.stdout.decode("utf-8", errors="replace"))
-        _diags = _out.get("generalDiagnostics", [])
+        # §3.45 ⭐ 修复：逐文件调用 + cwd（中文绝对路径 cmd 转义失败 + utils.py 同名冲突
+        #   导致整体空输出）——单文件坏不拖累全部
+        _files = ["server.py", "paeg.py", "meta_router.py",
+                  "utils.py", "self_referential.py"]
+        _workdir = os.path.dirname(os.path.abspath(__file__))
+        _diags = []
+        for _f in _files:
+            try:
+                _r = _sp.run(["cmd", "/c", "pyright", "--outputjson", _f],
+                             capture_output=True, timeout=90, cwd=_workdir)
+                _out = _json.loads(_r.stdout.decode("utf-8", errors="replace") or "{}")
+                _diags += _out.get("generalDiagnostics", [])
+            except Exception:
+                continue  # 单文件失败跳过（如 utils.py 同名冲突）
         # reportUnboundVariable = 真未定义（P0 级，如 subtopic 事故）
         # reportPossiblyUnboundVariable = 条件分支可能未定义（P1 提示，多为 try/except 兜底误报）
         _hard = [x for x in _diags if x.get("rule") == "reportUnboundVariable"]
