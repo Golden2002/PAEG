@@ -248,7 +248,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 5 | **用户家目录 overlay**：`~/.paeg/cordis.patch.yml` 不改代码改默认模型/学科 | $DSH_HOME/cordis.patch.yml | config_hub 加载链 | P1 |
 | 6 | **OS 平台双轨**：TTS/STT/PPT 模板按平台分支 | bash+pwsh 双轨 | config_hub 条件挂载 | P2 |
 | 7 | **教学预设 4 内置+N 自定义**：standard/minimal/code-mode/weil-classical | 4 预设目录 | paeg/presets/ | **P0 ✅**（§3.46.2，services/teaching_presets.py）|
-| 8 | **PresetService**：mount/list/resolve/recompose/copy/remove | ctx.agentPresets | paeg/preset/service.py | **P0** |
+| 8 | **PresetService**：mount/list/resolve/recompose/copy/remove | ctx.agentPresets | paeg/preset/service.py | **P0 ✅**（§3.46.2，services/preset_service.py）|
 | 9 | **Per-Agent Scope**：每 subagent 独立工具/提示词作用域（shadowing）| dsh-scope agent.ctx | AgentScope 类 | P1 |
 | 10 | **Preset 文件结构标准化**：agent.patch.yml + preset.yml + prompts/ + assets/ | preset 目录规范 | paeg/presets/* | P1 |
 | 11 | **9 Subagent 三角色重构**：Service Definition/Provider/Consumer（RuleDiagnostor vs LLMDiagnostor 等）| ctx.shell 三角色 | subagents.py | **P0 ✅ 契约层**（§3.46.2，services/agent_trirole.py；具体三角色化后续迁移）|
@@ -1495,5 +1495,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#21 Subagent Registry Provider 可插拔 ✅（Harness P0，2026-08-16）**——infra/subagent_registry.py 追加：PROVIDER_TYPES（in-process/external-script/llm-call 三类）+ EXTERNAL_PROVIDERS + LLM_CALL_PROVIDERS 注册表 + register/get_external_provider + register/get_llm_call_provider + get_provider（统一入口，未知类型容错）；与既有 Registry（in-process，W3 完成）互补——Registry 管"类"注册，此处管"provider 类型"；dsh 借鉴 packages/subagent spawn/fork provider；6 测试全绿 + SURFACE 验证（3 类型/注册/统一入口/容错）（commit 新）
   - **#13 Shell/Subprocess Seam ✅（Harness P0，2026-08-16）**——services/subprocess_service.py 新建：RunResult + SUBPROCESS_PROVIDERS 注册表 + run_command（统一入口，替代散落 13+ 处 subprocess.run——manim/video 等）+ get_provider（未知回退 local 容错）+ python_cmd（跨平台）；本地/docker/沙箱执行可换（provider 可注册可替换）；dsh 借鉴 packages/shell/executor seam；7 测试全绿 + SURFACE 验证（统一入口/超时保护/回退/失败码）（commit 新）
   - **#11 9 Subagent 三角色契约 ✅（Harness P0，2026-08-16，契约层）**——services/agent_trirole.py 新建：ServiceDefinition（服务契约 name/desc/input_schema/output_schema）+ ServiceProvider（实现基类，execute 契约）+ DEFAULT_SERVICE_DEFINITIONS（9 subagent 契约）+ register_definition/get_definition/make_provider；同一 Definition 可挂多 Provider（Rule vs LLM 语义），Consumer 不感知实现；**低风险增量（ratchet）**：只定义契约类型，不触碰现有 9 subagent 实现——#11 契约层完成，具体三角色化（9 类改挂 Provider）作为后续迁移；与 #1 装扮层（9 名对齐）+ #21 Registry 衔接；dsh 借鉴 ctx.shell 三角色；6 测试全绿 + SURFACE 验证（9 契约/双 Provider/衔接）（commit 新）
+  - **#8 PresetService ✅（Harness P0，2026-08-16）**——services/preset_service.py 新建：PresetService 类完整 API（list/get/resolve/mount/copy/recompose/remove）；基于 #7 teaching_presets 扩展为管理服务层；resolve 联动 tool_registry 权限档 + paeg_personas persona 正文（2443 字符）；copy 深拷贝继承 / recompose 覆盖生成 / remove 不存在容错；dsh 借鉴 ctx.agentPresets；7 测试全绿 + SURFACE 验证（S1-S6 完整 API 链路）（commit 新）
   - **回归验证 ✅**：36 passed（全部新功能测试）+ audit_check 39/39
 
