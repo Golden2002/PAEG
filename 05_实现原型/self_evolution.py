@@ -88,6 +88,107 @@ class SelfEvolution:
         self._log(f"知识库新增: {concept} ({subject})")
         return {"distilled": 1, "node": knowledge, "rejected": []}
 
+    def _failure_case_distill(self, concept: str, subject: str,
+                              failure_note: str) -> Dict[str, Any]:
+        """A3 ⭐ 失败案例提炼：把一次失败教学/反思压缩为 anti-pattern 节点。
+
+        与 ``_extract_knowledge`` 的区别：
+        - 触发条件不同：成功教学 → concept 节点；失败教学 → failure_case 节点
+        - 字段不同：额外含 ``failure_reason`` / ``corrective_strategy``
+        - 重要性默认 high（避免重蹈覆辙的优先级最高）
+
+        行为契约：
+        - 输入：概念名 + 学科 + 教学反思（失败描述）
+        - 输出：``{"distilled": int, "node": dict | None, "rejected": [...]}``
+        - 流程：LLM 提炼 → QualityGate → _append_evolved_node（复用 B4 标准化）
+        """
+        if not concept or not subject:
+            return {"distilled": 0, "rejected": ["缺少概念/学科"]}
+        if not failure_note or len(failure_note.strip()) < 10:
+            return {"distilled": 0, "rejected": ["反思过短"]}
+
+        node = self._extract_failure_case(concept, subject, failure_note)
+        if not node:
+            return {"distilled": 0, "rejected": ["LLM 提炼失败"]}
+
+        # 质量门禁（与 distill_knowledge 一致：skip_sandbox 直接入库——失败反思本身已是"环境验证"）
+        verdict = self.gate.evaluate({
+            "content": node.get("content", ""),
+            "entry_type": "knowledge",  # 复用 knowledge entry 评分
+            "subject": subject,
+            "source": f"failure:{concept}",
+        }, skip_sandbox=True)
+        if not verdict.get("pass"):
+            return {"distilled": 0, "rejected": verdict.get("reasons", [])}
+
+        # 写入（_append_evolved_node 已自动 _normalize_node + B4 schema_version）
+        self._append_evolved_node(node, subject)
+        self._log(f"失败案例入库(anti-pattern): {concept} ({subject})")
+        return {"distilled": 1, "node": node, "rejected": []}
+
+    def _extract_failure_case(self, concept: str, subject: str,
+                              failure_note: str) -> Optional[dict]:
+        """LLM 提炼失败案例为 anti-pattern 节点字段。"""
+        try:
+            from subagents import _safe_chat
+            system = (
+                "你是失败教学案例提炼器。从一段失败教学反思中提炼**可复用的反模式经验**。\n"
+                "思考步骤（不要在输出中体现，仅内部推理）：\n"
+                "  1. 这次失败的根本原因（认知/顺序/示例/抽象度哪个环节出问题）\n"
+                "  2. 如何避免重蹈覆辙（具体、可操作、不空泛）\n"
+                "然后按以下 JSON Schema 输出：\n"
+                "{\n"
+                "  \"concept\": \"概念名\",\n"
+                "  \"topic\": \"主题\",\n"
+                "  \"definition\": \"失败案例的简明描述\",\n"
+                "  \"intuition\": \"失败模式的一句话总结\",\n"
+                "  \"level\": \"high_school / middle_school / college / primary\",\n"
+                "  \"subject\": \"学科英文短码\",\n"
+                "  \"grade\": \"学段\",\n"
+                "  \"type\": \"failure_case\",\n"
+                "  \"tags\": [\"关键词1\", \"关键词2\", \"关键词3\"],  // 2-4 个\n"
+                "  \"importance\": \"high / medium / low\",\n"
+                "  \"failure_reason\": \"失败的根本原因（具体到教学行为）\",\n"
+                "  \"corrective_strategy\": \"可操作的纠正策略（下次遇到应如何处理）\"\n"
+                "}\n"
+                "要求：\n"
+                "1. failure_reason 必须具体到「哪一步教学动作出了问题」，不要空泛\n"
+                "2. corrective_strategy 必须可执行（如「下次应先讲直觉再讲形式化」而非「注意改进」）\n"
+                "3. importance 默认 high（失败案例价值很高，避免重蹈）\n"
+                "4. 输出纯 JSON，不要多余文字、不要 Markdown 包裹"
+            )
+            user = (f"学科：{subject}  概念：{concept}\n"
+                    f"教学反思（失败描述）：\n{failure_note[:1000]}\n\n请提炼失败案例。")
+            r = _safe_chat(self.llm, system, user, max_tokens=600)
+            if r:
+                m = re.search(r'\{.*\}', r, re.S)
+                if m:
+                    raw = json.loads(m.group(0))
+                    # A3 核心：节点类型固定为 failure_case（即便 LLM 误给，也覆盖）
+                    raw["type"] = "failure_case"
+                    # importance 默认 high（即便 LLM 误给 medium/low，也提升）
+                    raw["importance"] = "high"
+                    raw["id"] = f"evolved.{subject}.{concept}"
+                    raw["subject"] = raw.get("subject") or subject
+                    # content = failure_reason + corrective_strategy（供检索）
+                    content = (
+                        f"{raw.get('failure_reason', '')} "
+                        f"{raw.get('corrective_strategy', '')}"
+                    ).strip()
+                    if not content:
+                        # 兜底：definition + intuition
+                        content = (
+                            f"{raw.get('definition', '')} "
+                            f"{raw.get('intuition', '')}"
+                        ).strip()
+                    raw["content"] = content
+                    if not content:
+                        return None
+                    return self._normalize_node(raw)
+        except Exception:
+            pass
+        return None
+
     def _extract_knowledge(self, concept: str, subject: str, session) -> Optional[dict]:
         """A1 ⭐ LLM 提炼知识点（Schema+CoT 升级版）。
 
