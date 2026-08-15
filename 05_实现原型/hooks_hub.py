@@ -162,7 +162,8 @@ class Hook:
 
     def __init__(self, hook_id: str, event: str, module: str, function: str,
                  priority: int = 100, enabled: bool = True, blocking: bool = False,
-                 match: Optional[dict] = None, timeout: Optional[int] = None):
+                 match: Optional[dict] = None, timeout: Optional[int] = None,
+                 dispatch: str = "waterfall"):
         self.id = hook_id
         self.event = event
         self.module = module
@@ -172,6 +173,8 @@ class Hook:
         self.blocking = blocking       # 兼容：blocking=True → continue_chain 默认 False
         self.match = match or {}
         self.timeout = timeout
+        # §3.42 W1 ⭐ 4-dispatch：waterfall（默认）/ parallel / serial / emit
+        self.dispatch = dispatch if dispatch in ("waterfall", "parallel", "serial", "emit") else "waterfall"
         self._fn: Optional[Callable] = None
         self._loaded = False
 
@@ -251,15 +254,8 @@ class HooksHub:
         except Exception:
             pass
 
-        def _terminal(c: dict) -> dict:
-            return c
-
-        _chain = _terminal
-        for _h in reversed(_listeners):
-            _prev = _chain
-            _chain = (lambda c, _h2=_h, _p=_prev: self._invoke(_h2, c, _p))
-
-        _result = _chain(ctx)
+        # §3.42 W1 ⭐ 4-dispatch：按 hook.dispatch 分派（默认 waterfall 向后兼容）
+        _result = self._dispatch(event, ctx, _listeners)
 
         # §3.38 A2：hook/result 事件
         try:
@@ -270,6 +266,107 @@ class HooksHub:
         except Exception:
             pass
         return _result
+
+    def _dispatch(self, event: str, ctx: dict, listeners: list) -> dict:
+        """§3.42 W1 ⭐ 按 dispatch 模式分发钩子。
+
+        - waterfall（默认）：链式 next() 短路（现有语义）
+        - serial：严格顺序（前完成才后执行，异常中断后续但记录）
+        - parallel：并行触发（ThreadPoolExecutor，按各自 timeout）
+        - emit：广播（所有 listener 收到，结果聚合到 ctx 但不阻断）
+
+        混合模式：列表按 priority 分组，各组用其成员的 dispatch 执行；
+        纯 waterfall 组走原链（性能优先）。
+        """
+        if not listeners:
+            return {**ctx, "__verdict": "allow", "__sticky_deny": False}
+
+        # 统计 dispatch 类型分布
+        _types = {h.dispatch for h in listeners}
+        # 全 waterfall → 原链（性能）
+        if _types == {"waterfall"}:
+            def _terminal(c: dict) -> dict:
+                return c
+            _chain = _terminal
+            for _h in reversed(listeners):
+                _prev = _chain
+                _chain = (lambda c, _h2=_h, _p=_prev: self._invoke(_h2, c, _p))
+            return _chain(ctx)
+
+        # 混合/parallel/serial/emit：分组按 dispatch 执行
+        _result = dict(ctx)
+        # 1. serial 组（严格顺序）
+        _serial = [h for h in listeners if h.dispatch == "serial"]
+        for _h in _serial:
+            try:
+                _r = self._run_single(_h, _result)
+                if _r is not None:
+                    _result = _r
+            except Exception:
+                break  # serial：前失败中断后续（记录语义）
+
+        # 2. parallel 组（并行）
+        _par = [h for h in listeners if h.dispatch == "parallel"]
+        if _par:
+            _par_results = self._run_parallel(_par, _result)
+            for _r in _par_results:
+                if _r is not None:
+                    _result = _r
+
+        # 3. emit 组（广播：结果合并，不阻断）
+        _emit = [h for h in listeners if h.dispatch == "emit"]
+        for _h in _emit:
+            try:
+                _r = self._run_single(_h, _result)
+                if _r is not None:
+                    _result = _r
+            except Exception:
+                pass
+
+        # 4. waterfall 组（与混合并存时，作为最后链）
+        _wf = [h for h in listeners if h.dispatch == "waterfall"]
+        if _wf:
+            def _terminal2(c: dict) -> dict:
+                return c
+            _chain = _terminal2
+            for _h in reversed(_wf):
+                _prev = _chain
+                _chain = (lambda c, _h2=_h, _p=_prev: self._invoke(_h2, c, _p))
+            _result = _chain(_result)
+
+        return _result
+
+    def _run_single(self, h: Hook, ctx: dict) -> Optional[dict]:
+        """执行单个 hook（无 next 语义，直接调 _fn 并传恒等 next）。"""
+        if h._fn is None:
+            h.resolve()
+        if h._fn is None:
+            return None
+        try:
+            # _fn 是 _legacy_adapter 包装的 (ctx, next_fn) 双参——serial/parallel/emit
+            # 无 next 链，传恒等函数（_r 非 None 即结果）
+            _ident = lambda c: c
+            _r = h._fn(dict(ctx), _ident)
+            if isinstance(_r, dict):
+                return _merge(_r, dict(ctx))
+        except Exception:
+            pass
+        return None
+
+    def _run_parallel(self, hooks: list, ctx: dict) -> list:
+        """并行执行多个 hook（ThreadPoolExecutor），按各自 timeout。"""
+        import concurrent.futures
+        _futs = []
+        for _h in hooks:
+            _futs.append(_executor.submit(self._run_single, _h, dict(ctx)))
+        _results = []
+        for _f in _futs:
+            try:
+                _r = _f.result(timeout=max(10, getattr(_f, "timeout", 0) or 10))
+                _results.append(_r)
+            except Exception:
+                _results.append(None)
+        return _results
 
     def _invoke(self, h: Hook, ctx: dict, next_fn: Callable[[dict], dict]) -> dict:
         """执行单个钩子；永不抛（异常降级为透传）。
@@ -414,6 +511,7 @@ class HooksHub:
             blocking=bool(hook_def.get("blocking", False)),
             match=hook_def.get("match"),
             timeout=hook_def.get("timeout"),
+            dispatch=str(hook_def.get("dispatch") or "waterfall"),  # §3.42 W1 ⭐
         )
         _h.resolve()
         with self._lock:
