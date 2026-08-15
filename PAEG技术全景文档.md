@@ -2373,7 +2373,14 @@ s["skill.cooking.egg"] = {
 │   ├── llm_adapter.py    兼容层
 │   ├── safety.py         安全中间件
 │   ├── cli.py            命令行交互
-│   ├── server.py         Flask 后端
+│   ├── server.py         Flask 组合根（v0.43 §3.45 架构拆分后：仅 app 装配/CORS/middleware/蓝图注册/启动）
+│   ├── blueprints/       ⭐ HTTP 蓝图（§3.45 Phase 1：voice/threads/admin/conversations/uploads/quiz，17 路由）
+│   │   ├── voice.py          /api/voice/tts、stt
+│   │   ├── threads.py        /api/threads 4 路由（ThreadStore 会话容器）
+│   │   ├── admin.py          /api/admin/reload、dump-config（配置热重载/配置树导出）
+│   │   ├── conversations.py  /api/conversations 5 路由（对话历史持久化）
+│   │   ├── uploads.py        /api/upload、/api/avatar（资料/图片/头像上传）
+│   │   └── quiz.py           /api/teach/quiz/next、answer（交互式选择题）
 │   ├── prompts.py        ⭐ 教师画像（薇依）+ 语言风格 + 学科×学段提示词
 │   ├── pedagogy.py       ⭐ 教学策略库（苏格拉底/支架/掌握/费曼，v0.9）
 │   ├── subjects_ext.py   15 学科扩展节点
@@ -4352,6 +4359,11 @@ PPT 大纲 ≥ 3 章节且围绕提问。**"能用就行"不算完成，质量�
   - `infra/runtime.py`：12 个懒加载 getter（get_llm/get_kb/get_paeg/...）；`infra/sessions.py`：SESSIONS 独立
   - audit_check 24/24 全绿，行为零变化（回归 + 端到端验证）
 - 📋 Phase 3：`blueprints/` 拆分（45 路由按域分组；teach/chat 含 SSE 闭包最后做）
+- ✅ **§3.45 Phase 3 第一部分（2026-08-16）**：`blueprints/` 落地 6 低风险域 17 路由（voice/threads/admin/conversations/uploads/quiz），server.py 转组合根（装配/注册/启动）
+  - 依赖注入：`from infra.runtime import get_conv_store` 等懒加载单例（与 server 模块级全局同引用）；`_is_registered` 迁入 `services/_learner_session.py`
+  - 审计配套：audit_check 双源扫描（`_backend_route_src()` 归一化 `@bp.route`）+ pyright 列表 + 反向依赖检查含 blueprints/
+  - 验证：92 项测试通过 + audit 39/39 + 服务重启实测蓝图路由全通；pytest 2 批 + 活服务 HTTP 验证
+  - 📋 后续：Phase 2/3 剩余（self_update/resources/modes/proactive + chat/teaching）按需求文档 §3.45.2 清单推进
 - 📋 Phase 4：`agents/` 重新导出（subagent 类已在 subagents.py）
 
 
