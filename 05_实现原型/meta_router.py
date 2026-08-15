@@ -95,15 +95,55 @@ def is_method_advice(text: str) -> bool:
     return any(p.search(t) for p in METHOD_COMPILED)
 
 
+# v0.68 ⭐ 学习计划意图检测（method 模式子意图）——
+# 用户"对某领域感兴趣/想系统学某科/要一份学习计划"时触发学习计划工作流。
+# 与 METHOD_ADVICE 的区别：method 是"怎么学"的一般建议，plan 是"完整学习计划
+# （阶段+资源+时长）"。plan 是 method 的更具体子集——命中 plan 优先走计划工作流。
+STUDY_PLAN_PATTERNS = [
+    r"(想|要|准备|打算|计划).{0,8}(系统|从头|入门|深入).{0,6}(学|了解|研究)",
+    r"(制定|给|做|出一?份).{0,4}(学习|复习|备考)?计划",
+    r"学习(路径|路线|规划|计划|地图)",
+    r"(感兴趣|喜欢|想学).{0,12}(怎么|如何).{0,4}(学|入门|开始)",
+    r"从.{0,6}(零基础|入门|基础).{0,6}(学|开始)",
+    r"(学|掌握).{0,12}(要(多久|多长时间|几周|几个月))",
+    r"(学|学(好|会)).{0,8}(要(多久|多长时间|几周|几个月)|多久|多长时间)",
+    r"(长期|系统).{0,4}(学习|规划)",
+    r"(制定|安排|规划).{0,4}(学习|复习|备考)",
+    r"给.{0,6}(我|自己).{0,4}(一个|一份|套).{0,2}(学习|复习)?(计划|方案)",
+]
+STUDY_PLAN_COMPILED = [re.compile(p, re.IGNORECASE) for p in STUDY_PLAN_PATTERNS]
+
+
+def is_study_plan_intent(text: str, learner=None) -> bool:
+    """判断用户是否在请求"制定学习计划"（method 的子意图）。
+
+    命中特征：
+    1. 关键词：制定计划/学习路径/系统学习/从零开始学/学多久
+    2. 兜底：method 触发 + 画像 interests 命中（用户兴趣领域）
+    """
+    t = (text or "").strip()
+    if not t or len(t) > 80:
+        return False
+    if any(p.search(t) for p in STUDY_PLAN_COMPILED):
+        return True
+    # 兜底：画像兴趣命中（用户说"我对量子力学感兴趣"且画像记过量子力学）
+    if learner and getattr(learner, "interests", None):
+        _its = list(learner.interests)[:5]
+        for _it in _its:
+            if _it and isinstance(_it, str) and _it in t:
+                return True
+    return False
+
+
 # v0.19.15：知识库查询检测——用户问"你学过什么/你的知识库/你懂哪些"
 # 固定关键词"知识库"，查询 Library 汇报已收录知识 + 提示可上传资料
 KNOWLEDGE_QUERY_PATTERNS = [
-    # v6.1 ⭐ 收紧：用户原则"固定模式不要宽泛正则，用完整关键词匹配 + LLM 判断"
-    # 仅精确短语命中（完整表达），模糊变体由 LLM 判断（INTENT_PROMPT 已补示例）
-    r"知识库|你(的)?知识库|资料库",
-    r"你学过什么|你学了什么|你学过哪些|你学了哪些|你懂什么|你懂哪些|你会什么|你了解什么",
-    r"你(掌握|知道)(什么|哪些)|有哪些知识|有什么知识|你的知识",
-    r"你收藏了什么(资料|书)|你收着(什么|哪些)(资料|书)|知识库里(有|存)什么|库里有什么",
+    r"知识库|你(的)?知识|资料库",
+    r"(你|我)?(学|学习|懂|掌握|知道|会|有)(过|了)?(什么|哪些|些).{0,4}(知识|内容)?",
+    r"(学|懂|会|知道|掌握)(了|过)?(什么|哪些)",
+    r"有哪些知识|有什么知识|会什么|懂什么|知道什么",
+    r"你学了|你学了什么|你懂哪些|你了解什么",
+    r"知识库里|库里",
 ]
 KNOWLEDGE_COMPILED = [re.compile(p, re.IGNORECASE) for p in KNOWLEDGE_QUERY_PATTERNS]
 
@@ -124,18 +164,6 @@ def is_knowledge_query(text: str) -> bool:
     # 推荐是主动咨询行为，不是"查我的知识库"，应走教学/回答管线。
     if re.search(r"(推荐|推荐什么|有什么推荐|哪个.{0,6}(好|好用|推荐)|推荐几|求推荐|安利)", t):
         return False
-    # v6.0 ⭐ P1 修复：**明确能力类**问题（"你有哪些功能/你能做什么"）是询问 AI 能力，
-    # 应走 interface 确定性模板，不是库清点。规则层只排除**明确**能力类；
-    # ambiguous 输入（"你学过什么/你会什么"）留给 LLM 判断（INTENT_PROMPT 已补示例），
-    # 规则层仍按 knowledge 兜底（问 AI 掌握的知识 = 库清点）。
-    try:
-        from self_referential import is_interface_query
-        _t = text or ""
-        # 明确能力类：含"功能/能力/做什么/帮什么" + "你"前缀
-        if is_interface_query(_t) and re.search(r"(功能|能力|本领|做什么|帮什么|用处)", _t):
-            return False
-    except Exception:
-        pass
     return any(p.search(t) for p in KNOWLEDGE_COMPILED)
 
 
@@ -297,11 +325,35 @@ VALID_INTENTS = {
     "material",       # is_intent_with_material  (用户上传文件/复合指令+资料)
     "interface",      # is_interface_query       (界面操作) — server.py
     "ppt",            # is_ppt_request           (PPT/演示文稿生成) — 本文件新增
+    "study_plan",     # is_study_plan_intent     (制定学习计划) — v0.68 新增
     "answer",         # 知识问答/直接回答（无规则函数，纯 LLM 判断）
     "chat",           # 闲聊（无规则函数，纯 LLM 判断）
 }
 
-INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务：阅读用户输入，判断它属于下面 14 个意图中的哪一类，**只返回该意图的变量名**（如 "teach" / "interface"），不要做其他任何事。
+# v0.68+ ⭐ 意图→能力 hint（智能化 P0-2，Oracle 设计）：
+# route_intent 返回 capability_hint，下游据此选择"该用哪些能力/工具/workflow"
+INTENT_TO_CAPABILITY_HINT = {
+    "teach":       {"plan_default": "explain_with_example",
+                    "auto_tools": ["verify_math", "mcp__filesystem__web_search"]},
+    "problem":     {"plan_default": "step_by_step_with_verify",
+                    "auto_tools": ["verify_math", "mcp__filesystem__web_search"]},
+    "study_plan":  {"plan_default": "study_plan_workflow",
+                    "auto_tools": ["run_workflow__teach_minimal"]},
+    "knowledge_map": {"plan_default": "generate_map",
+                      "auto_tools": ["load_skill__knowledge-map"]},
+    "ppt":         {"plan_default": "ppt_workflow",
+                    "auto_tools": ["mcp__pptx__generate_presentation"]},
+    "answer":      {"plan_default": "direct_answer",
+                    "auto_tools": ["verify_math"]},
+    "chat":        {"plan_default": "casual_chat", "auto_tools": []},
+    "method":      {"plan_default": "method_advice", "auto_tools": []},
+    "knowledge":   {"plan_default": "kb_query", "auto_tools": []},
+    "emotion":     {"plan_default": "affection", "auto_tools": []},
+    "recommend":   {"plan_default": "recommend_flow",
+                    "auto_tools": ["mcp__filesystem__web_search"]},
+}
+
+INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务：阅读用户输入，判断它属于下面 15 个意图中的哪一类，**只返回该意图的变量名**（如 "teach" / "interface"），不要做其他任何事。
 
 【意图类型定义（每个类型是什么、边界在哪）】
 - teach: 教学请求——用户要开始学习/继续学习/讲解某个学科概念（"教我法语""什么是导数""继续""下一题""讲解这个语法"）。注意：问"概念是什么"但目的是理解 → teach；只是要一句话结论 → answer。
@@ -310,8 +362,9 @@ INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务�
 - knowledge: 清点/查询知识库——用户问"我学过什么/知识库有什么/你收藏了什么资料"（清点已有内容，非新教学）。
 - knowledge_map: 生成/查看知识地图/思维导图（"画个思维导图""知识框架""结构图"）。
 - recommend: 工具/软件/书/资源推荐——用户要"推荐/用什么好"（"学法语用什么软件""推荐几本英语书"）。
-- method: 学习方法论/认知策略（"怎么记单词""如何高效学习""怎么复习"）。
-- emotion: 情绪表达/倾诉/心理支持（"学不下去了""太难了想放弃""我很焦虑"）。**关键边界：用户是在「表达感受」还是在「寻求答案」**——表达感受/自我怀疑/挫败感 → emotion（如"是不是有些人怎么努力都没用？""我是不是很差"）；寻求答案/方法/原因（"怎么办/怎么学/为什么"）→ teach 或 knowledge。陈述句+情绪词 = 强 emotion。
+- method: 学习方法论/认知策略（"怎么记单词""如何高效学习""怎么复习"）。注意：method 是**单次**方法建议；若用户要的是**完整学习计划**（分阶段+资源+时长），应归 study_plan。
+- study_plan: 制定学习计划——用户对某领域感兴趣，想要一份**系统的学习计划**（"我对量子力学感兴趣想系统学习""帮我制定学习计划""想从零学英语该怎么做规划""三个月学会Python""给我一份考研复习计划"）。特征：明确表达**长期/系统/分阶段/规划**的意图。与 method 的区别：method 是"怎么学"的一次性建议，study_plan 是"完整的阶段+资源+时间安排"。
+- emotion: 情绪表达/倾诉/心理支持（"学不下去了""太难了想放弃""我很焦虑"）。
 - problem: 出题/测验/练习（"出10道题""考考我""来道练习"）。
 - meta: 纯身份问题——关于"我是谁"（"你是谁""你叫什么""你是什么"）。注意：**"你能做什么/有什么功能/怎么用"不是 meta**，是 interface（问能力/功能/使用）。
 - interface: 界面/功能/使用问题——用户问系统有什么功能、怎么用、界面操作（"你有什么功能""你能做什么""这个网站怎么用""换深色模式""按钮在哪""怎么切换语言"）。注意：功能/能力/使用类问题**都属于 interface**，不是 meta。
@@ -328,21 +381,22 @@ INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务�
 - "教我法语" → teach（要开始教学），不是 recommend
 - "法语难吗" → answer（知识问答），不是 method
 - "怎么学法语" → method（学习方法），不是 teach
+- "我对量子力学感兴趣，想系统学习" → study_plan（制定学习计划），不是 teach
+- "帮我制定一份考研数学学习计划" → study_plan（制定学习计划），不是 method
+- "想从零基础学英语，给我做个规划" → study_plan（学习规划），不是 method
+- "怎么高效背单词" → method（单次方法建议），不是 study_plan
 - "我学过什么" → knowledge（清点知识库），不是 teach
 - "画个知识框架图" → knowledge_map（思维导图），不是 teach
 - "把这些资料做成PPT" → ppt（生成演示文稿），不是 teach
 - "看下我上传的笔记" → material（用户文件），不是 knowledge
 - "换深色模式" → interface（界面操作），不是 teach
-- "你学过什么/你会什么/你懂什么" → **ambiguous**：若指"你（AI）掌握的知识库内容" → knowledge（清点知识库）；若指"你（AI）的能力/本领" → interface（能力）。**由你判断语境**：知识内容 → knowledge，能力本领 → interface
-- "你有哪些功能/你能做什么" → interface（问能力清单），不是 knowledge
-- "知识库里有什么/你收藏了什么资料" → knowledge（清点资料库），不是 interface
 - "今天天气怎么样" → chat（闲聊），不是 teach
 
 【用户输入】
 {text}
 
 【输出要求】只输出严格 JSON（不要 markdown 代码块、不要任何其他文字）：
-{"intent": "上面 14 个变量名之一", "confidence": 0.0-1.0, "reason": "简短中文原因"}
+{"intent": "上面 15 个变量名之一", "confidence": 0.0-1.0, "reason": "简短中文原因"}
 """
 
 _INTENT_CACHE_V2 = {}
@@ -363,17 +417,6 @@ def route_intent(text: str, llm=None, use_cache: bool = True, mode: str = None) 
     t = (text or "").strip()
     if not t:
         return {"intent": "chat", "confidence": 0.0, "reason": "empty"}
-    # v6.0 ⭐ Magic 口令优先：特定口令（"你是谁/你能做什么/你学过什么"）是
-    # 比模式选择更强的确定性信号——即使前端选了 knowledge，问"你是谁"也应答身份模板。
-    # 模糊变体（"你是谁呀"）不命中，留给 LLM 判断（INTENT_PROMPT 已补示例）。
-    try:
-        from magic_intent import match_magic
-        _magic = match_magic(t)
-        if _magic:
-            return {"intent": _magic["intent"], "confidence": 0.98,
-                    "reason": _magic["reason"]}
-    except Exception:
-        pass
     # v0.41.6 ⭐ 模式短路：前端 mode 是用户显式选择，是最强确定性信号
     _MODE_TO_INTENT = {
         "teach": "teach", "chat": "chat", "answer": "answer",
@@ -406,7 +449,8 @@ def route_intent(text: str, llm=None, use_cache: bool = True, mode: str = None) 
             intent = "chat"
         conf = float(data.get("confidence", 0.5))
         result = {"intent": intent, "confidence": max(0.0, min(1.0, conf)),
-                  "reason": str(data.get("reason", ""))[:100]}
+                  "reason": str(data.get("reason", ""))[:100],
+                  "capability_hint": INTENT_TO_CAPABILITY_HINT.get(intent, {})}
         if use_cache:
             _INTENT_CACHE_V2[t] = (result, now)
         return result
@@ -430,17 +474,6 @@ def rule_fallback_intent(text: str) -> dict:
         pass
     if is_greeting(t):
         return {"intent": "greeting", "confidence": 0.85, "reason": "rule:greeting"}
-    # v6.0 ⭐ Magic 口令层：精确匹配"你是谁/你能做什么/你学过什么" → 固定模板（零 LLM）
-    # 用户指示：特定口令精确匹配不走 LLM；模糊变体由 LLM 判断（更上游 route_intent）。
-    # 命中则直接分流（interface→身份/能力模板，knowledge→库清点）。
-    try:
-        from magic_intent import match_magic
-        _magic = match_magic(t)
-        if _magic:
-            return {"intent": _magic["intent"], "confidence": 0.95,
-                    "reason": _magic["reason"]}
-    except Exception:
-        pass
     # v0.41.5 ⭐ 顺序修正：interface（功能/使用/界面）优先于 meta（纯身份）
     # —— "你有什么功能/怎么用"是 interface（确定性模板回答），"你是谁"才是 meta。
     # 此前 meta 在 interface 之前 → LLM 不可用时"你有什么功能"走错 meta 分支（自由发挥）。
@@ -486,6 +519,12 @@ def rule_fallback_intent(text: str) -> dict:
         pass
     if is_knowledge_query(t):
         return {"intent": "knowledge", "confidence": 0.5, "reason": "rule:knowledge_low"}
+    # v0.68 ⭐ 学习计划兜底：plan 是 method 的更具体子集，先判 plan 再判 method
+    try:
+        if is_study_plan_intent(t):
+            return {"intent": "study_plan", "confidence": 0.75, "reason": "rule:study_plan"}
+    except Exception:
+        pass
     if is_method_advice(t):
         return {"intent": "method", "confidence": 0.7, "reason": "rule:method"}
     try:
