@@ -260,7 +260,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 17 | **Subprocess 抽象**：MCP 客户端/ffmpeg/PDF/PPT 统一 spawn 服务 | ctx.subprocess | subprocess service | P2 |
 | 18 | **权限预设系统**：student-safe/tutor-write/researcher-full 三档 | permission-presets | tool_registry PERMISSION_PRESETS 升级 | P1 ✅（v1.1.2 4 档 + §3.46.2 #7 预设联动）|
 | 19 | **Permission 事件入 Session Log**：切换可回放 | permission/preset log-only | session log | P1 ✅（§3.46.2，tool_registry 接入 infra/session_log）|
-| 20 | **Custom 衍生状态**：临时切换显示"自定义"不可保存 | current() 返回 custom | permission service | P2 |
+| 20 | **Custom 衍生状态**：临时切换显示"自定义"不可保存 | current() 返回 custom | permission service | P2 ✅（§3.46.2，tool_registry.py）|
 | 21 | **Subagent Registry Provider 可插拔**：in-process/external-script/llm-call | ctx.subagents 6 providers | subagents.py registry | **P0 ✅**（§3.42 W3 in-process + §3.46.2 #21 三类 provider）|
 | 22 | **Subagent Report/Continuable 协议**：子代理回报 + 父发消息 | subagent-control/report | subagent 控制 | P1 |
 | 23 | **Fresh-Agent Loop**（tool-ralph）：每轮 fresh child + 共享进度 + 结构化 handoff | tool-ralph | 对应 PAEG RALPH 循环（已有，对照增强）| P2 |
@@ -1500,5 +1500,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#9 Per-Agent Scope ✅（Harness P1，2026-08-16）**——services/agent_scope.py 新建：AgentScope（allow_tools/block_tools/prompt_override，shadowing 语义——黑名单优先于白名单，默认全工具兼容现状）；DEFAULT_AGENT_SCOPES（9 subagent，与 #1 装扮层/#11 契约层对齐）+ register_scope 可插拔 + is_tool_allowed_for_agent 便捷入口（供 tool_registry 联动）；未知回退默认（容错）；与 #1/#11/#21 形成完整体系（装扮层+契约层+作用域+provider 注册）；dsh 借鉴 dsh-scope agent.ctx 隔离 realm；8 测试全绿 + SURFACE 验证（S1-S5 隔离/联动/回退）（commit 新）
   - **#5 用户家目录 overlay ✅（Harness P1，2026-08-16）**——config_loader.py：DEFAULT_OVERLAY_PATH（默认 ~/.paeg/cordis.patch.yml）+ load_yaml_overlay() + load_agents_config 增 overlay_path 参数；四层合并（defaults → user agents.json → project agents.json → YAML overlay 最高优先）；无 yaml 依赖/文件缺失/解析失败 → 空 dict（容错），未覆盖字段继承下层；对齐 dsh $DSH_HOME/cordis.patch.yml 语义——不改代码改默认模型/学科；5 测试全绿 + SURFACE 验证（覆盖默认模型/温度/继承/容错/默认路径）（commit 新）
   - **#14 Tool Registry 能力协商 ✅（Harness P1，2026-08-16）**——tool_registry.py：get_tool_metadata（轻量 name/desc/risk，不含 parameters）+ get_tool_full_def(name)（按需完整定义，未知→None）+ get_tool_revision() + list_changed_since(seq)；register_external_tools 挂接 _bump_tool_revision()（外部工具注册后版本递增）；metadata 先注入省上下文、完整定义按需取——dsh defer_loading 语义；6 测试全绿 + SURFACE 验证（59 工具 metadata/懒加载/revision/listChanged/容错）（commit 新）
+  - **#20 Custom 衍生状态 ✅（Harness P2，2026-08-16）**——tool_registry.set_permission_preset 支持 custom 衍生状态（可切换但不入 PERMISSION_PRESETS 可保存目标）；custom 临时宽松语义（对齐 standard 允许写工具）；切回真实预设（exam 锁写）正常；无效目标仍拒绝；与 #18 权限预设 + #19 事件入 Session Log 衔接（衍生状态全链路）；dsh 借鉴 current() 返回 custom 衍生状态语义；4 测试全绿 + SURFACE 验证（切换/宽松/切回/拒绝）（commit 新）
   - **回归验证 ✅**：36 passed（全部新功能测试）+ audit_check 39/39
 
