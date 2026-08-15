@@ -257,7 +257,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 14 | **Tool Registry 能力协商**：元数据级先注入 name/desc，按需完整加载 | defer_loading + listChanged | skill_registry.py | P1 ✅（§3.46.2，tool_registry.py）|
 | 15 | **Session Event Log**："Model-visible ⟺ logged" 铁律 + deriveMessages 投影 + SessionEventMap 类型化 | core/session | infra/session | P1 ✅（§3.37 类型层+§3.46.2 H-1 存储层）|
 | 16 | **Hooks 瀑布链**：waterfall 事件（next() 委托，短路可观测）| Waterfall listeners MUST call next() | hooks_hub | P2 ✅（§3.42 W1 4-dispatch + §3.46.2 H-14 tools/* 补全）|
-| 17 | **Subprocess 抽象**：MCP 客户端/ffmpeg/PDF/PPT 统一 spawn 服务 | ctx.subprocess | subprocess service | P2 |
+| 17 | **Subprocess 抽象**：MCP 客户端/ffmpeg/PDF/PPT 统一 spawn 服务 | ctx.subprocess | subprocess service | P2 ✅（§3.46.2，services/subprocess_spawn.py）|
 | 18 | **权限预设系统**：student-safe/tutor-write/researcher-full 三档 | permission-presets | tool_registry PERMISSION_PRESETS 升级 | P1 ✅（v1.1.2 4 档 + §3.46.2 #7 预设联动）|
 | 19 | **Permission 事件入 Session Log**：切换可回放 | permission/preset log-only | session log | P1 ✅（§3.46.2，tool_registry 接入 infra/session_log）|
 | 20 | **Custom 衍生状态**：临时切换显示"自定义"不可保存 | current() 返回 custom | permission service | P2 ✅（§3.46.2，tool_registry.py）|
@@ -1503,5 +1503,6 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#20 Custom 衍生状态 ✅（Harness P2，2026-08-16）**——tool_registry.set_permission_preset 支持 custom 衍生状态（可切换但不入 PERMISSION_PRESETS 可保存目标）；custom 临时宽松语义（对齐 standard 允许写工具）；切回真实预设（exam 锁写）正常；无效目标仍拒绝；与 #18 权限预设 + #19 事件入 Session Log 衔接（衍生状态全链路）；dsh 借鉴 current() 返回 custom 衍生状态语义；4 测试全绿 + SURFACE 验证（切换/宽松/切回/拒绝）（commit 1fcd23b）
   - **#30 Cordis 式 Service Registry ✅（Harness P1，2026-08-16）**——services/service_registry.py 新建：ServiceRegistry（register/get/has/list/override）+ DEFAULT_SERVICES（12 核心服务懒加载关联 infra.runtime：llm/paeg/conv_store/user_store/evolver/agent_engine/skill_registry/periodic_updater/session_log/file_generator/library/kb）+ get_service_registry() 单例；工厂懒加载（import 期零副作用）、覆盖可替换（dsh 一切皆插件）、未知容错；与 infra/runtime.py 衔接——"一切皆 ctx"统一入口；dsh 借鉴 ctx.key Service；6 测试全绿 + SURFACE 验证（12 服务/懒加载/覆盖/容错）（commit a2bfc6f）
   - **#22 Subagent Report/Continuable 协议 ✅（Harness P1，2026-08-16）**——services/subagent_report.py 新建：make_report（agent/status/result/ts 契约）+ make_instruction（to/instruction/ts，父发消息 continuable 语义）+ ReportRegistry（线程安全 add_report/get_reports/list_all/clear，未知 agent 容错，保留最近 20 条）；与 #11 契约层衔接（回报即 ServiceProvider.execute 结果），与 #1/#21/#30 形成完整 subagent 体系（装扮层+契约层+provider 注册+服务注册+回报协议）；dsh 借鉴 subagent-control/report；6 测试全绿 + SURFACE 验证（回报/失败/父发消息/注册表/容错）（commit 新）
+  - **#17 Subprocess 抽象 ✅（Harness P2，2026-08-16）**——services/subprocess_spawn.py 新建：Spawner（build 构造命令 + run 执行）+ SPAWN_KINDS（ffmpeg/python/mcp 内置）+ register_spawner（可插拔）+ spawn_python 便捷入口；执行统一走 #13 run_command（本地/docker/沙箱可换 provider）；未知回退 python（容错）；基于 #13 扩展——高层 spawner 抽象（按进程类型封装命令构造与执行，业务代码不直接调 subprocess.run）；dsh 借鉴 ctx.subprocess；6 测试全绿 + SURFACE 验证（注册表/统一执行/命令构造/回退/自定义）（commit 新）
   - **回归验证 ✅**：36 passed（全部新功能测试）+ audit_check 39/39
 
