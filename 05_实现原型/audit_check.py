@@ -19,6 +19,21 @@ ROOT = BASE.parent  # 项目根
 GUI = ROOT / "09_GUI前端" / "index.html"
 SRV = BASE / "server.py"
 
+# §3.45 ⭐ 架构拆分后：路由分布两处（server.py + blueprints/*.py），
+# 接线完整性 / 测试盲区 / 内部 API 标注 检查必须双源扫描。
+BLUEPRINTS_DIR = BASE / "blueprints"
+
+
+def _backend_route_src() -> str:
+    """server.py + blueprints/*.py 拼接源码（蓝图 @bp.route 归一化为 @app.route），
+    使既有 `@app.route(...)` 正则无需改动即可覆盖全部路由。"""
+    src = SRV.read_text(encoding="utf-8")
+    if BLUEPRINTS_DIR.is_dir():
+        for _bpf in sorted(BLUEPRINTS_DIR.glob("*.py")):
+            _bsrc = _bpf.read_text(encoding="utf-8")
+            src += "\n" + _bsrc.replace("@bp.route", "@app.route")
+    return src
+
 REPORT = []
 
 
@@ -78,7 +93,8 @@ def audit_silent_except():
 # 维度 3：接线完整性（前后端契约）
 # ---------------------------------------------------------------------------
 def audit_wiring():
-    srv = SRV.read_text(encoding="utf-8")
+    # §3.45 ⭐ 双源：server.py + blueprints/*.py（蓝图路由已迁出，接线检查需覆盖）
+    srv = _backend_route_src()
     html = GUI.read_text(encoding="utf-8")
     # 前端 API 调用
     front_api = set(re.findall(r"fetch\(['\"]([^'\"]+)", html)) | \
@@ -128,7 +144,8 @@ def audit_test_coverage():
     test_src = ""
     for f in tests_dir.glob("test_*.py"):
         test_src += f.read_text(encoding="utf-8")
-    srv = SRV.read_text(encoding="utf-8")
+    # §3.45 ⭐ 双源：server.py + blueprints/*.py（蓝图路由已迁出，测试盲区需覆盖）
+    srv = _backend_route_src()
     routes = re.findall(r'@app\.route\("(/api/[^"]+)', srv)
     uncovered = []
     for r in routes:
@@ -449,8 +466,12 @@ def audit_refactor_integrity():
         # Windows 下 pyright 是 .cmd 包装，需经 cmd /c 调用（npm 全局）
         # §3.45 ⭐ 修复：逐文件调用 + cwd（中文绝对路径 cmd 转义失败 + utils.py 同名冲突
         #   导致整体空输出）——单文件坏不拖累全部
+        # §3.45 ⭐ 架构拆分：blueprints/ 新增 6 个路由文件，纳入 pyright 静态扫描
         _files = ["server.py", "paeg.py", "meta_router.py",
-                  "utils.py", "self_referential.py"]
+                  "utils.py", "self_referential.py",
+                  "blueprints/voice.py", "blueprints/threads.py",
+                  "blueprints/admin.py", "blueprints/conversations.py",
+                  "blueprints/uploads.py", "blueprints/quiz.py"]
         _workdir = os.path.dirname(os.path.abspath(__file__))
         _diags = []
         for _f in _files:
@@ -508,9 +529,10 @@ def audit_modular_health():
                        if f"def _handle_{h}_" in srv and f"from services.handlers.{h}" not in srv]
     record("模块健康", "P1", "handler 定义已迁出 server.py（走 services.handlers）",
            not inline_handlers, f"仍内联: {inline_handlers}" if inline_handlers else "")
-    # 4) 依赖方向：services/ 不应 import server.py（单向依赖：server → services）
+    # 4) 依赖方向：services/infra/blueprints 不应 import server.py（单向依赖：server → 各层）
+    #    §3.45 ⭐ blueprints 加入检查（蓝图反向 import server 会造成循环导入 + 架构倒退）
     dep_violations = []
-    for mod in ["services", "infra"]:
+    for mod in ["services", "infra", "blueprints"]:
         mdir = BASE / mod
         if mdir.is_dir():
             for f in mdir.rglob("*.py"):
