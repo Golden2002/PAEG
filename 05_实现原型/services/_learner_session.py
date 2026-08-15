@@ -21,7 +21,31 @@ v0.42 重构提取：原 server.py 中 13 处完全相同的内联实现合并�
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Optional
+
+
+def _is_registered(learner_id: str) -> bool:
+    """v0.32 ⭐ 放宽：注册用户（u 前缀）与匿名用户（web_ 前缀）都允许对话落盘。
+
+    §3.45 架构拆分：自 server.py 迁入（原 L4278）。依赖改为 infra.runtime 懒加载
+    单例（get_user_store()/get_conv_store() 与 server 模块级 USER_STORE/CONV_STORE
+    同引用——runtime 模块缓存单例），行为字节级不变。
+
+    历史问题：此函数只认 u 前缀 → 匿名用户（web_xxx）的对话不落盘也不读取，
+    导致换设备/清缓存后（localStorage 的匿名 ID 丢失，生成新 web_xxx）历史全丢。
+    修复：web_ 前缀同样允许持久化（同浏览器刷新/标签页稳定）；真正跨设备仍需登录。
+    路径安全：仅允许 alnum/下划线/连字符，防止目录穿越。
+    """
+    from infra.runtime import get_conv_store, get_user_store
+    if get_user_store() is None or get_conv_store() is None:
+        return False
+    sid = str(learner_id)
+    if not re.match(r'^(u|web_)[A-Za-z0-9_\-]+$', sid):
+        return False
+    if sid.startswith('u'):
+        return sid[1:].isdigit()
+    return True
 
 
 def ensure_learner_session(
