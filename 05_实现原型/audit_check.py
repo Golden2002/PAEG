@@ -622,6 +622,20 @@ def audit_dataflow_integrity():
                not _bad_text, "提示仍写'左上角'（实际在底部输入栏）" if _bad_text else "")
     except Exception:
         pass
+    # 9) H-1 ⭐ 会话事件日志完备（§3.46.2 H-1，2026-08-16）
+    #    "模型可见⟺已记录"铁律：类型层(event_types)+发射层(emit_event_typed)+
+    #    存储层(session_log)三件套齐备，模型可见输入可审计可回放。
+    try:
+        _sl = (BASE / "infra" / "session_log.py").read_text(encoding="utf-8")
+        _et = (BASE / "infra" / "event_types.py").read_text(encoding="utf-8")
+        _ob = (BASE / "observability.py").read_text(encoding="utf-8")
+        _ok_h1 = all(k in _sl for k in ["SessionEventLog", "derive_messages", "append"]) \
+            and all(k in _et for k in ["make_event", "KNOWN_EVENT_TYPES", "surfaceOp"]) \
+            and "emit_event_typed" in _ob
+        record("数据流", "P1", "H-1 会话事件日志三件套齐备（模型可见⟺已记录）",
+               _ok_h1, "" if _ok_h1 else "session_log/event_types/emit_event_typed 缺失")
+    except Exception as _h1e:
+        record("数据流", "P1", "H-1 会话事件日志三件套齐备", False, f"检查失败: {_h1e}")
 
 
 def main():
