@@ -54,6 +54,7 @@ PAEG_EVENT_TYPES = frozenset({
     "teach/evaluation", "teach/adaptation", "teach/reflection",
     "material/handout", "material/script", "material/ppt", "material/mindmap",
     "self/evolve", "self/distill", "self/tool-lesson",
+    "profile/stale-refreshed",  # §3.12 ⭐ 画像陈旧轻量诊断触发
 })
 
 KNOWN_EVENT_TYPES = CORE_EVENT_TYPES | PLUGIN_EVENT_TYPES | PAEG_EVENT_TYPES

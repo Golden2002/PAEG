@@ -1021,6 +1021,12 @@ class Presenter:
                 subtopic=step.get("subtopic", "") or "",
                 constraint_flags=getattr(learner, "_constraint_flags", ()) or (),  # v0.43 ⭐ 3参数分层放开
             )
+            # §3.12 ⭐ 知识依赖图注入（v1.1.5）：leads_to 此前零消费——补"学前需掌握X/掌握后能学Y"路径指引
+            try:
+                from services.prereq_graph import inject_graph_into_system
+                system = inject_graph_into_system(system, self.kb, concept=concept, subject=subject or "")
+            except Exception:
+                pass
             # v0.26 ⭐ 教学模式识别（agent 引导 LLM 判断 easy/normal/deep，不靠关键词）
             try:
                 _mode = _detect_teaching_mode(concept, self.model)
