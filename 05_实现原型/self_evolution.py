@@ -291,7 +291,17 @@ class SelfEvolution:
         return out
 
     def _append_evolved_node(self, node: dict, subject: str):
-        """追加到当日 evolved_*.json（原子写）。B4：写入前先 _normalize_node 兜底。"""
+        """追加到当日 evolved_*.json（原子写）。
+
+        写入流程：
+        - B4：先 ``_normalize_node`` 兜底字段 + 注入 schema_version
+        - A2：以 ``(subject, concept)`` 为键查当日文件既有节点
+          - 若已存在同键 live 节点 → 旧节点标 ``status='superseded'`` +
+            ``superseded_by=<新id>``；新节点生成唯一 id（同键加 ``.v2/.v3`` 计数后缀）
+            并标 ``status='live'``；不重复插入同键
+          - 否则 → 直接以 ``status='live'`` 写入
+        - 原子写 + reload_library 热加载
+        """
         # B4：先标准化（兜底字段 + schema_version）——所有写入路径必经此关
         node = self._normalize_node(node)
         fname = f"evolved_{datetime.now().strftime('%Y%m%d')}.json"
@@ -303,7 +313,38 @@ class SelfEvolution:
                     data = json.load(f)
             except Exception:
                 data = {}
-        data[node.get("id", f"evolved.{time.time()}")] = node
+        # A2：确定性去重（同 subject+concept → 仅 1 个 live，旧节点 superseded）
+        new_id = node.get("id", f"evolved.{time.time()}")
+        concept = node.get("concept", "")
+        # 查既有节点中同 (subject, concept) 的 live 节点
+        existing_id = None
+        for k, v in data.items():
+            if not isinstance(v, dict):
+                continue
+            if (v.get("subject") == subject
+                    and v.get("concept") == concept
+                    and v.get("status") in ("live", None)):
+                existing_id = k
+                break
+        if existing_id is not None:
+            # 旧节点标 superseded + superseded_by 指向新节点 id
+            data[existing_id]["status"] = "superseded"
+            data[existing_id]["superseded_by"] = new_id
+            # 为新节点生成唯一 id（同键加 .v2/.v3... 后缀）
+            if new_id == existing_id or new_id in data:
+                # 找未占用的版本号
+                base = existing_id
+                version = 2
+                while True:
+                    cand = f"{base}.v{version}"
+                    if cand not in data:
+                        new_id = cand
+                        break
+                    version += 1
+            node["id"] = new_id
+        # 新节点：status="live"
+        node["status"] = "live"
+        data[new_id] = node
         tmp = fpath + ".tmp"
         with open(tmp, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
