@@ -123,6 +123,27 @@ def choose_strategy(learner, diagnosis: dict, subject: str) -> dict:
     elif depth == "advanced":
         strategy_key = "socratic"
 
+    # 4. 画像驱动（v0.69+ §3.12：让 17 维学习者画像真正驱动策略——此前 learner 参数未使用）
+    # 仅补充默认场景（不覆盖上方 diagnosis 主规则：诊断优先、画像兜底）
+    try:
+        _gl = str(getattr(learner, "grade_level", "") or "") if learner else ""
+        _cs = str(getattr(learner, "cognitive_style", "") or "") if learner else ""
+        _tm = getattr(learner, "target_exam", None) if learner else None
+        if strategy_key == "default":
+            if _gl == "graduate_exam":
+                strategy_key = "socratic"          # 考研：深度优先
+            elif _gl in ("middle_school", "high_school") and subject in (
+                    "math", "physics", "chemistry", "coding"):
+                strategy_key = "mastery"           # 初高中技能学科：练习优先
+            elif _tm:
+                strategy_key = "socratic"          # 有目标考试：深度备考
+        if strategy_key == "default" and _cs:
+            _cs_l = str(_cs).lower()
+            if any(k in _cs_l for k in ("具体", "实例", "视觉", "concrete", "visual", "经验")):
+                strategy_key = "scaffolded"        # 具体/实例偏好：支架式（多例子）
+    except Exception:
+        pass
+
     return {**STRATEGIES[strategy_key], "key": strategy_key, "base_bloom": base_bloom}
 
 
