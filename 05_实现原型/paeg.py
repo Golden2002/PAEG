@@ -17,6 +17,9 @@ from subagents import (
 from world_view import select_tone
 from self_update import SelfUpdater
 
+# §3.42 W3 ⭐ subagent provider registry（ratchet：subagents.py 类本身不动，只加注册层）
+from infra.subagent_registry import get_default_registry
+
 
 @dataclass
 class LearnerProfile:
@@ -93,34 +96,49 @@ class PAEG:
             self._llm_for = lambda name: model_api
 
         # v0.24 ⭐ 持有全部 9 个 subagent
+        # §3.42 W3 ⭐ subagent provider registry：8 个核心 subagent 改用 registry.get()
+        # 统一构造（config/agents.json enabled:false → 跳过/None），self_update_agent
+        # 仍走 _get_self_update_agent() 懒加载（v0.42 P1 设计——教学路径不创建僵尸实例）。
+        # ratchet：subagents.py 中 9 个类完全不动；本块只换获取方式，行为兼容旧测试。
+        _registry = get_default_registry()
         # 1. 诊断
-        self.diagnostor = Diagnostor(self._llm_for("diagnostor"), knowledge_base)
+        self.diagnostor = _registry.get("diagnostor",
+                                        llm=self._llm_for("diagnostor"), kb=knowledge_base)
         # 2. 计划
-        self.planner = Planner(self._llm_for("planner"), knowledge_base)
+        self.planner = _registry.get("planner",
+                                     llm=self._llm_for("planner"), kb=knowledge_base)
         # 3. 呈现
-        self.presenter = Presenter(self._llm_for("presenter"), knowledge_base)
+        self.presenter = _registry.get("presenter",
+                                       llm=self._llm_for("presenter"), kb=knowledge_base)
         # 4. 评估（v0.24：区分 presentation_quality 与 learner_state）
-        self.evaluator = Evaluator(self._llm_for("evaluator"), knowledge_base)
+        self.evaluator = _registry.get("evaluator",
+                                       llm=self._llm_for("evaluator"), kb=knowledge_base)
         # 5. 调整（v0.24：决策携带可执行 override_system_line）
-        self.adapter = Adapter(self._llm_for("adapter"), knowledge_base)
+        self.adapter = _registry.get("adapter",
+                                     llm=self._llm_for("adapter"), kb=knowledge_base)
         # 6. 答案（找答案模式）
-        self.answer_solver = AnswerSolver()
+        self.answer_solver = _registry.get("answer_solver", llm=None, kb=knowledge_base)
         # 7. 情绪支持（危机信号时走这条而非教学）
-        self.affection_supportor = AffectionSupportor()
+        self.affection_supportor = _registry.get("affection_supportor",
+                                                 llm=None, kb=knowledge_base)
         # 8. 自我更新（基于反馈生成结构化建议）
         # v0.42 ⭐ P1 修复：改为懒初始化——此前这里直接构造 SelfUpdateAgent()，
         # 但全项目只有 /api/self-update/from-feedback 端点调用 .run()，教学/闲聊路径
         # 从不触发（僵尸实例，误导读者以为自我更新在教学时被驱动）。现改为 None +
         # _get_self_update_agent() 懒创建，语义清晰且节省构造开销。
+        # §3.42 W3：self_update_agent 不进 registry（懒加载语义独特，独立保留）。
         self.self_update_agent = None
         self._self_update_agent_loaded = False
         # 9. 个体化（聚合 16 维画像 + 控制 LLM 教学）
-        self.individuality = Individuality()
+        self.individuality = _registry.get("individuality", llm=None, kb=knowledge_base)
         # 10. 资料检索员（v0.43 ⭐ P0-C 提升：从"按请求构造"升级为全局持有）
         # ResourceLibrarian 构造无状态（仅绑定 model/kb），用户隔离靠 run(learner=...) 参数，
         # 因此全局持有完全安全——真正实现"9+1 全持有"，不再每请求 new 实例。
-        self.resource_librarian = ResourceLibrarian(model=self._llm_for("resource_librarian"),
-                                                    kb=knowledge_base)
+        self.resource_librarian = _registry.get(
+            "resource_librarian",
+            llm=self._llm_for("resource_librarian"),
+            kb=knowledge_base,
+        )
         self.self_updater = SelfUpdater(knowledge_base) if enable_self_update else None
         # v0.12：语言优化 Agent（薇依语料矫正，去除 AI 痕迹）
         self.refiner = None
@@ -176,11 +194,20 @@ class PAEG:
             pass
 
     def _subagent_run(self, name: str, fn, run_id: str, **kwargs):
-        """包一层 subagent 调用：start → run → end（runId 配对 + 时长）。"""
+        """包一层 subagent 调用：run-start → agent-start → run → agent-end → run-end。
+
+        §3.42 W7 ⭐（v1.1.5）：补齐 run-start/run-end——run 粒度比 agent 细，
+        与 agent-start/end 用 workflow_id 配对（四事件完备）。
+        """
         import time as _t
         _t0 = _t.time()
+        self._emit("tool-workflow/run-start",
+                   agent=name, workflow_id=run_id,
+                   learner_id=str(getattr(kwargs.get("learner"), "id", "anon")),
+                   subject=kwargs.get("subject", ""), ts=_t.time())
         self._emit("tool-workflow/agent-start",
-                   agent=name, run_id=run_id, learner_id=str(getattr(kwargs.get("learner"), "id", "anon")),
+                   agent=name, run_id=run_id, workflow_id=run_id,
+                   learner_id=str(getattr(kwargs.get("learner"), "id", "anon")),
                    subject=kwargs.get("subject", ""), ts=_t.time())
         try:
             _res = fn(**kwargs)
@@ -188,8 +215,11 @@ class PAEG:
         finally:
             _dur = round((_t.time() - _t0) * 1000, 1)
             self._emit("tool-workflow/agent-end",
-                       agent=name, run_id=run_id, duration_ms=_dur,
-                       stop_reason="completed")
+                       agent=name, run_id=run_id, workflow_id=run_id,
+                       duration_ms=_dur, stop_reason="completed")
+            self._emit("tool-workflow/run-end",
+                       agent=name, workflow_id=run_id,
+                       duration_ms=_dur, stop_reason="completed")
 
     def _get_self_update_agent(self):
         """v0.42 ⭐ P1 修复：懒创建 SelfUpdateAgent（替代僵尸实例）。
