@@ -263,7 +263,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | 20 | **Custom 衍生状态**：临时切换显示"自定义"不可保存 | current() 返回 custom | permission service | P2 ✅（§3.46.2，tool_registry.py）|
 | 21 | **Subagent Registry Provider 可插拔**：in-process/external-script/llm-call | ctx.subagents 6 providers | subagents.py registry | **P0 ✅**（§3.42 W3 in-process + §3.46.2 #21 三类 provider）|
 | 22 | **Subagent Report/Continuable 协议**：子代理回报 + 父发消息 | subagent-control/report | subagent 控制 | P1 ✅（§3.46.2，services/subagent_report.py）|
-| 23 | **Fresh-Agent Loop**（tool-ralph）：每轮 fresh child + 共享进度 + 结构化 handoff | tool-ralph | 对应 PAEG RALPH 循环（已有，对照增强）| P2 |
+| 23 | **Fresh-Agent Loop**（tool-ralph）：每轮 fresh child + 共享进度 + 结构化 handoff | tool-ralph | 对应 PAEG RALPH 循环（已有，对照增强）| P2  ✅（§3.46.2 对照验证，RALPH 已具备）|
 | 24 | **Web UI 模式化**：shell/wire/slots 拆分，ui-*.js 插件化 | ui-* 插件 ~30 个 | 09_GUI前端 | P1 |
 | 25 | **Preset 即 UI 风格**：预设决定挂哪些 ui-* 模块 | web-app patch | 前端按 preset 挂载 | P1 |
 | 26 | **客户端 HMR 热刷新**：dev 模式前端自动刷新 | client-hmr | 09_GUI前端 | P2 |
@@ -1505,6 +1505,7 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#22 Subagent Report/Continuable 协议 ✅（Harness P1，2026-08-16）**——services/subagent_report.py 新建：make_report（agent/status/result/ts 契约）+ make_instruction（to/instruction/ts，父发消息 continuable 语义）+ ReportRegistry（线程安全 add_report/get_reports/list_all/clear，未知 agent 容错，保留最近 20 条）；与 #11 契约层衔接（回报即 ServiceProvider.execute 结果），与 #1/#21/#30 形成完整 subagent 体系（装扮层+契约层+provider 注册+服务注册+回报协议）；dsh 借鉴 subagent-control/report；6 测试全绿 + SURFACE 验证（回报/失败/父发消息/注册表/容错）（commit 新）
   - **#17 Subprocess 抽象 ✅（Harness P2，2026-08-16）**——services/subprocess_spawn.py 新建：Spawner（build 构造命令 + run 执行）+ SPAWN_KINDS（ffmpeg/python/mcp 内置）+ register_spawner（可插拔）+ spawn_python 便捷入口；执行统一走 #13 run_command（本地/docker/沙箱可换 provider）；未知回退 python（容错）；基于 #13 扩展——高层 spawner 抽象（按进程类型封装命令构造与执行，业务代码不直接调 subprocess.run）；dsh 借鉴 ctx.subprocess；6 测试全绿 + SURFACE 验证（注册表/统一执行/命令构造/回退/自定义）（commit 新）
   - **#10 Preset 文件结构标准化 ✅（Harness P1，2026-08-16）**——services/preset_structure.py 新建：DEFAULT_PRESET_DIR（paeg/presets）+ ensure_preset_dirs + save_preset_to_dir + load_preset_from_dir + list_presets_in_dir；preset 落盘标准结构（preset.yml 主配置 + agent.patch.yml 与 #1 subagent_loader 衔接 + prompts/ + assets/）；无 yaml 依赖时 JSON 兜底（兼容）；缺失容错；与 #7 教学预设/#8 PresetService 衔接（preset 可持久化可移植）；dsh 借鉴 preset 目录规范；5 测试全绿 + SURFACE 验证（目录/保存/装载/列表/容错）（commit ef0187d）
-  - **#6 OS 平台双轨 ✅（Harness P2，2026-08-16）**——services/platform_dual_track.py 新建：get_platform（win32/posix）+ get_command_template（双轨模板）+ resolve_platform_value（平台感知配置：平台特定值优先、common 回退、未知回退 default 容错）；应用：ffmpeg/python/脚本命令在 win32/posix 不同（ffmpeg.exe vs ffmpeg）——TTS/STT/PPT 按平台分支；dsh 借鉴 bash+pwsh 双轨；4 测试全绿 + SURFACE 验证（平台检测/双轨模板/common 回退/未知回退）（commit 新）
+  - **#6 OS 平台双轨 ✅（Harness P2，2026-08-16）**——services/platform_dual_track.py 新建：get_platform（win32/posix）+ get_command_template（双轨模板）+ resolve_platform_value（平台感知配置：平台特定值优先、common 回退、未知回退 default 容错）；应用：ffmpeg/python/脚本命令在 win32/posix 不同（ffmpeg.exe vs ffmpeg）——TTS/STT/PPT 按平台分支；dsh 借鉴 bash+pwsh 双轨；4 测试全绿 + SURFACE 验证（平台检测/双轨模板/common 回退/未知回退）（commit be8e540）
+  - **#23 Fresh-Agent Loop 对照验证 ✅（Harness P2，2026-08-16）**——对照验证测试 test_fresh_agent_loop.py（4 项）：确认 RALPH 循环（§3.42 T5）已具备 dsh tool-ralph 语义——每轮 fresh child（executor 注入）+ 共享进度（history/prev 传递）+ 结构化 handoff（RoundOutput snapshot + LoopResult.promise + 状态快照落盘）；对照增强无缺口，以测试锁定能力；dsh 借鉴 tool-ralph；4 测试全绿 + SURFACE 验证（DONE/fresh child/prev 传递/handoff 快照）（commit 新）
   - **回归验证 ✅**：36 passed（全部新功能测试）+ audit_check 39/39
 
