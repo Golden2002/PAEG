@@ -7,7 +7,11 @@ LLM 生成 Manim 代码 → 隔离渲染 → 数学动画视频
 """
 import os, re, ast, subprocess, tempfile, uuid, sys, io
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+# v0.69+：stdout 包装移入 __main__——模块级替换会破坏 pytest capsys（import 时副作用）
+if __name__ == '__main__':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+
+from manim_speed import _SPEED_STANDARD_TEXT  # v0.64 ⭐ 速度规范固定化
 
 # 隔离环境路径（可移植：相对项目根）
 _BASE = os.path.dirname(os.path.abspath(__file__))
@@ -17,11 +21,77 @@ _MANIM_PY = os.path.join(_MANIM_ENV, 'python.exe')
 _MANIM_CLI = os.path.join(_MANIM_ENV, 'manim.exe')
 _MEDIA_DIR = os.path.join(_PROJ, 'downloads', 'manim')
 
+# v0.67 ⭐ Docker 兼容：容器内统一 Python 3.12（pip manim），无 manim_env/venv
+# 检测 Windows venv 不存在 → 用系统 manim 命令（Linux 容器：shutil.which('manim')）
+if not os.path.exists(_MANIM_CLI):
+    import shutil as _shutil
+    _SYS_MANIM = _shutil.which('manim')
+    if _SYS_MANIM:
+        _MANIM_CLI = _SYS_MANIM
+        _MANIM_PY = _SYS_MANIM
+
 # 安全校验：禁用的 import / 调用
 _BLOCKED_IMPORTS = {'os', 'sys', 'subprocess', 'socket', 'shutil', 'ctypes',
                     'multiprocessing', 'signal', 'importlib', 'pathlib', 'requests'}
 _BLOCKED_CALLS = {'eval', 'exec', '__import__', 'compile', 'globals', 'locals',
                   'open', 'getattr', 'setattr', 'delattr'}
+
+# v1.0 ⭐ 学科门控：仅"可视化类"学科插入 manim 动画。
+# 数学/物理/几何等有图形语义；语文/历史/英语等纯文本学科不插（走纯讲解视频）。
+_MANIM_SUBJECTS = {
+    'math', 'mathematics', '物理', 'physics', '数学',
+    '几何', 'geometry', '代数', 'algebra', '化学', 'chemistry',
+    '函数', '微积分', 'calculus', '统计', 'statistics', '概率', 'probability',
+    '线性代数', 'linear_algebra', '解析几何', 'graph', '图论',
+}
+
+
+def is_manim_subject(subject: str) -> bool:
+    """主题类型分派：该学科是否适合插入 manim 演示动画。
+
+    用户需求（v1.0）：除数学讲解视频外，其他讲解视频不需要往视频中插入
+    manim 渲染动画——融合管线按学科类型决定是否渲染/插入 manim 片段。
+    """
+    if not subject:
+        return False
+    s = str(subject).strip().lower()
+    if s in {x.lower() for x in _MANIM_SUBJECTS}:
+        return True
+    # 包含匹配：如 "高中数学" → math
+    return any(k.lower() in s for k in _MANIM_SUBJECTS)
+
+
+# v0.66 ⭐ 主题内容推断：不依赖用户显式选学科，从主题关键词判断是否适合 manim
+# 可视化主题关键词（数学/物理/几何图形语义）
+_MANIM_TOPIC_KEYWORDS = (
+    # 数学核心概念
+    '行列式', '矩阵', '特征值', '特征向量', '导数', '积分', '极限', '微积分',
+    '函数', '抛物线', '正弦', '余弦', '三角函数', '向量', '几何', '面积',
+    '方程', '线性代数', '概率', '统计', '分布', '曲线', '图像', '图形',
+    '斜率', '切线', '圆周率', '圆', '三角形', '多边形', '对称',
+    # 物理可视化
+    '力', '速度', '加速度', '运动', '波形', '电场', '磁场', '光学', '振动',
+    '机械波', '电磁', '轨迹', '场', '能量', '动能', '势能',
+    # 化学
+    '分子结构', '晶体', '化学键', '反应速率', '轨道',
+    # 英文
+    'determinant', 'matrix', 'eigenvalue', 'eigenvector', 'derivative',
+    'integral', 'limit', 'function', 'sine', 'cosine', 'vector', 'geometry',
+    'area', 'probability', 'statistics', 'graph', 'curve', 'slope', 'tangent',
+    'circle', 'triangle', 'polygon', 'velocity', 'acceleration', 'wave',
+)
+
+
+def infer_manim_suitability(topic: str, subject: str = "") -> bool:
+    """v0.66 ⭐ 判断主题是否适合 manim 动画（显式学科 + 主题内容推断取并集）。
+
+    修复：用户不选学科（subject=''）时，仅凭主题关键词（如"行列式"）也能
+    识别为可视化主题并插入 manim 动画。
+    """
+    if is_manim_subject(subject):
+        return True
+    t = (topic or "").lower()
+    return any(k in t for k in _MANIM_TOPIC_KEYWORDS)
 
 
 def validate_manim_code(code: str):
@@ -97,27 +167,85 @@ _MANIM_SYSTEM = """你是 Manim 数学动画代码生成助手。为教学问题
 1. from manim import *
 2. Scene 类实现 construct(self)
 3. 数学曲线用 axes.plot()，几何用 Circle/Square 等
-4. 总时长 30-60 秒
+4. 总时长 60-100 秒
 5. 纯几何动画（不用 Text/MathTex 避免依赖问题）
-6. 输出完整可运行 Python 代码"""
+6. 输出完整可运行 Python 代码""" + _SPEED_STANDARD_TEXT
+
+
+def _get_llm_for_manim():
+    """获取 LLM 实例（供流水线使用）。"""
+    try:
+        from llm_adapter import create_llm
+        return create_llm("auto")
+    except Exception:
+        return None
 
 
 def generate_manim_video(topic: str, subject: str = 'math',
                          learner_id: str = 'anon') -> dict:
-    """LLM 生成 Manim 代码 → 渲染视频。返回 {ok, path, url, error}"""
-    # 1. LLM 生成代码（用现有 llm 接口）
+    """LLM 生成 Manim 代码 → 渲染视频。返回 {ok, path, url, error}
+
+    v0.63 ⭐ 意图层：match_manim_intent 把简单话（"画个抛物线"）映射为
+    场景专属 prompt（含教学叙事）+ 对应模板 key，LLM 按精确指令生成。
+
+    v1.1 ⭐ §3.34 智绘科普范式：若已生成 script.json（manim_pipeline 规划产物），
+    则优先走流水线（多阶段+门控+自动修复）；否则回退原单段流程（兼容）。
+    """
+    # v1.1 ⭐ 优先：script.json 流水线（若存在规划产物）
+    try:
+        from manim_pipeline import run_pipeline
+        # 尝试用现有流水线（含 Phase1 规划→门控→草稿→实现→修复）
+        _r = run_pipeline(
+            llm=_get_llm_for_manim(),
+            topic=topic, audience="高中", duration_target_sec=120,
+            style="3blue1brown", prerequisites="",
+            intuition="", objectives="")
+        if _r.get("ok"):
+            return {"ok": True, "path": _r.get("video_path", ""),
+                    "url": _r.get("url", ""), "error": "",
+                    "pipeline": "multi-stage"}
+    except Exception as _pe:
+        print(f"[manim_service] 流水线尝试失败（回退单段）: {_pe}")
+    # v0.63 ⭐ 意图匹配：简单话 → 场景 prompt + 模板 key
+    intent = None
+    try:
+        from manim_prompts import match_manim_intent
+        intent = match_manim_intent(topic)
+    except Exception:
+        intent = None
+    _scene_prompt = (intent or {}).get("prompt", "")
+    _template_key = (intent or {}).get("template_key", "")
+
+    # 1. LLM 生成代码（场景 prompt 优先；失败用通用）——v0.66 重试 2 次防 API 波动
     code = None
     try:
         from subagents import _safe_chat
-        code = _safe_chat(_MANIM_SYSTEM, f"教学问题：{topic}\n学科：{subject}\n生成 Manim 动画代码")
+        _sys = _MANIM_SYSTEM
+        # v0.66 ⭐ 统一资源门面：注入 KB/用户物料/网络检索（动画主题有事实依据）
+        try:
+            from services.library import collect_all_resources
+            _res = collect_all_resources(learner_id, topic, llm=_safe_chat,
+                                         subject=subject, include_web=False)
+            if _res.get("has_any"):
+                _sys += "\n\n## 可用资源（动画应基于这些事实）\n" + _res["block"]
+        except Exception:
+            pass
+        if _scene_prompt:
+            _sys = _sys + "\n\n## 本次动画要求（场景专属）\n" + _scene_prompt
+        for _attempt in range(3):
+            code = _safe_chat(_sys, f"教学问题：{topic}\n学科：{subject}\n生成 Manim 动画代码")
+            if code and 'class ' in code:
+                break
+            import time as _t
+            _t.sleep(1.0)
     except Exception as e:
         code = None
         last_err = f"LLM 调用失败: {e}"
 
-    # LLM 失败则用模板兜底
+    # LLM 失败则用模板兜底（按意图 key 选择，非通用）
     if not code or 'class ' not in code:
-        from manim_templates import template_for
-        code = template_for(topic, subject)
+        from manim_templates import template_for, template_by_key
+        code = template_by_key(_template_key, topic) if _template_key else template_for(topic, subject)
 
     # 2. AST 校验
     ok, err = validate_manim_code(code)
@@ -129,7 +257,13 @@ def generate_manim_video(topic: str, subject: str = 'math',
     if not path:
         return {"ok": False, "path": "", "url": "", "error": f"渲染失败: {rerr}"}
 
-    return {"ok": True, "path": path, "url": f"/api/download/manim/{os.path.basename(path)}",
+    # v0.66 ⭐ 修复：URL 需含 jobs/<job>/videos/scene/<q>/ 完整路径（否则下载 404）
+    try:
+        _rel = os.path.relpath(path, _MEDIA_DIR).replace('\\', '/')
+        _url = f"/api/download/manim/{_rel}"
+    except Exception:
+        _url = f"/api/download/manim/{os.path.basename(path)}"
+    return {"ok": True, "path": path, "url": _url,
             "error": ""}
 
 
