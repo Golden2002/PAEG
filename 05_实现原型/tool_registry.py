@@ -107,11 +107,25 @@ _active_preset = "standard"  # 当前权限档（运行时可切换）
 
 
 def set_permission_preset(preset: str) -> bool:
-    """v0.68+ ⭐ 运行时切换权限档（如教师切"考试模式"）。"""
+    """v0.68+ ⭐ 运行时切换权限档（如教师切"考试模式"）。
+
+    #19 ⭐（§3.46.2 Harness P1）：切换成功后向 session_log 发射 permission/preset
+    事件（记录 from→to），可回放审计——dsh permission/preset log-only 事件语义。
+    """
     global _active_preset
     if preset not in PERMISSION_PRESETS:
         return False
+    _prev = _active_preset
     _active_preset = preset
+    # #19 ⭐ Permission 事件入 Session Log（切换可回放）
+    try:
+        from infra.session_log import get_session_log
+        get_session_log().append(
+            "permission/preset",
+            {"from": _prev, "to": preset, "preset": preset},
+        )
+    except Exception:
+        pass  # 日志发射失败不影响切换（容错）
     return True
 
 
