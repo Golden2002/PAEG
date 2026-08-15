@@ -1399,7 +1399,16 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 
 - **W1 SEL-1 知识蒸馏深化 ✅ 已完成（2026-08-16）**：B4 normalize_node+A1 Schema+CoT+A3 failure_case+A2 确定性去重（见 §3.47.4），4 commit（910f08c/b8617eb/4e63da3/0e5dc50），7 测试
 - **RAG W-N 首批 ✅ 已完成（2026-08-16）**：B3 SOURCES 注入+B1 rag.json 配置化（见 §3.47.4），2 commit（bb0699a/b74ef27），9 测试
-- （待 W2）
+- **W2 ✅ B2 BM25Okapi**：knowledge_base.search 真 rank_bm25（见 §3.47.4），14 测试 + 77 回归全绿（commit 8a13277）
+- **W3 ✅ H-1 SessionEventLog**：infra/session_log.py 存储层三件套齐备（类型层 §3.37+发射层+存储层），audit 39→40 项（commit 69c45be）
+- **W3 ✅ PTC-5 主循环可替换**：services/teach_strategy.py + paeg.teach 策略分派，PTC-1~5 系列收官（commit c7a7b9d）
+- **W4 ✅ H-14 hooks 瀑布补全**：VALID_EVENTS 新增 tools/pre-execute + post-execute，7 钩子全 loaded（commit 769832e）
+- **W5 ✅ §3.38.2 compaction 4-event 验证**：已有实现（§3.42 W8），test_compaction_events 5 passed
+- **W9 ✅ 架构 Phase 2 拆分**：4 域 9 路由迁 blueprints/（proactive/resources/modes/self_update）+ session_helpers 下沉，server.py 3928 行，audit 40/40 + 47 测试（commit b577dff）
+- **W10 第一部分 ✅ 架构 Phase 3 拆分**：chat/teaching 迁 blueprints/（12 蓝图），server.py 2601 行/31 路由；teach_stream SSE 保留（Oracle 判断核心链路不贸然拆）；修复 time 潜伏 bug（commit 00bf16e）
+- **Harness P0 ✅ #12 LLM Provider Seam**：Provider 注册表 + env 驱动 + provider_info 可观测（commit 9318b5d）
+- **T5 ✅ 技术说明文档更新**：版本 v0.72+ + 文件地图 + §10.2.21 落地进度（commit 1220475）
+- **最终回归 ✅**：60 项新功能测试全绿 + audit_check 40/40 + 服务重启 health OK + 12 蓝图路由 HTTP 实测（11 即时 200，resources/method 为 LLM 联网时序超时非拆分引入）+ 双远程推送（GitHub + ModelScope 至 1220475）
 
 
 ### 3.47 RAG 检索增强优化（2026-08-16 用户指示 · 进行中）
