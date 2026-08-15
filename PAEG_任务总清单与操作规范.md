@@ -418,6 +418,14 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 
 ### D. 历史 bug report 档案（2026-08-14 用户要求重点记录，4 份完整报告）
 
+**Bug-Report-5：今日一句不显示（2026-08-15，用户实测）**
+- 现象：网站"今日一句"卡片只显示标题"今日一句"和"—"，无句子内容
+- 根因：09_GUI前端/index.html L5322 悬空 `async`（代码合并事故：`// v6.1 授课视频生成` 行后误留 `async` + 注释，下一行才是完整 `async function kmapChat`）——悬空 async 被当表达式求值 → `ReferenceError: async is not defined` → 启动区 JS（含 loadDailyQuote 调用）中断
+- 诊断：Playwright stack trace 精确定位到 :5322:1；Node 语法检查不报错（async 悬空是运行期错误）
+- 修复：删除悬空 async（保留 L5323 完整函数）
+- 验证：Playwright 实测页面错误清空 + 今日一句恢复「敬畏，是责任的开始。」—— 汉斯·约纳斯
+- 教训：代码合并/编辑后必须跑前端 JS 运行期检查（node --check 不够，需浏览器实测）+ 关注"悬空关键字"（async/await/return 后跟注释）
+
 
 > 用户报告 → 根因 → 修复 → 验证，全部可追溯。对应 DONE-12/15/16/17。
 
