@@ -76,7 +76,7 @@ class OpenAICompatModelAPI(ModelAPI):
             return self._base_url + "/chat/completions"
         return self._base_url + "/v1/chat/completions"
 
-    def chat(self, system: str, messages: list, max_tokens: int = 2000,
+    def chat(self, system: str, messages: list, max_tokens: int = 4000,
              temperature: float = 0.7, tools: Optional[list] = None,
              tool_choice: Optional[str] = None) -> str:
         payload = {
@@ -85,6 +85,11 @@ class OpenAICompatModelAPI(ModelAPI):
             "max_tokens": max_tokens,
             "temperature": temperature,
             "stream": False,
+            # v0.68 修复：v4-flash 是思考型模型——普通 chat 必须显式关思考，
+            # 否则 content 被思考链占满返回空（OFF/B 路径被污染）。
+            # 只有 ReasonerModelAPI（A 路径）才开启 thinking。
+            # max_tokens 放开到 4000：思考型模型需要 token 空间（用户要求不限制）。
+            "thinking": {"type": "disabled"},
         }
         if tools:
             payload["tools"] = tools
@@ -114,7 +119,108 @@ class OpenAICompatModelAPI(ModelAPI):
                         for tc in msg["tool_calls"]
                     ],
                 }, ensure_ascii=False)
-            return msg.get("content") or ""
+            # v0.68 修复：deepseek-v4-flash 是思考型模型——即使不请求 thinking，
+            # API 也先输出 reasoning_content。content 为空时降级取 reasoning_content 尾部
+            # （避免空响应导致调用方走兜底/报错）。
+            _content = msg.get("content") or ""
+            if not _content.strip():
+                _rc = msg.get("reasoning_content") or ""
+                if _rc.strip():
+                    # 取思考链最后一句作为可用内容（去掉思考前缀，保留结论性文字）
+                    _content = _rc.strip().split("\n")[-1][:500]
+            return _content
+        except error.HTTPError as e:
+            detail = e.read().decode("utf-8", errors="replace")[:300]
+            raise ModelError(f"[{self.name}] HTTP {e.code}: {detail}") from e
+        except error.URLError as e:
+            raise ModelError(f"[{self.name}] 网络错误: {e.reason}") from e
+        except (KeyError, IndexError, json.JSONDecodeError) as e:
+            raise ModelError(f"[{self.name}] 响应解析失败: {e}") from e
+
+    def available(self) -> bool:
+        return bool(self._api_key) and bool(self._base_url) and bool(self._model)
+
+
+class ReasonerModelAPI(OpenAICompatModelAPI):
+    """深度思考模式 API（v0.51 ⭐ DeepSeek V4 thinking 接入）。
+
+    与普通 OpenAICompatModelAPI 的差异：
+    - 请求带 `thinking: {"type": "enabled"}` + `reasoning_effort`
+    - 响应提取 `reasoning_content`（思考链）字段
+    - `chat()` 保持原契约：返回 content 字符串（现有 130+ 调用方零改动）
+    - `chat_with_reasoning()` 返回完整结构 {"thinking", "content", "reasoning_tokens", ...}
+
+    参考（librarian 调研 2026-08）：
+    - DeepSeek V4 思考模式：https://api-docs.deepseek.com/zh-cn/guides/thinking_mode
+    - 思考模式下 temperature/top_p 等采样参数不生效（API 静默忽略）
+    - 模型名用 V4 系列（deepseek-v4-flash / deepseek-v4-pro）；旧 deepseek-reasoner 别名已下线
+    """
+
+    name = "reasoner"
+
+    def __init__(self, api_key: str, base_url: str, model: str,
+                 timeout: int = 120, temperature: float = 0.7,
+                 reasoning_effort: str = "high"):
+        super().__init__(api_key, base_url, model, timeout=timeout,
+                         temperature=temperature)
+        self._reasoning_effort = reasoning_effort  # low / high / max
+
+    def chat(self, system: str, messages: list, max_tokens: int = 2000,
+             temperature: float = 0.7, tools: Optional[list] = None,
+             tool_choice: Optional[str] = None) -> str:
+        """保持原 chat() 行为：返回 content 字符串（向后兼容）。
+
+        thinking 通过 chat_with_reasoning() 单独获取。
+        """
+        r = self.chat_with_reasoning(system, messages, max_tokens,
+                                     temperature, tools, tool_choice)
+        return r.get("content") or ""
+
+    def chat_with_reasoning(self, system: str, messages: list,
+                            max_tokens: int = 4000,
+                            temperature: float = 0.7,
+                            tools: Optional[list] = None,
+                            tool_choice: Optional[str] = None) -> dict:
+        """返回完整结构 {thinking, content, reasoning_tokens, total_tokens}。
+
+        思考模式下 tools 不支持（DeepSeek reasoner 不可 tool call）——
+        若传 tools 直接抛 ModelError（调用方降级到普通 chat 路径）。
+        失败抛 ModelError（同 chat 契约）。
+        """
+        if tools:
+            raise ModelError(
+                "[reasoner] 思考模式不支持 tools，请用普通 chat + 后置工具循环")
+        payload = {
+            "model": self._model,
+            "messages": [{"role": "system", "content": system}] + messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "stream": False,
+            # v0.51 ⭐ DeepSeek V4 思考模式（OpenAI 兼容 extra 字段透传）
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": self._reasoning_effort,
+        }
+        body = json.dumps(payload).encode("utf-8")
+        req = request.Request(
+            self._url(),
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self._api_key}",
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=self._timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            msg = data["choices"][0]["message"]
+            usage = data.get("usage") or {}
+            return {
+                "thinking": msg.get("reasoning_content") or "",
+                "content": msg.get("content") or "",
+                "reasoning_tokens": (usage.get("completion_tokens_details") or {}).get("reasoning_tokens", 0),
+                "total_tokens": usage.get("total_tokens", 0),
+            }
         except error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")[:300]
             raise ModelError(f"[{self.name}] HTTP {e.code}: {detail}") from e
@@ -216,24 +322,45 @@ def auto_detect_model_api(verbose: bool = True) -> ModelAPI:
     4. OPENAI_API_KEY -> OpenAI
     5. opencode auth.json（deepseek 优先）
     6. 全部不可用 -> MockModelAPI（离线演示）
+
+    v0.51 ⭐ 深度思考：PAEG_MODEL=deepseek-v4-pro / PAEG_REASONING=on 时
+    返回 ReasonerModelAPI（thinking 模式）；否则默认 V4-Flash 普通对话。
+    旧别名 deepseek-chat/deepseek-reasoner 已下线（2026-07-24），自动迁移到 V4。
     """
     def log(msg):
         if verbose:
             print(f"[llm_api] {msg}", file=sys.stderr)
 
+    # v0.51 ⭐ 模型名迁移：旧别名 deepseek-chat → deepseek-v4-flash（2026-07-24 下线）
+    def _migrate_model(m: str) -> str:
+        if m in ("deepseek-chat", "deepseek-reasoner"):
+            return "deepseek-v4-flash"
+        return m
+
+    def _maybe_reasoner(key: str, base: str, model: str, **kw) -> ModelAPI:
+        """PAEG_REASONING=on 或 PAEG_MODEL 含 reasoner/v4-pro → ReasonerModelAPI。"""
+        reasoning = os.environ.get("PAEG_REASONING", "off").lower() in ("on", "1", "true")
+        pro_reasoner = ("pro" in model.lower() or "reasoner" in model.lower())
+        effort = os.environ.get("PAEG_REASONING_EFFORT", "high")
+        if reasoning or pro_reasoner:
+            log(f"深度思考模式（reasoner, effort={effort}）")
+            return ReasonerModelAPI(key, base, model, reasoning_effort=effort, **kw)
+        return OpenAICompatModelAPI(key, base, model, **kw)
+
     # 1. 自定义
     custom_key = os.environ.get("PAEG_API_KEY")
     custom_base = os.environ.get("PAEG_API_BASE", "https://api.deepseek.com/v1")
-    custom_model = os.environ.get("PAEG_MODEL", "deepseek-chat")
+    custom_model = _migrate_model(os.environ.get("PAEG_MODEL", "deepseek-v4-flash"))
     if custom_key:
         log(f"使用 PAEG_API_KEY（{custom_model} @ {custom_base}）")
-        return OpenAICompatModelAPI(custom_key, custom_base, custom_model)
+        return _maybe_reasoner(custom_key, custom_base, custom_model)
 
     # 2-4. 标准环境变量
     if os.environ.get("DEEPSEEK_API_KEY"):
         log("使用 DEEPSEEK_API_KEY")
-        return OpenAICompatModelAPI(
-            os.environ["DEEPSEEK_API_KEY"], "https://api.deepseek.com/v1", "deepseek-chat")
+        return _maybe_reasoner(
+            os.environ["DEEPSEEK_API_KEY"], "https://api.deepseek.com/v1",
+            _migrate_model(os.environ.get("PAEG_MODEL", "deepseek-v4-flash")))
     if os.environ.get("ANTHROPIC_API_KEY"):
         log("使用 ANTHROPIC_API_KEY")
         return AnthropicModelAPI(os.environ["ANTHROPIC_API_KEY"])
@@ -246,8 +373,9 @@ def auto_detect_model_api(verbose: bool = True) -> ModelAPI:
     auth = _find_opencode_auth()
     if auth.get("deepseek"):
         log("使用 opencode auth.json 中的 DeepSeek 凭据")
-        return OpenAICompatModelAPI(
-            auth["deepseek"], "https://api.deepseek.com/v1", "deepseek-chat")
+        return _maybe_reasoner(
+            auth["deepseek"], "https://api.deepseek.com/v1",
+            _migrate_model(os.environ.get("PAEG_MODEL", "deepseek-v4-flash")))
     if auth.get("anthropic"):
         log("使用 opencode auth.json 中的 Anthropic 凭据")
         return AnthropicModelAPI(auth["anthropic"])
