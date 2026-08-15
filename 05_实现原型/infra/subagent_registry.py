@@ -264,6 +264,72 @@ def _build_registry_from_agents_json() -> Registry:
 
 
 # ────────────────────────────────────────────────────────────
+# #21 ⭐ Subagent Registry Provider 可插拔（Harness 30 项 P0，2026-08-16）
+# dsh 借鉴（packages/subagent spawn/fork provider，commit 47f9438）：
+# subagent 的 provider 可插拔——进程内类 / 外部脚本 / LLM 调用，均可注册替换。
+# 与 Registry（in-process）互补：Registry 管"类"的注册，此处管"provider 类型"。
+# ────────────────────────────────────────────────────────────
+
+# Provider 类型注册表（标识三类 provider 均受支持）
+PROVIDER_TYPES = {"in-process", "external-script", "llm-call"}
+
+# external-script provider 注册表：name -> {command, desc, cwd?}
+EXTERNAL_PROVIDERS: Dict[str, dict] = {}
+
+# llm-call provider 注册表：name -> {system, desc, temperature?}
+LLM_CALL_PROVIDERS: Dict[str, dict] = {}
+
+
+def register_external_provider(name: str, config: dict) -> None:
+    """注册 external-script provider（subagent 由外部脚本/进程执行）。
+
+    Args:
+        name: provider 名
+        config: {command: [可执行+参数], desc?, cwd?}
+    """
+    EXTERNAL_PROVIDERS[name] = config
+
+
+def get_external_provider(name: str) -> Optional[dict]:
+    """获取 external-script provider 配置；未知 → None（容错）。"""
+    return EXTERNAL_PROVIDERS.get(name)
+
+
+def register_llm_call_provider(name: str, config: dict) -> None:
+    """注册 llm-call provider（subagent 即一次 LLM 调用，无独立类）。
+
+    Args:
+        name: provider 名
+        config: {system: 系统提示词, desc?, temperature?}
+    """
+    LLM_CALL_PROVIDERS[name] = config
+
+
+def get_llm_call_provider(name: str) -> Optional[dict]:
+    """获取 llm-call provider 配置；未知 → None（容错）。"""
+    return LLM_CALL_PROVIDERS.get(name)
+
+
+def get_provider(name: str, provider_type: str = "in-process") -> Any:
+    """按类型获取 provider（三类统一入口）。
+
+    Args:
+        name: provider/subagent 名
+        provider_type: in-process（走 Registry）/ external-script / llm-call
+
+    Returns:
+        in-process → Registry 实例；external-script/llm-call → 配置 dict；未知 → None
+    """
+    if provider_type == "in-process":
+        return get_default_registry().get(name)
+    if provider_type == "external-script":
+        return get_external_provider(name)
+    if provider_type == "llm-call":
+        return get_llm_call_provider(name)
+    return None
+
+
+# ────────────────────────────────────────────────────────────
 # CLI 入口（手动调试用：python -m infra.subagent_registry）
 # ────────────────────────────────────────────────────────────
 
