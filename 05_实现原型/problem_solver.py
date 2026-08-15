@@ -231,6 +231,15 @@ def solve_problem(llm, problem: str, subject: str = "math",
         return {"type": qtype, "answer": None, "verified": False,
                 "confidence": 0, "verification_note": "生成失败", "took_s": round(took, 1)}
 
+    # v0.70+ §3.28 Phase 2：/api/solve 补语言规范（此前漏洞不过 polish）
+    try:
+        from services.lang_gate import lang_gate_content
+        _polished = lang_gate_content(str(answer), context=f"solve:{subject}:{problem[:30]}")
+        if _polished:
+            answer = _polished
+    except Exception:
+        pass
+
     # 验证（仅计算题尝试 SymPy）
     verification_note = ""
     verified = False
