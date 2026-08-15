@@ -336,6 +336,63 @@ def get_tool_defs() -> List[dict]:
     ] + _extended_tool_defs() + _config_tool_defs())
 
 
+# ─────────────────────────────────────
+# #14 ⭐ Tool Registry 能力协商（Harness 30 项 P1，§3.46.2，2026-08-16）
+# dsh 借鉴（defer_loading + listChanged，commit 47f9438）：
+# 工具元数据先注入 name/desc（轻量，省上下文），完整定义按需加载；变更可追踪。
+# ─────────────────────────────────────
+
+# 工具注册表版本号（register_external_tools 等注册点递增——listChanged 语义）
+_TOOL_REVISION: int = 0
+
+
+def _bump_tool_revision() -> None:
+    """工具注册表变更时递增版本号（listChanged 追踪）。"""
+    global _TOOL_REVISION
+    _TOOL_REVISION += 1
+
+
+def get_tool_metadata() -> List[dict]:
+    """返回工具轻量元数据（name/description/risk——不含完整 parameters）。
+
+    供 LLM 上下文先注入名称与用途（省 token），完整定义按需 get_tool_full_def()。
+    """
+    meta = []
+    for d in get_tool_defs():
+        fn = d.get("function", {})
+        meta.append({
+            "name": fn.get("name", ""),
+            "description": fn.get("description", ""),
+            "risk": get_tool_risk(fn.get("name", "")),
+        })
+    return meta
+
+
+def get_tool_full_def(name: str) -> Optional[dict]:
+    """按需返回工具完整定义（含 parameters）；未知 → None（容错）。"""
+    for d in get_tool_defs():
+        fn = d.get("function", {})
+        if fn.get("name") == name:
+            return d
+    return None
+
+
+def get_tool_revision() -> int:
+    """返回工具注册表当前版本号（listChanged 追踪基线）。"""
+    return _TOOL_REVISION
+
+
+def list_changed_since(seq: int) -> List[str]:
+    """返回自 seq 版本以来新增/变更的工具名（dsh listChanged 语义）。
+
+    简化实现：当前全部工具名（PAEG 工具集静态为主，MCP/skills/workflows 经
+    register_external_tools 合并时 _bump_tool_revision 递增——调用方用
+    get_tool_revision() 对比即知是否有变更）。
+    """
+    _ = seq  # 版本对比由调用方 get_tool_revision() 完成
+    return [d.get("function", {}).get("name", "") for d in get_tool_defs()]
+
+
 def _apply_config_meta(defs: List[dict]) -> List[dict]:
     """§3.36 ⭐ 配置驱动元数据覆盖：JSON 声明的 description/params 覆盖内置工具。
 
@@ -418,6 +475,8 @@ def register_external_tools() -> int:
                 elif name in _HANDLERS_TIMEOUT_MS and _tms is None:
                     # 显式 None/缺失 → 保留默认值（不抹掉）
                     pass
+        # #14 ⭐ 外部工具注册后递增版本号（listChanged 追踪）
+        _bump_tool_revision()
         return len(handlers)
     except Exception:
         return 0
