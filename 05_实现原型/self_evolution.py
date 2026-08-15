@@ -89,7 +89,13 @@ class SelfEvolution:
         return {"distilled": 1, "node": knowledge, "rejected": []}
 
     def _extract_knowledge(self, concept: str, subject: str, session) -> Optional[dict]:
-        """LLM 提炼知识点。"""
+        """A1 ⭐ LLM 提炼知识点（Schema+CoT 升级版）。
+
+        升级要点：
+        - Prompt 前置 CoT 引导：先让 LLM 思考"知识点属于什么类型/学科/难度"
+        - JSON Schema 扩展：新增 ``type / grade / tags / importance`` 字段
+        - 解析后通过 ``_normalize_node`` 兜底默认值（旧 schema 缺字段不报错）
+        """
         try:
             from subagents import _safe_chat
             # 教学内容摘要
@@ -98,28 +104,49 @@ class SelfEvolution:
                 c = p.get("content", "") if isinstance(p, dict) else str(p)
                 if c:
                     steps.append(c[:150])
+            # A1：CoT 前置引导 + 新 JSON Schema（含 type/tags/importance/grade）
             system = (
                 "你是知识提炼器。从一次成功教学中提炼**可复用的学科知识点**。\n"
+                "思考步骤（不要在输出中体现，仅内部推理）：\n"
+                "  1. 这个知识点属于什么类型（concept=概念 / principle=原理 / method=方法）\n"
+                "  2. 属于哪个学科/学段\n"
+                "  3. 对学生而言难度/重要性如何\n"
+                "然后按以下 JSON Schema 输出（字段全部必填，可为合理值）：\n"
+                "{\n"
+                "  \"concept\": \"概念名\",\n"
+                "  \"topic\": \"主题\",\n"
+                "  \"definition\": \"一句话精确定义\",\n"
+                "  \"intuition\": \"直觉解释（教师式、可讲给学生）\",\n"
+                "  \"level\": \"high_school / middle_school / college / primary\",\n"
+                "  \"subject\": \"学科英文短码（如 physics/math/philosophy）\",\n"
+                "  \"grade\": \"学段（high_school / middle_school / college / primary）\",\n"
+                "  \"type\": \"concept / principle / method\",\n"
+                "  \"tags\": [\"关键词1\", \"关键词2\", \"关键词3\"],  // 2-4 个中文关键词\n"
+                "  \"importance\": \"high / medium / low\"\n"
+                "}\n"
                 "要求：\n"
-                "1. 输出 JSON：{\"concept\": \"概念名\", \"topic\": \"主题\", "
-                "\"definition\": \"一句话定义\", \"intuition\": \"直觉解释（教师式、可讲给学生）\", "
-                "\"level\": \"high_school\"}\n"
-                "2. definition 必须准确、无幻觉；intuition 必须具体、可讲给学生听\n"
-                "3. 只提炼确实在本课讲清楚的内容，不编造\n"
-                "4. 输出纯 JSON，不要多余文字"
+                "1. definition 必须准确、无幻觉；intuition 必须具体、可讲给学生听\n"
+                "2. 只提炼确实在本课讲清楚的内容，不编造\n"
+                "3. tags 给 2-4 个中文关键词；importance 按「对学科基础的重要性」判断\n"
+                "4. 输出纯 JSON，不要多余文字、不要 Markdown 包裹"
             )
             user = (f"学科：{subject}  概念：{concept}\n"
                     f"教学步骤摘要：\n{chr(10).join(steps)}\n\n请提炼知识点。")
-            r = _safe_chat(self.llm, system, user, max_tokens=400)
+            r = _safe_chat(self.llm, system, user, max_tokens=600)
             if r:
                 m = re.search(r'\{.*\}', r, re.S)
                 if m:
                     node = json.loads(m.group(0))
                     node["id"] = f"evolved.{subject}.{concept}"
-                    node["subject"] = subject
+                    # 已有逻辑：保留 subject 兜底
+                    node["subject"] = node.get("subject") or subject
+                    # content 拼接兜底
                     content = (node.get("definition", "") + " " + node.get("intuition", "")).strip()
                     node["content"] = content
-                    return node if content else None
+                    if not content:
+                        return None
+                    # A1：通过 _normalize_node 兜底（tags/importance/grade_level/schema_version）
+                    return self._normalize_node(node)
         except Exception:
             pass
         return None
@@ -145,6 +172,7 @@ class SelfEvolution:
         out.setdefault("tags", [])
         out.setdefault("importance", "medium")
         out.setdefault("grade_level", "high_school")
+        out.setdefault("type", "concept")  # A1：节点类型默认 concept（principle/method 由 LLM 显式给）
         # 2) content 兜底（若缺则由 definition+intuition 拼接）
         if not out.get("content"):
             content = (
