@@ -1,4 +1,4 @@
-# PAEG 教育智能体 — 简明技术说明（v1.1.5）
+# PAEG 教育智能体 — 简明技术说明（v1.1.7）
 
 > 面向项目所有者：快速恢复对 PAEG 技术实现的全貌认知。
 > 结构：TL;DR → 能力全景（每个功能：技术路线 + 实现方法）→ 分层架构 → 关键流程 → 扩展指南。
@@ -797,6 +797,116 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 1. 每条 Roadmap 项必须挂钩：九模块薄弱点 / 教育体系能力 / Harness 包——空泛项砍掉
 2. 季度回顾硬指标：Q3 看"零丢失+反馈入库率"，Q4 看"认知图谱可复现"，2027 看"教师实际干预次数"
 3. 多 agent 不换框架（复用 RALPH）；知识图谱先轻量本体（JSON）确认需求再上 Neo4j
+
+
+## 第 7 章 能力全景与引用来源（v1.1.6）
+
+### 7.1 能力全景：56 种能力，一套路由
+
+PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可增删，且不改核心代码**。当前共有 **56 种可调用能力**，分五层：
+
+- **常驻层（22 内置工具）**：web_search、verify_math、fetch_page 等直接调用的基础工具，常驻内存。
+- **配置层（14 标准 MCP 工具）**：normalize_text、constraint 六件套、generate_* 等经 config_hub 统一路由。
+- **按需层（11 Skills）**：concept-explainer、essay-feedback、pdf/docx/xlsx 等，三级渐进加载，用时才激活。
+- **接入层（6 MCP 服务器）**：filesystem、memory、fetch、git、brave-search、pptx——外部标准服务。
+- **编排层（3 Workflows）**：teach_materials、teach_concept、teach_minimal——声明式 DAG 流程。
+
+> **口径说明**：早期文档写"25 个 MCP 工具"是混合统计（内置+标准混计）。v0.73 起精确分类为 **22 内置 + 14 标准**——能力并未减少，反而因 constraint 六件套、RAG 多路召回等新增基础设施而增强。
+
+**扩展性如何？** 加一个内置工具 = 改一行注册表；加一个 Skill = 丢一个 SKILL.md；加一个 MCP = 改一个 JSON。四类扩展零代码侵入，唯一例外是新增 subagent（需改 subagents.py）——这也是下一步最值得做的声明式化改造。
+
+### 7.2 能力增强落地（§3.54 ULW 循环 · 2026-08-16）
+
+> Oracle 咨询（bg_e57b7aec）筛出 6 个候选，按"先补短板、再做增强"推进。**C1-C3 已落地**，C4-C6 进行中。
+
+**已落地（C1-C3）**：
+
+| 项 | 能力 | 实现 | 状态 |
+|---|---|---|---|
+| C1 | 间隔重复 SRS | `services/srs_sm2.py`（SM-2 算法，Anki 标准）| ✅ 完成 |
+| C2 | 学科知识图谱 | `services/concept_graph.py`（纯 Python 前驱关系图，19 概念种子）| ✅ 完成 |
+| C3 | 语义检索 | `services/semantic_search.py`（BM25Plus 基线 + BGE ONNX 扩展点）| ✅ 完成 |
+
+**进行中（C4-C6）**：
+
+| 项 | 能力 | 依赖 | 状态 |
+|---|---|---|---|
+| C4 | OCR（拍照作业识别）| rapidocr-onnxruntime | 🔄 实施中 |
+| C5 | 后端 Whisper STT | faster-whisper（已在 requirements）| ⬜ 待实施 |
+| C6 | 手写公式识别 | torch/pix2tex（重依赖）| ⬜ 评估 |
+
+**C1-C3 关键点**：
+- **C1**：SM-2 纯函数式（EF 公式/答错重置/指数增长），连续答对间隔 1→6→17→49→147 天；零依赖
+- **C2**：前驱/后继/相关/学习路径四 API；内置数学物理链（函数→极限→导数→积分）；未知节点容错
+- **C3**：渐进式架构——模型缺失降级关键词（ratchet），模型就绪自动升级向量检索；BM25Plus 修复低频词零分
+
+**能力全景更新**：C1-C3 落地后，PAEG 新增 3 个服务模块（srs_sm2/concept_graph/semantic_search），可调用能力从 56 增至 **59+**（3 服务 + 待 C4-C6）。
+
+
+### 7.3 引用来源（标准参考文献格式）
+
+> 项目遵循"借鉴有来源 · 改动有说明"原则。每个借鉴模块在文件头注释中标注来源；
+> 下文按 **APA 参考文献格式**列出全部外部引用，便于审计与回溯。
+
+**[1] deepseek-ai. (2025). deepseek-harness [Computer software]. GitHub. https://github.com/deepseek-ai/deepseek-harness**（MIT License · commit 47f9438）
+
+> PAEG 的"一切皆插件"基础设施整体借鉴该项目的 Cordis 事件体系，落地 9 处：
+> service_registry（ctx 服务注册）· subprocess_spawn（子进程抽象）· llm_adapter（LLM Provider Seam）· hooks_hub（事件钩子 + matcher）· workflows_hub（声明式工作流 + PTC 模式）· config_hub（溢出防护）· compaction（压缩守卫）· skill_registry（多级技能）· subagent_registry（子代理注册）
+
+**[2] Bai, J. et al. (2024). Constitutional AI: Harmlessness from AI Feedback. arXiv. https://arxiv.org/abs/2212.08073**
+
+**[3] Chen, L. et al. (2023). AlpaGasus: Training A Better Alpaca with Fewer Data. arXiv. https://arxiv.org/abs/2307.08701**
+
+**[4] Asai, A. et al. (2023). Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection. arXiv. https://arxiv.org/abs/2310.11511**
+
+**[5] Park, J. S. et al. (2023). Generative Agents: Interactive Simulacra of Human Behavior. arXiv. https://arxiv.org/abs/2304.03442**
+
+**[6] Zhou, Z. et al. (2024). Large Language Models as Optimizers. arXiv. https://arxiv.org/abs/2309.03409**（ExpeL 证据追踪模式）
+
+> [2]-[6] 共同构成 quality_gate.py 质量门禁的设计依据：L1 宪法过滤（[2]）· L3 多维评分（[3][4][5]）· L4 证据门槛（[6]）
+
+**[7] Yao, S. et al. (2022). ReAct: Synergizing Reasoning and Acting in Language Models. arXiv. https://arxiv.org/abs/2210.03629**
+
+**[8] Shinn, N. et al. (2023). Reflexion: Language Agents with Verbal Reinforcement Learning. arXiv. https://arxiv.org/abs/2303.11366**
+
+**[9] OpenAI. (2023). Codex App Server [Computer software]. GitHub. https://github.com/openai/codex**
+
+**[10] Anthropic. (2024). Claude Code & CLAUDE.md Memory [Computer software]. GitHub. https://github.com/anthropics/claude-code**
+
+**[11] Liu, P. et al. (2023). LangChain: Build Context-aware Reasoning Applications [Computer software]. GitHub. https://github.com/langchain-ai/langchain**（ConversationSummaryBufferMemory）
+
+**[12] OpenCode. (2024). opencode [Computer software]. GitHub. https://github.com/sst/opencode**（auth.json 凭据发现 + 标准 MCP server 包）
+
+**[13] Robertson, S. & Zaragoza, H. (2009). The Probabilistic Relevance Framework: BM25 and Beyond. Foundations and Trends in IR, 3(4), 333-389.**
+
+**[14] Sun, J. (2012). jieba: Chinese Text Segmentation [Computer software]. GitHub. https://github.com/fxsjy/jieba**（MIT License）
+
+**框架级引用（项目结构层）**：Flask（Pallets Projects, https://flask.palletsprojects.com）· Kraken · EAS Station · llama-index（https://github.com/run-llama/llama_index）· lucide（https://github.com/lucide-icons/lucide, ISC License）
+
+**标注规范**：每个借鉴模块文件头统一注释块（零运行时开销）：
+
+```
+source:  <项目名> <版本/commit>  |  repo: <URL>
+path:    <原文件路径>            |  adapted: <PAEG 改动>
+since:   <PAEG 版本号>
+```
+
+**待补标注 9 处**（后续开发逐处补全）：paeg.py · subagents.py · runtime.py · tool_registry.py · config_hub.py（4-hub 范式）· observability.py · lib/ingest（[13][14] 算法级）· sse/protocol.py · blueprints/*.py（Flask 框架级）
+
+
+
+### 7.4 Docker 打包依赖纪律（用户执行标准 · 2026-08-16）
+
+> **原则**：本地能跑 ≠ Docker 能跑——任何新引入的依赖必须同步 Docker 打包。
+
+| 依赖类型 | 同步位置 | 当前实例 |
+|---|---|---|
+| pip 包 | `05_实现原型/requirements.txt` | onnxruntime（C3）· rapidocr-onnxruntime（C4）· faster-whisper（C5）|
+| 系统库 | Dockerfile `apt-get install` 段 | ffmpeg / libcairo（manim）|
+| 模型文件 | Dockerfile COPY / .dockerignore 白名单 | bge ONNX（下载到 data/models/）|
+| 可选重依赖 | requirements 注释 + 需求文档记录 | torch / pix2tex（C6，默认不装防镜像膨胀）|
+
+**验证**：引入新依赖后 `docker compose up -d --build` 必须成功；魔搭部署（ms_deploy.json）构建时自动读 requirements.txt。
 
 ## 附录 A 术语表
 
