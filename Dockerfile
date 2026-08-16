@@ -1,6 +1,9 @@
-# PAEG Docker 化（v0.67 单容器最小可行版）
+# PAEG Docker 化（v0.67 单容器最小可行版 → v0.73 魔搭部署兼容）
 # 用户方案：Docker 统一 Python 3.12——manim 0.19 兼容 3.12，无需隔离 venv。
 # 覆盖：教学/闲聊/PPT/讲义/manim 动画 五大场景。
+# 魔搭创空间（ModelScope Studio）要求：服务监听 7860 端口 + ms_deploy.json 声明
+#   port=7860 + sdk_type=docker。通过 PORT 环境变量切换（config.py 已支持）。
+#   本地 docker-compose 传 PORT=5000；魔搭平台自动注入 PORT=7860（或 ms_deploy.json）。
 
 # Python 3.12（manim 0.19 兼容最稳）
 FROM python:3.12-slim
@@ -33,13 +36,14 @@ COPY . .
 # 持久化数据卷（运行时挂载）
 VOLUME ["/app/05_实现原型/users_data", "/app/05_实现原型/downloads", "/app/Library"]
 
-# Flask 端口
-EXPOSE 5000
+# 魔搭创空间固定暴露 7860；本地 compose 用 5000（PORT 环境变量覆盖，默认 5000 保持本地行为）
+ENV PORT=7860
+EXPOSE 7860
 
-# 健康检查
+# 健康检查（/api/health 已在 server.py L379 实现）
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health').read()" || exit 1
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/api/health').read()" || exit 1
 
-# 启动（入口 server.py）
+# 启动（入口 server.py；APP_PORT 读 PORT 环境变量）
 WORKDIR /app/05_实现原型
 CMD ["python", "server.py"]

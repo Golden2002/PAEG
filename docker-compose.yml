@@ -1,5 +1,7 @@
-# PAEG docker-compose（v0.67 ⭐ 单容器最小可行版）
+# PAEG docker-compose（v0.67 ⭐ 单容器最小可行版 → v0.73 魔搭兼容）
 # 用法：docker compose up -d --build  → http://localhost:5000
+# 魔搭创空间（ModelScope）：平台注入 PORT=7860（ms_deploy.json 声明），
+#   本地 compose 显式覆盖回 5000 保持既有行为。
 version: '3.8'
 
 services:
@@ -20,6 +22,7 @@ services:
       - PYTHONUNBUFFERED=1
       - FLASK_ENV=production
       - PAEG_ENV=development   # 生产改 production（需 PAEG_SECRET_KEY）
+      - PORT=5000              # 本地覆盖 Dockerfile 默认 7860（魔搭平台会注入 7860）
       # whisper 模型（STT）：small/base/medium，首次自动下载
       - WHISPER_MODEL=small
       # TTS 中文女声
