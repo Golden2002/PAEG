@@ -1681,7 +1681,7 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 |---|---|---|---|---|
 | C1 | 间隔重复 SRS（SM-2 算法）| P2 | 纯算法（50 行）| ✅ 完成 |
 | C2 | 学科知识图谱（networkx+JSON）| P1 | networkx（可纯 Python 替代）| ✅ 完成 |
-| C3 | 语义检索（bge-small-zh ONNX）| P0 | onnxruntime（已可用）+ 模型 | ⬜ 待实施 |
+| C3 | 语义检索（bge-small-zh ONNX）| P0 | onnxruntime（已可用）+ 模型 | ✅ 完成 |
 | C4 | OCR 工具（rapidocr-onnxruntime）| P1 | rapidocr-onnxruntime（需安装）| ⬜ 待实施 |
 | C5 | 后端 Whisper STT（pywhispercpp）| P0 | pywhispercpp（需安装）| ⬜ 待实施 |
 | C6 | 手写公式识别（pix2tex）| P2 | torch（不可用，重依赖）| ⬜ 评估后定 |
@@ -1720,3 +1720,14 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - 测试：`tests/test_concept_graph.py` 5 项（前驱/后继/路径/未知容错/关系类型）
 - SURFACE：导数关系完整（前驱极限/后继积分微分方程/相关变化率）；积分路径 方程→函数→极限→导数→积分；物理链 力→牛顿定律→功→能量；未知节点容错
 - 引用标注：借鉴 networkx DAG 图论模型（零依赖实现）；可扩展 data/concept_graph.json
+
+#### 3.54.3 C3 语义检索完成（2026-08-16）
+
+- 实现：`services/semantic_search.py`——渐进式架构（关键词基线 BM25Plus + BGE ONNX 向量扩展点）
+- 关键修复：BM25Okapi 对低频词零分 → BM25Plus（rank_bm25 内置，解决）
+- API：index(docs) / search(query, top_k) / model_ready 属性
+- 测试：`tests/test_semantic_search.py` 5 项（索引检索/近义降级/模型缺失容错/空索引/score 字段）
+- SURFACE：关键词基线正常（"导数"命中微积分文档）；"毕达哥拉斯定理"近义无共享词返回空=语义缺口（模型就绪后解决）
+- **Docker 依赖**：requirements.txt 新增 onnxruntime>=1.20.0（Docker 打包包含）
+- 引用标注：BGE small-zh（FlagEmbedding，https://github.com/FlagOpen/FlagEmbedding）+ rank_bm25
+- 模型就绪路径：下载 bge-small-zh-v1.5 ONNX 到 data/models/bge-small-zh-v1.5/ 即自动升级向量检索
