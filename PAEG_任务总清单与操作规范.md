@@ -1684,7 +1684,7 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 | C3 | 语义检索（bge-small-zh ONNX）| P0 | onnxruntime（已可用）+ 模型 | ✅ 完成 |
 | C4 | OCR 工具（rapidocr-onnxruntime）| P1 | rapidocr-onnxruntime（需安装）| ✅ 完成 |
 | C5 | 后端 Whisper STT（faster-whisper）| P0 | faster-whisper（已在 requirements）| ✅ 完成（能力已有，补测试锁定）|
-| C6 | 手写公式识别（pix2tex）| P2 | torch（不可用，重依赖）| ⬜ 评估后定 |
+| C6 | 手写公式识别（pix2tex）| P2 | torch（重依赖，接口预留）| ✅ 完成（接口+降级）|
 
 ### 环境依赖现状（2026-08-16 核实）
 
@@ -1764,3 +1764,13 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - 增量：补 `tests/test_voice_stt.py` 5 项（可用性/就绪一致性/空字节容错/None 容错/提示词 env）
 - SURFACE：faster-whisper 可用 + stt_available True；模型懒加载（首次调用下载 ~460MB）
 - 解决场景：微信 X5 内核不支持 Web Speech API → 后端 /api/voice/stt 上传音频转录
+
+#### 3.54.6 C6 手写公式识别完成（2026-08-16 · 接口预留 + 降级）
+
+- 实现：`services/formula_ocr.py`——接口预留（pix2tex 可选加载）
+- 纪律 33：torch/pix2tex 为重依赖（~2GB），**默认不装**（防 Docker 镜像膨胀/构建超时），requirements.txt 注释记录可选
+- API：is_formula_ocr_available() / FormulaOCR.extract_latex(image_bytes) → LaTeX 或 None
+- 降级：依赖缺失 → None → 调用方走 verify_math 文本验证路径（拍照做题闭环的文本路径）
+- 测试：`tests/test_formula_ocr.py` 4 项（可用性/降级/非法输入/接口语义）
+- 引用标注：pix2tex / LaTeX-OCR（https://github.com/lukas-blecher/LaTeX-OCR）
+- 激活方式：pip install pix2tex 后自动启用（无需改代码）
