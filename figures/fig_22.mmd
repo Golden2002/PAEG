@@ -1,0 +1,10 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart TB
+    SRC["事件源<br/>hooks / subagent<br/>/ tool / workflow"] --> ENV["SessionEvent 信封<br/>seq + time + data<br/>+ surfaceOp"]
+    ENV --> SURF{"surfaceOp 校验<br/>强制 schema"}
+    SURF --> TY{"类型检查<br/>56 已知类型白名单"}
+    TY -->|拼错| ERR["立即报错<br/>fail-fast"]
+    TY -->|通过| RT["sinks 三路由"]
+    RT --> S1["审计日志"]
+    RT --> S2["持久化<br/>JSONL"]
+    RT --> S3["UI 事件流"]

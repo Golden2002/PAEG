@@ -1,0 +1,12 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart LR
+    JSON["config/mcp_tools.json<br/>14 工具声明"] --> LD["mcp_tools_loader<br/>JSON→工具注册"]
+    LD --> W1{"模块白名单<br/>mcp_tools.*"}
+    W1 -->|拒绝| X["四重安全边界<br/>危险模块黑名单"]
+    LD --> W2["函数名校验<br/>非下划线开头"]
+    LD --> W3["危险模块拒绝<br/>os/sys/subprocess/importlib"]
+    W1 -->|通过| REG["工具注册表"]
+    W2 --> REG
+    W3 --> REG
+    REG --> R["/api/admin/reload<br/>热重载"]
+    R --> EX["execute_tool<br/>统一路由"]

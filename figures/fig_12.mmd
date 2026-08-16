@@ -1,0 +1,16 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart TD
+    In["诊断+学科+画像"] --> Bloom["学科默认 Bloom 起点"]
+    Bloom --> R1{"有缺口且无前置?"}
+    R1 -->|是| S1["scaffolded 支架式"]
+    R1 -->|否| R2{"depth=basic?"}
+    R2 -->|是| S1
+    R2 -->|否| R3{"技能类学科?"}
+    R3 -->|是| S2["mastery 掌握式"]
+    R3 -->|否| R4{"高阶 Bloom?"}
+    R4 -->|是| S3["socratic 苏格拉底"]
+    R4 -->|否| R5{"画像兜底<br/>考研/初高中/具体偏好?"}
+    R5 -->|考研| S3
+    R5 -->|初高中技能| S2
+    R5 -->|具体/视觉| S1
+    R5 -->|默认| S4["default"]

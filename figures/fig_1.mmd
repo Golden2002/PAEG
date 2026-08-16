@@ -1,0 +1,9 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart LR
+    User(["学生<br/>浏览器/微信"]) -->|HTTP/SSE| PAEG["PAEG 教育智能体"]
+    PAEG -->|Prompt| LLM(("LLM<br/>DeepSeek/OpenAI"))
+    LLM -->|生成/工具调用| PAEG
+    PAEG <-->|检索/写入| KB[("知识库")]
+    PAEG <-->|联网| Ext["外部世界"]
+    PAEG <-->|画像/历史| DB[("持久化")]
+    Dev["开发者"] -.->|热加载| PAEG

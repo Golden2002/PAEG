@@ -1,0 +1,10 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart TD
+    In["用户输入"] --> Mode{"模式短路<br/>用户显式选择?"}
+    Mode -->|是| Direct["确定性意图<br/>confidence 0.95"]
+    Mode -->|否| LLM["LLM 判断 15 意图"]
+    LLM -->|低置信/异常| Rule["规则兜底<br/>正则检测器"]
+    LLM -->|高置信| Use["使用意图"]
+    Rule --> Use
+    Direct --> Use
+    Use --> Route["路由到处理链"]

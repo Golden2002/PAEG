@@ -1,0 +1,9 @@
+flowchart TD
+    P["LearnerProfile 17 维"] --> L1["L1 核心 5 维<br/>identity/cognitive_style/mastery/study_goal/emotion"]
+    P --> L2["L2 触发 5 维<br/>engagement/motivation/belief/intention/error_response"]
+    P --> L3["L3 懒加载 6 维<br/>world_view/learning_rhythm/time/collaboration/media/accessibility"]
+    P --> D["第 17 维<br/>动态扩展 add_dimension"]
+    L1 -->|始终注入| SYS["system prompt"]
+    L2 -->|条件注入| SYS
+    L3 -->|按需注入| SYS
+    Ind["Individuality 增量建模"] -->|对话后 LLM 提取| P

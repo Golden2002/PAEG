@@ -1,0 +1,16 @@
+%%{init: {'theme': 'dark'}}%%
+sequenceDiagram
+    participant S as server
+    participant P as PeriodicUpdater
+    participant E as SelfEvolver
+    participant I as SelfImprover
+    S->>P: 启动后台线程
+    P->>P: 立即跑一次（消化积压）
+    loop 每 24h 检查
+        P->>E: weekly_insight_update
+        E-->>P: 洞察+Library 防护
+        P->>P: batch_update（清过期快照）
+        P->>I: analyze_failures
+        I-->>P: improvements.md
+    end
+    P-->>S: 下次教学自动加载改进
