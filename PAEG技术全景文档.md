@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.73 关键节点（2026-08-16）：架构精细拆分（server.py 2601 行/31 路由/12 蓝图）+ RAG 检索增强（BM25Okapi/多路召回）+ 自我进化优化（Schema+CoT/失败案例/去重）+ dsh Harness 30 项落地 27/30（Seam/Registry/Provider/Persona 外置/Patch 系统/三角色契约层/Preset 体系/条件启停/Constitutional 补丁化/Self-Update via Patch）+ 前端 SVG 化+ 薇依人格大幅提升（文选 9 大哲学基石）
+> **版本**：v0.73 关键节点（2026-08-16）：Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）；架构精细拆分（server.py 2601 行/31 路由/12 蓝图）+ RAG 检索增强（BM25Okapi/多路召回）+ 自我进化优化（Schema+CoT/失败案例/去重）+ dsh Harness 30 项落地 27/30（Seam/Registry/Provider/Persona 外置/Patch 系统/三角色契约层/Preset 体系/条件启停/Constitutional 补丁化/Self-Update via Patch）+ 前端 SVG 化+ 薇依人格大幅提升（文选 9 大哲学基石）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -5288,42 +5288,107 @@ Step 5 QA：结构/音频/字幕/转帧
 
 
 
-## 10.11 Docker 化部署（v0.67 ⭐ 2026-08-13）
+## 10.11 ⭐ Docker 容器化技术（v0.67 → v0.73 · 与 Flask 同级的基础设施技术）
 
-**方案**：单容器最小可行版——Python 3.12 统一环境（用户方案：manim 0.19 兼容 3.12，无需隔离 venv）。
+> Docker 是本项目的标准部署技术：单容器承载 Flask 后端 + 前端静态资源 + manim/ffmpeg 等系统依赖。
+> 本节按"镜像如何构建 → 端口如何约定 → 如何健康检查 → 如何持久化 → 如何发布到魔搭创空间 → 如何排障"
+> 组织，是维护者必须掌握的基础设施知识。
 
-### 10.11.1 文件清单
+### 10.11.1 镜像构建原理（Dockerfile 逐层解析）
 
-| 文件 | 职责 |
-|------|------|
-| Dockerfile | python:3.12-slim + ffmpeg + pip manim 0.19 + 主依赖 + 源码 |
-| docker-compose.yml | 单服务 + 数据卷（users_data/downloads/Library）+ 环境变量 |
-| .dockerignore | 排除 manim_env/venv/数据/密钥（减体积） |
-| .env.example | 环境变量示例（DeepSeek key/语音/安全） |
-
-### 10.11.2 关键决策
-
-- **Python 3.12-slim**：manim 0.19 兼容最稳（moderngl 编译需 build-essential）
-- **manim pip 直接装**：放弃隔离 venv（容器内统一环境更简）
-- **manim_service 容器兼容**：检测 manim_env 不存在 → `shutil.which('manim')` 用系统命令
-- **数据卷持久化**：users_data/downloads/Library 挂载主机路径
-- **系统 ffmpeg**：apt 装（manim + 音视频通用）
-
-### 10.11.3 使用
-
-```bash
-cp .env.example .env   # 填 DEEPSEEK_API_KEY
-docker compose up -d --build
-# http://localhost:5000
+```
+FROM python:3.12-slim            # 基础镜像：3.12 与 manim 0.19 兼容性最优
+RUN apt-get install ffmpeg libcairo2-dev libpango1.0-dev ...  # 系统依赖层（manim 渲染必需）
+COPY requirements.txt .          # 只复制依赖清单（利用缓存层优化：依赖不变则不重装）
+RUN pip install -r requirements.txt + manim==0.19.0            # Python 依赖层
+COPY . .                         # 复制全部源码（server.py + 前端 + Library）
+VOLUME [users_data, downloads, Library]   # 数据卷声明（运行时挂载）
+ENV PORT=7860                    # v0.73：魔搭固定公网端口
+EXPOSE 7860                      # 声明容器监听端口（EXPOSE 仅文档性，真正映射靠 -p）
+HEALTHCHECK CMD python -c "urllib.request.urlopen('http://localhost:${PORT}/api/health')"
+WORKDIR /app/05_实现原型          # 入口工作目录
+CMD ["python", "server.py"]      # 容器主进程（PID 1）
 ```
 
-### 10.11.4 边界与坑
+**关键设计决策**：
+1. **单容器**（非多容器编排）：Flask + 前端 + manim 全在一镜像——部署简化优先；用户方案放弃 manim 隔离 venv 换统一 3.12。
+2. **分层缓存**：依赖 COPY 在源码 COPY 之前——源码改动不触发依赖重装（构建提速数倍）。
+3. **HEALTHCHECK 指向真实端点**：`/api/health`（server.py L379 实现，返回 agent_engine_ready/db_ok/kb_stats）——Docker 判定容器健康状态，魔搭平台依赖它判断"部署完成"。
 
-- whisper 模型首次下载 ~150MB（环境变量 WHISPER_MODEL）
-- manim LaTeX 渲染需 texlive（MVP 省略，报错时再装）
-- Windows 中文文件名挂载 → Docker Desktop File Sharing 或命名卷
-- MCP 三 server 跑同容器（fastmcp 进程内），完整版可拆
+### 10.11.2 端口约定（本地 vs 魔搭）
 
+| 环境 | 端口 | 机制 |
+|------|------|------|
+| 本地 docker-compose | 5000 | compose `environment: PORT=5000` 显式覆盖 |
+| 魔搭创空间（ModelScope）| **7860（强制）** | 平台注入 PORT=7860；ms_deploy.json 声明 port=7860 |
+| 裸跑 server.py | 5000（默认）| config.py `APP_PORT = os.environ.get("PORT", 5000)` |
+
+**魔搭端口规则（关键）**：魔搭创空间 Docker 类型**强制要求服务监听 7860**（平台把 7860 暴露给公网做反向代理）。服务监听其他端口 → 平台在 7860 探测不到 → 一直"部署中"。
+**本项目端口适配**：config.py 的 `APP_PORT` 读 `PORT` 环境变量 → 同一份代码无需修改即可双环境运行（本地 5000 / 魔搭 7860）。
+
+### 10.11.3 部署配置 ms_deploy.json（魔搭专用）
+
+```json
+{
+  "$schema": "https://modelscope.cn/api/v1/studios/deploy_schema.json",
+  "sdk_type": "docker",
+  "resource_configuration": "platform/2v-cpu-16g-mem",
+  "port": 7860
+}
+```
+
+- `sdk_type: "docker"`：声明 Docker 部署（缺省会被当 gradio/static 处理 → 构建失败）
+- `port: 7860`：必须与容器内服务监听端口一致
+- `resource_configuration`：CPU 资源规格（本项目 2v-cpu-16g-mem 足够，无需 GPU）
+- **注意**：docker 类型的环境变量**不在 ms_deploy.json 配置**（仅 gradio/streamlit 支持）——需在魔搭空间界面"设置→环境变量"手动配置 DEEPSEEK_API_KEY 等
+
+### 10.11.4 数据持久化
+
+```
+# Dockerfile 声明的数据卷
+VOLUME ["/app/05_实现原型/users_data", "/app/05_实现原型/downloads", "/app/Library"]
+
+# docker-compose 主机映射
+- ./05_实现原型/users_data:/app/05_实现原型/users_data   # 用户画像/学习数据
+- ./05_实现原型/downloads:/app/05_实现原型/downloads     # 生成的讲义/PPT
+- ./Library:/app/Library                                 # 知识库（可挂载外部更新）
+```
+
+**注意**：魔搭创空间**不保留容器重启后的数据**（无持久卷）——users_data 等运行时数据在魔搭每次部署重建会重置。生产数据需外部存储（如 ModelScope 数据集挂载/对象存储）。
+
+### 10.11.5 使用方式
+
+```bash
+# 本地开发（5000）
+cp .env.example .env   # 填 DEEPSEEK_API_KEY
+docker compose up -d --build
+# → http://localhost:5000
+
+# 魔搭发布（7860）
+# 1. 推送代码到创空间 Git（master 分支）：
+#    git push modelscope master
+# 2. 平台自动识别 ms_deploy.json（docker + 7860）→ 构建镜像 → 部署
+# 3. 在创空间"设置→环境变量"配置 DEEPSEEK_API_KEY
+# 4. 等待构建完成后访问创空间网页
+```
+
+### 10.11.6 排障手册（本次实战沉淀）
+
+| 现象 | 根因 | 修复 |
+|------|------|------|
+| 魔搭一直"部署中"不显示网页 | 服务监听端口 ≠ 7860（平台探测不到）| 确认 ms_deploy.json port=7860 + 容器内 PORT=7860 |
+| 构建失败 | 缺 ms_deploy.json 或 sdk_type 错误（平台按 gradio 处理）| 补 ms_deploy.json `"sdk_type":"docker"` |
+| 健康检查失败 | HEALTHCHECK 指向不存在的端点 | 指向真实端点 `/api/health`（已验证存在）|
+| 前端能开但 API 401/403 | 环境变量缺失（docker 类型不在 json 配 env）| 创空间界面手动配 DEEPSEEK_API_KEY 等 |
+| 容器启动慢 | 首次 whisper 模型下载 ~150MB | 预下载或调大平台启动超时；WHISPER_MODEL 选 small |
+| manim LaTeX 渲染失败 | 容器无 texlive | MVP 省略；需要时装 texlive（镜像变大）|
+| 重启后数据丢失 | 魔搭无持久卷 | 外部存储（数据集挂载/对象存储）|
+
+### 10.11.7 Docker 与本地开发的一致性保障
+
+- **行为一致性**：容器内 `WORKDIR /app/05_实现原型` + `GUI_DIR = PROJECT_DIR.parent / "09_GUI前端"`（config.py L28）——路径解析在容器内外一致（COPY . . 保持相对结构）。
+- **本地模拟魔搭**：`PORT=7860 python server.py` 可完整模拟魔搭端口环境（验证脚本：health 200 + 前端 200 + 静态资源 200）。
+- **验证三件套**：每次改 Dockerfile 后跑 `docker compose up -d --build` + `curl localhost:5000/api/health` + Playwright 前端冒烟。
 
 
 ## 10.12 双远程仓库同步（GitHub + ModelScope）（v0.67 ⭐ 2026-08-13）
