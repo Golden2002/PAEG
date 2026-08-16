@@ -1,0 +1,8 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart LR
+    subgraph ASM["system 装配"]
+        B["WEIL_CORE"]; T2["TRUTH_GROUNDING"]; SS["SUBJECT_STYLES"]; LG["LANGUAGE_STYLE"]
+    end
+    ASM --> Sys["system prompt"] --> LLM2["LLM 调用 重试+超时"]
+    LLM2 --> St["60字分片"] --> Y["SSE yield"]
+    Y -.->|需工具| MC["mcp__ 工具"] --> LLM2

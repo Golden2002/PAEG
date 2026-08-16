@@ -1,0 +1,14 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart TD
+    Teach["教学完成"] --> Hist["对话历史抓取 G1"]
+    Hist --> Dist["知识蒸馏<br/>LLM 提炼"]
+    Dist --> Gate["QualityGate L1-L3<br/>事实评分"]
+    Gate -->|pass| Evolved["evolved_*.json"]
+    Evolved --> Hot["热加载 G3"]
+    Hot --> KB[("知识库可检索")]
+    Teach --> Refl["教学反思"]
+    Refl --> Patch["subject_patches G5"]
+    Patch --> TM["教学记忆注入"]
+    Tool["工具调用"] --> Lesson["工具经验 G4/G6"]
+    Lesson --> TL["tool_lessons.md"]
+    TL --> Next["下次教学注入"]

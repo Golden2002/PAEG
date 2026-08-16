@@ -1,0 +1,11 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart LR
+    App["server.py/subagents"] -->|get_all_tool_defs| Hub["config_hub"]
+    Hub --> MCP["MCP 14 工具"]
+    Hub --> SK["Skills 11"]
+    Hub --> HK["hooks 7 事件"]
+    Hub --> WF["Workflows DAG"]
+    MCP -->|mcp__ 前缀| Exec["execute_tool 统一路由"]
+    SK -->|load_skill__| Exec
+    WF -->|run_workflow__| Exec
+    Exec -->|spill 防护| Out["LLM 工具结果"]

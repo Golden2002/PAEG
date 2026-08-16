@@ -1,0 +1,15 @@
+%%{init: {'theme': 'dark'}}%%
+sequenceDiagram
+    participant S as 学生
+    participant T as teach_stream
+    participant P as Presenter
+    participant E as Evaluator
+    S->>T: 提问
+    T->>P: 讲解步骤
+    P-->>S: SSE 流式讲解
+    T-->>S: event: checkpoint(听懂了吗)
+    S->>T: 回答(strict_checkpoint 挂起后)
+    T->>E: _student_signal 评估
+    E-->>T: understood/partial/confused
+    T->>P: 续讲(_pending_steps + remediation)
+    P-->>S: 继续流式讲解
