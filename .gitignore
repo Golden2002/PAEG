@@ -44,3 +44,10 @@ Library/usr_knowledge/
 05_实现原型/evolve_data/ralph_tasks.json
 05_实现原型/evolve_data/ralph_state/
 05_实现原型/evolve_data/ralph_log.jsonl
+
+# v0.73: 运行时测试产物/PDF 生成调试产物（非项目完整性必要）
+05_实现原型/evolve_data/material_pipeline/
+05_实现原型/evolve_data/vis_test_*.json
+交付物/技术说明/pdf_assets/
+交付物/文档模板/_dbg_*.html
+交付物/文档模板/_mermaid_*.png
