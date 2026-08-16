@@ -1,6 +1,6 @@
 # PAEG 教育者智能体 — 技术全景文档
 
-> **版本**：v0.72+ 关键节点（2026-08-16）· 架构组合根化（server.py 2601 行/31 路由/12 蓝图）+ RAG 检索增强（真 BM25Okapi/多路召回）+ 自我进化深化（Schema+CoT/失败案例/去重）+ dsh Harness 借鉴落地（H-1 会话日志/PTC-5 策略/LLM Seam）
+> **版本**：v0.73 关键节点（2026-08-16）：架构精细拆分（server.py 2601 行/31 路由/12 蓝图）+ RAG 检索增强（BM25Okapi/多路召回）+ 自我进化优化（Schema+CoT/失败案例/去重）+ dsh Harness 30 项落地 27/30（Seam/Registry/Provider/Persona 外置/Patch 系统/三角色契约层/Preset 体系/条件启停/Constitutional 补丁化/Self-Update via Patch）+ 前端 SVG 化+ 薇依人格大幅提升（文选 9 大哲学基石）
 > **适用对象**：项目维护者（你本人）
 > **目的**：让你从零到一掌握 PAEG 的每个环节——大模型、智能体架构、后端、前端、网络部署、日常维护与升级。读完本文档，你能独立理解、排查、升级这套系统。
 > **项目位置**：`D:\桌面\智能体架构与开发（含大模型）\14_教育者Agent项目\`
@@ -4391,6 +4391,28 @@ PPT 大纲 ≥ 3 章节且围绕提问。**"能用就行"不算完成，质量�
   - 修复既有潜伏 bug：模块级缺 `import time` → teach_stream hooks `time.time()` NameError 被吞（H-14 hooks 从未真实触发），修复 + SURFACE 验证
   - 验证：56 路由 + audit 40/40 + 34 测试全绿 + SSE diagnosis 事件可达
 - ✅ **#12 LLM Provider Seam（2026-08-16）**：llm_adapter.py 重写——PROVIDER_REGISTRY 注册表（deepseek/openai/anthropic/mock 可插拔）+ `register_provider()` + `PAEG_LLM_PROVIDER` env 驱动 + `provider_info()` 可观测（暴露实际 provider/model）；auto 模式自动发现降级 mock；7 测试 + 真实调用 0.7s + audit 40/40
+- ✅ **#3 Persona 外置（2026-08-16）**：薇依人格自 WEIL_CORE 硬编码 → `paeg_personas/weil.yml`（可编辑可替换），`prompts._load_persona()` 加载，`WEIL_CORE` 符号保留兼容；修复 os.path.join/isfile bug；6 测试 + audit 40/40
+- ✅ **#1 Subagent Patch 系统（2026-08-16）**：`services/subagent_loader.py`——9 subagent 装扮（persona/prompt_override/enabled）配置可 patch 不写死；`get_subagent_patch`/`apply_subagent_patch`/`register_subagent_patch`/`load_yaml_patch`；与 config/agents.json 互补
+- ✅ **#21 Subagent Registry Provider 可插拔（2026-08-16）**：`infra/subagent_registry.py` 三类 provider（builtin/file/dynamic）+ get/register/list/reload；7 测试
+- ✅ **#13 Shell/Subprocess Seam（2026-08-16）**：`services/subprocess_service.py`——subprocess 调用统一出口（run/capture/timeout）
+- ✅ **#11 三角色契约层（2026-08-16）**：`services/agent_trirole.py`——教学/答题/陪伴三角色契约（RoleContract/TRIPLE_ROLE_CONTRACTS）
+- ✅ **#8 PresetService（2026-08-16）**：`services/preset_service.py`——preset 加载/注册/列出（学习计划/讲义等预设）
+- ✅ **#19 Permission 事件入 Session Log（2026-08-16）**：tool_registry permission 检查结果写入 session log
+- ✅ **#9 Per-Agent Scope（2026-08-16）**：`services/agent_scope.py`——per-subagent 作用域隔离
+- ✅ **#5 用户家目录 overlay（2026-08-16）**：config_loader DEFAULT_OVERLAY_PATH + load_yaml_overlay——配置分层覆盖
+- ✅ **#14 Tool Registry 能力协商（2026-08-16）**：tool_registry get_tool_metadata/full_def/revision/list_changed_since
+- ✅ **#20 Custom 衍生状态（2026-08-16）**：tool_registry custom 工具衍生状态支持
+- ✅ **#30 Cordis 式 Service Registry（2026-08-16）**：`services/service_registry.py`——服务注册/发现（get_service/register_service）
+- ✅ **#22 Subagent Report/Continuable 协议（2026-08-16）**：`services/subagent_report.py`——结构化 report + continuation
+- ✅ **#17 Subprocess 抽象（2026-08-16）**：`services/subprocess_spawn.py`——spawn 抽象层
+- ✅ **#10 Preset 文件结构标准化（2026-08-16）**：`services/preset_structure.py`——preset 文件 schema 校验
+- ✅ **#6 OS 平台双轨（2026-08-16）**：`services/platform_dual_track.py`——win32/posix 双轨命令模板 + 平台感知配置
+- ✅ **#23 Fresh-Agent Loop 对照验证（2026-08-16）**：RALPH 循环已具备 dsh tool-ralph 语义（fresh child/共享进度/结构化 handoff），4 测试锁定
+- ✅ **#28 Constitutional AI 补丁化（2026-08-16）**：`services/quality_gate_config.py`——门禁阈值/最小长度/宪法条款配置化（不改代码调门禁）
+- ✅ **#27 Self-Update via Patch（2026-08-16）**：subagent_loader `save_yaml_patch`/`read_yaml_patch`/`list_yaml_patches`——AI 读/写自身 preset
+- ✅ **#4 !!js 条件启停（2026-08-16，安全子集）**：`services/condition_eval.py`——ast 白名单受限求值器（布尔/比较/platform()/env()/module()），任意代码拒绝
+- ✅ **#2/#15/#16/#18/#29（此前版本已落地）**：permission presets / hooks 瀑布 / H-14 事件 / registry provider / MCP 可移植性
+- 📋 Phase 4：`agents/` 重新导出（subagent 类已在 subagents.py）；Harness 剩余 3 项（#11 具体三角色化/#24-26 UI 模式化）按需确认
 - 📋 Phase 4：`agents/` 重新导出（subagent 类已在 subagents.py）
 
 
