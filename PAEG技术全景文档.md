@@ -5644,6 +5644,72 @@ hooks_hub.repeat_guard_check 升级为 **chain-key 精确计数**：
 **验证**：16 项新测试全过 + 回归 47/47 + 真实验证（模块导入/双开关/custom 派生/guard 拦截重置/envelope 构造）。
 
 
+
+## 10.20 ⭐ 本次大更新架构章节（v0.73 · 2026-08-16 · Harness 30 项 27/30 + T1-T4）
+
+> 读者：工程师（维护/扩展此代码库的人）。本节按"接线关系"组织——新模块放哪里、依赖谁、如何替换。
+
+### 10.20.1 新模块接线总图（services/ + infra/ + config/）
+
+```
+blueprints/ (12 蓝图 · 31 路由)          ← HTTP 层（只调 services/infra，不反向 import server）
+   │
+   ├─► services/session_helpers.py      会话工具（_append_chat_hist/_set_constraint_flags/_norm_trait_scalar）
+   ├─► services/file_operation.py       用户文件 4 能力统一入口（_try_file_operation）
+   ├─► services/teach_strategy.py       PTC-5 教学循环可替换（TeachStrategy/STRATEGY_REGISTRY）
+   ├─► services/retrieval/knowledge_retriever.py  KnowledgeRetriever 多路召回（BM25+Tag RRF+semantic 钩子）
+   ├─► services/rag_config.py           config/rag.json 加载（深合并 + 异常兜底）
+   ├─► services/llm_seam → llm_adapter.py  LLM Provider 注册表（deepseek/openai/anthropic/mock）
+   │
+   ├─► infra/runtime.py (12+ 懒加载单例 getter)  ──► infra/session_log.py (H-1 事件日志)
+   │       └─► infra/subagent_registry.py (三类 provider: builtin/file/dynamic)
+   │
+   └─► config_hub.py (ConfigHub 统一出口) ──► services/service_registry.py (#30 Cordis 式服务注册/发现)
+```
+
+### 10.20.2 Harness 30 项落地模块清单（27/30，按 Seam/Registry/Provider 三类）
+
+| 类别 | 模块 | 用途 | 关键 API |
+|---|---|---|---|
+| Seam（替换缝）| `llm_adapter.py` #12 | LLM Provider 可插拔 | PROVIDER_REGISTRY/register_provider/PAEG_LLM_PROVIDER |
+| | `services/subprocess_service.py` #13 | 子进程统一出口 | run/capture/timeout |
+| | `services/subprocess_spawn.py` #17 | spawn 抽象层 | spawn |
+| | `services/teach_strategy.py` PTC-5 | 教学循环可替换 | STRATEGY_REGISTRY |
+| Registry（注册表）| `services/subagent_loader.py` #1/#27 | subagent 装扮 patch + AI 读写 | get/apply/register/save/read/list_yaml_patch |
+| | `infra/subagent_registry.py` #21 | subagent 注册三类 provider | get/register/list/reload |
+| | `services/service_registry.py` #30 | 服务注册/发现（Cordis 式）| get_service/register_service |
+| | `services/preset_service.py` #8 | 预设加载/注册 | load/register/list |
+| | `services/preset_structure.py` #10 | preset 文件 schema 校验 | validate |
+| Provider（实现提供）| `services/agent_scope.py` #9 | per-subagent 作用域 | get_scope |
+| | `services/agent_trirole.py` #11 | 三角色契约层（契约先行）| RoleContract/TRIPLE_ROLE_CONTRACTS |
+| | `services/quality_gate_config.py` #28 | 门禁配置化（Constitutional 补丁化）| get_gate_config/apply_to_gate |
+| | `services/condition_eval.py` #4 | !!js 条件启停（ast 白名单安全子集）| evaluate_condition |
+| | `services/platform_dual_track.py` #6 | OS 平台双轨（win32/posix）| get_platform/get_command_template |
+| | `services/subagent_report.py` #22 | subagent 结构化 report/continuation | build_report |
+| 基础设施 | `infra/session_log.py` H-1 | 会话事件日志 | append/derive_messages |
+| | `tool_registry.py` #14/#19/#20 | 工具能力协商/权限事件/custom 状态 | get_tool_metadata/full_def/revision |
+
+### 10.20.3 关键架构决策（本次更新定案）
+
+1. **teach_stream（SSE 1222 行）保留 server.py**：Oracle 判断核心链路不贸然拆；chat/teaching 蓝图已迁，SSE 闭包留在组合根。
+2. **#4 条件启停不引入 JS 引擎**：quickjs 重依赖 + AI 已可写 patch（#27）→ JS 求值 = 任意代码执行风险。ast 白名单求值器（仅布尔/比较/platform()/env()/module()），import/属性链/下标/任意调用全拒 → False。
+3. **Persona 外置**：`prompts.WEIL_CORE = _load_persona("weil")` 从 `paeg_personas/weil.yml` body 段加载；`WEIL_CORE` 符号保留兼容既有 import。
+4. **ratchet 铁律**：无配置/无 patch 时行为字节级不变——每个 Seam/Registry 都带"缺省回退内置"语义（quality_gate_config 缺省 12/4/4，subagent_loader 缺省 weil persona）。
+
+### 10.20.4 前端 SVG 化规范（T1）
+
+- 图标一律 `09_GUI前端/assets/icons/` 下 SVG（lucide-static v1.28.0 - ISC：stroke=currentColor / viewBox 0 0 24 24 / stroke-width 2 / fill none）
+- 按钮内 `<img class="link-icon" src="assets/icons/xxx.svg" alt="..." style="width:13px;height:13px;vertical-align:middle"/>`
+- 禁止按钮文本 emoji；注释/JS 正则过滤符（如 L4680 🔊）除外
+
+### 10.20.5 人格设定数据源与提升记录（T2/T3）
+
+- 一手数据源：`Library/Simone Weil/`（9 文件 ≈224MB）——本次精读《西蒙娜·薇依文选》docx（7 篇核心文章）
+- 排除项：`神贫的人是有福的`（Edith Stein 作品）、`志村五郎—我所知的安德烈·薇依`（数学家兄长，姓氏撞车）
+- 扫描版 PDF（重负与神恩/科学与我们/超自然认识/斯坦福百科/评传）无文本层，OCR 工具缺失——列为后续波次
+- 人格输出：`paeg_personas/weil.yml`（79→190 行，9 大哲学基石：注意力/重力恩典/阅读读法/超脱/必然性顺从/不幸同情/友爱/沉默等待/善恶真实面目）
+- 名字解释：Émile=卢梭《爱弥儿》(1762) + Novis=拉丁语 novus(新) + 薇依化名（1942.7《经济与人文主义》/1944.1《南方手册》）
+
 ## 10.19 subagent 生命周期事件 + 多级 skill 目录（v1.1.4 §3.38 ⭐ 2026-08-15）
 
 ### 10.19.1 多级 skill 目录（#29，借鉴 deepseek-harness skill-filesystem）
