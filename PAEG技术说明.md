@@ -217,7 +217,7 @@ flowchart TB
 
 **图 2B · Blueprints 分层架构（Phase 3 · 12 蓝图）**
 
-```
+```mermaid
 flowchart TB
     subgraph 入口层
         server["server.py 组合根<br/>app 装配 + 蓝图注册 + 启动"]
@@ -693,22 +693,34 @@ sequenceDiagram
 
 **图 26 · 教学物料流水线 material_pipeline**
 
+```mermaid
+flowchart LR
+    IN["主题输入"] --> DAG["teach_materials<br/>DAG 编排"]
+    DAG --> P1["导图 + 讲义"]
+    DAG --> P2["讲稿 + PPT"]
+    DAG --> P3["视频脚本 + manim"]
+    P1 --> GATE{"门控 self-check<br/>≤2 轮重生成"}
+    P2 --> GATE
+    P3 --> GATE
+    GATE -->|通过| OUT["联动下载包<br/>6 类物料"]
+    GATE -->|失败| REGEN["重生成"]
+    REGEN --> GATE
 ```
 
 **图 27 · Docker 打包 + 双远程部署（§7.4/§7.5）**
 
-```
+```mermaid
 flowchart LR
-    subgraph 本地开发
+    subgraph "本地开发"
         dev["本地 :5000<br/>python server.py"]
         docker["Docker Compose<br/>docker compose up"]
     end
-    subgraph 依赖打包（纪律 33）
+    subgraph "依赖打包(纪律33)"
         pip["requirements.txt<br/>onnxruntime/rapidocr/whisper"]
         sys["Dockerfile apt<br/>ffmpeg/libcairo"]
         model["模型文件<br/>bge ONNX / whisper"]
     end
-    subgraph 双远程同步（纪律 34）
+    subgraph "双远程同步(纪律34)"
         gh["GitHub<br/>sync_check.py --fix"]
         ms["ModelScope<br/>git push modelscope master"]
         deploy["魔搭创空间<br/>ms_deploy.json :7860"]
