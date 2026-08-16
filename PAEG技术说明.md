@@ -694,15 +694,16 @@ sequenceDiagram
 **图 26 · 教学物料流水线 material_pipeline
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
-    IN["主题输入"] --> DAG["teach_materials DAG 编排"]
+    IN["主题输入"] --> DAG["teach_materials<br/>DAG 编排"]
     DAG --> P1["导图 + 讲义"]
     DAG --> P2["讲稿 + PPT"]
     DAG --> P3["视频脚本 + manim"]
-    P1 --> GATE{"门控 self-check 不超过2轮"}
+    P1 --> GATE{"门控 self-check<br/>≤2 轮重生成"}
     P2 --> GATE
     P3 --> GATE
-    GATE -->|通过| OUT["联动下载包 6 类物料"]
+    GATE -->|通过| OUT["联动下载包<br/>6 类物料"]
     GATE -->|失败| REGEN["重生成"]
     REGEN --> GATE
 ```
@@ -734,21 +735,6 @@ flowchart LR
     docker --> ms
     ms --> deploy
     deploy --> user["公网用户"]
-```
-
-mermaid
-%%{init: {'theme': 'dark'}}%%
-flowchart LR
-    IN["主题输入"] --> DAG["teach_materials<br/>DAG 编排"]
-    DAG --> P1["导图 + 讲义"]
-    DAG --> P2["讲稿 + PPT"]
-    DAG --> P3["视频脚本 + manim"]
-    P1 --> GATE{"门控 self-check<br>不超过2轮重生成"}
-    P2 --> GATE
-    P3 --> GATE
-    GATE -->|通过| OUT["联动下载包<br/>6 类物料"]
-    GATE -->|失败| REGEN["重生成"]
-    REGEN --> GATE
 ```
 
 

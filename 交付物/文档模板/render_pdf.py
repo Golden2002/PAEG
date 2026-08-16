@@ -37,7 +37,10 @@ DEFAULT_META = '''
 
 
 def _mermaid_sub(m):
-    """Mermaid 块 → <pre class="mermaid">（保留给浏览器端 mermaid.js 渲染 SVG）"""
+    """Mermaid 块 → <pre class="mermaid">（保留给浏览器端 mermaid.js 渲染 SVG）
+    v1.1.9 ⭐ 泄漏根因修复：此前"图26 泄漏"实为文档混入的幽灵块（缺 ```mermaid 前缀的
+    残留副本，build_html 正则匹配不到 → 纯文本进 HTML → print 原样输出）。
+    幽灵块已从 md 删除，恢复纯 SVG 直出（28 图全 SVG）。"""
     return '<pre class="mermaid">' + m.group(1) + '</pre>'
 
 
