@@ -1680,7 +1680,7 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 | # | 能力 | 优先级 | 依赖 | 状态 |
 |---|---|---|---|---|
 | C1 | 间隔重复 SRS（SM-2 算法）| P2 | 纯算法（50 行）| ✅ 完成 |
-| C2 | 学科知识图谱（networkx+JSON）| P1 | networkx（可纯 Python 替代）| ⬜ 待实施 |
+| C2 | 学科知识图谱（networkx+JSON）| P1 | networkx（可纯 Python 替代）| ✅ 完成 |
 | C3 | 语义检索（bge-small-zh ONNX）| P0 | onnxruntime（已可用）+ 模型 | ⬜ 待实施 |
 | C4 | OCR 工具（rapidocr-onnxruntime）| P1 | rapidocr-onnxruntime（需安装）| ⬜ 待实施 |
 | C5 | 后端 Whisper STT（pywhispercpp）| P0 | pywhispercpp（需安装）| ⬜ 待实施 |
@@ -1711,3 +1711,12 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - SURFACE：连续答对 1→6→17→49→147 天（EF 2.5→3.0）；答错 interval=0 repetition=0 EF 下调
 - 引用标注：借鉴 Anki SM-2（SuperMemo-2 改良），文件头已标注来源
 - ratchet：纯新增，零依赖，不影响现有 56 种能力
+
+#### 3.54.2 C2 学科知识图谱完成（2026-08-16）
+
+- 实现：`services/concept_graph.py`——纯 Python 零依赖（networkx 不可用，DAG 关系用边列表实现）
+- 数据：内置 19 概念种子（数学链 函数→极限→导数→积分→微分方程；代数/几何/物理链）
+- API：prerequisites() / successors() / relations() / learning_path()（前驱回溯）
+- 测试：`tests/test_concept_graph.py` 5 项（前驱/后继/路径/未知容错/关系类型）
+- SURFACE：导数关系完整（前驱极限/后继积分微分方程/相关变化率）；积分路径 方程→函数→极限→导数→积分；物理链 力→牛顿定律→功→能量；未知节点容错
+- 引用标注：借鉴 networkx DAG 图论模型（零依赖实现）；可扩展 data/concept_graph.json
