@@ -6037,7 +6037,7 @@ blueprints/ (12 蓝图 · 31 路由)          ← HTTP 层（只调 services/inf
 - 人格输出：`paeg_personas/weil.yml`（79→190 行，9 大哲学基石：注意力/重力恩典/阅读读法/超脱/必然性顺从/不幸同情/友爱/沉默等待/善恶真实面目）
 - 名字解释：Émile=卢梭《爱弥儿》(1762) + Novis=拉丁语 novus(新) + 薇依化名（1942.7《经济与人文主义》/1944.1《南方手册》）
 
-### 10.20.6 能力全景（56 种可调用能力 · v1.1.6）
+### 10.20.6 能力全景（60 种可调用能力 · v1.1.8 · 含 C1-C6 能力增强）
 
 PAEG 的能力体系围绕"一切能力可替换、可增删、不改核心代码"组织：
 
@@ -6051,6 +6051,13 @@ PAEG 的能力体系围绕"一切能力可替换、可增删、不改核心代�
 
 > 早期"25 MCP 工具"为混合口径；v0.73 起精确分类为 22 内置 + 14 标准（能力不减反增）。
 > 扩展性：新增工具=改注册表 ✓ / 新增 Skill=丢 SKILL.md ✓ / 新增 MCP=改 JSON ✓ / 新增 subagent=需改代码 ⚠️
+
+
+> **C1-C6 能力增强（§3.54 · 2026-08-16）**：新增 4 服务模块 + 2 能力锁定——
+> services/srs_sm2.py（SM-2 间隔重复）/ services/concept_graph.py（学科前驱图）/
+> services/semantic_search.py（BM25Plus+BGE ONNX 渐进检索）/ services/ocr_service.py（RapidOCR）/
+> services/formula_ocr.py（pix2tex 接口预留）/ voice_service STT（faster-whisper 测试锁定）。
+> Docker 依赖（纪律 33）：onnxruntime + rapidocr-onnxruntime 已入 requirements.txt；torch/pix2tex 可选注释。
 
 ### 10.20.7 引用来源标注（合规 · 可审计）
 
