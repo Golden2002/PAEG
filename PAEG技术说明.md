@@ -5,6 +5,27 @@
 
 ---
 
+---
+
+## 目录
+
+- 第 0 章 TL;DR（快速概览）
+- 第 1 章 项目概览
+- 第 2 章 能力全景（F1-F7，每功能含技术路线+实现方法）
+- 第 3 章 系统架构（六层）
+- 第 4 章 关键流程
+- 第 5 章 扩展指南
+- 第 5A 章 可扩展模块（框架化 · v0.70 ⭐）
+- 第 5B 章 DeepSeek Harness 借鉴蓝图（2026-08-14 调研 · 30 项中 27 项已落地）
+- 第 6 章 未来规划（Roadmap · Oracle 咨询 2026-08-14）
+- 第 7 章 能力全景与引用来源（v1.1.8）
+- 附录 A 术语表
+- 附录 B 核心文件索引
+- 附录 C 技术创新亮点（v0.70 ⭐）
+- 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
+
+---
+
 ## 第 0 章 TL;DR（快速概览）
 
 **PAEG 是什么**：一个**多 Agent 架构的学科教学智能体**——不是"给 LLM 套聊天框"，而是让 LLM 扮演"有教学法、有过程、有陪伴、能自我成长"的教师，完成诊断→计划→讲解→评估→调整→自我进化的完整教学闭环。
@@ -31,7 +52,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 定位 | 个性化自适应教育智能体（v0.73） |
+| 定位 | 个性化自适应教育智能体（v1.1.8） |
 | 入口 | Web UI（index.html）/ REST API（server.py）/ 微信桥 |
 | 技术栈 | Python 3.12 / Flask / SSE / MCP / FastMCP / SQLite / JSON 持久化 |
 | 核心模块 | meta_router（意图路由）/ paeg（教学编排）/ subagents（9 专家）/ prompts（提示词库）/ self_evolution（自我更新）/ config_hub（配置体系）/ ralph（循环器） |
@@ -172,7 +193,7 @@ flowchart LR
 | L1 用户入口 | 接收请求 | Web UI / REST API / 微信桥 | 收到提问，发起请求 |
 | L2 意图路由 | 识别意图 | meta_router（15 意图） | 判定 intent=teach |
 | L3 教学编排 | 流程控制 | paeg.teach / teach_stream（SSE） | 五阶段编排 + 流式输出 |
-| L4 Subagent | 领域执行 | 9 个领域专家 | 诊断/计划/讲解/评估协作 |
+| L4 Subagent | 领域执行 | 9 核心 subagent + ResourceLibrarian | 诊断/计划/讲解/评估协作 |
 | L5 能力组件 | 可复用能力 | 14 MCP / 11 Skills / Workflows | 按需调工具 |
 | L6 基础设施 | 底层支撑 | LLM 适配 / 知识库 / config_hub / 持久化 | 提供算力与数据 |
 | **L0 横切** | 质量保障 | TRUTH_GROUNDING / QualityGate / 语言规范 | **约束每一层** |
@@ -185,7 +206,7 @@ flowchart LR
 %%{init: {'theme': 'dark'}}%%
 flowchart TB
     UI["Web UI"] --> API["REST API"] --> R["meta_router 15意图"] --> T["paeg.teach / teach_stream"]
-    T --> S["9 个领域专家"]
+    T --> S["9 核心 subagent + ResourceLibrarian"]
     S --> M["14 MCP 工具"]
     S --> LL["LLM 适配"]
     T --> ST["持久化"]
@@ -561,7 +582,7 @@ flowchart TD
     OK --> EVT["权限事件 emit<br/>seq+profile+decision<br/>可回放审计"]
 ```
 
-**图 22 · 事件类型化（56 类型 + SessionEvent envelope）**
+**图 22 · 事件类型化（62 类型：13 CORE + 35 PLUGIN + 14 PAEG）**
 
 ```mermaid
 %%{init: {'theme': 'dark'}}%%
@@ -818,7 +839,7 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 3. 多 agent 不换框架（复用 RALPH）；知识图谱先轻量本体（JSON）确认需求再上 Neo4j
 
 
-## 第 7 章 能力全景与引用来源（v1.1.6）
+## 第 7 章 能力全景与引用来源（v1.1.8）
 
 ### 7.1 能力全景：56 种能力，一套路由
 
@@ -957,7 +978,7 @@ since:   <PAEG 版本号>
 |---|---|
 | server.py | Flask 入口（所有端点 + teach_stream SSE） |
 | paeg.py | 教学编排主链（teach() 五阶段） |
-| subagents.py | 9 个 subagent + Presenter + 能力清单 |
+| subagents.py | 9 核心 subagent + ResourceLibrarian + Presenter + 能力清单 |
 | prompts.py | 提示词库（WEIL_CORE/TRUTH_GROUNDING/SUBJECT_STYLES/build_*_system） |
 | meta_router.py | 15 意图路由 |
 | self_evolution.py | 自我更新（蒸馏/补丁/工具经验/老化） |
@@ -1047,14 +1068,14 @@ since:   <PAEG 版本号>
 
 ### C.7 运行可治理三件套（v1.1.2-1.1.3 §3.37/§3.38 ⭐）
 
-- **权限双开关（#18）**：sandbox + approval 命名组合——pply("exam") 一键锁写工具+禁审批；custom 派生防误判；意图事件可回放审计（services/permission.py）
+- **权限双开关（#18）**：sandbox + approval 命名组合——apply("exam") 一键锁写工具+禁审批；custom 派生防误判；意图事件可回放审计（services/permission.py）
 - **repeat-tool-guard（H-16）**：chain-key 精确计数（同工具不同参数不算重复）+ 多级阈值 [3,5,8] + 用户插话重置——防 AI 死循环（hooks_hub）
 - **事件类型化（H-1/H-12）**：56 个已知事件类型 + SessionEvent envelope（seq/time/data/surfaceOp）——拼错类型立即报错，surface 事件强制校验（infra/event_types.py）
 
 ### C.8 subagent 生命周期事件 + 多级 skill（v1.1.4 §3.38 ⭐）
 
-- **subagent/descriptor**：构造时 9 个 subagent 各一个；**tool-workflow/agent-start/end**：每个 .run() 前后成对（runId UUID 配对 + duration_ms），teach 直调与 workflow 路径双覆盖；hook/invoked/result 包裹钩子链——调试像看剧本
-- **多级 skill**：~/.paeg/skills.json（）+ {env:KEY|默认} 替换——用户级技能覆盖项目/全局
+- **subagent/descriptor**：构造时 9 核心 subagent + ResourceLibrarian 各一个；**tool-workflow/agent-start/end**：每个 .run() 前后成对（runId UUID 配对 + duration_ms），teach 直调与 workflow 路径双覆盖；hook/invoked/result 包裹钩子链——调试像看剧本
+- **多级 skill**：~/.paeg/skills.json（用户级）+ {env:KEY|默认} 替换——用户级技能覆盖项目/全局
 
 ## 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
 
