@@ -1599,3 +1599,26 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - G2 Playwright 真实浏览器端到端：页面加载（无 JS 报错）→ 聊天 → 点赞 SVG → 网络请求（/api/feedback 200）→ 截图留存。
 - G3 双远程推送（GitHub API + ModelScope git）至同一 commit；git status 代码文件零残留。
 - G4 交付：版本号 + 网页链接（本地 :5000 + 公网隧道）。
+
+## §3.50 魔搭创空间部署修复（2026-08-16 · Docker 一直"部署中"）
+
+**现象**：Docker 打包推送到魔搭社区（ModelScope Studio）后，总是处于"部署中"状态，不显示项目网页。
+
+**根因（调研确认，魔搭平台要求 vs 项目配置）**：
+| 项 | 魔搭要求 | 修复前 | 状态 |
+|---|---|---|---|
+| 服务端口 | Docker 类型**必须监听 7860**（平台固定暴露 7860 给公网）| 项目默认 5000 | ❌ 主因 |
+| 部署配置 | 需 `ms_deploy.json`（sdk_type=docker + port=7860）| 文件缺失 | ❌ 平台无法识别 Docker 部署 |
+| 健康检查 | 平台轮询 /service/status；容器 HEALTHCHECK 需可达端点 | Dockerfile 指向 /api/health（存在，L379）| ✅ 已确认有效 |
+
+**修复（三件套）**：
+1. **新建 `ms_deploy.json`**：`{"sdk_type":"docker","port":7860,"resource_configuration":"platform/2v-cpu-16g-mem"}`
+2. **Dockerfile**：`ENV PORT=7860` + `EXPOSE 7860`（config.py APP_PORT 读 PORT 环境变量已支持）
+3. **docker-compose.yml**：`PORT=5000` 显式覆盖（本地保持既有 5000 行为，魔搭平台自动注入 7860）
+
+**验证（本地模拟魔搭环境）**：
+- `PORT=7860 python server.py` → /api/health 200（agent_engine_ready/db_ok/kb_stats 全绿）
+- 前端 / → 200（231896 字节）；静态资源（paeg-logo/thumbs-up/volume-2 SVG）全部 200
+- 结论：修复后魔搭应能识别 Docker 类型、在 7860 探到服务、健康检查通过 → 部署完成
+
+**后续**：需在魔搭空间设置中配置 DEEPSEEK_API_KEY 等环境变量（docker 类型环境变量在 ms_deploy.json 不生效，需平台界面设置）；重新发布验证。
