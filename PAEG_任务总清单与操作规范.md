@@ -1668,3 +1668,46 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - 子编号同步：1.14.1/1.14.2 → 1.17.1/1.17.2；1.15.1-1.15.4 → 1.18.1-1.18.4
 - 验证：§1.x 全部编号唯一（1.1-1.18，无重复主编号）；无正文交叉引用受影响
 - §1.6 错层（H1→H2）已在前轮修复（11 处）
+
+## §3.54 能力增强 ULW 循环（2026-08-16 · Oracle 咨询 bg_e57b7aec 后固定化）
+
+> **纪律 30 执行**：本循环一切以需求文档为中心——先固定任务清单，再逐一实施，每项完成即更新状态。
+> **来源**：Oracle 咨询（bg_e57b7aec）基于能力全景表（22 内置 + 14 标准 MCP + 11 Skills + 6 MCP 服务器 + 3 Workflows = 56 种能力）评估的教育场景缺口。
+> **筛选铁律（三问）**：①真增强？（现有 56 种是否已覆盖）②轻依赖？（纯 Python/ONNX？<200MB？）③教育相关？（教学/检索/陪伴/评估/进化五轴缺口？）——任一为否即放弃。
+
+### 任务清单（6 项，按优先级）
+
+| # | 能力 | 优先级 | 依赖 | 状态 |
+|---|---|---|---|---|
+| C1 | 间隔重复 SRS（SM-2 算法）| P2 | 纯算法（50 行）| ✅ 完成 |
+| C2 | 学科知识图谱（networkx+JSON）| P1 | networkx（可纯 Python 替代）| ⬜ 待实施 |
+| C3 | 语义检索（bge-small-zh ONNX）| P0 | onnxruntime（已可用）+ 模型 | ⬜ 待实施 |
+| C4 | OCR 工具（rapidocr-onnxruntime）| P1 | rapidocr-onnxruntime（需安装）| ⬜ 待实施 |
+| C5 | 后端 Whisper STT（pywhispercpp）| P0 | pywhispercpp（需安装）| ⬜ 待实施 |
+| C6 | 手写公式识别（pix2tex）| P2 | torch（不可用，重依赖）| ⬜ 评估后定 |
+
+### 环境依赖现状（2026-08-16 核实）
+
+可用：onnxruntime v1.26 / sympy v1.14 / jieba / rank_bm25
+不可用（需安装或替代）：sentence-transformers / pywhispercpp / rapidocr-onnxruntime / networkx / torch
+
+### 实施纪律（本循环必须遵守）
+
+1. **TDD**：每项 RED（先写失败测试）→ GREEN（最小实现）→ SURFACE（真实调用验证）
+2. **以需求文档为中心**：每项完成即更新本表状态（⬜→✅）+ 在 §3.54.x 记录实施详情
+3. **文档同步**：代码落地后更新 技术说明（§7.2 增强候选状态）/ 技术全景 / 维护 / 元能力
+4. **ratchet**：新增能力不得破坏现有 56 种能力行为；懒加载，依赖缺失时优雅降级
+5. **双远程推送**：循环收口时 GitHub（sync_check）+ ModelScope（git push）双端同步
+6. **引用标注**：引入的任何外部库/模型按 §7.3 标准参考文献格式标注来源
+
+### 实施记录
+
+（每项完成后追加 §3.54.x）
+
+#### 3.54.1 C1 间隔重复 SRS 完成（2026-08-16）
+
+- 实现：`services/srs_sm2.py`——SM-2 纯函数式（Anki 标准公式）
+- 测试：`tests/test_srs_sm2.py` 5 项（首成 1 天/答错重置/指数增长/EF 下限 1.3/EF 公式精确）
+- SURFACE：连续答对 1→6→17→49→147 天（EF 2.5→3.0）；答错 interval=0 repetition=0 EF 下调
+- 引用标注：借鉴 Anki SM-2（SuperMemo-2 改良），文件头已标注来源
+- ratchet：纯新增，零依赖，不影响现有 56 种能力
