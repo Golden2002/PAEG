@@ -1682,7 +1682,7 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 | C1 | 间隔重复 SRS（SM-2 算法）| P2 | 纯算法（50 行）| ✅ 完成 |
 | C2 | 学科知识图谱（networkx+JSON）| P1 | networkx（可纯 Python 替代）| ✅ 完成 |
 | C3 | 语义检索（bge-small-zh ONNX）| P0 | onnxruntime（已可用）+ 模型 | ✅ 完成 |
-| C4 | OCR 工具（rapidocr-onnxruntime）| P1 | rapidocr-onnxruntime（需安装）| ⬜ 待实施 |
+| C4 | OCR 工具（rapidocr-onnxruntime）| P1 | rapidocr-onnxruntime（需安装）| ✅ 完成 |
 | C5 | 后端 Whisper STT（pywhispercpp）| P0 | pywhispercpp（需安装）| ⬜ 待实施 |
 | C6 | 手写公式识别（pix2tex）| P2 | torch（不可用，重依赖）| ⬜ 评估后定 |
 
@@ -1738,3 +1738,13 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
     - **模型文件**（ONNX/whisper 等）→ 必须加入 .dockerignore 白名单或 Dockerfile COPY，并注明下载方式
     - **重依赖**（如 torch）→ 默认不装，但必须在 requirements.txt 注释 + 需求文档记录"可选依赖"，避免 Docker 构建失败
     - 判定标准：**改完代码跑 `docker compose up -d --build` 必须成功**；无法本地验证时至少更新 requirements.txt
+
+#### 3.54.4 C4 OCR 工具完成（2026-08-16）
+
+- 实现：`services/ocr_service.py`——RapidOCR 封装（懒加载 + 依赖缺失降级）
+- 依赖：rapidocr-onnxruntime（已安装 + 已入 requirements.txt，Docker 打包包含——纪律 33）
+- API：is_ocr_available() / OCRService.extract_text(image_bytes)
+- 测试：`tests/test_ocr_service.py` 4 项（可用性/降级/非法输入/真实 OCR）
+- SURFACE：真实图片 OCR 成功（"He llo PAEG"）；None/空字节容错返回 ""
+- 引用标注：RapidOCR（https://github.com/RapidAI/RapidOCR，PaddleOCR ONNX 版）
+- 对接场景：学生拍照上传作业/笔记 → OCR 提取 → 知识库检索（后续接线）
