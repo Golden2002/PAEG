@@ -691,21 +691,22 @@ sequenceDiagram
     H-->>WF: 续传下个步骤
 ```
 
-**图 26 · 教学物料流水线 material_pipeline**
+**图 26 · 教学物料流水线 material_pipeline
 
 ```mermaid
 flowchart LR
-    IN["主题输入"] --> DAG["teach_materials<br/>DAG 编排"]
+    IN["主题输入"] --> DAG["teach_materials DAG 编排"]
     DAG --> P1["导图 + 讲义"]
     DAG --> P2["讲稿 + PPT"]
     DAG --> P3["视频脚本 + manim"]
-    P1 --> GATE{"门控 self-check<br/>≤2 轮重生成"}
+    P1 --> GATE{"门控 self-check 不超过2轮"}
     P2 --> GATE
     P3 --> GATE
-    GATE -->|通过| OUT["联动下载包<br/>6 类物料"]
+    GATE -->|通过| OUT["联动下载包 6 类物料"]
     GATE -->|失败| REGEN["重生成"]
     REGEN --> GATE
 ```
+
 
 **图 27 · Docker 打包 + 双远程部署（§7.4/§7.5）**
 
@@ -742,7 +743,7 @@ flowchart LR
     DAG --> P1["导图 + 讲义"]
     DAG --> P2["讲稿 + PPT"]
     DAG --> P3["视频脚本 + manim"]
-    P1 --> GATE{"门控 self-check<br/>≤2 轮重生成"}
+    P1 --> GATE{"门控 self-check<br>不超过2轮重生成"}
     P2 --> GATE
     P3 --> GATE
     GATE -->|通过| OUT["联动下载包<br/>6 类物料"]
