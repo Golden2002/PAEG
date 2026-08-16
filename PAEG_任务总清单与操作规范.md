@@ -1512,3 +1512,18 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
   - **#4 !!js 条件启停 ✅（Harness P1，2026-08-16，安全子集）**——services/condition_eval.py 新建：evaluate_condition(expr, ctx) ast 白名单受限求值器；支持布尔/比较/算术 + 白名单函数 platform()/env('VAR')/module('id')；安全边界：不引入真 JS 引擎（quickjs 重依赖 + AI 已可写 patch（#27）→ JS 求值=任意代码执行风险），import/属性链/下标/任意调用/推导式/lambda 全部拒绝 → False；module('id') 与 module_registry.is_enabled 一致（未知模块防御性默认启用，ratchet）；dsh 借鉴 config disabled: !!js expr；7 测试全绿 + SURFACE 验证（条件真实生效/环境变量/安全边界全拒/语法容错）（commit 新）
   - **回归验证 ✅**：181 passed（全部新功能测试）+ audit_check 40/40
 
+## §3.48 T1 前端 SVG 化（2026-08-16 发布任务 1）
+
+**需求**：前端不要使用 emoji，使用 SVG 图片，并归档入 assets，记录入需求文档。
+
+**规范（前端图标约定）**：
+- 图标一律用 SVG（lucide-static v1.28.0 - ISC 风格），归档于 `09_GUI前端/assets/icons/`
+- 格式：stroke=currentColor / viewBox 0 0 24 24 / stroke-width 2 / fill none
+- 禁止在按钮文本中直接使用 emoji 字符（注释/正则过滤符除外）
+
+**实施记录（T1 首批）**：
+- 新增 `assets/icons/thumbs-up.svg` + `assets/icons/thumbs-down.svg`（lucide 官方路径）
+- index.html L2176/L2178：点赞👍/点踩👎 emoji → SVG img（link-icon 13px，参照 speakBtn 模式）
+- 其余 emoji（✓/💡/📚/✕/🔒 等 11 处）列为后续 SVG 化候选；🔊(L4680) 是 JS 正则过滤符不可替换
+
+**验证**：替换后按钮区无 emoji 残留；sendFeedback 逻辑不受影响（_rawText 不读按钮文本）

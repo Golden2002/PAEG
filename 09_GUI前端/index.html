@@ -2171,11 +2171,11 @@ function addMsg(role, html, tone, intent, preHtml) {
     ? `<button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)"><img class="link-icon" src="assets/icons/volume-2.svg" alt="朗读" style="width:13px;height:13px;vertical-align:middle"/></button>` : '';
   const checkBox = role === 'paeg'
     ? `<input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" />` : '';
-  // v0.69+ SEL-8：用户反馈按钮（👍/👎 → /api/feedback，反馈→自我更新）
+  // v0.73+ T1：用户反馈按钮（SVG 图标 → /api/feedback，反馈→自我更新；前端去 emoji 化）
   const fbGood = role === 'paeg'
-    ? `<button class="msg-copy" title="教学有帮助" aria-label="教学有帮助" onclick="sendFeedback(this,'good')">👍</button>` : '';
+    ? `<button class="msg-copy" title="教学有帮助" aria-label="教学有帮助" onclick="sendFeedback(this,'good')"><img class="link-icon" src="assets/icons/thumbs-up.svg" alt="教学有帮助" style="width:13px;height:13px;vertical-align:middle"/></button>` : '';
   const fbBad = role === 'paeg'
-    ? `<button class="msg-copy" title="需要改进" aria-label="需要改进" onclick="sendFeedback(this,'bad')">👎</button>` : '';
+    ? `<button class="msg-copy" title="需要改进" aria-label="需要改进" onclick="sendFeedback(this,'bad')"><img class="link-icon" src="assets/icons/thumbs-down.svg" alt="需要改进" style="width:13px;height:13px;vertical-align:middle"/></button>` : '';
   div.innerHTML = `
     <div class="msg-avatar">${avatar}</div>
     <div class="msg-bubble">${pre}${contentHtml}${intentTag}${toneTag}
