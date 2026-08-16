@@ -44,8 +44,8 @@
 - **subagent**：专科老师——每个负责一个领域（诊断/讲解/评估…），职责单一
 - **MCP**：工具调用标准——让 AI 能联网、读写文件、调用外部工具（14 个标准 MCP 工具）
 - **Skill**：按需加载的能力包——需要时才加载的专业流程（11 个）
-- **SSE**：流式推送——AI 边想边输出，像打字机一样逐字显示
-- **TRUTH_GROUNDING**：防幻觉底线——10 条规则强制 AI 不准编造，宁可说"不知道"
+- **SSE**：流式推送——AI 增量式生成文本，像打字机一样逐字显示
+- **TRUTH_GROUNDING**：防幻觉底线——10 条规则要求 AI 不得编造事实，宁可说"不知道"
 
 
 ## 第 1 章 项目概览
@@ -69,7 +69,7 @@
 | **交互式理解检查** | 讲完一步问"听懂了吗" | checkpoint 事件 + 前端问答面板 | teach_stream 每步 presentation 后发 `event: checkpoint`（携带复述问题）；前端显示"我理解了/不太清楚/有疑问"按钮，回答走教学续问 |
 | **学情诊断** | 教学前评估学生水平 | Diagnostor subagent | 前置知识规则检查 + LLM 判断（recommended_depth/identified_gaps），输出 JSON |
 | **教学策略选择** | 决定用苏格拉底/支架式/掌握式 | pedagogy.choose_strategy | 基于诊断（缺口/深度）+ 学科 Bloom 起点 + 画像（学段/认知风格/目标考试）选策略，生成差异化步骤 |
-| **掌握度评估** | 判断学生是否学会 | Evaluator（纯确定性） | `score = 0.6*讲解质量 + 0.4*学生状态`；`_student_signal` 浅层语义分析（理解度/困惑/参与/情绪） |
+| **掌握度评估** | 判断学生是否学会 | Evaluator（纯确定性） | `score = 0.6*讲解质量 + 0.4*学生状态`；`_student_signal` 信号分析（理解度/困惑/参与/情绪四维） |
 | **教学调整** | 学生困惑时换讲法 | Adapter（纯确定性） | 根据 score/confusion/mastery 输出 switch_style/reinforce/continue + 6 种风格选项（类比/例子优先/苏格拉底/视觉…） |
 | **倾诉陪伴** | "我压力好大" | AffectionSupportor | 三阶段对话（现象学倾听→薇依注意力→尼采自我克服）；注入完整 WEIL_CORE + TRUTH_GROUNDING；危机识别（自伤信号） |
 | **找答案** | "直接告诉我答案" | AnswerSolver | 直接输出完整答案模板（不走教学引导）；强制检索知识库 + 暴露工具 |
@@ -133,7 +133,7 @@
 | **工作流** | 声明式流程 | workflows_hub.py | teach_minimal/teach_concept DAG（诊断→计划→实施→评估），run_workflow__ 路由 |
 | **权限预设** | 考试模式锁写工具 | Permission Preset | read_only/standard/exam/full 四档，exam 禁写工具 |
 | **动态提示词拼接** | LLM 主动调取自我更新补丁 | compose_dynamic_prompt tool | LLM 调用返回 subject_patches/tool_lessons/教师笔记 动态段合并 |
-| **语言规范 MCP 化** | 语言质量成为可治理服务 | lang_gate + forbidden_words.json | 统一入口（13 处收敛 lang_gate_content）+ 违禁词数据化（内嵌 AI_TELLS 去重 555+外部 18）+ MCP 三工具（normalize_text/language_policy_check/forbidden_words），外部 agent 可调用 |
+| **语言规范 MCP 化** | 语言质量成为可治理服务 | lang_gate + forbidden_words.json | 统一入口（统一入口 lang_gate_content（替换 13 处散落调用））+ 违禁词数据化（内嵌 AI_TELLS 去重 555+外部 18）+ MCP 三工具（normalize_text/language_policy_check/forbidden_words），外部 agent 可调用 |
 | **约束引擎 MCP 化** | L0-L8 约束可治理/自演进 | constraint_engine.py | 6 API（layer_get/set/compose/always_active/self_evolve/feedback_adjust）+ 数据化落盘（constraint_layers.json/always_active.json/feedback_log） |
 | **sub agent 模型配置化** | 为每个 subagent 分配不同模型 | config_loader.py + config/agents.json | 三层合并（内置默认→用户~/.paeg→项目）+ {env:}/{file:} 变量替换 + per-subagent LLM 工厂（provider/model/temperature/max_tokens/thinking_level/enabled）——用户不改代码即可定制 |
 
@@ -149,7 +149,7 @@
 |---|---|---|---|
 | **防幻觉底线** | 不编造事实 | TRUTH_GROUNDING | 10 条底线（绝不编造/信源为绝对命令/允许说不知道）注入全模式（presenter/general_chat/affection），幂等 |
 | **质量门禁** | 自我更新入库审核 | QualityGate | L1 宪法（有害/注入/PII）→L2 硬规则→L3 LLM 多维评分（factuality/safety/pedagogy）→L4 证据沙盒 |
-| **语言规范** | 输出像人话 | LANGUAGE_STYLE + lang_gate + refiner | L1 提示词约束（主谓宾/词法/介词）+ L0/L2 规则+薇依语料矫正 + 违禁词兜底（内嵌 AI_TELLS + 外部 forbidden_words.json 合并）——统一入口 lang_gate_content，MCP 工具化（§3.28） |
+| **语言规范** | 输出文本自然化 | LANGUAGE_STYLE + lang_gate + refiner | L1 提示词约束（主谓宾/词法/介词）+ L0/L2 规则+薇依语料矫正 + 违禁词兜底（内嵌 AI_TELLS + 外部 forbidden_words.json 合并）——统一入口 lang_gate_content，MCP 工具化（§3.28） |
 | **安全协议** | 危机/有害内容 | safety.py | 危机识别（自伤/自杀）→ 注入指引不短路；有害内容 L1 拦截 |
 | **事实锚定** | 真实信息优先 | 知识库检索 + 联网降级栈 | web_search（Brave→Tavily→Serper→Bing 降级）；知识库优先 |
 
@@ -159,7 +159,7 @@
 
 ### 架构多尺度图（从最大尺度到精细尺度）
 
-**图 1 · 全景尺度（PAEG 与外部世界）**
+**图 1 · 全景视角（PAEG 与外部世界）**
 
 | 参与方 | 与 PAEG 的关系 | 数据方向 |
 |---|---|---|
@@ -186,7 +186,7 @@ flowchart LR
     Dev["开发者"] -.->|热加载| PAEG
 ```
 
-**图 2 · 系统尺度（六层 + 一次请求数据流）**
+**图 2 · 系统视角（六层 + 一次请求数据流）**
 
 | 层 | 职责 | 核心组件 | 本次请求的角色 |
 |---|---|---|---|
@@ -214,7 +214,42 @@ flowchart TB
     L0 -.- S
 ```
 
-**图 3 · 教学流尺度（五阶段 + checkpoint 互动）**
+
+**图 2B · Blueprints 分层架构（Phase 3 · 12 蓝图）**
+
+```
+flowchart TB
+    subgraph 入口层
+        server["server.py 组合根<br/>app 装配 + 蓝图注册 + 启动"]
+    end
+    subgraph 核心教学
+        chat["chat.py<br/>教学/闲聊 + SSE 流式"]
+        teaching["teaching.py<br/>teach 同步闭环"]
+        quiz["quiz.py<br/>测验"]
+    end
+    subgraph 会话与用户
+        conversations["conversations.py<br/>历史会话"]
+        threads["threads.py<br/>Thread 模型"]
+        modes["modes.py<br/>模式管理"]
+        uploads["uploads.py<br/>文件上传"]
+    end
+    subgraph 资源与管理
+        resources["resources.py<br/>教学资源 + PPT"]
+        proactive["proactive.py<br/>主动外联"]
+        self_update["self_update.py<br/>自我更新"]
+        admin["admin.py<br/>管理端点"]
+        voice["voice.py<br/>TTS/STT"]
+    end
+    server --> 核心教学
+    server --> 会话与用户
+    server --> 资源与管理
+    核心教学 --> services[services/ 业务层]
+    会话与用户 --> services
+    资源与管理 --> services
+    services --> infra[infra/ 基础设施]
+```
+
+**图 3 · 教学流视角（五阶段 + checkpoint 互动）**
 
 | 阶段 | 执行者 | 做什么 | 产出 |
 |---|---|---|---|
@@ -253,14 +288,14 @@ flowchart LR
     Loop ~~~ Done
 ```
 
-**图 4 · 组件尺度（Presenter 内部装配）**
+**图 4 · 组件视角（Presenter 内部装配）**
 
 | 装配块 | 内容 | 作用 |
 |---|---|---|
 | WEIL_CORE | 薇依人格基线 | 身份与教育信念锚定 |
 | TRUTH_GROUNDING | 防幻觉 10 条底线 | 不编造/信源为绝对命令 |
 | SUBJECT_STYLES | 35 学科风格（persona/语言/方法论） | 因材施教 |
-| LANGUAGE_STYLE | 语言规范三层 | 输出像人话 |
+| LANGUAGE_STYLE | 语言规范三层 | 输出文本自然化 |
 | 动态补丁 | compose_dynamic_prompt | 注入自我更新建议 |
 
 **内部流程**：确定性装配（上述块）→ system prompt → LLM 调用（重试+超时）→ 60 字分片 → SSE yield；如需工具则经 config_hub 路由到 mcp__ 工具，结果回灌 LLM。
@@ -283,7 +318,7 @@ flowchart LR
 ### 核心调用链（用户问"什么是导数"）
 用户输入 → L1(POST /api/teach/stream) → L2(meta_router → intent=teach) → L3(teach_stream：诊断→计划→讲解→checkpoint→评估→调整) → L4(subagent 协作) → L5(工具按需调用) → L0(防幻觉全程约束)
 
-### 架构图集（尺度分级 · 从全景到模块）
+### 架构图集（视角分层 · 从全景到模块）
 
 **图集总览**：
 
@@ -383,7 +418,7 @@ sequenceDiagram
 
 
 
-**图 10 · 17 维学生画像正交模型**
+**图 10 · 17 维学生画像独立性模型**
 
 ```mermaid
 flowchart TD
@@ -460,7 +495,7 @@ flowchart TD
     L4 -->|通过| OK["入库"]
 ```
 
-**图 15 · 周期自我更新调度（periodic）**
+**图 15 · 周期自我更新调度**
 
 ```mermaid
 %%{init: {'theme': 'dark'}}%%
@@ -502,7 +537,7 @@ sequenceDiagram
     S-->>U: event: done
 ```
 
-**图 17 · hooks 事件链（横切关注点）**
+**图 17 · hooks 事件链（贯穿各层）**
 
 ```mermaid
 sequenceDiagram
@@ -519,7 +554,7 @@ sequenceDiagram
     Handler-->>H: 可短路/透传
 ```
 
-**图 18 · 危机信号拦截协议（affection_gate）**
+**图 18 · 危机信号识别协议（affection_gate）**
 
 ```mermaid
 flowchart TD
@@ -548,7 +583,7 @@ flowchart TD
     Out["工具返回超长"] --> Sp["spill 截断 12000 字符"]
 ```
 
-**图 20 · MCP 工具配置驱动加载器（v1.1.1 ⭐）**
+**图 20 · MCP 工具配置化加载器（v1.1.1 ⭐）**
 
 ```mermaid
 %%{init: {'theme': 'dark'}}%%
@@ -565,7 +600,7 @@ flowchart LR
     R --> EX["execute_tool<br/>统一路由"]
 ```
 
-**图 21 · 权限双开关（sandbox+approval+custom）**
+**图 21 · 权限控制三层（sandbox+approval+custom）**
 
 ```mermaid
 %%{init: {'theme': 'dark'}}%%
@@ -587,7 +622,7 @@ flowchart TD
 ```mermaid
 %%{init: {'theme': 'dark'}}%%
 flowchart TB
-    SRC["事件源<br/>hooks / subagent<br/>/ tool / workflow"] --> ENV["SessionEvent envelope<br/>seq + time + data<br/>+ surfaceOp"]
+    SRC["事件源<br/>hooks / subagent<br/>/ tool / workflow"] --> ENV["SessionEvent 信封<br/>seq + time + data<br/>+ surfaceOp"]
     ENV --> SURF{"surfaceOp 校验<br/>强制 schema"}
     SURF --> TY{"类型检查<br/>56 已知类型白名单"}
     TY -->|拼错| ERR["立即报错<br/>fail-fast"]
@@ -656,9 +691,39 @@ sequenceDiagram
     H-->>WF: 续传下个步骤
 ```
 
-**图 26 · 物料流水线 material_pipeline**
+**图 26 · 教学物料流水线 material_pipeline**
 
-```mermaid
+```
+
+**图 27 · Docker 打包 + 双远程部署（§7.4/§7.5）**
+
+```
+flowchart LR
+    subgraph 本地开发
+        dev["本地 :5000<br/>python server.py"]
+        docker["Docker Compose<br/>docker compose up"]
+    end
+    subgraph 依赖打包（纪律 33）
+        pip["requirements.txt<br/>onnxruntime/rapidocr/whisper"]
+        sys["Dockerfile apt<br/>ffmpeg/libcairo"]
+        model["模型文件<br/>bge ONNX / whisper"]
+    end
+    subgraph 双远程同步（纪律 34）
+        gh["GitHub<br/>sync_check.py --fix"]
+        ms["ModelScope<br/>git push modelscope master"]
+        deploy["魔搭创空间<br/>ms_deploy.json :7860"]
+    end
+    dev --> docker
+    docker --> pip
+    docker --> sys
+    docker --> model
+    docker --> gh
+    docker --> ms
+    ms --> deploy
+    deploy --> user["公网用户"]
+```
+
+mermaid
 %%{init: {'theme': 'dark'}}%%
 flowchart LR
     IN["主题输入"] --> DAG["teach_materials<br/>DAG 编排"]
@@ -754,7 +819,7 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 
 ## 第 5B 章 DeepSeek Harness 借鉴蓝图（2026-08-14 调研 · 30 项中 27 项已落地）
 
-> 来源：[github.com/deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（81.5k stars · MIT）——**一切皆插件**（Everything is a Plugin），Cordis 驱动。PAEG 依据其架构产出 **30 项优化需求**（§二 Step 2 需求文档，9 P0 + 14 P1 + 7 P2）。
+> 来源：[github.com/deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（81.5k stars · MIT）——**一切皆插件**（Everything is a Plugin），基于 Cordis 事件框架。PAEG 依据其架构产出 **30 项优化需求**（§二 Step 2 需求文档，9 P0 + 14 P1 + 7 P2）。
 
 ### 核心架构五要点（PAEG 已落地部分标注）
 
@@ -851,7 +916,7 @@ PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可�
 - **接入层（6 MCP 服务器）**：filesystem、memory、fetch、git、brave-search、pptx——外部标准服务。
 - **编排层（3 Workflows）**：teach_materials、teach_concept、teach_minimal——声明式 DAG 流程。
 
-> **口径说明**：早期文档写"25 个 MCP 工具"是混合统计（内置+标准混计）。v0.73 起精确分类为 **22 内置 + 14 标准**——能力并未减少，反而因 constraint 六件套、RAG 多路召回等新增基础设施而增强。
+> **口径说明**：早期文档写"25 个 MCP 工具"是混合统计（内置+标准混合统计）。v0.73 起精确分类为 **22 内置 + 14 标准**——能力并未减少，反而因 constraint 六件套、RAG 多路召回等新增基础设施而增强。
 
 **扩展性如何？** 加一个内置工具 = 改一行注册表；加一个 Skill = 丢一个 SKILL.md；加一个 MCP = 改一个 JSON。四类扩展零代码侵入，唯一例外是新增 subagent（需改 subagents.py）——这也是下一步最值得做的声明式化改造。
 
@@ -878,57 +943,102 @@ PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可�
 
 **能力全景更新**：C1-C4 新增 4 个服务模块，可调用能力从 56 增至 **60**（含 C5/C6 能力接口）。
 
-### 7.3 引用来源（标准参考文献格式）
+### 7.3 引用来源（标准参考文献格式 · 全部并列）
 
-> 项目遵循"借鉴有来源 · 改动有说明"原则。每个借鉴模块在文件头注释中标注来源；
-> 下文按 **APA 参考文献格式**列出全部外部引用，便于审计与回溯。
+> 原则：**借鉴标注来源，改动附说明**。以下按 **APA 格式**列出全部外部引用——GitHub 库、学术文献、教育学理论统一编号并列（用户执行标准：参考的所有项目、GitHub 库、成熟项目均须作为引用来源）。
 
-**[1] deepseek-ai. (2025). deepseek-harness [Computer software]. GitHub. https://github.com/deepseek-ai/deepseek-harness**（MIT License · commit 47f9438）
+#### 7.3.1 技术栈与库（GitHub / 软件）
 
-> PAEG 的"一切皆插件"基础设施整体借鉴该项目的 Cordis 事件体系，落地 9 处：
-> service_registry（ctx 服务注册）· subprocess_spawn（子进程抽象）· llm_adapter（LLM Provider Seam）· hooks_hub（事件钩子 + matcher）· workflows_hub（声明式工作流 + PTC 模式）· config_hub（溢出防护）· compaction（压缩守卫）· skill_registry（多级技能）· subagent_registry（子代理注册）
+**[1] deepseek-ai. (2025). deepseek-harness [Computer software]. GitHub. https://github.com/deepseek-ai/deepseek-harness**（MIT · commit 47f9438）
+> PAEG"一切皆插件"基础设施整体借鉴其 Cordis 事件体系，落地 9 处（service_registry/subprocess_spawn/llm_adapter/hooks_hub/workflows_hub/config_hub/compaction/skill_registry/subagent_registry）
 
-**[2] Bai, J. et al. (2024). Constitutional AI: Harmlessness from AI Feedback. arXiv. https://arxiv.org/abs/2212.08073**
+**[2] OpenAI. (2023). Codex App Server [Computer software]. GitHub. https://github.com/openai/codex**（Thread/Turn/Item 三层会话模型）
 
-**[3] Chen, L. et al. (2023). AlpaGasus: Training A Better Alpaca with Fewer Data. arXiv. https://arxiv.org/abs/2307.08701**
+**[3] Anthropic. (2024). Claude Code & CLAUDE.md Memory [Computer software]. GitHub. https://github.com/anthropics/claude-code**（记忆分层设计）
 
-**[4] Asai, A. et al. (2023). Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection. arXiv. https://arxiv.org/abs/2310.11511**
+**[4] langchain-ai. (2023). LangChain [Computer software]. GitHub. https://github.com/langchain-ai/langchain**（ConversationSummaryBufferMemory）
 
-**[5] Park, J. S. et al. (2023). Generative Agents: Interactive Simulacra of Human Behavior. arXiv. https://arxiv.org/abs/2304.03442**
+**[5] sst. (2024). opencode [Computer software]. GitHub. https://github.com/sst/opencode**（auth.json 凭据发现 + 标准 MCP server 包）
 
-**[6] Zhou, Z. et al. (2024). Large Language Models as Optimizers. arXiv. https://arxiv.org/abs/2309.03409**（ExpeL 证据追踪模式）
+**[6] Pallets Projects. (2010). Flask [Computer software]. GitHub. https://github.com/pallets/flask**（Web 框架）
 
-> [2]-[6] 共同构成 quality_gate.py 质量门禁的设计依据：L1 宪法过滤（[2]）· L3 多维评分（[3][4][5]）· L4 证据门槛（[6]）
+**[7] run-llama. (2023). llama-index [Computer software]. GitHub. https://github.com/run-llama/llama_index**（RAG 框架参考）
 
-**[7] Yao, S. et al. (2022). ReAct: Synergizing Reasoning and Acting in Language Models. arXiv. https://arxiv.org/abs/2210.03629**
+**[8] lucide-icons. (2023). lucide [Computer software]. GitHub. https://github.com/lucide-icons/lucide**（ISC · 前端 SVG 图标）
 
-**[8] Shinn, N. et al. (2023). Reflexion: Language Agents with Verbal Reinforcement Learning. arXiv. https://arxiv.org/abs/2303.11366**
+**[9] Kraken [Computer software]. GitHub. https://github.com/mittagessen/kraken**（项目结构借鉴）
 
-**[9] OpenAI. (2023). Codex App Server [Computer software]. GitHub. https://github.com/openai/codex**
+**[10] EAS Station [Computer software]. GitHub.**（项目结构借鉴；URL 以官方文档为准）
 
-**[10] Anthropic. (2024). Claude Code & CLAUDE.md Memory [Computer software]. GitHub. https://github.com/anthropics/claude-code**
+**[11] RapidAI. (2023). RapidOCR [Computer software]. GitHub. https://github.com/RapidAI/RapidOCR**（C4 OCR：PaddleOCR 的 ONNX 精简版）
 
-**[11] Liu, P. et al. (2023). LangChain: Build Context-aware Reasoning Applications [Computer software]. GitHub. https://github.com/langchain-ai/langchain**（ConversationSummaryBufferMemory）
+**[12] SYSTRAN. (2023). faster-whisper [Computer software]. GitHub. https://github.com/SYSTRAN/faster-whisper**（C5 后端 STT）
 
-**[12] OpenCode. (2024). opencode [Computer software]. GitHub. https://github.com/sst/opencode**（auth.json 凭据发现 + 标准 MCP server 包）
+**[13] BAAI. (2023). bge (BGE Embedding Models) [Computer software]. GitHub. https://github.com/BAAI/bge**（C3 语义检索向量模型）
 
-**[13] Robertson, S. & Zaragoza, H. (2009). The Probabilistic Relevance Framework: BM25 and Beyond. Foundations and Trends in IR, 3(4), 333-389.**
+**[14] lukas-blecher. (2022). LaTeX-OCR (pix2tex) [Computer software]. GitHub. https://github.com/lukas-blecher/LaTeX-OCR**（C6 手写公式识别，接口预留）
 
-**[14] Sun, J. (2012). jieba: Chinese Text Segmentation [Computer software]. GitHub. https://github.com/fxsjy/jieba**（MIT License）
+**[15] rany2. (2023). edge-tts [Computer software]. GitHub. https://github.com/rany2/edge-tts**（TTS 语音合成）
 
-**框架级引用（项目结构层）**：Flask（Pallets Projects, https://flask.palletsprojects.com）· Kraken · EAS Station · llama-index（https://github.com/run-llama/llama_index）· lucide（https://github.com/lucide-icons/lucide, ISC License）
+**[16] Manim Community. (2020). manim [Computer software]. GitHub. https://github.com/ManimCommunity/manim**（数学动画引擎；源于 3Blue1Brown）
 
-**标注规范**：每个借鉴模块文件头统一注释块（零运行时开销）：
+**[17] fxsjy. (2012). jieba [Computer software]. GitHub. https://github.com/fxsjy/jieba**（MIT · 中文分词）
 
+**[18] Robertson, S. & Zaragoza, H. (2009). The Probabilistic Relevance Framework: BM25 and Beyond. Foundations and Trends in IR, 3(4), 333-389.**（检索算法）
+
+**[19] Lv, Y. & Zhai, C. (2011). When Documents are Very Long, BM25 Fails! SIGIR.**（BM25Plus 扩展，C3 检索基线）
+
+#### 7.3.2 学术文献与 AI 研究
+
+**[20] Bai, Y. et al. (2024). Constitutional AI: Harmlessness from AI Feedback. arXiv:2212.08073.**（L1 宪法过滤）
+
+**[21] Chen, L. et al. (2023). AlpaGasus: Training A Better Alpaca with Fewer Data. arXiv:2307.08701.**（L3 多维评分）
+
+**[22] Asai, A. et al. (2023). Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection. arXiv:2310.11511.**（L3 反思令牌）
+
+**[23] Park, J. S. et al. (2023). Generative Agents: Interactive Simulacra of Human Behavior. arXiv:2304.03442.**（L3 importance 评分）
+
+**[24] Zhou, Z. et al. (2024). Large Language Models as Optimizers (OPRO/ExpeL). arXiv:2309.03409.**（L4 证据追踪）
+
+**[25] Yao, S. et al. (2022). ReAct: Synergizing Reasoning and Acting in Language Models. arXiv:2210.03629.**（Plan→Act→Observe→Reflect）
+
+**[26] Shinn, N. et al. (2023). Reflexion: Language Agents with Verbal Reinforcement Learning. arXiv:2303.11366.**（反思循环）
+
+**[27] Wozniak, P. (1990). SuperMemo SM-2 Algorithm. supermemo.com.**（C1 间隔重复调度）
+
+**[28] Grant Sanderson (3Blue1Brown). Mathematical Visualizations & Manim Methodology. YouTube.**（F5 数学可视化原则）
+
+**[29] Google Research. (2025). ReasoningBank（失败案例提炼参考）. GitHub.**（C.4 反直觉失败案例；URL 以官方为准）
+
+#### 7.3.3 教育学与认知科学理论
+
+**[30] Mishra, P. & Koehler, M. J. (2006). Technological Pedagogical Content Knowledge (TPACK). Teachers College Record, 108(6), 1017-1054.**（Q3-5 教学设计框架）
+
+**[31] Gagne, R. M. (1965). The Conditions of Learning. New York: Holt, Rinehart & Winston.**（Q3-5 学习条件理论）
+
+**[32] Branson, R. K. et al. (1975). Interservice Procedures for Instructional Systems Development (ADDIE). Florida State University.**（Q4-2 教学设计模型）
+
+**[33] Anderson, L. W. & Krathwohl, D. R. (2001). A Taxonomy for Learning, Teaching, and Assessing (Bloom's Revised Taxonomy). Longman.**（F2 学习目标分类）
+
+**[34] Berliner, D. C. (1988/2001). The Development of Expertise in Pedagogy. AACTE.**（Q4-3 教师专长发展）
+
+**[35] Vygotsky, L. S. (1978). Mind in Society: The Development of Higher Psychological Processes. Harvard University Press.**（ZPD 最近发展区）
+
+**[36] Neo4j Inc. (2015). Neo4j Graph Database [Computer software]. neo4j.com.**（Q4 知识图谱路线）
+
+#### 7.3.4 外部检索服务
+
+**[37] Brave Search API. brave.com/search/api.**（F7 联网检索）
+**[38] Tavily Search API. tavily.com.**（F7 联网检索降级）
+**[39] Serper API. serper.dev.**（F7 联网检索降级）
+**[40] Bing Search API. Microsoft Azure Cognitive Search.**（F7 联网检索降级）
+
+> **标注规范**：每个借鉴模块文件头统一注释块（零运行时开销）：
 ```
 source:  <项目名> <版本/commit>  |  repo: <URL>
 path:    <原文件路径>            |  adapted: <PAEG 改动>
 since:   <PAEG 版本号>
 ```
-
-**待补标注 9 处**（后续开发逐处补全）：paeg.py · subagents.py · runtime.py · tool_registry.py · config_hub.py（4-hub 范式）· observability.py · lib/ingest（[13][14] 算法级）· sse/protocol.py · blueprints/*.py（Flask 框架级）
-
-
 
 ### 7.4 Docker 打包依赖纪律（用户执行标准 · 2026-08-16）
 
@@ -1022,7 +1132,7 @@ since:   <PAEG 版本号>
 |---|---|
 | **6 API 全覆盖** | `layer_get`（读层放开组）/ `layer_set`（动态切换教学/考试/自由，支持外部扩展层）/ `compose`（任意提示词块拼接）/ `always_active`（永远激活不随层放开）/ `self_evolve`（教学洞察自动提炼入层）/ `feedback_adjust`（"太啰嗦→放宽节奏、太深→收紧深度"信号映射） |
 | **框架化** | 内嵌 8 层 × 6 组（PAEG 原设计完整保留）+ 外部 JSON 可更换层内容/拓展 L8+ 层级/新增组；`constraint_layer_scope` 框架自省 API |
-| **示例** | `constraint_feedback_adjust("你讲得太啰嗦了")` → 检测到『啰嗦』→ 建议放宽节奏组(M) + 落盘反馈日志；`constraint_self_evolve("分步讲解时先给结论再展开")` → 自动写入 L5 组 M |
+| **示例** | `constraint_feedback_adjust("你讲得太啰嗦了")` → 检测到'啰嗦'信号→ 建议放宽节奏组(M) + 落盘反馈日志；`constraint_self_evolve("分步讲解时先给结论再展开")` → 自动写入 L5 组 M |
 | **创新点** | ①8 层线性约束谱（L0 绝对底线→L7 自由创造，crisis 强制 L1）②"约束"作为可治理资源（自演进/反馈调强=agent 自创生性）③框架化双层结构（内嵌默认+外部扩展） |
 
 ### C.3 同等量级技术创新一览（explore 调研确认 · 2026-08-14）
@@ -1033,7 +1143,7 @@ since:   <PAEG 版本号>
 |---|---|---|---|
 | **A+** | **RALPH 持续改进子系统** | 6 模块任务驱动循环：Verdict 承诺协议（DONE/CONTINUE/ABORT）+ L0-L2 三层完成判定 + 五道防线防呆（轮次上限/收益递减/质量回退/人类确认/资源熔断）+ 任务注册表持久化 + 优先级队列 | ralph/ 6 模块（contracts/loop_controller/completion_evaluator/termination_guard/task_registry） |
 | **A+** | **插件生态中枢（config_hub 三件套）** | MCP/Skills/Hooks/Workflows 四子 hub 统一注册 + 热更新 + waterfall+next() 钩子链 + matcher 引擎 + DAG 工作流 + 两道防护（repeat_guard 防重复调用循环 + spill_guard 防上下文爆掉） | config_hub.py + hooks_hub.py + workflows_hub.py + config/*.json |
-| **A** | **17 维学生画像 Individuality** | 16+1 维正交 dataclass + L1/L2/L3 三级注入 + add_dimension 动态扩展（加到第 18/19 维不破坏 to_prompt）+ 增量建模 merge 算法 + 五层注入控制（语言/风格/深度/节奏/情绪）+ 持久化闭环 | student_trait.py（956 行）+ subagents.py Individuality |
+| **A** | **17 维学生画像 Individuality** | 16+1 维独立 dataclass + L1/L2/L3 三级注入 + add_dimension 动态扩展（加到第 18/19 维不破坏 to_prompt）+ 增量建模 merge 算法 + 五层注入控制（语言/风格/深度/节奏/情绪）+ 持久化闭环 | student_trait.py（956 行）+ subagents.py Individuality |
 | **A-** | **3B1B 数学可视化剧本生成器** | 8 项铁律形式化（渐进揭示/单一聚焦/颜色语义/节奏/文字最小化/构图/回看锚点/依赖显式）+ 5 段式 JSON Schema + 校验修补循环（失败→重生成最多 2 轮）——3B1B 方法论工程化封装 | visual_script_generator.py + visual_script_validator.py |
 
 ### C.4 自我更新模块（四路自进化 + 质量门禁闭环 · F4 展开）
@@ -1068,13 +1178,13 @@ since:   <PAEG 版本号>
 
 ### C.7 运行可治理三件套（v1.1.2-1.1.3 §3.37/§3.38 ⭐）
 
-- **权限双开关（#18）**：sandbox + approval 命名组合——apply("exam") 一键锁写工具+禁审批；custom 派生防误判；意图事件可回放审计（services/permission.py）
+- **权限控制三层（#18）**：sandbox + approval 命名组合——apply("exam") 一键锁写工具+禁审批；custom 派生防误判；意图事件可回放审计（services/permission.py）
 - **repeat-tool-guard（H-16）**：chain-key 精确计数（同工具不同参数不算重复）+ 多级阈值 [3,5,8] + 用户插话重置——防 AI 死循环（hooks_hub）
-- **事件类型化（H-1/H-12）**：56 个已知事件类型 + SessionEvent envelope（seq/time/data/surfaceOp）——拼错类型立即报错，surface 事件强制校验（infra/event_types.py）
+- **事件类型化（H-1/H-12）**：56 个已知事件类型 + SessionEvent 信封（seq/time/data/surfaceOp）——拼错类型立即报错，surface 事件强制校验（infra/event_types.py）
 
 ### C.8 subagent 生命周期事件 + 多级 skill（v1.1.4 §3.38 ⭐）
 
-- **subagent/descriptor**：构造时 9 核心 subagent + ResourceLibrarian 各一个；**tool-workflow/agent-start/end**：每个 .run() 前后成对（runId UUID 配对 + duration_ms），teach 直调与 workflow 路径双覆盖；hook/invoked/result 包裹钩子链——调试像看剧本
+- **subagent/descriptor**：构造时 9 核心 subagent + ResourceLibrarian 各一个；**tool-workflow/agent-start/end**：每个 .run() 前后成对（runId UUID 配对 + duration_ms），teach 直调与 workflow 路径双覆盖；hook/invoked/result 包裹钩子链——调试体验如翻阅剧本
 - **多级 skill**：~/.paeg/skills.json（用户级）+ {env:KEY|默认} 替换——用户级技能覆盖项目/全局
 
 ## 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
@@ -1088,4 +1198,4 @@ since:   <PAEG 版本号>
 
 **工作流**：任务核对 → 按优先级执行 → 每项完成更新状态 → 完成验证 → 调研落盘 → 重大改动回归 → 更新技术快照
 
-**元技能**：**"先记录，后执行"是第一纪律**——需求文档是记忆的外部化、版本化的决策日志；没有需求文档的工作流不可追溯、不可复盘、不可交接。
+**元技能**：**"先记录，后执行"是第一纪律**——需求文档是团队记忆的外部载体，也是版本化的决策日志；没有需求文档的工作流不可追溯、不可复盘、不可交接。
