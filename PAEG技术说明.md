@@ -908,6 +908,19 @@ since:   <PAEG 版本号>
 
 **验证**：引入新依赖后 `docker compose up -d --build` 必须成功；魔搭部署（ms_deploy.json）构建时自动读 requirements.txt。
 
+
+### 7.5 双远程同步（GitHub + ModelScope）
+
+> **铁律**：项目双远程托管（GitHub + ModelScope），任何交付前必须双端同步。
+
+| 通道 | 命令 | 说明 |
+|---|---|---|
+| GitHub | `python sync_check.py --fix` | API 通道，本地为权威源 |
+| ModelScope | `git push modelscope master` | git 通道，oauth2 token 在 remote |
+
+**判定标准**：sync_check 显示"一致 X 文件 / 缺失 0 / 差异 0" + modelscope push 成功。
+**三处一致**：本地 ↔ GitHub ↔ Release（tag）内容一致，可从任一端恢复整个项目。
+
 ## 附录 A 术语表
 
 | 术语 | 含义 |

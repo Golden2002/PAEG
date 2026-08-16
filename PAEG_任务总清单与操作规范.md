@@ -1748,3 +1748,10 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - SURFACE：真实图片 OCR 成功（"He llo PAEG"）；None/空字节容错返回 ""
 - 引用标注：RapidOCR（https://github.com/RapidAI/RapidOCR，PaddleOCR ONNX 版）
 - 对接场景：学生拍照上传作业/笔记 → OCR 提取 → 知识库检索（后续接线）
+
+34. **⭐ 双远程推送铁律（2026-08-16 用户执行标准）**：项目同时托管 GitHub（Golden2002/PAEG）+ ModelScope（Golden2002/Emile_Novis）双远程，**任何收口/交付前必须双端同步**：
+    - **GitHub 通道**：`python sync_check.py --fix`（API 通道，本地为权威源，规避本地代理重置 git 协议问题）
+    - **ModelScope 通道**：`git push modelscope master`（git 通道，oauth2 token 已在 remote）
+    - **判定标准**：`sync_check.py` 校验显示"一致 X 文件 / 缺失 0 / 差异 0" + `git push modelscope` 成功
+    - **时机**：每批任务收口（3-5 项一批）、每次文档同步、每次发版——**不是可选项，是交付前置条件**
+    - **三处一致**：本地 ↔ GitHub ↔ Release（tag）内容一致，可从任一端恢复整个项目
