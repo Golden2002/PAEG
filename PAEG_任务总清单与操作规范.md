@@ -1731,3 +1731,10 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - **Docker 依赖**：requirements.txt 新增 onnxruntime>=1.20.0（Docker 打包包含）
 - 引用标注：BGE small-zh（FlagEmbedding，https://github.com/FlagOpen/FlagEmbedding）+ rank_bm25
 - 模型就绪路径：下载 bge-small-zh-v1.5 ONNX 到 data/models/bge-small-zh-v1.5/ 即自动升级向量检索
+
+33. **⭐ Docker 打包依赖纪律（2026-08-16 用户执行标准）**：任何新引入的第三方依赖（pip 包/系统库/模型文件），必须**同步更新 Docker 打包**，确保本地能跑、Docker 也能跑：
+    - **pip 依赖** → 必须加入 `05_实现原型/requirements.txt`（Dockerfile `pip install -r requirements.txt` 自动包含）
+    - **系统库**（apt 包）→ 必须加入 Dockerfile `RUN apt-get install` 段
+    - **模型文件**（ONNX/whisper 等）→ 必须加入 .dockerignore 白名单或 Dockerfile COPY，并注明下载方式
+    - **重依赖**（如 torch）→ 默认不装，但必须在 requirements.txt 注释 + 需求文档记录"可选依赖"，避免 Docker 构建失败
+    - 判定标准：**改完代码跑 `docker compose up -d --build` 必须成功**；无法本地验证时至少更新 requirements.txt

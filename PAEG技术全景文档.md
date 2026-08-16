@@ -5609,6 +5609,20 @@ docker compose up -d --build
 - **验证三件套**：每次改 Dockerfile 后跑 `docker compose up -d --build` + `curl localhost:5000/api/health` + Playwright 前端冒烟。
 
 
+
+### 10.11.8 Docker 依赖同步纪律（v0.73 · 2026-08-16 用户执行标准）
+
+> 新增能力引入的依赖必须同步 Docker 打包，否则"本地能跑、Docker 不能跑"。
+
+| 依赖类型 | 同步位置 | 当前实例 |
+|---|---|---|
+| pip 包 | `05_实现原型/requirements.txt` | onnxruntime（C3 语义检索）/ rapidocr-onnxruntime（C4 OCR）/ faster-whisper（C5 STT）|
+| 系统库 | Dockerfile apt 段 | ffmpeg/libcairo（manim）|
+| 模型文件 | Dockerfile COPY / 白名单 | bge ONNX（待下载到 data/models/）|
+| 可选重依赖 | requirements 注释 + 需求文档 | torch/pix2tex（C6，默认不装防镜像膨胀）|
+
+**验证**：改依赖后 `docker compose up -d --build` 必须成功；魔搭部署同理（ms_deploy.json 构建时读 requirements.txt）。
+
 ## 10.12 双远程仓库同步（GitHub + ModelScope）（v0.67 ⭐ 2026-08-13）
 
 **背景**：项目同时托管于 GitHub（Golden2002/PAEG）与 ModelScope（Golden2002/Emile_Novis），需保持两仓库内容一致。
@@ -6022,3 +6036,38 @@ blueprints/ (12 蓝图 · 31 路由)          ← HTTP 层（只调 services/inf
 - 扫描版 PDF（重负与神恩/科学与我们/超自然认识/斯坦福百科/评传）无文本层，OCR 工具缺失——列为后续波次
 - 人格输出：`paeg_personas/weil.yml`（79→190 行，9 大哲学基石：注意力/重力恩典/阅读读法/超脱/必然性顺从/不幸同情/友爱/沉默等待/善恶真实面目）
 - 名字解释：Émile=卢梭《爱弥儿》(1762) + Novis=拉丁语 novus(新) + 薇依化名（1942.7《经济与人文主义》/1944.1《南方手册》）
+
+### 10.20.6 能力全景（56 种可调用能力 · v1.1.6）
+
+PAEG 的能力体系围绕"一切能力可替换、可增删、不改核心代码"组织：
+
+| 层 | 数量 | 构成 | 路由方式 |
+|---|---|---|---|
+| 常驻层 | 22 内置工具 | web_search/verify_math/fetch_page/get_time/constraint 六件套/文件生成等 | tool_registry 直接调用 |
+| 配置层 | 14 标准 MCP 工具 | normalize_text/constraint 六件套/generate_* 等 | config_hub 统一路由 |
+| 按需层 | 11 Skills | concept-explainer/essay-feedback/pdf/docx/xlsx 等 | skill_registry 三级渐进加载 |
+| 接入层 | 6 MCP 服务器 | filesystem/memory/fetch/git/brave-search/pptx | mcp_servers.json 配置 |
+| 编排层 | 3 Workflows | teach_materials/teach_concept/teach_minimal | workflows_hub 声明式 DAG |
+
+> 早期"25 MCP 工具"为混合口径；v0.73 起精确分类为 22 内置 + 14 标准（能力不减反增）。
+> 扩展性：新增工具=改注册表 ✓ / 新增 Skill=丢 SKILL.md ✓ / 新增 MCP=改 JSON ✓ / 新增 subagent=需改代码 ⚠️
+
+### 10.20.7 引用来源标注（合规 · 可审计）
+
+**规范**（每个借鉴模块文件头统一注释块，零运行时开销）：
+
+```
+source:  <项目名> <版本/commit>  |  repo: <URL>
+path:    <原文件路径>            |  adapted: <PAEG 改动>
+since:   <PAEG 版本号>
+```
+
+**dsh 借鉴族（9 处 · commit 47f9438）**：service_registry（ctx）/ subprocess_spawn / llm_adapter（Seam）/ hooks_hub（Cordis）/ workflows_hub（PTC）/ config_hub（guard）/ compaction / skill_registry / subagent_registry（⚠️ 补 commit）。
+
+**学术参考（quality_gate 五源）**：Constitutional AI / AlpaGasus / Self-RAG / Generative Agents / ExpeL。
+
+**Agent 范式**：agent_engine（ReAct/Reflexion/Claude Code）· session_model（Codex App Server）· memory_system（Claude Code/Codex/LangChain）。
+
+**OpenCode 生态**：llm_api（auth.json 凭据发现）· mcp_servers（opencode 同款标准 server）。
+
+**待补（9 处）**：paeg.py / subagents.py / runtime.py / tool_registry.py / config_hub.py / observability.py / lib/ingest / sse/protocol.py / blueprints/*.py。
