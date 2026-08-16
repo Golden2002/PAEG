@@ -152,6 +152,16 @@ final = tpl.replace("{{CONTENT}}", content_html)
 - 迭代：阈值 65% 误伤小图（第11页图4被推走）→ 调 55% + 用 viewBox 真实高度 → 修复
 - 教训：分页判断要区分"真大图"（viewBox 高）与"宽扁小图"（宽但矮）；阈值需实测调优
 
+
+**23. Mermaid 围栏黏连根因 + 恢复策略（v1.1.8 · 2026-08-16）**：
+- **症状**：PDF 渲染后 mermaid 全部显示 "Syntax error in text"，图表区域空白；但浏览器直接加载 HTML 时 mermaid 正常渲染 26 SVG。
+- **根因**：Markdown 中 mermaid 闭合围栏 ``` 黏在节点行尾（`PAEG["..."]``` 无换行），共 19 处。mermaid.js 把 `]``` 当节点文本的一部分 → 语法错误 → 整块渲染失败。
+- **排查路径**（重要）：①先浏览器加载 HTML 验证 mermaid 是否正常（排除渲染工具问题）→ ②若浏览器 OK 但 PDF 错，问题在 Markdown 源而非工具 → ③扫描所有 ``` 围栏配对，找"行尾 ```"（正则 `[^\n`](```)\n`）。
+- **修复**：`re.sub(r'([^\n`])(```)\n', r'\1\n```\n', md)` 一次性拆开全部黏连围栏（19 处），零内容改动。
+- **恢复策略**（关键）：若误改 mermaid 越改越乱，**从远端恢复原始 md + 只重做文字改动**——`git checkout <上次成功渲染的commit> -- 文件.md`。本案例恢复到 14bca34（v1.1.8 文字 + 原始 mermaid）后只做围栏修复。
+- **验证**：渲染后 `fitz` 扫全文查 "Syntax error" 必须为 0；`get_drawings()` 确认图表页有矢量绘图对象。
+- **教训**：①别在已弄乱的版本上反复修补，恢复原始 + 单点修复更稳；②mermaid 源改动前先备份；③"节点连写/init 主题"常是误判，围栏结构才是首要检查项。
+
 ## 更新日志
 
 | 日期 | 版本 | 改动 |
@@ -162,3 +172,4 @@ final = tpl.replace("{{CONTENT}}", content_html)
 | 2026-08-14 | v0.71.1 | 排版深水区修复（多轮 Oracle+visual+用户洞察）：①print 图片压扁（去 max-height）②深色背景（pre.mermaid 白底）③紫底白框冲突（文字标签与节点同色）④配色方案 A 蓝灰专业 ⑤dsf=4 至尊高清 ⑥图分类三类+hero ⑦pre 去边框；经验 #16-19 |
 | 2026-08-14 | v0.71.2 | 图双主题方案（用户精确指令）：保持现状（base 蓝灰）图9/15/16/17 + 其余 15 图第一版（neutral 白节点深字，白框融入不可见）；Mermaid 图级 `%%{init:{theme:'neutral'}}%%` 覆盖；经验 #20 |
 | 2026-08-15 | v1.1 | SVG 矢量直出终极方案：放弃 PNG 截图，mermaid.js 浏览器渲染 SVG 直接 page.pdf（矢量无限清晰）；白框根治（sequence textPlacement:'tspan' 绕开 foreignObject div 白底）；跨页截断修复（svg max-height 240mm）；大图分页（标题前插 page-break-before）；宽度解放（svg width:100%）；经验 #21-22 |
+| 2026-08-16 | v1.1.8 | Mermaid 围栏黏连根因修复（19 处行尾 ``` 拆分）+ 恢复策略沉淀（远端恢复+单点修复）+ 页脚版本统一 v1.1.8 + 渲染经验 #23 |
