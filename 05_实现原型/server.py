@@ -1,5 +1,5 @@
 """
-PAEG Flask 后端服务（v0.38 多用户扩展+SQLite）
+PAEG Flask 后端服务（v0.73 权威版本；v0.38 起多用户扩展+SQLite）
 
 实现 API 契约（详见 07_参考与勘误/01_API契约.md）：
 - POST /api/teach - 同步教学
