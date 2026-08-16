@@ -1,0 +1,12 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart TD
+    REQ["tool.before<br/>调用请求"] --> LD["加载 Profile<br/>+ preset 预设"]
+    LD --> P{"preset 类型<br/>read_only/standard/exam/full"}
+    P --> SB{"sandbox 检查<br/>写工具类型?"}
+    SB --> AP{"approval 检查<br/>需人工审批?"}
+    AP --> CU{"custom 派生<br/>场景规则匹配"}
+    CU -->|通过| OK["允许执行"]
+    CU -->|拒绝| NO["拒绝"]
+    AP -->|拒绝| NO
+    SB -->|拒绝| NO
+    OK --> EVT["权限事件 emit<br/>seq+profile+decision<br/>可回放审计"]

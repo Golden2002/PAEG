@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant App as 应用
+    participant H as hooks_hub
+    participant Handler as 各 handler
+    App->>H: session.start
+    App->>H: message.before_user
+    App->>H: llm.before（注入约束五层）
+    App->>H: llm.after（语言规范修正）
+    App->>H: tool.before/after
+    App->>H: session.end
+    H->>Handler: 按优先级串行（waterfall）
+    Handler-->>H: 可短路/透传

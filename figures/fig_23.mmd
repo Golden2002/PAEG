@@ -1,0 +1,18 @@
+%%{init: {'theme': 'dark'}}%%
+stateDiagram-v2
+    [*] --> calc
+    calc: tool.before hook<br/>计算 chain-key<br/>hash tool+args
+    calc --> count
+    count: 累加 N
+    count --> tier1: N=3
+    count --> tier2: N=5
+    count --> tier3: N=8
+    tier1: 等级1<br/>温和提示
+    tier2: 等级2<br/>警告+改建议
+    tier3: 等级3<br/>强制终止
+    tier1 --> count: 继续
+    tier2 --> count: 继续
+    count --> reset: 用户插话
+    reset: 计数清零
+    reset --> count
+    tier3 --> [*]

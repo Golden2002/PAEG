@@ -1,0 +1,9 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart TD
+    Sub["任务提交 TaskRegistry"] --> Exec["执行本轮 executor"]
+    Exec --> Eval["三层判定<br/>L0门禁+L1指标+L2证据"]
+    Eval -->|未达标| Guard{"防呆五防线"}
+    Guard -->|继续| Exec
+    Guard -->|轮次上限/停滞| ABORT["ABORT + 摘要"]
+    Eval -->|达标| DONE["DONE 承诺协议"]
+    DONE --> Back["结果回流 self_evolution"]

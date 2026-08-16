@@ -1,0 +1,15 @@
+%%{init: {'theme': 'dark'}}%%
+sequenceDiagram
+    participant App as server
+    participant WF as workflow
+    participant H as hooks_hub
+    participant SA as subagent
+    App->>SA: 构造（subagent/descriptor 9 个）
+    App->>WF: 触发 teach_materials
+    WF->>H: agent-start (runId=UUID, name=Presenter)
+    H->>SA: .run() 进入
+    SA->>H: hook invoked
+    H->>SA: 执行教学逻辑
+    SA->>H: hook result
+    SA->>H: agent-end (runId 配对, duration_ms)
+    H-->>WF: 续传下个步骤

@@ -691,7 +691,7 @@ sequenceDiagram
     H-->>WF: 续传下个步骤
 ```
 
-**图 26 · 教学物料流水线 material_pipeline
+**图 26 · 教学物料流水线 material_pipeline**
 
 ```mermaid
 %%{init: {'theme': 'dark'}}%%

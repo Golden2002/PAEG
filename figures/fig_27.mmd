@@ -1,0 +1,23 @@
+flowchart LR
+    subgraph "本地开发"
+        dev["本地 :5000<br/>python server.py"]
+        docker["Docker Compose<br/>docker compose up"]
+    end
+    subgraph "依赖打包(纪律33)"
+        pip["requirements.txt<br/>onnxruntime/rapidocr/whisper"]
+        sys["Dockerfile apt<br/>ffmpeg/libcairo"]
+        model["模型文件<br/>bge ONNX / whisper"]
+    end
+    subgraph "双远程同步(纪律34)"
+        gh["GitHub<br/>sync_check.py --fix"]
+        ms["ModelScope<br/>git push modelscope master"]
+        deploy["魔搭创空间<br/>ms_deploy.json :7860"]
+    end
+    dev --> docker
+    docker --> pip
+    docker --> sys
+    docker --> model
+    docker --> gh
+    docker --> ms
+    ms --> deploy
+    deploy --> user["公网用户"]

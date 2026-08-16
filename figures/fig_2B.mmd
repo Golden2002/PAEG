@@ -1,0 +1,29 @@
+flowchart TB
+    subgraph 入口层
+        server["server.py 组合根<br/>app 装配 + 蓝图注册 + 启动"]
+    end
+    subgraph 核心教学
+        chat["chat.py<br/>教学/闲聊 + SSE 流式"]
+        teaching["teaching.py<br/>teach 同步闭环"]
+        quiz["quiz.py<br/>测验"]
+    end
+    subgraph 会话与用户
+        conversations["conversations.py<br/>历史会话"]
+        threads["threads.py<br/>Thread 模型"]
+        modes["modes.py<br/>模式管理"]
+        uploads["uploads.py<br/>文件上传"]
+    end
+    subgraph 资源与管理
+        resources["resources.py<br/>教学资源 + PPT"]
+        proactive["proactive.py<br/>主动外联"]
+        self_update["self_update.py<br/>自我更新"]
+        admin["admin.py<br/>管理端点"]
+        voice["voice.py<br/>TTS/STT"]
+    end
+    server --> 核心教学
+    server --> 会话与用户
+    server --> 资源与管理
+    核心教学 --> services[services/ 业务层]
+    会话与用户 --> services
+    资源与管理 --> services
+    services --> infra[infra/ 基础设施]

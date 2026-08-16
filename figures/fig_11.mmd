@@ -1,0 +1,8 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart LR
+    ST["短期记忆<br/>≤12 条/token≤6000"] -->|超阈值| CP["compress_if_needed<br/>LLM 摘要"]
+    CP --> MT["中期记忆<br/>主题/掌握/薄弱/情感四信号<br/>≤900 字"]
+    MT -->|持久化| LT["长期记忆<br/>memory_summary.json"]
+    LT --> Profile["LearnerProfile 画像"]
+    ST -->|build_context| LLM["注入 LLM"]
+    MT -->|build_context| LLM

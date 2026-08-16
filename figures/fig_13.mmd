@@ -1,0 +1,9 @@
+%%{init: {'theme': 'dark'}}%%
+stateDiagram-v2
+    [*] --> step_idle
+    step_idle --> step_in_progress: 首步进入
+    step_in_progress --> step_awaiting_answer: checkpoint 发出
+    step_awaiting_answer --> step_resumed: 学生回答
+    step_resumed --> step_awaiting_answer: 再 checkpoint
+    step_resumed --> step_final: 无剩余步骤
+    step_final --> plan_complete: done 事件
