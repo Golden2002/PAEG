@@ -823,17 +823,17 @@ PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可�
 
 | 项 | 能力 | 实现 | 状态 |
 |---|---|---|---|
-| C1 | 间隔重复 SRS | `services/srs_sm2.py`（SM-2 算法，Anki 标准）| ✅ 完成 |
-| C2 | 学科知识图谱 | `services/concept_graph.py`（纯 Python 前驱关系图，19 概念种子）| ✅ 完成 |
-| C3 | 语义检索 | `services/semantic_search.py`（BM25Plus 基线 + BGE ONNX 扩展点）| ✅ 完成 |
+| C1 | 间隔重复 SRS | `services/srs_sm2.py`（SM-2 算法，Anki 标准）| 已完成 |
+| C2 | 学科知识图谱 | `services/concept_graph.py`（纯 Python 前驱关系图，19 概念种子）| 已完成 |
+| C3 | 语义检索 | `services/semantic_search.py`（BM25Plus 基线 + BGE ONNX 扩展点）| 已完成 |
 
 **进行中（C4-C6）**：
 
 | 项 | 能力 | 依赖 | 状态 |
 |---|---|---|---|
-| C4 | OCR（拍照作业识别）| rapidocr-onnxruntime | 🔄 实施中 |
-| C5 | 后端 Whisper STT | faster-whisper（已在 requirements）| ⬜ 待实施 |
-| C6 | 手写公式识别 | torch/pix2tex（重依赖）| ⬜ 评估 |
+| C4 | OCR（拍照作业识别）| rapidocr-onnxruntime | 实施中 |
+| C5 | 后端 Whisper STT | faster-whisper（已在 requirements）| 待实施 |
+| C6 | 手写公式识别 | torch/pix2tex（重依赖）| 评估中 |
 
 **C1-C3 关键点**：
 - **C1**：SM-2 纯函数式（EF 公式/答错重置/指数增长），连续答对间隔 1→6→17→49→147 天；零依赖
