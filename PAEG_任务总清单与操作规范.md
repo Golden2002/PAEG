@@ -1553,3 +1553,49 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - 合意："新的爱弥儿"
 
 **已融入 weil.yml 名字段落**（学生对"名字什么意思"可自然回答）
+
+## §3.49 本次 ULW 大更新操作标准提炼（2026-08-16，覆盖 Harness 30 项 27 项 + T1-T4 发布任务）
+
+> 来源：2026-08-16 整个执行周期的真实经验。以下每条都对应一次实际踩坑/成功，可复用。
+
+### A. 执行节奏标准（多波次大任务）
+- A1 **每项任务走 TDD 闭环**：RED（先写测试确认失败）→ GREEN（最小实现）→ SURFACE（真实调用验证，非仅测试）→ 提交（单 commit）→ 需求文档记录。铁律：无 RED 不写实现，无 SURFACE 不宣称完成。
+- A2 **每批提交用独立 commit + 中文 message**：feat/docs/chore 前缀 + 编号 + 引用需求文档章节（如 `feat: #4 ⭐ !!js 条件启停(Harness 30 项 P1, §3.46.2)`）。复杂 message 用临时 Python 脚本经 subprocess 提交（PowerShell 对 `<` `>` 重定向符解析有坑）。
+- A3 **每 3-5 项一批收口一次**：全量回归 + audit + 双远程推送，再开下一批。避免长尾堆叠。
+- A4 **上下文预算管理**：长对话中每完成一大项给用户阶段总结；后续任务独立开新轮次。
+
+### B. 架构拆分标准（借鉴成熟项目结构）
+- B1 **拆分动机是"架构质量"非"行数"**：低风险且适合拆分的模块独立成文件；核心链路（如 teach_stream SSE 1222 行）按 Oracle 判断保留原位，不贸然拆。
+- B2 **依赖注入三件套**：blueprint 直接 `from infra.runtime import get_x`（懒加载单例，与 server 模块级全局同引用）；`server.SESSIONS is infra.sessions.SESSIONS` 同一性验证；audit_check 反向依赖检查防 blueprints/services 反向 import server。
+- B3 **docstring 避免 "import server" 字面量**：audit L521 用文本扫描检测反向依赖，docstring 出现该字面量会误报。
+- B4 **`__file__` 上溯修复**：模块迁移后相对路径用 `os.path.dirname(os.path.abspath(__file__))` + parent.parent 逐级修正（self_update insights/memory 路径踩坑）。
+- B5 **每阶段验证：路由数 + audit 40/40 + 新功能测试全绿 + 活服务 HTTP 实测**（字节级行为不变为 ratchet 铁律）。
+
+### C. 借鉴 dsh Harness 的落地模式（30 项 → 27 项完成）
+- C1 **先契约后实现**：#11 三角色先落地契约层（agent_trirole.py），具体三角色化留待后续——契约先行，实现渐进。
+- C2 **安全边界优先**：#4 !!js 条件启停不引入真 JS 引擎（quickjs 重依赖 + AI 已可写 patch → JS 求值=任意代码执行风险），改 ast 白名单受限求值器（import/属性链/下标/任意调用全拒）。
+- C3 **配置化优于硬编码**：#28 质量门禁阈值/宪法条款走 config/quality_gate.json，不改代码调门禁；无配置行为不变（ratchet）。
+- C4 **对照验证也是交付**：#23 Fresh-Agent Loop 对照 RALPH——确认已有能力后用测试锁定，不重复造轮子。
+- C5 **AI 读写闭环**：#27 save/read/list_yaml_patch——AI 可修改自身 preset，但写入口必须收敛（PATCH_DIR 隔离）。
+
+### D. 文档同步标准（每次大更新必做）
+- D1 **需求文档即时记录**：每个子任务完成即记（§3.46-§3.49 章节化），不攒到最后。
+- D2 **技术文档"融入"而非"追加"**：新架构必须融入既有章节（版本头 + §10.2.21 落地进度），禁止简单 append 末尾。本次检查发现 Harness 新模块 0 提及 → 补融入。
+- D3 **三文档分层记录**：同一信息按读者层级组织——技术文档（工程师：结构/数据流）、维护手册（运维：命令/SOP）、元能力文档（架构师：方法论/高阶经验）。
+- D4 **三处一致**：本地 ↔ GitHub（sync_check.py --fix，API 通道）↔ Release；运行时数据（evolve_data/memory/data）与 PDF 调试产物（pdf_assets/_mermaid_*.png）入 .gitignore。
+
+### E. 验证盲区教训（本次 smoke_test 暴露）
+- E1 **测试脚本契约会过时**：smoke_test 用 `{"text": ...}` 调 affection（端点契约实为 `text` 字段，返回 200 正常）；`s == 200 or s == 500` 判定遇 LLM 慢 → timeout 得 -1。**修测试而非修代码**（ratchet：行为不变）。
+- E2 **LLM 慢 ≠ bug**：teach_stream 首事件 13.8s（真实推理），STREAM_TIMEOUT 设短会误报。验证 SSE 用 90s 超时。
+- E3 **audit_check 是接线安全网**：40/40 覆盖路由注册/反向依赖/权限校验/事件日志不变量——改架构后先跑它，再跑功能测试。
+
+### F. 前端/人格/命名标准（T1-T3 经验）
+- F1 **前端 emoji → SVG**：图标一律 lucide-static v1.28.0 风格（stroke=currentColor / viewBox 24 / stroke-width 2），归档 assets/icons/，按钮用 `<img class="link-icon">`（13px）。禁止按钮文本 emoji；注释/正则过滤符除外。
+- F2 **人格设定外置可编辑**：weil.yml（body 段）+ prompts._load_persona() 加载；提升人格必须基于一手著作（本次精读《薇依文选》7 篇），排除同名/仿作（Edith Stein 作品、安德烈·薇依回忆录）。
+- F3 **命名解释必须核实史实**：Émile Novis = 卢梭《爱弥儿》(1762) + 拉丁语 novus（新） + 薇依化名（1942.7《经济与人文主义》/1944.1《南方手册》）——用户原述"希腊语"修正为拉丁语源，期刊非报纸。
+
+### G. 收尾标准（每次大更新交付前）
+- G1 全量新功能测试（181 项）+ audit 40/40 + smoke + 活服务 HTTP 验证。
+- G2 Playwright 真实浏览器端到端：页面加载（无 JS 报错）→ 聊天 → 点赞 SVG → 网络请求（/api/feedback 200）→ 截图留存。
+- G3 双远程推送（GitHub API + ModelScope git）至同一 commit；git status 代码文件零残留。
+- G4 交付：版本号 + 网页链接（本地 :5000 + 公网隧道）。
