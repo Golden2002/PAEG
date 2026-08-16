@@ -1,4 +1,4 @@
-# PAEG 教育智能体 — 简明技术说明（v1.1.7）
+# PAEG 教育智能体 — 简明技术说明（v1.1.8）
 
 > 面向项目所有者：快速恢复对 PAEG 技术实现的全貌认知。
 > 结构：TL;DR → 能力全景（每个功能：技术路线 + 实现方法）→ 分层架构 → 关键流程 → 扩展指南。
@@ -815,33 +815,28 @@ PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可�
 
 **扩展性如何？** 加一个内置工具 = 改一行注册表；加一个 Skill = 丢一个 SKILL.md；加一个 MCP = 改一个 JSON。四类扩展零代码侵入，唯一例外是新增 subagent（需改 subagents.py）——这也是下一步最值得做的声明式化改造。
 
-### 7.2 能力增强落地（§3.54 ULW 循环 · 2026-08-16）
+### 7.2 能力增强落地（§3.54 ULW 循环 · 2026-08-16 · C1-C6 全部完成）
 
-> Oracle 咨询（bg_e57b7aec）筛出 6 个候选，按"先补短板、再做增强"推进。**C1-C3 已落地**，C4-C6 进行中。
-
-**已落地（C1-C3）**：
+> Oracle 咨询（bg_e57b7aec）筛出 6 个候选，按"先补短板、再做增强"推进，**全部落地**（4 新服务 + 2 能力锁定）。
 
 | 项 | 能力 | 实现 | 状态 |
 |---|---|---|---|
-| C1 | 间隔重复 SRS | `services/srs_sm2.py`（SM-2 算法，Anki 标准）| 已完成 |
-| C2 | 学科知识图谱 | `services/concept_graph.py`（纯 Python 前驱关系图，19 概念种子）| 已完成 |
-| C3 | 语义检索 | `services/semantic_search.py`（BM25Plus 基线 + BGE ONNX 扩展点）| 已完成 |
+| C1 | 间隔重复 SRS | services/srs_sm2.py（SM-2 算法，Anki 标准）| 已完成 |
+| C2 | 学科知识图谱 | services/concept_graph.py（纯 Python 前驱图，19 概念）| 已完成 |
+| C3 | 语义检索 | services/semantic_search.py（BM25Plus 基线 + BGE ONNX 扩展）| 已完成 |
+| C4 | OCR（拍照作业识别）| services/ocr_service.py（RapidOCR 封装）| 已完成 |
+| C5 | 后端 Whisper STT | voice_service.py（faster-whisper，能力已有+测试锁定）| 已完成 |
+| C6 | 手写公式识别 | services/formula_ocr.py（pix2tex 接口预留+降级）| 已完成 |
 
-**进行中（C4-C6）**：
+**落地要点**：
+- C1：SM-2 纯函数式，连续答对间隔 1→6→17→49→147 天；零依赖
+- C2：前驱/后继/相关/学习路径四 API；内置数学物理链；未知节点容错
+- C3：渐进式——模型缺失降级关键词（ratchet），BGE ONNX 就绪自动升级向量检索
+- C4：RapidOCR 懒加载 + 依赖缺失降级；图片→文字→知识库检索
+- C5：faster-whisper small/int8 CPU + 教学提示词；解决微信 X5 内核 STT 限制
+- C6：pix2tex 重依赖接口预留（纪律 33 默认不装），缺失时降级 verify_math 文本路径
 
-| 项 | 能力 | 依赖 | 状态 |
-|---|---|---|---|
-| C4 | OCR（拍照作业识别）| rapidocr-onnxruntime | 实施中 |
-| C5 | 后端 Whisper STT | faster-whisper（已在 requirements）| 待实施 |
-| C6 | 手写公式识别 | torch/pix2tex（重依赖）| 评估中 |
-
-**C1-C3 关键点**：
-- **C1**：SM-2 纯函数式（EF 公式/答错重置/指数增长），连续答对间隔 1→6→17→49→147 天；零依赖
-- **C2**：前驱/后继/相关/学习路径四 API；内置数学物理链（函数→极限→导数→积分）；未知节点容错
-- **C3**：渐进式架构——模型缺失降级关键词（ratchet），模型就绪自动升级向量检索；BM25Plus 修复低频词零分
-
-**能力全景更新**：C1-C3 落地后，PAEG 新增 3 个服务模块（srs_sm2/concept_graph/semantic_search），可调用能力从 56 增至 **59+**（3 服务 + 待 C4-C6）。
-
+**能力全景更新**：C1-C4 新增 4 个服务模块，可调用能力从 56 增至 **60**（含 C5/C6 能力接口）。
 
 ### 7.3 引用来源（标准参考文献格式）
 
