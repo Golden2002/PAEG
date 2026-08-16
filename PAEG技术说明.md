@@ -139,10 +139,12 @@
 %%{init: {'theme': 'dark'}}%%
 flowchart LR User(["学生<br/>浏览器/微信"]) -->|HTTP/SSE| PAEG["PAEG 教育智能体"]
     PAEG -->|Prompt| LLM(("LLM<br/>DeepSeek/OpenAI"))
-    LLM -->|生成/工具调用| PAEG PAEG <-->|检索/写入| KB[("知识库")]
+    LLM -->|生成/工具调用| PAEG
+    PAEG <-->|检索/写入| KB[("知识库")]
     PAEG <-->|联网| Ext["外部世界"]
     PAEG <-->|画像/历史| DB[("持久化")]
-    Dev["开发者"] -.->|热加载| PAEG```
+    Dev["开发者"] -.->|热加载| PAEG
+```
 
 **图 2· 系统尺度（六层 + 一次请求数据流）**
 
@@ -401,7 +403,8 @@ flowchart TD In["输入/工具返回"] --> L1["L1 注入模式正则"]
     L3 -->|pass| L4["L4 元能力边界<br/>自我指涉路由"]
     L4 -->|pass| M["memory 写入审计"]
     L1 -->|reject| X["拦截"]
-    L2 -->|reject| X Out["工具返回超长"] --> Sp["spill 截断 12000 字符"]
+    L2 -->|reject| X
+    Out["工具返回超长"] --> Sp["spill 截断 12000 字符"]
 ```
 
 **图 20· MCP 工具配置驱动加载器（v1.1.1 ⭐）**
@@ -414,7 +417,9 @@ flowchart LR JSON["config/mcp_tools.json<br/>14 工具声明"] --> LD["mcp_tools
     LD --> W2["函数名校验<br/>非下划线开头"]
     LD --> W3["危险模块拒绝<br/>os/sys/subprocess/importlib"]
     W1 -->|通过| REG["工具注册表"]
-    W2 --> REG W3 --> REG REG --> R["/api/admin/reload<br/>热重载"]
+    W2 --> REG
+    W3 --> REG
+    REG --> R["/api/admin/reload<br/>热重载"]
     R --> EX["execute_tool<br/>统一路由"]
 ```
 
@@ -429,7 +434,9 @@ flowchart TD REQ["tool.before<br/>调用请求"] --> LD["加载 Profile<br/>+ pr
     AP --> CU{"custom 派生<br/>场景规则匹配"}
     CU -->|通过| OK["允许执行"]
     CU -->|拒绝| NO["拒绝"]
-    AP -->|拒绝| NO SB -->|拒绝| NO OK --> EVT["权限事件 emit<br/>seq+profile+decision<br/>可回放审计"]
+    AP -->|拒绝| NO
+    SB -->|拒绝| NO
+    OK --> EVT["权限事件 emit<br/>seq+profile+decision<br/>可回放审计"]
 ```
 
 **图 22· 事件类型化（56 类型 + SessionEvent envelope）**
@@ -482,7 +489,9 @@ flowchart LR IN["主题输入"] --> DAG["teach_materials<br/>DAG 编排"]
     DAG --> P2["讲稿 + PPT"]
     DAG --> P3["视频脚本 + manim"]
     P1 --> GATE{"门控 self-check<br/>≤2 轮重生成"}
-    P2 --> GATE P3 --> GATE GATE -->|通过| OUT["联动下载包<br/>6 类物料"]
+    P2 --> GATE
+    P3 --> GATE
+    GATE -->|通过| OUT["联动下载包<br/>6 类物料"]
     GATE -->|失败| REGEN["重生成"]
     REGEN --> GATE
 ```
