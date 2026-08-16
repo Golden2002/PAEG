@@ -73,14 +73,14 @@
     - [1.13 上下文打包契约 + 模式自动纠正（v0.20.3 ⭐ 关键技术）](#113-上下文打包契约--模式自动纠正v0203--关键技术)
     - [1.13.1 上下文打包器（context_bundle.py）](#1131-上下文打包器context_bundlepy)
     - [1.13.2 模式自动纠正（_mode_auto_correct）](#1132-模式自动纠正_mode_auto_correct)
-    - [1.14 知识导图 + 气象页面（v0.20.5 ⭐ 新能力）](#114-知识导图--气象页面v0205--新能力)
-    - [1.14.1 知识导图功能](#1141-知识导图功能)
-    - [1.14.2 气象页面（windy 接入）](#1142-气象页面windy-接入)
-    - [1.15 模块化架构 + 元能力 + 可观测性（v0.21 ⭐ 架构成熟化）](#115-模块化架构--元能力--可观测性v021--架构成熟化)
-    - [1.15.1 功能模块注册机制（module_registry.py）](#1151-功能模块注册机制module_registrypy)
-    - [1.15.2 元能力文档（元能力文档.md）](#1152-元能力文档元能力文档md)
-    - [1.15.3 可观测性（observability.py）](#1153-可观测性observabilitypy)
-    - [1.15.4 Thread/Turn/Item 三层会话模型（v0.21.1 ⭐ 借鉴 Codex App Server）](#1154-threadturnitem-三层会话模型v0211--借鉴-codex-app-server)
+    - [1.17 知识导图 + 气象页面（v0.20.5 ⭐ 新能力）](#117-知识导图--气象页面v0205--新能力)
+    - [1.17.1 知识导图功能](#1171-知识导图功能)
+    - [1.17.2 气象页面（windy 接入）](#1172-气象页面windy-接入)
+    - [1.18 模块化架构 + 元能力 + 可观测性（v0.21 ⭐ 架构成熟化）](#118-模块化架构--元能力--可观测性v021--架构成熟化)
+    - [1.18.1 功能模块注册机制（module_registry.py）](#1181-功能模块注册机制module_registrypy)
+    - [1.18.2 元能力文档（元能力文档.md）](#1182-元能力文档元能力文档md)
+    - [1.18.3 可观测性（observability.py）](#1183-可观测性observabilitypy)
+    - [1.18.4 Thread/Turn/Item 三层会话模型（v0.21.1 ⭐ 借鉴 Codex App Server）](#1184-threadturnitem-三层会话模型v0211--借鉴-codex-app-server)
     - [1.16 商业教育 AI 借鉴设计（v0.21.2 ⭐ 调研转化）](#116-商业教育-ai-借鉴设计v0212--调研转化)
     - [1.16.1 防止直接给答案（Khanmigo 四层防线）](#1161-防止直接给答案khanmigo-四层防线)
     - [1.16.2 教育 KPI（Khanmigo 可观测化）](#1162-教育-kpikhanmigo-可观测化)
@@ -1552,9 +1552,9 @@ flowchart TB
 
 ---
 
-## 1.14 知识导图 + 气象页面（v0.20.5 ⭐ 新能力）
+## 1.17 知识导图 + 气象页面（v0.20.5 ⭐ 新能力）
 
-## 1.14.1 知识导图功能
+## 1.17.1 知识导图功能
 
 **触发**：用户说"画知识导图/列提纲/思维导图/知识结构/知识脉络/知识系统/框架图"
 
@@ -1565,7 +1565,7 @@ flowchart TB
 
 **卷首语**：WEIL_CORE 开头加"你的能力提示"——Émile 知道可要求画导图。
 
-## 1.14.2 气象页面（windy 接入）
+## 1.17.2 气象页面（windy 接入）
 
 **方案**（调研 embed.windy.com 官方）：
 - **Windy Embed iframe**（免费无 key，生产可用）：`embed.windy.com/embed2.html?lat&lon&overlay&product`
@@ -1576,11 +1576,11 @@ flowchart TB
 
 ---
 
-## 1.15 模块化架构 + 元能力 + 可观测性（v0.21 ⭐ 架构成熟化）
+## 1.18 模块化架构 + 元能力 + 可观测性（v0.21 ⭐ 架构成熟化）
 
 > 借鉴 opencode v2 插件架构 + OpenAI Codex agent 设计，将 PAEG 从"脚本式 Flask"升级为**可配置、可模块、可观测**的工程化平台。
 
-## 1.15.1 功能模块注册机制（module_registry.py）
+## 1.18.1 功能模块注册机制（module_registry.py）
 
 **原则**：功能模块独立注册，配置驱动启用/禁用，**上架/下架不改代码**。
 
@@ -1593,18 +1593,18 @@ paeg_modules.json（配置）→ module_registry.py（注册表）→ server 挂
 - `/api/modules` 查询端点；weather.html 门控（禁用 → 403）
 - 支持 `{env:VAR}` 环境变量替换
 
-## 1.15.2 元能力文档（元能力文档.md）
+## 1.18.2 元能力文档（元能力文档.md）
 
 7 条智能体设计原则 + 4 项开发流程元技能 + 架构成熟度清单——**指导后续所有开发的方法论**。
 
-## 1.15.3 可观测性（observability.py）
+## 1.18.3 可观测性（observability.py）
 
 - 结构化日志：`get_logger("server").info("tool.execute.after", tool=..., session=...)`
 - 核心指标：`record_metric("paeg.tool.duration", ms, {"tool": ...})`
 - JSONL 事件流：`emit_event("item.completed", type="tool_call", ...)`（供测试契约）
 - 接入 chat_stream：工具调用自动记录指标+事件
 
-## 1.15.4 Thread/Turn/Item 三层会话模型（v0.21.1 ⭐ 借鉴 Codex App Server）
+## 1.18.4 Thread/Turn/Item 三层会话模型（v0.21.1 ⭐ 借鉴 Codex App Server）
 
 **Codex 核心抽象落地**：教学会话从"内存 SESSIONS dict"升级为**持久化三层模型**。
 
