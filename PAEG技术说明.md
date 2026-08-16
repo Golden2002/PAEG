@@ -1,4 +1,4 @@
-# PAEG 教育智能体 — 简明技术说明（v1.1.4）
+# PAEG 教育智能体 — 简明技术说明（v1.1.5）
 
 > 面向项目所有者：快速恢复对 PAEG 技术实现的全貌认知。
 > 结构：TL;DR → 能力全景（每个功能：技术路线 + 实现方法）→ 分层架构 → 关键流程 → 扩展指南。
@@ -14,14 +14,14 @@
 2. **学科专精**：35 学科 × 4 学段各有专属教学法（哲学文献论证/大学物理拆键/外语母语迁移…）
 3. **自我进化**：越用越好——从教学中自动蒸馏知识、沉淀教学经验、热更新知识库，还能用 RALPH 循环持续改进自身
 
-**技术底座**：Python + Flask（SSE 流式）+ 多种 LLM（DeepSeek/OpenAI 兼容）+ MCP 工具链（25 工具）+ Skills + Workflows + 自我更新引擎。
+**技术底座**：Python + Flask（SSE 流式）+ 多种 LLM（DeepSeek/OpenAI 兼容）+ MCP 工具链（14 标准工具）+ Skills（11）+ Workflows + 自我更新引擎。
 
 ---
 
 
 ### 先认识 5 个关键名词（快速速查）
 - **subagent**：专科老师——每个负责一个领域（诊断/讲解/评估…），职责单一
-- **MCP**：工具调用标准——让 AI 能联网、读写文件、调用外部工具（25 个）
+- **MCP**：工具调用标准——让 AI 能联网、读写文件、调用外部工具（14 个标准 MCP 工具）
 - **Skill**：按需加载的能力包——需要时才加载的专业流程（11 个）
 - **SSE**：流式推送——AI 边想边输出，像打字机一样逐字显示
 - **TRUTH_GROUNDING**：防幻觉底线——10 条规则强制 AI 不准编造，宁可说"不知道"
@@ -31,7 +31,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 定位 | 个性化自适应教育智能体（v0.69） |
+| 定位 | 个性化自适应教育智能体（v0.73） |
 | 入口 | Web UI（index.html）/ REST API（server.py）/ 微信桥 |
 | 技术栈 | Python 3.12 / Flask / SSE / MCP / FastMCP / SQLite / JSON 持久化 |
 | 核心模块 | meta_router（意图路由）/ paeg（教学编排）/ subagents（9 专家）/ prompts（提示词库）/ self_evolution（自我更新）/ config_hub（配置体系）/ ralph（循环器） |
@@ -95,7 +95,7 @@
 | 功能 | 用户场景 | 技术路线 | 实现方法 |
 |---|---|---|---|
 | **讲义/PPT/视频/manim/思维导图** | 制作教学材料 | 文件生成器 + MCP | 能力清单注入（_build_capability_manifest）→ LLM 判断何时生成 → manim 动画（manim_service）/PPT（mcp__pptx）/讲义（keyword_doc）/视频脚本（script_service）/思维导图（knowledge_map） |
-| **MCP 工具链** | 联网/文件/检索 | 25 个 MCP 工具 | filesystem/memory/brave-search/pptx 等；config_hub 统一路由（mcp__ 前缀），spill 溢出防护（超 12000 字符截断） |
+| **MCP 工具链** | 联网/文件/检索 | 14 个 MCP 工具 | filesystem/memory/brave-search/pptx 等；config_hub 统一路由（mcp__ 前缀），spill 溢出防护（超 12000 字符截断） |
 | **语音朗读** | 播放回复 | /api/voice/tts | 前端朗读按钮→TTS |
 | **数学可视化视频** | 生成高质量数学动画 | visual_script_generator + manim_service | 对话+轮询→script.json（3B1B 原则）→Manim 渲染；脚本+讲稿+PPT+讲义+思维导图联动可下载 |
 | **教学视频** | 授课视频生成 | script_service（视频讲稿）+ 视频管线 | 大纲→口语化讲稿（秒数控制）→合成视频 |
@@ -172,7 +172,7 @@ flowchart LR
 | L2 意图路由 | 识别意图 | meta_router（15 意图） | 判定 intent=teach |
 | L3 教学编排 | 流程控制 | paeg.teach / teach_stream（SSE） | 五阶段编排 + 流式输出 |
 | L4 Subagent | 领域执行 | 9 个领域专家 | 诊断/计划/讲解/评估协作 |
-| L5 能力组件 | 可复用能力 | 25 MCP / 11 Skills / Workflows | 按需调工具 |
+| L5 能力组件 | 可复用能力 | 14 MCP / 11 Skills / Workflows | 按需调工具 |
 | L6 基础设施 | 底层支撑 | LLM 适配 / 知识库 / config_hub / 持久化 | 提供算力与数据 |
 | **L0 横切** | 质量保障 | TRUTH_GROUNDING / QualityGate / 语言规范 | **约束每一层** |
 
@@ -185,7 +185,7 @@ flowchart LR
 flowchart TB
     UI["Web UI"] --> API["REST API"] --> R["meta_router 15意图"] --> T["paeg.teach / teach_stream"]
     T --> S["9 个领域专家"]
-    S --> M["25 MCP 工具"]
+    S --> M["14 MCP 工具"]
     S --> LL["LLM 适配"]
     T --> ST["持久化"]
     L0{{"L0 横切质量层"}} -.- T
@@ -323,7 +323,7 @@ flowchart TD
 %%{init: {'theme': 'dark'}}%%
 flowchart LR
     App["server.py/subagents"] -->|get_all_tool_defs| Hub["config_hub"]
-    Hub --> MCP["MCP 25 工具"]
+    Hub --> MCP["MCP 14 工具"]
     Hub --> SK["Skills 11"]
     Hub --> HK["hooks 7 事件"]
     Hub --> WF["Workflows DAG"]
@@ -670,7 +670,7 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 
 ---
 
-## 第 5 章附录 可扩展模块（框架化 · v0.70 ⭐）
+## 第 5A 章 可扩展模块（框架化 · v0.70 ⭐）
 
 > **框架化原则**：所有可扩展能力（约束层级/语言规范/配置体系）都是"**内嵌默认内容 + 外部扩展**"双层结构——PAEG 自身的设计逻辑与内容 100% 保留为内嵌默认，外部开发者可在此基础上更换内容或拓展结构，**不破坏原设计**。
 
@@ -712,7 +712,7 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 
 ---
 
-## 第 5A 章 DeepSeek Harness 借鉴蓝图（2026-08-14 调研）
+## 第 5B 章 DeepSeek Harness 借鉴蓝图（2026-08-14 调研 · 30 项中 27 项已落地）
 
 > 来源：[github.com/deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（81.5k stars · MIT）——**一切皆插件**（Everything is a Plugin），Cordis 驱动。PAEG 依据其架构产出 **30 项优化需求**（§二 Step 2 需求文档，9 P0 + 14 P1 + 7 P2）。
 
@@ -728,20 +728,20 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 
 ### 30 项优化需求速查（完整清单见需求文档 §二 Step 2）
 
-**P0（9 项，长期蓝图核心）**：#1 subagent patch · #2 profile bundle · #3 persona 外置 · #7 教学预设 · #8 PresetService · #11 三角色重构 · #12 LLM Provider Seam · #13 Shell Seam · #21 Subagent Registry
+**P0（9 项）→ 已完成 8/9**：#1 subagent patch ✅ · #2 profile bundle（§3.38 H-2 ✅）· #3 persona 外置 ✅ · #7 教学预设 ✅ · #8 PresetService ✅ · #11 三角色重构（契约层 ✅，具体化待后续）· #12 LLM Provider Seam ✅ · #13 Shell Seam ✅ · #21 Subagent Registry ✅
 
-**P1（14 项）**：#4 !!js 条件 · #5 home overlay · #9 per-agent scope · #10 preset 结构 · #14 tool 按需加载 · #15 Session Event Log · #18 权限预设升级 · #19 权限事件 · #22 subagent report · #24/25 UI 模式化 · #27 self-update via patch · #29 多级 skill · #30 ctx registry
+**P1（14 项）→ 已完成 12/14**：#4 !!js 条件 ✅ · #5 home overlay ✅ · #9 per-agent scope ✅ · #10 preset 结构 ✅ · #14 tool 按需加载 ✅ · #15 Session Event Log ✅ · #18 权限预设升级 ✅ · #19 权限事件 ✅ · #22 subagent report ✅ · #24/25 UI 模式化（待确认）· #27 self-update via patch ✅ · #29 多级 skill ✅ · #30 ctx registry ✅
 
-**P2（7 项）**：#6 OS 双轨 · #16 hooks 瀑布 · #17 subprocess 抽象 · #20 custom 状态 · #23 fresh-agent loop（对照 RALPH）· #26 HMR · #28 Constitutional patch
+**P2（7 项）→ 已完成 6/7**：#6 OS 双轨 ✅ · #16 hooks 瀑布 ✅ · #17 subprocess 抽象 ✅ · #20 custom 状态 ✅ · #23 fresh-agent loop（对照 RALPH ✅）· #26 HMR（待确认）· #28 Constitutional patch ✅
 
 ### 建议实施路线（4 阶段，6-10 周）
 
-- **Phase 1 运行时底座**（1-2 周）：#30 ctx registry / #12 LLM Seam / #13 Shell Seam / #15 Session Event Log
-- **Phase 2 装扮系统**（2-3 周）：#1 subagent patch / #2 profile / #3 persona / #7-10 预设 / #4-6 条件+overlay
-- **Phase 3 能力接缝+权限+UI**（2-3 周）：#11 三角色 / #14 tool registry / #18-20 权限 / #21-23 subagent / #24-26 UI
-- **Phase 4 元能力**（1-2 周）：#27 self-update via patch / #28 constitutional patch / #29 多级 skill
+- **Phase 1 运行时底座**：✅ 已完成（#30/#12/#13/#15 全部落地）
+- **Phase 2 装扮系统**：✅ 已完成（#1/#2/#3/#7-10/#4-6 全部落地）
+- **Phase 3 能力接缝+权限+UI**：🔄 大部分完成（#11 契约层/#14/#18-20/#21-23 落地；#24-26 UI 待确认）
+- **Phase 4 元能力**：✅ 已完成（#27/#28/#29 全部落地）
 
-**衔接**：已落地的 constraint_engine（§3.29）+ lang_gate MCP（§3.28）正是 P1 #5/#18/#27 的雏形——约束/语言规范已数据化可动态，后续沿此模式扩展。
+**衔接**：已落地的 constraint_engine（§3.29）+ lang_gate MCP（§3.28）+ services/ 全套 Seam/Registry（§10.20 技术全景）正是 Harness 落地的实体——约束/语言规范/服务注册已数据化可动态，30 项中 27 项完成（2026-08-16），剩余 #11 具体化 / #24-26 UI 待后续波次。
 
 ---
 
@@ -805,7 +805,7 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 | meta_router | 意图路由器（15 意图分类，LLM 优先+规则兜底+模式短路） |
 | SUBJECT_STYLES | 35 学科教学风格字典（persona/语言/结构/侧重/方法论/例题） |
 | subagent | 领域专家子代理（9 个，职责单一+上下文隔离） |
-| MCP | Model Context Protocol——工具链（filesystem/brave-search 等 25 工具） |
+| MCP | Model Context Protocol——工具链（filesystem/brave-search 等 14 工具） |
 | Skill | 按需加载的专业能力（SKILL.md，L1 目录+L2 激活） |
 | Workflow | 声明式流程（JSON DAG，如 teach_minimal 诊断→计划→实施→评估） |
 | hooks | 事件钩子（session/message/llm/tool 7 类，waterfall 链） |
