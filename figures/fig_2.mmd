@@ -1,0 +1,9 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart TB
+    UI["Web UI"] --> API["REST API"] --> R["meta_router 15意图"] --> T["paeg.teach / teach_stream"]
+    T --> S["9 核心 subagent + ResourceLibrarian"]
+    S --> M["14 MCP 工具"]
+    S --> LL["LLM 适配"]
+    T --> ST["持久化"]
+    L0{{"L0 横切质量层"}} -.- T
+    L0 -.- S

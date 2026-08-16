@@ -1,0 +1,20 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart LR
+    subgraph Main["主线 · 五阶段"]
+        Start(["学生提问"]) --> D["① 诊断"]
+        D --> P["② 计划"]
+        P --> Pre["③ 讲解 LLM 流式"]
+    end
+    subgraph Loop["互动循环"]
+        Pre --> CP{{"checkpoint 听懂了吗"}}
+        CP -->|回答| E["④ 评估"]
+        E --> A["⑤ 调整"]
+        A -->|继续| Pre
+    end
+    subgraph Done["完成 · 进化"]
+        A -->|完成| Done2["✓ 完成"]
+        Done2 --> Ev["自我进化"]
+        Ev --> KB[("知识库 热加载")]
+    end
+    Main ~~~ Loop
+    Loop ~~~ Done

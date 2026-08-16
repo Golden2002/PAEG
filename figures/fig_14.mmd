@@ -1,0 +1,10 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart TD
+    C["候选内容"] --> L1["L1 宪法<br/>有害/注入/PII 正则 <1ms"]
+    L1 -->|pass| L2["L2 硬规则<br/>长度/去重/格式 <1ms"]
+    L2 -->|pass| L3["L3 LLM 评分 ~2s<br/>factuality/safety/pedagogy"]
+    L3 -->|pass| L4["L4 证据门槛<br/>沙盒池+实证贡献分"]
+    L1 -->|reject| X["拒绝"]
+    L2 -->|reject| X
+    L3 -->|reject| X
+    L4 -->|通过| OK["入库"]

@@ -1,0 +1,10 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart TD
+    In["输入/工具返回"] --> L1["L1 注入模式正则"]
+    L1 -->|pass| L2["L2 PII 检测"]
+    L2 -->|pass| L3["L3 长文复合输入检测<br/>指令 vs 资料"]
+    L3 -->|pass| L4["L4 元能力边界<br/>自我指涉路由"]
+    L4 -->|pass| M["memory 写入审计"]
+    L1 -->|reject| X["拦截"]
+    L2 -->|reject| X
+    Out["工具返回超长"] --> Sp["spill 截断 12000 字符"]

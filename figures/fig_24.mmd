@@ -1,0 +1,11 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart TB
+    L1["L1 内嵌默认<br/>PAEG 原设计"] --> L2
+    L2["L2 Bundle 加载<br/>standard / exam / weil"]
+    L2 --> L3
+    L3["L3 Bundle 堆叠<br/>多 bundle 顺序覆盖"] --> L4
+    L4["L4 Profile 加载<br/>教师预设场景"] --> L5
+    L5["L5 用户 patch<br/>稀疏字段覆盖"] --> L6
+    L6["L6 最终配置树<br/>→ execute_tool"]
+    L6 --> EX["/api/admin/dump-config<br/>完整可 patch JSON"]
+    EX -. 教师一键切换 .-> L2

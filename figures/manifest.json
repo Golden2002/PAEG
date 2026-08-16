@@ -1,0 +1,202 @@
+{
+  "version": "1.1.8",
+  "count": 28,
+  "figures": [
+    {
+      "num": "1",
+      "title": "全景尺度（PAEG 与外部世界）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart LR\n    User([\"学生<br/>浏览器/微信\"]) -->|HTTP/SSE| PAEG[\"PAEG 教育智能体\"]\n    PAEG -->|Prompt| LLM((\"LLM<br/>DeepSeek/OpenAI\"))\n    LLM -->|生成/工具调用| PAEG\n    PAEG <-->|检索/写入| KB[(\"知识库\")]\n    PAEG <-->|联网| Ext[\"外部世界\"]\n    PAEG <-->|画像/历史| DB[(\"持久化\")]\n    Dev[\"开发者\"] -.->|热加载| PAEG",
+      "svg": "fig_1.svg",
+      "mmd": "fig_1.mmd"
+    },
+    {
+      "num": "2",
+      "title": "系统尺度（六层 + 一次请求数据流）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart TB\n    UI[\"Web UI\"] --> API[\"REST API\"] --> R[\"meta_router 15意图\"] --> T[\"paeg.teach / teach_stream\"]\n    T --> S[\"9 核心 subagent + ResourceLibrarian\"]\n    S --> M[\"14 MCP 工具\"]\n    S --> LL[\"LLM 适配\"]\n    T --> ST[\"持久化\"]\n    L0{{\"L0 横切质量层\"}} -.- T\n    L0 -.- S",
+      "svg": "fig_2.svg",
+      "mmd": "fig_2.mmd"
+    },
+    {
+      "num": "2B",
+      "title": "Blueprints 分层架构（Phase 3 · 12 蓝图）",
+      "code": "flowchart TB\n    subgraph 入口层\n        server[\"server.py 组合根<br/>app 装配 + 蓝图注册 + 启动\"]\n    end\n    subgraph 核心教学\n        chat[\"chat.py<br/>教学/闲聊 + SSE 流式\"]\n        teaching[\"teaching.py<br/>teach 同步闭环\"]\n        quiz[\"quiz.py<br/>测验\"]\n    end\n    subgraph 会话与用户\n        conversations[\"conversations.py<br/>历史会话\"]\n        threads[\"threads.py<br/>Thread 模型\"]\n        modes[\"modes.py<br/>模式管理\"]\n        uploads[\"uploads.py<br/>文件上传\"]\n    end\n    subgraph 资源与管理\n        resources[\"resources.py<br/>教学资源 + PPT\"]\n        proactive[\"proactive.py<br/>主动外联\"]\n        self_update[\"self_update.py<br/>自我更新\"]\n        admin[\"admin.py<br/>管理端点\"]\n        voice[\"voice.py<br/>TTS/STT\"]\n    end\n    server --> 核心教学\n    server --> 会话与用户\n    server --> 资源与管理\n    核心教学 --> services[services/ 业务层]\n    会话与用户 --> services\n    资源与管理 --> services\n    services --> infra[infra/ 基础设施]",
+      "svg": "fig_2B.svg",
+      "mmd": "fig_2B.mmd"
+    },
+    {
+      "num": "3",
+      "title": "教学流尺度（五阶段 + checkpoint 互动）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart LR\n    subgraph Main[\"主线 · 五阶段\"]\n        Start([\"学生提问\"]) --> D[\"① 诊断\"]\n        D --> P[\"② 计划\"]\n        P --> Pre[\"③ 讲解 LLM 流式\"]\n    end\n    subgraph Loop[\"互动循环\"]\n        Pre --> CP{{\"checkpoint 听懂了吗\"}}\n        CP -->|回答| E[\"④ 评估\"]\n        E --> A[\"⑤ 调整\"]\n        A -->|继续| Pre\n    end\n    subgraph Done[\"完成 · 进化\"]\n        A -->|完成| Done2[\"✓ 完成\"]\n        Done2 --> Ev[\"自我进化\"]\n        Ev --> KB[(\"知识库 热加载\")]\n    end\n    Main ~~~ Loop\n    Loop ~~~ Done",
+      "svg": "fig_3.svg",
+      "mmd": "fig_3.mmd"
+    },
+    {
+      "num": "4",
+      "title": "组件尺度（Presenter 内部装配）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart LR\n    subgraph ASM[\"system 装配\"]\n        B[\"WEIL_CORE\"]; T2[\"TRUTH_GROUNDING\"]; SS[\"SUBJECT_STYLES\"]; LG[\"LANGUAGE_STYLE\"]\n    end\n    ASM --> Sys[\"system prompt\"] --> LLM2[\"LLM 调用 重试+超时\"]\n    LLM2 --> St[\"60字分片\"] --> Y[\"SSE yield\"]\n    Y -.->|需工具| MC[\"mcp__ 工具\"] --> LLM2",
+      "svg": "fig_4.svg",
+      "mmd": "fig_4.mmd"
+    },
+    {
+      "num": "5",
+      "title": "自我进化闭环（G1-G11）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart TD\n    Teach[\"教学完成\"] --> Hist[\"对话历史抓取 G1\"]\n    Hist --> Dist[\"知识蒸馏<br/>LLM 提炼\"]\n    Dist --> Gate[\"QualityGate L1-L3<br/>事实评分\"]\n    Gate -->|pass| Evolved[\"evolved_*.json\"]\n    Evolved --> Hot[\"热加载 G3\"]\n    Hot --> KB[(\"知识库可检索\")]\n    Teach --> Refl[\"教学反思\"]\n    Refl --> Patch[\"subject_patches G5\"]\n    Patch --> TM[\"教学记忆注入\"]\n    Tool[\"工具调用\"] --> Lesson[\"工具经验 G4/G6\"]\n    Lesson --> TL[\"tool_lessons.md\"]\n    TL --> Next[\"下次教学注入\"]",
+      "svg": "fig_5.svg",
+      "mmd": "fig_5.mmd"
+    },
+    {
+      "num": "6",
+      "title": "RALPH 循环（任务驱动持续改进）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart TD\n    Sub[\"任务提交 TaskRegistry\"] --> Exec[\"执行本轮 executor\"]\n    Exec --> Eval[\"三层判定<br/>L0门禁+L1指标+L2证据\"]\n    Eval -->|未达标| Guard{\"防呆五防线\"}\n    Guard -->|继续| Exec\n    Guard -->|轮次上限/停滞| ABORT[\"ABORT + 摘要\"]\n    Eval -->|达标| DONE[\"DONE 承诺协议\"]\n    DONE --> Back[\"结果回流 self_evolution\"]",
+      "svg": "fig_6.svg",
+      "mmd": "fig_6.mmd"
+    },
+    {
+      "num": "7",
+      "title": "意图路由（meta_router）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart TD\n    In[\"用户输入\"] --> Mode{\"模式短路<br/>用户显式选择?\"}\n    Mode -->|是| Direct[\"确定性意图<br/>confidence 0.95\"]\n    Mode -->|否| LLM[\"LLM 判断 15 意图\"]\n    LLM -->|低置信/异常| Rule[\"规则兜底<br/>正则检测器\"]\n    LLM -->|高置信| Use[\"使用意图\"]\n    Rule --> Use\n    Direct --> Use\n    Use --> Route[\"路由到处理链\"]",
+      "svg": "fig_7.svg",
+      "mmd": "fig_7.mmd"
+    },
+    {
+      "num": "8",
+      "title": "配置体系（config_hub）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart LR\n    App[\"server.py/subagents\"] -->|get_all_tool_defs| Hub[\"config_hub\"]\n    Hub --> MCP[\"MCP 14 工具\"]\n    Hub --> SK[\"Skills 11\"]\n    Hub --> HK[\"hooks 7 事件\"]\n    Hub --> WF[\"Workflows DAG\"]\n    MCP -->|mcp__ 前缀| Exec[\"execute_tool 统一路由\"]\n    SK -->|load_skill__| Exec\n    WF -->|run_workflow__| Exec\n    Exec -->|spill 防护| Out[\"LLM 工具结果\"]",
+      "svg": "fig_8.svg",
+      "mmd": "fig_8.mmd"
+    },
+    {
+      "num": "9",
+      "title": "checkpoint 互动时序（深入版教学互动）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nsequenceDiagram\n    participant S as 学生\n    participant T as teach_stream\n    participant P as Presenter\n    participant E as Evaluator\n    S->>T: 提问\n    T->>P: 讲解步骤\n    P-->>S: SSE 流式讲解\n    T-->>S: event: checkpoint(听懂了吗)\n    S->>T: 回答(strict_checkpoint 挂起后)\n    T->>E: _student_signal 评估\n    E-->>T: understood/partial/confused\n    T->>P: 续讲(_pending_steps + remediation)\n    P-->>S: 继续流式讲解",
+      "svg": "fig_9.svg",
+      "mmd": "fig_9.mmd"
+    },
+    {
+      "num": "10",
+      "title": "17 维学生画像独立性模型",
+      "code": "flowchart TD\n    P[\"LearnerProfile 17 维\"] --> L1[\"L1 核心 5 维<br/>identity/cognitive_style/mastery/study_goal/emotion\"]\n    P --> L2[\"L2 触发 5 维<br/>engagement/motivation/belief/intention/error_response\"]\n    P --> L3[\"L3 懒加载 6 维<br/>world_view/learning_rhythm/time/collaboration/media/accessibility\"]\n    P --> D[\"第 17 维<br/>动态扩展 add_dimension\"]\n    L1 -->|始终注入| SYS[\"system prompt\"]\n    L2 -->|条件注入| SYS\n    L3 -->|按需注入| SYS\n    Ind[\"Individuality 增量建模\"] -->|对话后 LLM 提取| P",
+      "svg": "fig_10.svg",
+      "mmd": "fig_10.mmd"
+    },
+    {
+      "num": "11",
+      "title": "三层记忆生命周期",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart LR\n    ST[\"短期记忆<br/>≤12 条/token≤6000\"] -->|超阈值| CP[\"compress_if_needed<br/>LLM 摘要\"]\n    CP --> MT[\"中期记忆<br/>主题/掌握/薄弱/情感四信号<br/>≤900 字\"]\n    MT -->|持久化| LT[\"长期记忆<br/>memory_summary.json\"]\n    LT --> Profile[\"LearnerProfile 画像\"]\n    ST -->|build_context| LLM[\"注入 LLM\"]\n    MT -->|build_context| LLM",
+      "svg": "fig_11.svg",
+      "mmd": "fig_11.mmd"
+    },
+    {
+      "num": "12",
+      "title": "教学策略决策树（choose_strategy）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart TD\n    In[\"诊断+学科+画像\"] --> Bloom[\"学科默认 Bloom 起点\"]\n    Bloom --> R1{\"有缺口且无前置?\"}\n    R1 -->|是| S1[\"scaffolded 支架式\"]\n    R1 -->|否| R2{\"depth=basic?\"}\n    R2 -->|是| S1\n    R2 -->|否| R3{\"技能类学科?\"}\n    R3 -->|是| S2[\"mastery 掌握式\"]\n    R3 -->|否| R4{\"高阶 Bloom?\"}\n    R4 -->|是| S3[\"socratic 苏格拉底\"]\n    R4 -->|否| R5{\"画像兜底<br/>考研/初高中/具体偏好?\"}\n    R5 -->|考研| S3\n    R5 -->|初高中技能| S2\n    R5 -->|具体/视觉| S1\n    R5 -->|默认| S4[\"default\"]",
+      "svg": "fig_12.svg",
+      "mmd": "fig_12.mmd"
+    },
+    {
+      "num": "13",
+      "title": "单步教学续讲（_pending_steps 状态机）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nstateDiagram-v2\n    [*] --> step_idle\n    step_idle --> step_in_progress: 首步进入\n    step_in_progress --> step_awaiting_answer: checkpoint 发出\n    step_awaiting_answer --> step_resumed: 学生回答\n    step_resumed --> step_awaiting_answer: 再 checkpoint\n    step_resumed --> step_final: 无剩余步骤\n    step_final --> plan_complete: done 事件",
+      "svg": "fig_13.svg",
+      "mmd": "fig_13.mmd"
+    },
+    {
+      "num": "14",
+      "title": "QualityGate L1-L4 四层过滤",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart TD\n    C[\"候选内容\"] --> L1[\"L1 宪法<br/>有害/注入/PII 正则 <1ms\"]\n    L1 -->|pass| L2[\"L2 硬规则<br/>长度/去重/格式 <1ms\"]\n    L2 -->|pass| L3[\"L3 LLM 评分 ~2s<br/>factuality/safety/pedagogy\"]\n    L3 -->|pass| L4[\"L4 证据门槛<br/>沙盒池+实证贡献分\"]\n    L1 -->|reject| X[\"拒绝\"]\n    L2 -->|reject| X\n    L3 -->|reject| X\n    L4 -->|通过| OK[\"入库\"]",
+      "svg": "fig_14.svg",
+      "mmd": "fig_14.mmd"
+    },
+    {
+      "num": "15",
+      "title": "周期自我更新调度",
+      "code": "%%{init: {'theme': 'dark'}}%%\nsequenceDiagram\n    participant S as server\n    participant P as PeriodicUpdater\n    participant E as SelfEvolver\n    participant I as SelfImprover\n    S->>P: 启动后台线程\n    P->>P: 立即跑一次（消化积压）\n    loop 每 24h 检查\n        P->>E: weekly_insight_update\n        E-->>P: 洞察+Library 防护\n        P->>P: batch_update（清过期快照）\n        P->>I: analyze_failures\n        I-->>P: improvements.md\n    end\n    P-->>S: 下次教学自动加载改进",
+      "svg": "fig_15.svg",
+      "mmd": "fig_15.mmd"
+    },
+    {
+      "num": "16",
+      "title": "SSE 流式协议事件序列",
+      "code": "sequenceDiagram\n    participant U as 用户\n    participant S as server\n    participant A as Agent\n    S->>A: connection_open\n    U->>S: user_message\n    S-->>U: event: diagnosis\n    S-->>U: event: plan\n    loop step 1..N\n        S-->>U: event: step\n        S-->>U: event: presentation（60字分片）\n    end\n    S-->>U: event: checkpoint\n    S-->>U: event: evaluation\n    S-->>U: event: adjustment\n    S-->>U: event: done",
+      "svg": "fig_16.svg",
+      "mmd": "fig_16.mmd"
+    },
+    {
+      "num": "17",
+      "title": "hooks 事件链（贯穿各层）",
+      "code": "sequenceDiagram\n    participant App as 应用\n    participant H as hooks_hub\n    participant Handler as 各 handler\n    App->>H: session.start\n    App->>H: message.before_user\n    App->>H: llm.before（注入约束五层）\n    App->>H: llm.after（语言规范修正）\n    App->>H: tool.before/after\n    App->>H: session.end\n    H->>Handler: 按优先级串行（waterfall）\n    Handler-->>H: 可短路/透传",
+      "svg": "fig_17.svg",
+      "mmd": "fig_17.mmd"
+    },
+    {
+      "num": "18",
+      "title": "危机信号识别协议（affection_gate）",
+      "code": "flowchart TD\n    In[\"用户输入\"] --> Det{\"自伤/自杀信号?\"}\n    Det -->|否| Normal[\"正常回应\"]\n    Det -->|是| Gate[\"affection_gate 拦截\"]\n    Gate --> R1[\"先完整回应用户的话<br/>不短路成预制提示\"]\n    R1 --> R2[\"自然融入关怀<br/>热线+继续聊天+现实陪伴\"]\n    R2 --> R3{\"用户明确拒绝?\"}\n    R3 -->|是| Respect[\"尊重选择不再重复\"]\n    R3 -->|否| R2",
+      "svg": "fig_18.svg",
+      "mmd": "fig_18.mmd"
+    },
+    {
+      "num": "19",
+      "title": "spill 防护（上下文溢出+注入防御）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart TD\n    In[\"输入/工具返回\"] --> L1[\"L1 注入模式正则\"]\n    L1 -->|pass| L2[\"L2 PII 检测\"]\n    L2 -->|pass| L3[\"L3 长文复合输入检测<br/>指令 vs 资料\"]\n    L3 -->|pass| L4[\"L4 元能力边界<br/>自我指涉路由\"]\n    L4 -->|pass| M[\"memory 写入审计\"]\n    L1 -->|reject| X[\"拦截\"]\n    L2 -->|reject| X\n    Out[\"工具返回超长\"] --> Sp[\"spill 截断 12000 字符\"]",
+      "svg": "fig_19.svg",
+      "mmd": "fig_19.mmd"
+    },
+    {
+      "num": "20",
+      "title": "MCP 工具配置化加载器（v1.1.1 ⭐）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart LR\n    JSON[\"config/mcp_tools.json<br/>14 工具声明\"] --> LD[\"mcp_tools_loader<br/>JSON→工具注册\"]\n    LD --> W1{\"模块白名单<br/>mcp_tools.*\"}\n    W1 -->|拒绝| X[\"四重安全边界<br/>危险模块黑名单\"]\n    LD --> W2[\"函数名校验<br/>非下划线开头\"]\n    LD --> W3[\"危险模块拒绝<br/>os/sys/subprocess/importlib\"]\n    W1 -->|通过| REG[\"工具注册表\"]\n    W2 --> REG\n    W3 --> REG\n    REG --> R[\"/api/admin/reload<br/>热重载\"]\n    R --> EX[\"execute_tool<br/>统一路由\"]",
+      "svg": "fig_20.svg",
+      "mmd": "fig_20.mmd"
+    },
+    {
+      "num": "21",
+      "title": "权限控制三层（sandbox+approval+custom）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart TD\n    REQ[\"tool.before<br/>调用请求\"] --> LD[\"加载 Profile<br/>+ preset 预设\"]\n    LD --> P{\"preset 类型<br/>read_only/standard/exam/full\"}\n    P --> SB{\"sandbox 检查<br/>写工具类型?\"}\n    SB --> AP{\"approval 检查<br/>需人工审批?\"}\n    AP --> CU{\"custom 派生<br/>场景规则匹配\"}\n    CU -->|通过| OK[\"允许执行\"]\n    CU -->|拒绝| NO[\"拒绝\"]\n    AP -->|拒绝| NO\n    SB -->|拒绝| NO\n    OK --> EVT[\"权限事件 emit<br/>seq+profile+decision<br/>可回放审计\"]",
+      "svg": "fig_21.svg",
+      "mmd": "fig_21.mmd"
+    },
+    {
+      "num": "22",
+      "title": "事件类型化（62 类型：13 CORE + 35 PLUGIN + 14 PAEG）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart TB\n    SRC[\"事件源<br/>hooks / subagent<br/>/ tool / workflow\"] --> ENV[\"SessionEvent 信封<br/>seq + time + data<br/>+ surfaceOp\"]\n    ENV --> SURF{\"surfaceOp 校验<br/>强制 schema\"}\n    SURF --> TY{\"类型检查<br/>56 已知类型白名单\"}\n    TY -->|拼错| ERR[\"立即报错<br/>fail-fast\"]\n    TY -->|通过| RT[\"sinks 三路由\"]\n    RT --> S1[\"审计日志\"]\n    RT --> S2[\"持久化<br/>JSONL\"]\n    RT --> S3[\"UI 事件流\"]",
+      "svg": "fig_22.svg",
+      "mmd": "fig_22.mmd"
+    },
+    {
+      "num": "23",
+      "title": "repeat-tool-guard（chain-key + 多级阈值）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nstateDiagram-v2\n    [*] --> calc\n    calc: tool.before hook<br/>计算 chain-key<br/>hash tool+args\n    calc --> count\n    count: 累加 N\n    count --> tier1: N=3\n    count --> tier2: N=5\n    count --> tier3: N=8\n    tier1: 等级1<br/>温和提示\n    tier2: 等级2<br/>警告+改建议\n    tier3: 等级3<br/>强制终止\n    tier1 --> count: 继续\n    tier2 --> count: 继续\n    count --> reset: 用户插话\n    reset: 计数清零\n    reset --> count\n    tier3 --> [*]",
+      "svg": "fig_23.svg",
+      "mmd": "fig_23.mmd"
+    },
+    {
+      "num": "24",
+      "title": "Profile Bundle 分层堆叠 + dump-config",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart TB\n    L1[\"L1 内嵌默认<br/>PAEG 原设计\"] --> L2\n    L2[\"L2 Bundle 加载<br/>standard / exam / weil\"]\n    L2 --> L3\n    L3[\"L3 Bundle 堆叠<br/>多 bundle 顺序覆盖\"] --> L4\n    L4[\"L4 Profile 加载<br/>教师预设场景\"] --> L5\n    L5[\"L5 用户 patch<br/>稀疏字段覆盖\"] --> L6\n    L6[\"L6 最终配置树<br/>→ execute_tool\"]\n    L6 --> EX[\"/api/admin/dump-config<br/>完整可 patch JSON\"]\n    EX -. 教师一键切换 .-> L2",
+      "svg": "fig_24.svg",
+      "mmd": "fig_24.mmd"
+    },
+    {
+      "num": "25",
+      "title": "subagent 生命周期事件（构造 + start/end + hook）",
+      "code": "%%{init: {'theme': 'dark'}}%%\nsequenceDiagram\n    participant App as server\n    participant WF as workflow\n    participant H as hooks_hub\n    participant SA as subagent\n    App->>SA: 构造（subagent/descriptor 9 个）\n    App->>WF: 触发 teach_materials\n    WF->>H: agent-start (runId=UUID, name=Presenter)\n    H->>SA: .run() 进入\n    SA->>H: hook invoked\n    H->>SA: 执行教学逻辑\n    SA->>H: hook result\n    SA->>H: agent-end (runId 配对, duration_ms)\n    H-->>WF: 续传下个步骤",
+      "svg": "fig_25.svg",
+      "mmd": "fig_25.mmd"
+    },
+    {
+      "num": "26",
+      "title": "教学物料流水线 material_pipeline",
+      "code": "%%{init: {'theme': 'dark'}}%%\nflowchart LR\n    IN[\"主题输入\"] --> DAG[\"teach_materials<br/>DAG 编排\"]\n    DAG --> P1[\"导图 + 讲义\"]\n    DAG --> P2[\"讲稿 + PPT\"]\n    DAG --> P3[\"视频脚本 + manim\"]\n    P1 --> GATE{\"门控 self-check<br/>≤2 轮重生成\"}\n    P2 --> GATE\n    P3 --> GATE\n    GATE -->|通过| OUT[\"联动下载包<br/>6 类物料\"]\n    GATE -->|失败| REGEN[\"重生成\"]\n    REGEN --> GATE",
+      "svg": "fig_26.svg",
+      "mmd": "fig_26.mmd"
+    },
+    {
+      "num": "27",
+      "title": "Docker 打包 + 双远程部署（§7.4/§7.5）",
+      "code": "flowchart LR\n    subgraph \"本地开发\"\n        dev[\"本地 :5000<br/>python server.py\"]\n        docker[\"Docker Compose<br/>docker compose up\"]\n    end\n    subgraph \"依赖打包(纪律33)\"\n        pip[\"requirements.txt<br/>onnxruntime/rapidocr/whisper\"]\n        sys[\"Dockerfile apt<br/>ffmpeg/libcairo\"]\n        model[\"模型文件<br/>bge ONNX / whisper\"]\n    end\n    subgraph \"双远程同步(纪律34)\"\n        gh[\"GitHub<br/>sync_check.py --fix\"]\n        ms[\"ModelScope<br/>git push modelscope master\"]\n        deploy[\"魔搭创空间<br/>ms_deploy.json :7860\"]\n    end\n    dev --> docker\n    docker --> pip\n    docker --> sys\n    docker --> model\n    docker --> gh\n    docker --> ms\n    ms --> deploy\n    deploy --> user[\"公网用户\"]",
+      "svg": "fig_27.svg",
+      "mmd": "fig_27.mmd"
+    }
+  ]
+}

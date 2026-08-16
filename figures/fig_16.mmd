@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant U as 用户
+    participant S as server
+    participant A as Agent
+    S->>A: connection_open
+    U->>S: user_message
+    S-->>U: event: diagnosis
+    S-->>U: event: plan
+    loop step 1..N
+        S-->>U: event: step
+        S-->>U: event: presentation（60字分片）
+    end
+    S-->>U: event: checkpoint
+    S-->>U: event: evaluation
+    S-->>U: event: adjustment
+    S-->>U: event: done
