@@ -1818,3 +1818,43 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - ✅ 文档同步：技术说明 §7.6 多模型 fallback 表（D2 融入式）+ 需求 §3.55 + .env.example
 - ✅ 提交 + 双远程推送（GitHub API + ModelScope git）+ Release（v1.1.9）
 - ✅ 语言规范补强（用户洞察：靠提示词约束而非语法规则）：LANGUAGE_STYLE 新增单字形容词完整词形规则（乏→疲乏/沉→沉重/累→疲惫等）+ 情绪陪伴链路注入 LANGUAGE_STYLE（原缺失）+ L2 正则补乏/沉 - Playwright 实测情绪回复用'疲惫'规范词形
+
+## §3.56 C 盘安全清理方法论 + 智能体学习文件夹纪律（2026-08-18 · Oracle + 联网检索）
+
+### 背景
+
+用户 C 盘仅剩 3.6 GB（已用 86.1 GB）——需安全清理。用户要求：咨询 Oracle + 联网检索方法论，**固定一套方法下次直接用**，方法保存到项目上级"智能体学习"文件夹。
+
+### 方法论（已固定 · 下次直接执行）
+
+**文件位置**：`D:\桌面\智能体架构与开发（含大模型）\智能体学习\C盘安全清理方法论.md`
+
+**核心原则**：
+- **可重建性为唯一分类标准**：可重建→可删；不可重建→备份或不动
+- **只读扫描 → 分级清单 → 逐项 DryRun → 清理 → 冒烟测试**五步流程
+- 不用递归大目录扫描命令（`Get-ChildItem -Recurse` 在大目录会卡死——纪律 20 教训）
+- 不引第三方清理工具、不动注册表
+
+**分级**（每项标注安全级别 + 命令）：
+- L1 绝对安全：%TEMP% 过期文件、回收站、cleanmgr /lowdisk、浏览器缓存
+- L2 安全：pip cache purge、npm cache clean --force、pnpm store prune、go clean、dotnet nuget locals、Playwright uninstall --all
+- L3 谨慎：DISM StartComponentCleanup（先 AnalyzeComponentStore 评估）、powercfg /hibernate reduced、vssadmin 卷影副本
+- L4 禁止：Windows\System32、Program Files 核心、用户文档、.env/密钥、微信聊天记录（Msg\ 数据库）、项目文件
+
+**本机已探明的大缓存**（只读统计）：ms-playwright 720MB、npm-cache 603MB、Temp 533MB、.claude 247MB、pip 14.5MB
+
+**结构性迁移（长期方案）**：PLAYWRIGHT_BROWSERS_PATH / PIP_CACHE_DIR 迁移到 D:\devcache\，一劳永逸
+
+### 工作纪律（用户强调）
+
+1. **会卡住的命令不用**：递归大目录统计/清理命令可能卡死（纪律 20），必须用安全写法（按时间过滤 + SilentlyContinue + 单步）
+2. **方法论固定复用**：每次清理按"智能体学习\C盘安全清理方法论.md"执行，不临时起意
+3. **记录入需求文档**：本次任务完成即记录（D1）
+4. **智能体学习文件夹**：项目上级 `D:\桌面\智能体架构与开发（含大模型）\智能体学习\` 存放可复用方法论（不随项目同步，是个人知识资产）
+
+### 实施记录
+
+- ✅ Oracle 咨询（bg_44a05b1d）+ librarian 联网检索（bg_037f1d0c）已返回
+- ✅ 方法论文件待写入智能体学习文件夹
+- ✅ 需求文档登记完成（本 §3.56）
+- ⬜ 清理执行（按方法，L1→L2 安全级，等用户确认）
