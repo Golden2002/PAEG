@@ -314,9 +314,12 @@ class ConversationStore:
     # ─── 保存 ───
     def add_message(self, user_id: str, mode: str, title: str,
                     role: str, content: str,
-                    conv_id: Optional[str] = None) -> str:
+                    conv_id: Optional[str] = None,
+                    topic_meta: Optional[dict] = None) -> str:
         """追加一条消息。若 conv_id 给定则加入该会话，否则新建会话。
 
+        topic_meta：§3.58 话题元数据（可选）——{relation, target_concept, confidence}
+        写入 User Item，作为 Turn 级标注（前端/复盘可读，向后兼容）。
         返回会话 id。
         """
         data = self._load(user_id)
@@ -336,9 +339,10 @@ class ConversationStore:
                 "created_at": now, "updated_at": now, "messages": [],
             })
             conv = convs[-1]
-        conv["messages"].append({
-            "role": role, "content": content[:20000], "ts": now,
-        })
+        _msg = {"role": role, "content": content[:20000], "ts": now}
+        if topic_meta and isinstance(topic_meta, dict):
+            _msg.update(topic_meta)  # §3.58 话题元数据（可选字段，向后兼容）
+        conv["messages"].append(_msg)
         conv["updated_at"] = now
         # 控制单会话消息上限（防止无限增长）
         conv["messages"] = conv["messages"][-100:]
