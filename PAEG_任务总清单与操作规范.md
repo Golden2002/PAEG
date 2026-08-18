@@ -2349,9 +2349,22 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 - 不破坏 §3.61/§3.62（进度延续/动态规划）
 - TDD：先写"开课宣告"失败测试
 
+### 三路调研结论（2026-08-18 已返回）
+
+**explore（bg_aed8dc65）**：agent 完全具备动态提示词拼接——Presenter.run 有 14+ 注入点（follow_instruction/知识图/学段profile/教学模式/用户资料/能力清单/教学记忆/联网上下文/资源门面/个体化画像/风格覆盖/强化note/技能目录），`_MODE_SCENE`（prompts.py:2262）是最匹配的"模式字典→动态注入"范本。
+
+**Oracle（bg_64254615）**：方案 C（静态骨架 + 动态选择）：
+- `PEDAGOGICAL_LANGUAGE` 常量（5 子类：开课宣告/步骤衔接/检查理解/鼓励支持/结束收束，各 2-3 句式 + 触发伪码 + 反例）
+- `render_pedagogical_language(plan_position, evaluator_signal, ...)` 按条件选择性注入
+- 输入绑定：复用 build_presenter_system 已有参数 + 新增 plan_position/evaluator_signal/dialogue_tail（Optional 向后兼容）
+- 拼接：prompts.py LANGUAGE_STYLE 后追加；subagents.py `_inject_skill_catalog` 后调用
+
+**librarian（bg_1021bc80）**：教学用语资源完备——7 类课堂用语句式（导入/过渡/提问/启发/评价/总结/结束）+ GMSL 鼓励框架（ACL 2023）+ 8 条设计原则（教学身份优先/句式按教学动作分类/一次只问一问/反馈具体到学生刚说的话/等待时间参数化等）+ AI 教育实践（Khanmigo 5 原则）。
+
 ### 实施记录
 
 （完成后更新）
+
 
 
 ## §3.64 教学用语动态拼接模块（2026-08-18 · 用户洞察：教学用语应是独立动态拼接组件）
@@ -2384,6 +2397,19 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 - 最小改动；不破坏 §3.61/§3.62/§3.63
 - 可测试；简洁可维护
 
+### 三路调研结论（2026-08-18 已返回）
+
+**explore（bg_aed8dc65）**：agent 完全具备动态提示词拼接——Presenter.run 有 14+ 注入点（follow_instruction/知识图/学段profile/教学模式/用户资料/能力清单/教学记忆/联网上下文/资源门面/个体化画像/风格覆盖/强化note/技能目录），`_MODE_SCENE`（prompts.py:2262）是最匹配的"模式字典→动态注入"范本。
+
+**Oracle（bg_64254615）**：方案 C（静态骨架 + 动态选择）：
+- `PEDAGOGICAL_LANGUAGE` 常量（5 子类：开课宣告/步骤衔接/检查理解/鼓励支持/结束收束，各 2-3 句式 + 触发伪码 + 反例）
+- `render_pedagogical_language(plan_position, evaluator_signal, ...)` 按条件选择性注入
+- 输入绑定：复用 build_presenter_system 已有参数 + 新增 plan_position/evaluator_signal/dialogue_tail（Optional 向后兼容）
+- 拼接：prompts.py LANGUAGE_STYLE 后追加；subagents.py `_inject_skill_catalog` 后调用
+
+**librarian（bg_1021bc80）**：教学用语资源完备——7 类课堂用语句式（导入/过渡/提问/启发/评价/总结/结束）+ GMSL 鼓励框架（ACL 2023）+ 8 条设计原则（教学身份优先/句式按教学动作分类/一次只问一问/反馈具体到学生刚说的话/等待时间参数化等）+ AI 教育实践（Khanmigo 5 原则）。
+
 ### 实施记录
 
 （完成后更新）
+
