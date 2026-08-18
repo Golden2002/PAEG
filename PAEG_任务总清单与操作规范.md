@@ -1940,6 +1940,24 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 | off_topic 路由 | L2 在 Presenter 前调用 → off_topic 直路由 chat_stream（解决 R4 169s 卡死）→ 完成后 current_concept 不变 |
 | 双层兜底 | L1 meta_router（greeting/affection 零 LLM 开销）+ L2 教学内 4 分类 |
 
+### 存储联动设计（Oracle bg_7805f504 + 联网检索 bg_6c5fa42c · 用户要求与SQLite/三层保存接线）
+
+**综合方案**：conversations.json 扩展为主路径 + SQLite 轻量联动 + 三层模型语义映射
+
+| 项 | 设计 | 业界来源 |
+|---|---|---|
+| 存储主路径 | conversations.json：conversation 加 concept_history:[](LRU 5)，message(user) 加 	opic_relation/target_concept/confidence | Oracle 方案A + Khanmigo（可读 plain text 存对话效果最好） |
+| SQLite 联动 | 新增 	opic_relation_log 表（每次分类写一条：relation/confidence/latency/ts）——利用已有 sqlite 基建，可统计分类准确率 | Oracle 方案B轻量 + Cursor SDK LocalAgentStore |
+| 三层模型映射 | Thread=conversation / Turn=user+assistant 对 / Item=message；4分类是 Turn 级元数据（标注在 User Item） | Oracle + AutoTutor plan stack |
+| 重启恢复 | 首次请求从最近 conversation 的 concept_history 载入 SESSIONS；revisit_candidates 从历史 topic_relation=revisit 恢复 | Oracle 步骤3 |
+| 业界借鉴 | Cloudflare writable context block（主题栈可被LLM改）+ NVIDIA 单次调用多字段(relation+action+target) + TIAGE 话题漂移三层定义 | librarian D4/D2/D1 |
+
+**业界关键参考**：
+- TIAGE（EMNLP 2021）：话题漂移四层定义（继续/子话题/相关新话题/无关）——与我们的 followup/detour/revisit/off_topic 对应
+- AutoTutor plan stack：student_initiative（学生跑题）vs tutor_initiative（教学主线）planner——学生主动游离用 student_initiative 分支
+- Cloudflare Session API：writable context block 存 topic stack（LLM 可 set_context 改）+ searchable 存历史主题（绕回检索）
+- Khanmigo AIED 2026：每个 feature 是 chat workflow；分类器决定走哪条推理路线（与我们同构）
+
 ### 实施记录
 
 （实施完成后更新）
