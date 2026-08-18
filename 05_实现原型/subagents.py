@@ -1040,6 +1040,16 @@ class Presenter:
                 subtopic=step.get("subtopic", "") or "",
                 constraint_flags=getattr(learner, "_constraint_flags", ()) or (),  # v0.43 ⭐ 3参数分层放开
             )
+            # §3.57 ⭐ 教学追问指令注入（Oracle 方案）：teach_stream 判定追问后
+            # 把 action 指令存 learner._follow_instruction，此处注入 system prompt
+            try:
+                _follow_inst = getattr(learner, "_follow_instruction", "")
+                if _follow_inst:
+                    system = system + "\n\n" + _follow_inst
+                    # 单轮消费，避免污染后续教学
+                    setattr(learner, "_follow_instruction", "")
+            except Exception:
+                pass
             # §3.12 ⭐ 知识依赖图注入（v1.1.5）：leads_to 此前零消费——补"学前需掌握X/掌握后能学Y"路径指引
             try:
                 from services.prereq_graph import inject_graph_into_system
@@ -1205,10 +1215,12 @@ class Presenter:
                 }
 
         # 规则回退模板（v0.24 ⭐ 适配决策也应用在规则回退里 —— 让端到端测试可观测风格变化）
+        # §3.59 ⭐ 无 key 可观测：回退时前置"未连接大模型"提示（用户能区分"配置问题"vs"系统故障"）
         if kb_node:
             base = (kb_node.get("intuition") or kb_node.get("definition") or "关于该主题的讲解")
         else:
             base = f"关于 '{topic}' 的讲解"
+        base = "（注：当前未连接大模型，以下为基础讲解）\n\n" + base
         # v0.24：在规则回退里也体现风格切换/强化决策（可观测）
         appendix = ""
         style_label = tone
