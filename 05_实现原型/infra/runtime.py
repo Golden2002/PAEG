@@ -1,6 +1,7 @@
 """PAEG 运行时依赖的懒加载单例。"""
 from __future__ import annotations
 
+import sys
 from typing import Any, Dict, Optional, Tuple
 
 
