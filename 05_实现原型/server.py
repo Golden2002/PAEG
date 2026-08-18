@@ -699,12 +699,58 @@ def teach_stream():
     if str(concept).strip() in _EXIT_ACK_WORDS or \
             any(str(concept).startswith(w) for w in ("好的", "懂了", "知道了", "不学了")):
         _can_continue = False
-    if _is_short_in and _prev_intent and _can_continue:
-        # 短输入 + 有上轮意图 + 通过安全边界 → 复用（不重跑 LLM 路由）
-        _llm_intent = _prev_intent
-        _llm_conf = 0.95
-        print(f"[PAEG][v0.41.9-INTENT-CONT] 短输入复用上轮意图 {_prev_intent!r} (concept={concept!r})",
-              file=__import__("sys").stderr, flush=True)
+    # §3.57 ⭐ 教学追问识别（Oracle 方案 A+C，替代 v0.41.9 短输入延续——延续与输入长短无关）：
+    # 上轮是教学且通过安全边界 → LLM 二分类判断"追问当前主题"还是"新主题"。
+    # 修复"先给原文"被当新主题教学的 bug。
+    if (_prev_intent in ("teach", "material") and _prev_concept
+            and _can_continue):
+        try:
+            from meta_router import classify_followup
+            _follow = classify_followup(
+                str(concept), str(_prev_concept), llm=llm,
+                recent_response_tail="",
+            )
+            print(f"[PAEG][§3.57-FOLLOWUP] 判定 {_follow}", file=sys.stderr, flush=True)
+        except Exception as _fe:
+            print(f"[PAEG][§3.57-FOLLOWUP] 判定失败回退: {_fe}")
+            _follow = {"is_followup": False, "action": "new_topic",
+                       "confidence": 0.0, "reason": "exception"}
+        if _follow.get("is_followup"):
+            # 追问 → 复用上轮主题 + 意图，action 注入后续 prompt
+            _llm_intent = _prev_intent
+            _llm_conf = _follow.get("confidence", 0.5)
+            _follow_action = _follow.get("action", "unknown")
+            _follow_reason = _follow.get("reason", "")
+            print(f"[PAEG][§3.57-FOLLOWUP] 追问确认: action={_follow_action} "
+                  f"主题={_prev_concept!r} 输入={concept!r}", file=sys.stderr, flush=True)
+            # 让后续教学使用上轮主题（concept 更新为 prev_concept）
+            concept = _prev_concept
+            # §3.57 ⭐ 追问指令注入 Presenter：按 action 生成教学指令（无正则，架构级）
+            _ACTION_LINES = {
+                "request_full_content": (
+                    "【用户要求先看完整内容】本轮第一步：先完整呈现当前主题的原文/全文/题目"
+                    "（古诗给全文、定义给完整表述、题目给完整题干），然后再继续讲解。"),
+                "re_explain": (
+                    "【用户没听懂】本轮用更简单的语言、更小的步子重新讲解当前主题，"
+                    "先确认学生卡在哪一步，再针对性重讲。"),
+                "give_example": (
+                    "【用户要例子】本轮以具体例子为主：先给 2-3 个由浅入深的例子，"
+                    "再回扣概念本身。"),
+                "continue_step": (
+                    "【用户要继续】不要重复已讲内容，直接承接当前主题继续往下讲新内容。"),
+                "switch_angle": (
+                    "【用户要换角度】换一个与之前不同的角度/方法讲解当前主题"
+                    "（如从例子→直觉、从直觉→应用）。"),
+            }
+            _follow_line = _ACTION_LINES.get(_follow_action, "")
+            if _follow_line:
+                try:
+                    setattr(learner, "_follow_instruction", _follow_line)
+                except Exception:
+                    pass
+        else:
+            _llm_intent = None
+            _llm_conf = 0.0
     else:
         _llm_intent = None
         _llm_conf = 0.0
@@ -745,9 +791,9 @@ def teach_stream():
     if _llm_intent is not None:
         print(f"[PAEG][v0.35-LLM-ROUTE] intent={_llm_intent!r} conf={_llm_conf:.2f} text={concept[:40]!r} mode={data.get('mode')!r}",
               file=__import__("sys").stderr, flush=True)
-    # v0.41.9 ⭐ 写回会话意图（供下一轮短输入复用）——非短输入才更新意图，
-    # 短输入（承接）保持上轮意图不变。
-    if not _is_short_in and _llm_intent is not None:
+    # §3.57 ⭐ 写回会话意图（供下一轮延续判定）——无论长短，有有效意图即写回。
+    # 追问分支已把 concept 设为 prev_concept，写回保持同一主题；新主题写回新值。
+    if _llm_intent is not None:
         SESSIONS[f"current_intent_{learner_id}"] = _llm_intent
         SESSIONS[f"current_concept_{learner_id}"] = concept
         # v0.41.9 ⭐ 补存 subject——供下一轮"学科变化不延续"边界判断
