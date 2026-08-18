@@ -2499,6 +2499,13 @@ class AffectionSupportor:
                 "4. 若学生愿意，可温和提到现实支持；不强行给热线。\n"
                 "5. 语气平稳、克制、真实（薇依式），不煽情。"
             )
+        # v0.36.2 ⭐ 语言规范注入：情绪陪伴同样遵守 LANGUAGE_STYLE（词形完整——
+        # 单字形容词须完整词形：乏→疲乏、沉→沉重、累→疲惫、苦→苦涩；禁止简略词）
+        try:
+            from prompts import LANGUAGE_STYLE
+            system = system + "\n\n" + LANGUAGE_STYLE
+        except Exception:
+            pass
         # v0.20.2：若有历史，传真 messages（多轮连贯性）
         # v0.24 ⭐ 健壮性：与 SelfUpdateAgent 1029-1031 同等标准——
         # isinstance(h, dict) 守护 + h.get("role")/h.get("content")，
