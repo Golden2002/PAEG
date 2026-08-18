@@ -1993,6 +1993,24 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - Oracle 咨询（bg 启动）
 - 无 key 兜底必须可观测（用户能一眼看出"是 key 没配"而非"部署坏了"）
 
+### Oracle 方案（bg_377e88e5 · 2026-08-18 已返回）
+
+**验证闭环**（改 key 后无需发对话即可确认）：
+1. /api/health 已有 llm_provider/llm_ok 字段——curl 见 "llm_provider":"openai_compat" 即 key 生效（"mock" = 无 key）
+2. 启动横幅 [PAEG Server] LLM: auto/default -> mock = 无 key（魔搭 Studio 日志标签可看）
+3. 改 Secrets **必须重启 Studio**（env 只在容器启动注入）；Secrets 名严格 DEEPSEEK_API_KEY 全大写下划线
+
+**代码改动**（≤30 行，不破 130+ 调用方）：
+1. infra/runtime.py：mock 兜底时启动横幅打印 ⚠️ 提示"请在 Studio Secrets 配置 DEEPSEEK_API_KEY"
+2. subagents.py Presenter 规则回退：content 前置一行"（注：当前未连接大模型，以下为基础讲解）"（tone_used/llm_generated 字段不动）
+
+**LaTeX 渲染**（Oracle 诊断）：
+- KaTeX 已加载（index.html L19-21 本地 + CDN 兜底）✓
+- **根因：SSE 流式逐 chunk 推送时未重新触发 renderMath**——新 chunk 不渲染公式
+- 修复：SSE message handler 末尾对最新节点补 enderMath(appendedNode)（每 token 后 <5ms）
+
+**用户操作清单**（已告知）：魔搭控制台设置→Secrets→DEEPSEEK_API_KEY=sk-xxx→保存→重启 Studio
+
 ### 实施记录
 
-（完成后更新）
+（实施完成后更新）
