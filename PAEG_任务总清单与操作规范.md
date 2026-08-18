@@ -2171,7 +2171,30 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 6. 灰度开关 paeg_modules.json planner_dynamic: true
 7. 测试：_StubPlannerLLM 注入 5 case（逐句将进酒/初中数学/大学物理/考研政治/re_explain）+ 质量对比
 
-### 实施记录（部分完成 · 2026-08-18）
+### 实施记录（核心完成 · 2026-08-18）
+
+**已落地**（9e7191b + 874e8b1 + d39b534 + 6c5ab7d）：
+- ✅ pedagogy.PLANNER_SYSTEM_PROMPT：策略知识库作为 LLM 参考 + action 方向参考（结合学科取舍，非强制模板）
+- ✅ pedagogy.validate_plan()：防幻觉
+- ✅ Planner.run(teach_state=None, action=None)：LLM 动态规划 + 完整上下文打包（最新输入/画像/学段/进度/§3.58 action）；LLM 失败→静态兜底
+- ✅ server.py 集成：_student_raw 入口捕获 + followup/revisit 拼接"主题——学生追问：原话"（LLM 理解具体指令）+ action 指令注入 concept
+- ✅ 修复 tool_calls 泄漏：Presenter 教学主输出不传 tools（生成讲解场景）
+- ✅ 学段映射：economics 加 graduate_exam（考研政治）
+- ✅ give_example 平衡：action 降为方向参考（古诗自然融入意象/数学具体举例）
+- ✅ max_tokens 拉高：Presenter 512→4000 / 全局 2000→4000（支持长文稿）
+- ✅ 测试：Planner 4 单测 + 意图理解 4 场景（这句X/继续/没懂/要例子）+ 跨学段（语文/数学/物理/政治）+ tool_calls 修复重测
+
+**关键成果**：
+- 学生"这句'天生我材必有用'是什么意思" → LLM 准确回应（原话保留生效，非讲首句）
+- 将进酒逐句进度延续（R1原文→R2时代→R3开头四句）
+- 跨学段逐步推进（数学3-4-5砌墙/物理电子位置→方程→概率）
+
+**待办（后续）**：
+- ⬜ teach_state 灰度开关 planner_dynamic（paeg_modules.json）
+- ⬜ 自进化素材（evolved_plans.json / improvements.md）
+- ⬜ 政治 R1 学段拦截复测（economics 已加考研档）
+
+### 跨学段测试结果（2026-08-18 首轮）
 
 **已落地**（9e7191b）：
 - ✅ pedagogy.PLANNER_SYSTEM_PROMPT：策略知识库（socratic/scaffolded/mastery/feynman/综合）作为 LLM 参考
@@ -2248,7 +2271,30 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 6. 灰度开关 paeg_modules.json planner_dynamic: true
 7. 测试：_StubPlannerLLM 注入 5 case（逐句将进酒/初中数学/大学物理/考研政治/re_explain）+ 质量对比
 
-### 实施记录（部分完成 · 2026-08-18）
+### 实施记录（核心完成 · 2026-08-18）
+
+**已落地**（9e7191b + 874e8b1 + d39b534 + 6c5ab7d）：
+- ✅ pedagogy.PLANNER_SYSTEM_PROMPT：策略知识库作为 LLM 参考 + action 方向参考（结合学科取舍，非强制模板）
+- ✅ pedagogy.validate_plan()：防幻觉
+- ✅ Planner.run(teach_state=None, action=None)：LLM 动态规划 + 完整上下文打包（最新输入/画像/学段/进度/§3.58 action）；LLM 失败→静态兜底
+- ✅ server.py 集成：_student_raw 入口捕获 + followup/revisit 拼接"主题——学生追问：原话"（LLM 理解具体指令）+ action 指令注入 concept
+- ✅ 修复 tool_calls 泄漏：Presenter 教学主输出不传 tools（生成讲解场景）
+- ✅ 学段映射：economics 加 graduate_exam（考研政治）
+- ✅ give_example 平衡：action 降为方向参考（古诗自然融入意象/数学具体举例）
+- ✅ max_tokens 拉高：Presenter 512→4000 / 全局 2000→4000（支持长文稿）
+- ✅ 测试：Planner 4 单测 + 意图理解 4 场景（这句X/继续/没懂/要例子）+ 跨学段（语文/数学/物理/政治）+ tool_calls 修复重测
+
+**关键成果**：
+- 学生"这句'天生我材必有用'是什么意思" → LLM 准确回应（原话保留生效，非讲首句）
+- 将进酒逐句进度延续（R1原文→R2时代→R3开头四句）
+- 跨学段逐步推进（数学3-4-5砌墙/物理电子位置→方程→概率）
+
+**待办（后续）**：
+- ⬜ teach_state 灰度开关 planner_dynamic（paeg_modules.json）
+- ⬜ 自进化素材（evolved_plans.json / improvements.md）
+- ⬜ 政治 R1 学段拦截复测（economics 已加考研档）
+
+### 跨学段测试结果（2026-08-18 首轮）
 
 **已落地**（9e7191b）：
 - ✅ pedagogy.PLANNER_SYSTEM_PROMPT：策略知识库（socratic/scaffolded/mastery/feynman/综合）作为 LLM 参考
