@@ -35,6 +35,11 @@ def get_llm() -> Any:
 
         _llm = create_llm(LLM_PROVIDER, model=LLM_MODEL)
         print(f"[PAEG Server] LLM: {LLM_PROVIDER}/{LLM_MODEL or 'default'} -> {_llm.name}")
+        # §3.59 ⭐ 无 key 可观测：mock 兜底时显式警告（魔搭部署诊断关键）
+        if getattr(_llm, "name", "") == "mock":
+            print("[PAEG Server] ⚠️ LLM=mock（未配置 API key）→ 教学对话会落规则模板"
+                  "『[balanced] 关于该主题的讲解』。请在创空间设置→Secrets 配置"
+                  " DEEPSEEK_API_KEY（或 QWEN_API_KEY）后重启。", file=sys.stderr)
     return _llm
 
 

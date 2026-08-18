@@ -1215,10 +1215,12 @@ class Presenter:
                 }
 
         # 规则回退模板（v0.24 ⭐ 适配决策也应用在规则回退里 —— 让端到端测试可观测风格变化）
+        # §3.59 ⭐ 无 key 可观测：回退时前置"未连接大模型"提示（用户能区分"配置问题"vs"系统故障"）
         if kb_node:
             base = (kb_node.get("intuition") or kb_node.get("definition") or "关于该主题的讲解")
         else:
             base = f"关于 '{topic}' 的讲解"
+        base = "（注：当前未连接大模型，以下为基础讲解）\n\n" + base
         # v0.24：在规则回退里也体现风格切换/强化决策（可观测）
         appendix = ""
         style_label = tone
