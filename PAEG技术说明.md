@@ -1065,6 +1065,24 @@ since:   <PAEG 版本号>
 **判定标准**：sync_check 显示"一致 X 文件 / 缺失 0 / 差异 0" + modelscope push 成功。
 **三处一致**：本地 ↔ GitHub ↔ Release（tag）内容一致，可从任一端恢复整个项目。
 
+### 7.6 多模型 fallback 链（§3.55 · 魔搭 Docker 对话修复）
+
+> **背景**：魔搭 Docker 未配 LLM key 时对话不输出（fallback 到 Mock）。修复：多模型自动 fallback。
+
+**检测顺序**（`llm_api.auto_detect_model_api()`，任一命中即返回）：
+
+| 优先级 | 环境变量 | Provider | 端点 |
+|---|---|---|---|
+| ① | `PAEG_API_KEY`（自定义） | 默认 DeepSeek | 可配 `PAEG_API_BASE` |
+| ② | `DEEPSEEK_API_KEY` | DeepSeek V4-Flash | api.deepseek.com/v1 |
+| ③ | `QWEN_API_KEY` / `DASHSCOPE_API_KEY` | 阿里通义千问 | dashscope.aliyuncs.com/compatible-mode/v1 |
+| ④ | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | Claude / GPT | 官方端点 |
+| ⑤ | opencode auth.json | 本地开发兜底 | deepseek 优先 |
+| ⑥ | —（全无） | MockModelAPI | 离线演示（明确标注） |
+
+**魔搭部署**：创空间"环境变量"配置 `DEEPSEEK_API_KEY`（或任一 fallback key），镜像无需改。
+**验证**：`python -m llm_api`（打印当前 provider + 真实回复）。
+
 ## 附录 A 术语表
 
 | 术语 | 含义 |
