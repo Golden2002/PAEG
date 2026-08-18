@@ -1,4 +1,4 @@
-"""
+﻿"""
 PAEG 学科专属教学提示词中心（v0.38）
 
 设计目标：让 LLM 教学输出"像人话"——自然、具体、不浮夸。
@@ -1485,7 +1485,14 @@ def build_presenter_system(subject: str, tone: str,
                            strategy_line: str = "",
                            user_model: Optional[dict] = None,
                            subtopic: str = "",
-                           constraint_flags: tuple = ()) -> str:  # v0.43 ⭐ 3参数分层放开
+                           constraint_flags: tuple = (),
+                           # §3.64 ⭐ 教学用语动态输入（Optional，向后兼容）
+                           plan_position: str = "",
+                           evaluator_signal: str = "",
+                           step_type: str = "",
+                           topic: str = "",
+                           prev_topic: str = "",
+                           next_topic: str = "") -> str:  # v0.43 ⭐ 3参数分层放开
     """构建 Presenter 的 system prompt。
 
     关键改进：不再把世界观比例数字字典塞给 LLM，而是用可读的教学风格描述。
@@ -1633,6 +1640,16 @@ def build_presenter_system(subject: str, tone: str,
     except Exception:
         constraint_layers_line = ""
 
+    # §3.64 ⭐ 教学用语动态拼接（方案 C：静态骨架 + 动态选择）
+    try:
+        _pedagogical_block = render_pedagogical_language(
+            plan_position=plan_position, evaluator_signal=evaluator_signal,
+            topic=topic or subtopic, step_type=step_type,
+            prev_topic=prev_topic, next_topic=next_topic)
+        if _pedagogical_block:
+            _pedagogical_block = "\n\n## 教学用语（动态注入 · §3.64）\n" + _pedagogical_block
+    except Exception:
+        _pedagogical_block = ""
     return f"""{TRUTH_GROUNDING}
 
 {WEIL_CORE}
@@ -1815,7 +1832,11 @@ def build_presenter_system(subject: str, tone: str,
 {style_anchor_line}
 {native_transfer_line}
 
-{LANGUAGE_STYLE}"""
+{LANGUAGE_STYLE}
+
+{_pedagogical_block}
+
+{_pedagogical_block}"""
 
 
 # ============================================================
@@ -2459,3 +2480,76 @@ def build_presenter_user(subject: str, topic: str, step_type: str = "present",
         "讲透机制/思路/方法，不要蜻蜓点水；讲完自然收尾。"
     )
     return "\n".join(parts)
+
+
+# ═══════════════════════════════════════════════════════════════
+# §3.64 ⭐ 教学用语模块（Pedagogical Language Module）
+# 独立拼接组件：动态输入(问题/画像/历史/进度) → 教育专业用语
+# 来源：librarian 检索（课堂用语体系/GMSL/Khanmigo）+ Oracle 方案 C
+# ═══════════════════════════════════════════════════════════════
+
+# 5 子类句式骨架（静态模板，LLM 填充变量；教育专业性下限稳定）
+PEDAGOGICAL_LANGUAGE = """## 教学用语（语言风格参考 · §3.64）
+
+> 以下是一线教师课堂用语的表达参考。**请自然运用这些语言风格，不必逐字套用**——
+> 它们是"教师说话的方式"，不是必须遵守的输出结构。结合当下教学场景灵活表达。
+
+### 开课宣告（新主题/开课时，可自然带出）
+- 参考表达：「好的，我们现在来学习 {topic}。首先从 {entry_point} 入手，然后{route}。」
+- 参考表达：「上次我们聊到 {prev_topic}，今天顺着这条线继续往前走一步。」
+- 目的：让学生知道你在学什么、怎么学——不是答非所问，而是讲授策略。
+
+### 步骤衔接（前后步骤之间，可自然过渡）
+- 参考表达：「刚才我们讲了 {prev_topic}，核心是 {prev_key}；现在把视线转向 {next_topic}。」
+- 参考表达：「前面是'是什么'，接下来我们看'为什么'——{next_topic}。」
+
+### 检查理解（讲到关键处，可自然发问）
+- 参考表达：「你能用自己的话，把 {key} 复述一遍吗？哪怕不完整也行。」
+- 参考表达：「这一步里，你认为最关键的是哪一句？为什么是它？」
+
+### 鼓励支持（学生卡住/困惑时，可自然支持）
+- 参考表达：「卡在这里很正常——{stuck_point} 本身就是反直觉的。我们换条路。」
+- 参考表达：「你已经走到这一步了，离答案只差最后一块砖。」
+- 避免：廉价表扬"你真棒"（教育心理学：德西效应，削弱内在动机）。
+
+### 结束收束（收尾时，可自然总结）
+- 参考表达：「今天我们走过了 {route}。如果只让你带走一句话，是 {takeaway}。」
+- 参考表达：「下课后把今天学的 {topic} 讲给身边的人听一遍——能讲出来才是真懂。」
+
+**原则**：教学用语让对话"像一位真实老师"，但**永远服务于当前教学内容**——不要为了套用句式而牺牲内容自然度。"""
+
+
+def render_pedagogical_language(plan_position: str = "",
+                                evaluator_signal: str = "",
+                                topic: str = "",
+                                step_type: str = "",
+                                prev_topic: str = "",
+                                next_topic: str = "") -> str:
+    """§3.64 ⭐ 按场景提示教学用语参考（语言风格软引导，非输出结构约束）。
+
+    触发规则（仅提示"当前场景可自然使用哪种教学用语"，不强制结构）：
+    - step1/新主题 → 开课宣告参考
+    - middle → 步骤衔接参考
+    - stuck/confused → 鼓励支持参考（+ 检查理解）
+    - final → 结束收束参考
+    - question → 检查理解参考
+    未触发场景不出现（避免多余提示）。
+    """
+    parts = []
+    if plan_position == "step1" or (not plan_position and not evaluator_signal):
+        parts.append("## 开课场景\n可自然带出开课语（参考）：「好的，我们现在来学习"
+                     + f"{topic or '本课主题'}。先从"
+                     + f"{prev_topic or '最直观的入口'}入手，然后逐步深入。」")
+    elif plan_position == "middle":
+        parts.append("## 衔接场景\n可自然过渡（参考）：「刚才我们讲了 "
+                     + f"{prev_topic or '前面'}；现在把视线转向 {next_topic or '下一步'}。」")
+    if plan_position == "final":
+        parts.append("## 收尾场景\n可自然总结（参考）：「今天我们走过了 "
+                     + f"{topic or '这段内容'}。如果只让你带走一句话，你会选哪句？」")
+    if evaluator_signal in ("stuck", "confused", "low"):
+        parts.append("## 支持场景\n可自然鼓励（参考）：「卡在这里很正常——"
+                     + f"{topic or '这一步'}本身就是反直觉的。我们换条路，慢慢来。」")
+    if step_type == "question" or evaluator_signal in ("partial", "check"):
+        parts.append("## 检查场景\n可自然发问（参考）：「你能用自己的话，把 "
+                     + f"{topic or '这一步'}的核心复述一遍吗？哪怕不完整也行。」")
+    return "\n\n".join(parts) if parts else ""
