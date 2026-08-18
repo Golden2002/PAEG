@@ -2025,7 +2025,15 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - **根因：SSE 流式逐 chunk 推送时未重新触发 renderMath**——新 chunk 不渲染公式
 - 修复：SSE message handler 末尾对最新节点补 enderMath(appendedNode)（每 token 后 <5ms）
 
-**用户操作清单**（已告知）：魔搭控制台设置→Secrets→DEEPSEEK_API_KEY=sk-xxx→保存→重启 Studio
+**用户操作清单**（已告知）：魔搭控制台设置→Secrets→DEEPSEEK_API_KEY=sk-xxx→保存→**必须重新部署/重启**（librarian bg_52f78f21 二次确认：Docker 容器 env 在 docker run 时固化，运行时修改无效，必须 redeploy 才生效——这是"配了 key 检测不到"的根因）
+
+**官方机制确认**（librarian bg_52f78f21 · 2026-08-18）：
+1. 控制台 Secret/Variable 对 docker ✅ 生效（os.environ 可读）
+2. **配置后必须 redeploy 才生效**（容器启动时注入，运行时修改无效）
+3. ms_deploy.json 的 environment_variables 对 docker ❌ 不生效（仅 gradio/streamlit/static）
+4. 其他注入方式：OpenAPI POST /studios/{o}/{r}/secrets + /deploy、ms CLI、Dockerfile ENV（密钥勿用）
+
+**auth.json 注入 Docker 方案**（用户提出）：可行但受限——auth.json 在 .gitignore（不进 git），魔搭构建用 git 仓库内容 → COPY . . 不会有它；除非手动上传魔搭仓库（key 进公开仓库，不安全）。**推荐走控制台 Secret**。
 
 ### 实施记录（验证完成 · 2026-08-18）
 
