@@ -891,7 +891,7 @@ SUBJECT_GRADES = {
     "english": ["middle_school", "high_school", "graduate_exam"],
     "geography": ["middle_school", "high_school", "undergraduate"],
     "literature": ["high_school", "undergraduate"],
-    "economics": ["high_school", "undergraduate"],
+    "economics": ["high_school", "undergraduate", "graduate_exam"],  # §3.62 ⭐ 补考研档（政治经济学/剩余价值属考研内容）
     "philosophy": ["high_school", "undergraduate", "graduate_exam"],
     "ethics": ["high_school", "undergraduate"],
     # 单学段学科（仅最低学段）：
