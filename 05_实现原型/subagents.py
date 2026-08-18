@@ -1040,6 +1040,16 @@ class Presenter:
                 subtopic=step.get("subtopic", "") or "",
                 constraint_flags=getattr(learner, "_constraint_flags", ()) or (),  # v0.43 ⭐ 3参数分层放开
             )
+            # §3.57 ⭐ 教学追问指令注入（Oracle 方案）：teach_stream 判定追问后
+            # 把 action 指令存 learner._follow_instruction，此处注入 system prompt
+            try:
+                _follow_inst = getattr(learner, "_follow_instruction", "")
+                if _follow_inst:
+                    system = system + "\n\n" + _follow_inst
+                    # 单轮消费，避免污染后续教学
+                    setattr(learner, "_follow_instruction", "")
+            except Exception:
+                pass
             # §3.12 ⭐ 知识依赖图注入（v1.1.5）：leads_to 此前零消费——补"学前需掌握X/掌握后能学Y"路径指引
             try:
                 from services.prereq_graph import inject_graph_into_system

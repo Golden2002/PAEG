@@ -710,6 +710,69 @@ def _llm_route_intent(text: str, llm) -> Optional[str]:
     return None
 
 
+def classify_followup(user_input: str, current_concept: str, llm=None,
+                      recent_response_tail: str = "") -> dict:
+    """§3.57 ⭐ 教学追问/新主题 二分类（Oracle 架构方案 A+C · 无正则）。
+
+    判断用户输入相对当前教学主题的性质：
+    - is_followup=True  → 是对当前主题的追问/指令（先给原文/继续/换例子/没懂）
+    - is_followup=False → 用户切换到新主题（仅在语义明确时）
+
+    返回：{"is_followup": bool, "action": str, "confidence": float, "reason": str}
+    action 枚举：request_full_content / re_explain / give_example / continue_step /
+                switch_angle / new_topic / unknown
+    """
+    if not current_concept or not user_input:
+        return {"is_followup": False, "action": "new_topic", "confidence": 1.0,
+                "reason": "无当前主题上下文，视为新主题"}
+    # 无 LLM 或当前主题过短 → 保守视为新主题（不吞切换）
+    if llm is None or len(str(current_concept).strip()) < 2:
+        return {"is_followup": False, "action": "new_topic", "confidence": 0.5,
+                "reason": "无 LLM 或主题过短，保守不延续"}
+
+    _sys = (
+        "你是对话意图判定器。判断用户输入相对于【当前教学主题】是'追问'还是'切换新主题'。\n"
+        "**只有语义明确表示要学新东西时才判定为 new_topic**；其余（要求原文、重讲、举例、"
+        "继续、换角度、说没听懂）都是对当前主题的追问。\n"
+        "返回 JSON：{\"is_followup\": bool, \"action\": str, \"confidence\": 0~1, \"reason\": str}\n"
+        "action 取值：request_full_content(要原文/全文/题目) / re_explain(没懂重讲) / "
+        "give_example(要例子) / continue_step(继续讲) / switch_angle(换角度) / "
+        "new_topic(明确新主题) / unknown"
+    )
+    _user = (
+        f"当前教学主题：{current_concept}\n"
+        + (f"上一轮教学结尾：{recent_response_tail[:200]}\n" if recent_response_tail else "")
+        + f"用户输入：{user_input}\n\n"
+        "只输出 JSON。"
+    )
+    try:
+        from subagents import _safe_chat
+        r = _safe_chat(llm, _sys, _user, max_tokens=120)
+        if r:
+            import json as _json
+            r = r.strip().strip("`").strip()
+            # 提取 JSON（LLM 可能夹带说明文字）
+            _start, _end = r.find("{"), r.rfind("}")
+            if _start >= 0 and _end > _start:
+                data = _json.loads(r[_start:_end + 1])
+                is_fu = bool(data.get("is_followup", False))
+                action = str(data.get("action", "unknown"))
+                conf = float(data.get("confidence", 0.0) or 0.0)
+                if action == "new_topic" and not is_fu:
+                    return {"is_followup": False, "action": "new_topic",
+                            "confidence": conf, "reason": str(data.get("reason", ""))}
+                if action in ("request_full_content", "re_explain", "give_example",
+                              "continue_step", "switch_angle"):
+                    return {"is_followup": True, "action": action,
+                            "confidence": conf, "reason": str(data.get("reason", ""))}
+                return {"is_followup": is_fu, "action": action, "confidence": conf,
+                        "reason": str(data.get("reason", ""))}
+    except Exception:
+        pass
+    return {"is_followup": False, "action": "new_topic", "confidence": 0.5,
+            "reason": "分类失败，保守视为新主题"}
+
+
 def route(text: str, learner=None, session=None, llm=None,
           fallback_to_teach: bool = False, endpoint_hint: Optional[str] = None) -> dict:
     """v0.24：集中路由决策器 —— 替代 server.py 中的 if/elif 链。
