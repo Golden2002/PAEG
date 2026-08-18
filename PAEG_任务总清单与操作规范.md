@@ -1961,3 +1961,38 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 ### 实施记录
 
 （实施完成后更新）
+
+## §3.59 魔搭创空间部署验证 + LaTeX 渲染修复（2026-08-18 · 用户实测：创空间仍无法正确运行）
+
+### 背景（用户实测魔搭创空间）
+
+用户贴出魔搭创空间实际对话输出：
+- 用户："为我讲解将进酒"
+- 系统回复：**"[balanced] 关于该主题的讲解"** ← 这是 LLM 缺失的兜底产物
+- 后续：检查理解 + "本次教学完成，理解反馈一般 掌握度信号 0.55"
+- **另有 LaTeX 符号未渲染问题**
+
+### 根因分析（初步）
+
+1. **"[balanced] 关于该主题的讲解"** = Presenter 无 LLM 时的规则模板兜底（Presenter.run："真实 LLM 生成讲解；无 LLM 时回退规则模板"）→ **魔搭容器内 LLM 调用失败**
+2. **为何 LLM 失败**：librarian 已查证（2026-08-18）——`ms_deploy.json` 的 `environment_variables` 对 **sdk_type=docker 不生效**（仅 gradio/streamlit/static 生效）；必须用魔搭控制台 **Secrets** 配置 DEEPSEEK_API_KEY。容器内 `os.environ` 才能读到
+3. 多模型 fallback（§3.55）在无 key 时落 Mock——但用户看到的是规则模板兜底（Presenter 层），说明 fallback 链也没 key
+
+### 待办
+
+1. **确认魔搭 Secrets 配置状态**：用户是否已在创空间控制台配置 DEEPSEEK_API_KEY？（需要用户操作确认或通过魔搭 API 查询）
+2. **代码侧改进**：无 LLM key 时**显式可观测**（启动日志/健康检查/API 返回明确提示"未配置 DEEPSEEK_API_KEY"），而不是静默降级——用户才能定位
+3. **魔搭部署验证**：配置 Secrets 后重部署，验证对话输出真实 LLM 内容
+4. **LaTeX 渲染修复**：魔搭前端 LaTeX 未渲染——排查（前端是否加载 KaTeX？SSE 内容里公式格式？）
+5. **本地等价验证**：本地模拟"无 key"场景确认兜底输出 = "[balanced]..."，验证修复后输出真实内容
+
+### 实施纪律
+
+- 按需求文档标准（D1 登记/D2 融入/D3 分层）
+- 不跑会卡住的命令（SSE 流式验证用短超时）
+- Oracle 咨询（bg 启动）
+- 无 key 兜底必须可观测（用户能一眼看出"是 key 没配"而非"部署坏了"）
+
+### 实施记录
+
+（完成后更新）
