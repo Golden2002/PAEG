@@ -1858,3 +1858,39 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - ✅ 方法论文件待写入智能体学习文件夹
 - ✅ 需求文档登记完成（本 §3.56）
 - ⬜ 清理执行（按方法，L1→L2 安全级，等用户确认）
+
+## §3.57 教学追问识别架构修复（2026-08-18 · 用户实测 bug"先给原文被当新主题教学"）
+
+### Bug 现象
+
+1. 用户教学模式问"教我将进酒" → 正常教学（但没先输出原文）
+2. 用户追问"你得先给我原文" → 智能体**把这句话当新教学主题**，开始"教学"这句话本身
+
+### 根因（架构缺口）
+
+- 前端每次发送 `concept: question`（输入框全文）→ 后端 teach_stream 直接当主题
+- **v0.41.9"短输入延续"策略**：仅 `<6 字` 才复用上轮意图——"你得先给我原文"（8 字）绕过 → 走新主题路由
+- 用户洞察：**"延续与否与输入长短无关"**——短输入延续策略本身是错误设计
+
+### 修复方案（Oracle 咨询 bg_532bda5f · 方案 A+C · 无正则）
+
+1. **meta_router.classify_followup()**：LLM 二分类（追问当前主题 vs 新主题），返回 action 枚举：
+   request_full_content(要原文) / re_explain(没懂) / give_example(要例子) / continue_step(继续) / switch_angle(换角度) / new_topic
+2. **teach_stream 集成**：上轮 intent ∈ (teach, material) 且通过安全边界 → classify_followup 判定
+   - 追问 → 复用 prev_concept（SESSIONS current_concept）+ 按 action 生成教学指令存 learner._follow_instruction
+   - 新主题 → 正常切换（写回新 concept）
+3. **删除"短输入延续"**（v0.41.9 _is_short_in 逻辑移除，写回也去掉长短判断——延续与长短无关）
+4. **Presenter.run 消费**：读 learner._follow_instruction 注入 system prompt，单轮消费（防污染）
+
+### 验证（Playwright + API 实测）
+
+- ✅ "教我将进酒" → 正常教学（含"君不见"引用）
+- ✅ "你得先给我原文" → **识别为追问**，复用将进酒 + 输出原文（"上一课我们看见了'君不见黄河之水天上来'"）
+- ✅ "我们学滕王阁序" → **正确切换新主题**（不再延续将进酒）
+- ✅ 语法检查通过 + 提交 a4ede24
+
+### 设计要点
+
+- **判定机制是 LLM 二分类**（非正则）：覆盖"先给原文/继续/换例子/没懂"等任意表达
+- **状态在后端 SESSIONS**（权威），前端不参与判定（仅 UX 镜像）
+- action 枚举可扩展（新增指令类型只加枚举 + 指令模板）
