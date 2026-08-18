@@ -1965,7 +1965,8 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - ✅ services/topic_stack.py——LRU 主题栈（push/find/recover/summarize，max=5）
 - ✅ server.py teach_stream——4 分支路由（followup 复用 / detour 入栈 / revisit 恢复 / off_topic 引导）+ _llm_intent 显式初始化（修复 500）
 - ✅ user_store.py add_message(topic_meta)——分类结果写入对话历史（Turn 级标注）
-- ✅ eflection_store.py log_topic_relation()——SQLite topic_relation_log 表（可观测）
+- ✅ 
+eflection_store.py log_topic_relation()——SQLite topic_relation_log 表（可观测）
 - ✅ 删除"短输入延续"策略（延续与长短无关）
 
 **验证结果**（分类器直接测试 5 场景全对）：
@@ -2023,9 +2024,18 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 **LaTeX 渲染**（Oracle 诊断）：
 - KaTeX 已加载（index.html L19-21 本地 + CDN 兜底）✓
 - **根因：SSE 流式逐 chunk 推送时未重新触发 renderMath**——新 chunk 不渲染公式
-- 修复：SSE message handler 末尾对最新节点补 enderMath(appendedNode)（每 token 后 <5ms）
+- 修复：SSE message handler 末尾对最新节点补 
+enderMath(appendedNode)（每 token 后 <5ms）
 
-**用户操作清单**（已告知）：魔搭控制台设置→Secrets→DEEPSEEK_API_KEY=sk-xxx→保存→重启 Studio
+**用户操作清单**（已告知）：魔搭控制台设置→Secrets→DEEPSEEK_API_KEY=sk-xxx→保存→**必须重新部署/重启**（librarian bg_52f78f21 二次确认：Docker 容器 env 在 docker run 时固化，运行时修改无效，必须 redeploy 才生效——这是"配了 key 检测不到"的根因）
+
+**官方机制确认**（librarian bg_52f78f21 · 2026-08-18）：
+1. 控制台 Secret/Variable 对 docker ✅ 生效（os.environ 可读）
+2. **配置后必须 redeploy 才生效**（容器启动时注入，运行时修改无效）
+3. ms_deploy.json 的 environment_variables 对 docker ❌ 不生效（仅 gradio/streamlit/static）
+4. 其他注入方式：OpenAPI POST /studios/{o}/{r}/secrets + /deploy、ms CLI、Dockerfile ENV（密钥勿用）
+
+**auth.json 注入 Docker 方案**（用户提出）：可行但受限——auth.json 在 .gitignore（不进 git），魔搭构建用 git 仓库内容 → COPY . . 不会有它；除非手动上传魔搭仓库（key 进公开仓库，不安全）。**推荐走控制台 Secret**。
 
 ### 实施记录（验证完成 · 2026-08-18）
 
@@ -2034,7 +2044,8 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - ✅ services/topic_stack.py——LRU 主题栈（push/find/recover/summarize，max=5）
 - ✅ server.py teach_stream——4 分支路由（followup 复用 / detour 入栈 / revisit 恢复 / off_topic 引导）+ _llm_intent 显式初始化（修复 500）
 - ✅ user_store.py add_message(topic_meta)——分类结果写入对话历史（Turn 级标注）
-- ✅ eflection_store.py log_topic_relation()——SQLite topic_relation_log 表（可观测）
+- ✅ 
+eflection_store.py log_topic_relation()——SQLite topic_relation_log 表（可观测）
 - ✅ 删除"短输入延续"策略（延续与长短无关）
 
 **验证结果**（分类器直接测试 5 场景全对）：
@@ -2046,3 +2057,266 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - R4 天气端到端：输出 off_topic 引导提示（"切换到闲聊~模式"），4s 返回不卡死（原 169s）✓
 
 **注意**：端到端 R1-R5 部分超时（LLM 生成 30-40s > 脚本 25s 超时）——是 LLM 响应慢非 bug；分类判定逻辑已独立验证正确。
+
+## §3.60 运行时 LLM 故障切换（failover）（2026-08-18 · 用户实测：DeepSeek key 无效 401 时 QWEN 不切换）
+
+### 背景
+
+魔搭部署：配置 DEEPSEEK_API_KEY（无效）+ QWEN_API_KEY（有效）→ 启动选 DeepSeek → 调用 HTTP 401 → 教学失败。**期望**：DeepSeek 401 时自动重试 QWEN。
+
+### 根因（已核实）
+
+- §3.55 只做**启动时选择**（auto_detect_model_api 返回第一个有 key 的），**无运行时故障切换**
+- llm_adapter.py：fallback/retry/401/switch 全部 0 处——单 API 实例，失败即抛错
+
+### Oracle 方案（bg_9fa94224 · 2026-08-18 已返回）
+
+**核心**：在 AdapterLLM.chat 层做 failover——启动检测返回**有序候选列表**，AdapterLLM 持列表迭代，遇可切错误自动跳下一家；全失败抛 AllProvidersFailedError（不静默 Mock）。
+
+**关键设计**：
+1. OpenAICompatModelAPI 加 provider_label（日志显示 deepseek/qwen 而非 openai_compat）
+2. detect_model_candidates() 返回有序列表（扩展加 QWEN/DASHSCOPE 分支）；auto_detect_model_api 保留为兼容壳
+3. ModelError 分类：permanent(401/403=True, 429/5xx=False) + is_failoverable()（401/403/429/5xx/网络；400/404/解析/内容过滤不切）
+4. AdapterLLM 持 candidates + _dead set + _cooldown dict；chat() 迭代跳过，失败日志切换
+5. AllProvidersFailedError(attempts) 多行摘要
+6. create_llm("auto") 用候选列表；Mock 仅在零真实 key 时进列表（有 key 失败→抛错不静默）
+7. pytest：401→切+标记dead / 429→冷却 / 全失败→AllProvidersFailedError
+
+**去重**：按 (base_url, api_key[:8]) 去重（env + auth.json 同 key 不重试两次）
+**tools 透传**：failover 循环透传全部 kwargs
+
+### 实施记录（验证完成 · 2026-08-18）
+
+**代码落地**（6c7e13e）：
+- ✅ llm_api.ModelError 分类：http_code + permanent(401/403) + failoverable(401/403/429/5xx/网络)
+- ✅ llm_api.detect_model_candidates()：收集全部候选（PAEG/DeepSeek/Qwen/Anthropic/OpenAI/auth.json），扩展 QWEN 分支；按 (base_url, key[:8]) 去重
+- ✅ llm_adapter.AdapterLLM：持 candidates + _dead set + _cooldown dict；chat() failover（401/403→dead，429/5xx→冷却60s，网络→试下一家）；非 failoverable(400/404/解析)直接抛
+- ✅ AllProvidersFailedError：全部失败明确抛错（不静默 Mock）
+- ✅ create_llm("auto") 用 candidates
+- ✅ 修复 llm_adapter 缺 import sys（测试抓到，同魔搭崩溃类型）
+
+**测试**（pytest 4 组全过）：
+- 401 → 切 qwen + 二次跳过 dead deepseek ✅
+- 429 → 冷却期内跳过 + 过期重试 ✅
+- 全失败 → AllProvidersFailedError ✅
+- 400 → 不切换直接抛 ✅
+
+**解决场景**：魔搭 DEEPSEEK(401无效) + QWEN(有效) → 自动切 QWEN 成功教学
+
+## §3.61 教学进度延续修复（2026-08-18 · 用户实测：逐句讲解"继续"后不延续进度）
+
+### 背景（用户实测）
+
+用户要求："讲解《将进酒》先给原文，再逐句解释每句话的字词+赏析"。
+- 第一轮：系统给原文 + 讲前两句 ✅
+- 用户"我理解了，继续" → 第二轮**重新从第一句讲**（重复，只到第三句）❌
+- 用户"继续" → 第三轮变成"放手练习"（用《行路难》例子），**不再逐句讲解** ❌
+
+**核心问题**：教学进度不延续——每次"继续"都重新规划步骤，不接着上次进度；甚至跑偏到新主题。
+
+### 任务
+
+1. **explore 排查**：teach_stream 步骤生成 / "继续"处理 / Presenter 推进 / 进度持久化（bg_876a2176）
+2. **Oracle 咨询**：设计"教学进度延续"架构（步骤记忆 + 续讲机制 + 防跑偏）
+3. **实施**：按 Oracle 方案修复（进度状态持久化 + 续讲路由）
+4. **验证**：逐句讲解场景全链路（原文→第1句→继续→第2句→...→全诗→赏析）
+
+### 实施纪律
+
+- 按需求文档标准（D1 登记/D2 融入/D3 分层）
+- 咨询 Oracle（bg 启动）
+- 不破坏 §3.57/§3.58（追问/游离识别）
+- TDD：先写"进度延续"失败测试
+
+### 测试标准（用户补充 · 修复后必测）
+
+1. **主场景**：《将进酒》逐句讲解——原文→第1句→继续→第2句→...→全诗→赏析，进度必须延续
+2. **跨学段学科**（至少 3 个）：
+   - 初中数学（如"讲勾股定理"）
+   - 大学物理（如"讲薛定谔方程"）
+   - 考研政治（如"讲剩余价值理论"）
+   - 其他（如小学通识/高中英语）
+3. **跟进提问模拟**（每主题至少 2 次）："继续/接着讲""没听懂，换个说法""举个例子""回到刚才那句"
+4. **输出质量检查**：
+   - 进度延续（不重讲已讲内容）
+   - 内容准确（学科正确、无幻觉）
+   - 学段适配（初中用初中语言，大学保持深度）
+   - 无源码泄漏/无 500/无卡死
+   - 语言规范（完整词形、无 AI 腔）
+
+### Oracle 方案（bg_238a0108 · 2026-08-18 已返回）
+
+**关键发现**：server.py:1431-1440 **已有 _is_continuation + 	each_plan_* 半成品**——但 pop 掉旧 plan 又跑新 plan（pop-then-discard bug）。方案是重构为**三层协议**：
+
+1. **状态模型**：SESSIONS["teach_state_{learner_id}"] 单键（替换 teach_plan_* 双键），含 original_concept/original_subject/strategy/plan/completed_step_ids/current_step_id/history/started_at；迁移时 pop 旧键
+2. **续讲识别**：_detect_continuation() 复用 §3.58 classify_topic_relation——teach_state 存在 + 学科未切换 + relation∈{followup,revisit} → 续讲；detour/off_topic → 新主题；低置信兜底续讲
+3. **流程分支**：续讲 → 
+ext_step = state["plan"][current_step_id+1] → Presenter.run（跳过 Diagnostor+Planner）；新主题 → 原管线 + 初始化 state；plan 跑完 → event: plan_completed
+4. **防跑偏**：Presenter 收 concept=original_concept / subject=original_subject / previous=state.history（结构化全量，移除 chat_hist[-6:] 60字截断）
+5. **步粒度**：Planner prompt 微调（plan steps = 内容自然单元数：古诗≈句数），schema 不变
+6. **生命周期**：超时30min/学科切换→清；plan_completed 后保留（再来一遍）
+7. **测试**：pytest 5 场景（将进酒逐句/初中数学/大学物理/考研政治/跟进变体）
+
+### Oracle 方案（bg_b1d5b22b · 2026-08-18 已返回）
+
+**核心**：Planner LLM 动态化——
+un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文打包（最新输入/§3.58 action/§3.61 teach_state/诊断/17维画像/学段学科/策略知识参考）动态生成 plan；alidate_plan() 防幻觉；LLM 失败→静态 choose_strategy 兜底；灰度开关 planner_dynamic。
+
+**关键设计**：
+1. pedagogy.py 加 PLANNER_SYSTEM_PROMPT（策略知识库 + JSON schema）+ alidate_plan()
+2. Planner.run(learner, diagnosis, subject, concept, tone_info, teach_state=None, action=None)——teach_state=None 新主题，非 None 续讲
+3. LLM 输出 schema 不变（steps[]），步数动态 1-20；解析失败/无LLM/token超限 → 静态兜底
+4. 续讲融合：server.py 调 classify_topic_relation（§3.58）→ action → Planner；teach_state 存 SESSIONS（original_concept/completed_step_ids/history_summary）
+5. §3.58 action→决策映射：continue_step→讲N+1句 / re_explain→小步重讲 / give_example→例子 / switch_angle→换角度 / request_full_content→先全文 / revisit→切回 / new_topic→新规划
+6. 灰度开关 paeg_modules.json planner_dynamic: true
+7. 测试：_StubPlannerLLM 注入 5 case（逐句将进酒/初中数学/大学物理/考研政治/re_explain）+ 质量对比
+
+### 实施记录（核心完成 · 2026-08-18）
+
+**已落地**（9e7191b + 874e8b1 + d39b534 + 6c5ab7d）：
+- ✅ pedagogy.PLANNER_SYSTEM_PROMPT：策略知识库作为 LLM 参考 + action 方向参考（结合学科取舍，非强制模板）
+- ✅ pedagogy.validate_plan()：防幻觉
+- ✅ Planner.run(teach_state=None, action=None)：LLM 动态规划 + 完整上下文打包（最新输入/画像/学段/进度/§3.58 action）；LLM 失败→静态兜底
+- ✅ server.py 集成：_student_raw 入口捕获 + followup/revisit 拼接"主题——学生追问：原话"（LLM 理解具体指令）+ action 指令注入 concept
+- ✅ 修复 tool_calls 泄漏：Presenter 教学主输出不传 tools（生成讲解场景）
+- ✅ 学段映射：economics 加 graduate_exam（考研政治）
+- ✅ give_example 平衡：action 降为方向参考（古诗自然融入意象/数学具体举例）
+- ✅ max_tokens 拉高：Presenter 512→4000 / 全局 2000→4000（支持长文稿）
+- ✅ 测试：Planner 4 单测 + 意图理解 4 场景（这句X/继续/没懂/要例子）+ 跨学段（语文/数学/物理/政治）+ tool_calls 修复重测
+
+**关键成果**：
+- 学生"这句'天生我材必有用'是什么意思" → LLM 准确回应（原话保留生效，非讲首句）
+- 将进酒逐句进度延续（R1原文→R2时代→R3开头四句）
+- 跨学段逐步推进（数学3-4-5砌墙/物理电子位置→方程→概率）
+
+**待办（后续）**：
+- ⬜ teach_state 灰度开关 planner_dynamic（paeg_modules.json）
+- ⬜ 自进化素材（evolved_plans.json / improvements.md）
+- ⬜ 政治 R1 学段拦截复测（economics 已加考研档）
+
+### 跨学段测试结果（2026-08-18 首轮）
+
+**已落地**（9e7191b）：
+- ✅ pedagogy.PLANNER_SYSTEM_PROMPT：策略知识库（socratic/scaffolded/mastery/feynman/综合）作为 LLM 参考
+- ✅ pedagogy.validate_plan()：防幻觉（step_id 连续/type/bloom 枚举/topic 非空/duration 范围/steps 1-20）
+- ✅ Planner.run(teach_state=None, action=None)：LLM 动态规划 + 完整上下文打包（最新输入/画像/学段/进度/§3.58 action）；LLM 失败→静态兜底
+- ✅ Planner._plan_dynamic()：_safe_reason_chat 调 LLM → JSON 解析 → validate_plan → 返回（planner_mode: dynamic/static）
+- ✅ 测试 4 组通过：逐句续讲(第4句)/数学新概念/非法JSON回退/无LLM回退
+
+**待完成**：
+- ⬜ server.py teach_stream 集成：构造 teach_state（从 SESSIONS）+ 调 classify_topic_relation 拿 action → 传 Planner.run
+- ⬜ teach_state 持久化（SESSIONS 存 original_concept/completed_step_ids/history_summary）
+- ⬜ 跨学段完整测试（将进酒逐句/初中数学/大学物理/考研政治 + 跟进提问 + 质量检查）
+
+### 跨学段测试结果（2026-08-18 首轮）
+
+| 主题 | 结果 | 详情 |
+|---|---|---|
+| 语文-将进酒 | ✅ | 逐句进度延续成功（R1原文→R2时代→R3开头四句，不重讲不跑偏）|
+| 数学-勾股定理 | ❌ | R1-R3 输出 tool_calls 原始 JSON（工具调用未处理）|
+| 物理-薛定谔 | ❌ | R1 tool_calls JSON；R2 改写薇依式偏离；R3 才正常 |
+| 政治-剩余价值 | ✅ | R1 学段拦截(economics映射)；R2/R3 正常推进 |
+
+**新问题**：教学主输出 tool_calls JSON 泄漏——Presenter 调 _safe_reason_chat 传 tools，LLM 返回 tool_calls 但未处理/未合并结果。需修复。
+
+- ⬜ 灰度开关 planner_dynamic（paeg_modules.json）
+
+## §3.62 教学规划 LLM 动态决策化（2026-08-18 · 用户洞察：scaffold 死板约束限制大模型能力）
+
+### 背景（用户核心批评）
+
+**用户原话**："Scaffold 约束得实在是太紧了，它当然是一个好的约束，但是不应该这么死板和机械。至少这个判定应该是动态的，至少这个判定应该是牢牢地围绕用户的最新的输入，以及用户的历史以及其他的相关的context，比如用户的画像，比如当前的学段和年级。大模型是有能力处理这些信息的，agent反而让大模型的能力无法发挥。"
+
+### 核心问题
+
+1. **choose_strategy + build_plan_steps（pedagogy.py）用静态策略模板**（socratic/scaffolded 各 3 步）——plan 粒度是策略级，非内容单元级
+2. 导致：逐句讲解《将进酒》→ R3 走到"放手练习"（scaffolded 第 3 步），**不逐句推进**（§3.61 问题根因）
+3. **根本**：教学规划被死板规则硬编码，**LLM 无法基于完整上下文动态决策**
+
+### 用户要求
+
+**教学规划应由 LLM 动态生成**，基于：
+- 用户最新输入（"继续"的语义：继续讲下一句/换角度/深入？）
+- 用户历史（已讲内容：讲到哪句、覆盖了什么）
+- 用户画像（17 维画像、掌握度）
+- 学段年级（高中/初中/大学——深度适配）
+- 学科（语文/数学/物理——方法论适配）
+
+**大模型有能力处理这些，agent（死板规则）反而限制其发挥**
+
+### 任务
+
+1. **Oracle 咨询**：设计"LLM 动态教学规划"架构——plan 生成由 LLM 基于完整上下文决策（steps 粒度/内容单元/推进方向），替代 choose_strategy 静态模板
+2. **实施**：Planner 改造为 LLM 动态规划（保留 scaffold 作为 LLM 的参考/兜底，而非强制）
+3. **验证**：逐句讲解《将进酒》→"继续"→ 每轮推进新句；跨学段学科完整测试
+
+### 约束
+
+- 不破坏 130+ 调用方（plan 输出 schema 不变：steps[]）
+- 无正则硬编码
+- 简洁可维护（执行标准）
+- scaffold 作为 LLM 决策的**参考框架**而非**强制模板**（用户认可它是好约束，但不该死板）
+
+### Oracle 方案（bg_b1d5b22b · 2026-08-18 已返回）
+
+**核心**：Planner LLM 动态化——
+un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文打包（最新输入/§3.58 action/§3.61 teach_state/诊断/17维画像/学段学科/策略知识参考）动态生成 plan；alidate_plan() 防幻觉；LLM 失败→静态 choose_strategy 兜底；灰度开关 planner_dynamic。
+
+**关键设计**：
+1. pedagogy.py 加 PLANNER_SYSTEM_PROMPT（策略知识库 + JSON schema）+ alidate_plan()
+2. Planner.run(learner, diagnosis, subject, concept, tone_info, teach_state=None, action=None)——teach_state=None 新主题，非 None 续讲
+3. LLM 输出 schema 不变（steps[]），步数动态 1-20；解析失败/无LLM/token超限 → 静态兜底
+4. 续讲融合：server.py 调 classify_topic_relation（§3.58）→ action → Planner；teach_state 存 SESSIONS（original_concept/completed_step_ids/history_summary）
+5. §3.58 action→决策映射：continue_step→讲N+1句 / re_explain→小步重讲 / give_example→例子 / switch_angle→换角度 / request_full_content→先全文 / revisit→切回 / new_topic→新规划
+6. 灰度开关 paeg_modules.json planner_dynamic: true
+7. 测试：_StubPlannerLLM 注入 5 case（逐句将进酒/初中数学/大学物理/考研政治/re_explain）+ 质量对比
+
+### 实施记录（核心完成 · 2026-08-18）
+
+**已落地**（9e7191b + 874e8b1 + d39b534 + 6c5ab7d）：
+- ✅ pedagogy.PLANNER_SYSTEM_PROMPT：策略知识库作为 LLM 参考 + action 方向参考（结合学科取舍，非强制模板）
+- ✅ pedagogy.validate_plan()：防幻觉
+- ✅ Planner.run(teach_state=None, action=None)：LLM 动态规划 + 完整上下文打包（最新输入/画像/学段/进度/§3.58 action）；LLM 失败→静态兜底
+- ✅ server.py 集成：_student_raw 入口捕获 + followup/revisit 拼接"主题——学生追问：原话"（LLM 理解具体指令）+ action 指令注入 concept
+- ✅ 修复 tool_calls 泄漏：Presenter 教学主输出不传 tools（生成讲解场景）
+- ✅ 学段映射：economics 加 graduate_exam（考研政治）
+- ✅ give_example 平衡：action 降为方向参考（古诗自然融入意象/数学具体举例）
+- ✅ max_tokens 拉高：Presenter 512→4000 / 全局 2000→4000（支持长文稿）
+- ✅ 测试：Planner 4 单测 + 意图理解 4 场景（这句X/继续/没懂/要例子）+ 跨学段（语文/数学/物理/政治）+ tool_calls 修复重测
+
+**关键成果**：
+- 学生"这句'天生我材必有用'是什么意思" → LLM 准确回应（原话保留生效，非讲首句）
+- 将进酒逐句进度延续（R1原文→R2时代→R3开头四句）
+- 跨学段逐步推进（数学3-4-5砌墙/物理电子位置→方程→概率）
+
+**待办（后续）**：
+- ⬜ teach_state 灰度开关 planner_dynamic（paeg_modules.json）
+- ⬜ 自进化素材（evolved_plans.json / improvements.md）
+- ⬜ 政治 R1 学段拦截复测（economics 已加考研档）
+
+### 跨学段测试结果（2026-08-18 首轮）
+
+**已落地**（9e7191b）：
+- ✅ pedagogy.PLANNER_SYSTEM_PROMPT：策略知识库（socratic/scaffolded/mastery/feynman/综合）作为 LLM 参考
+- ✅ pedagogy.validate_plan()：防幻觉（step_id 连续/type/bloom 枚举/topic 非空/duration 范围/steps 1-20）
+- ✅ Planner.run(teach_state=None, action=None)：LLM 动态规划 + 完整上下文打包（最新输入/画像/学段/进度/§3.58 action）；LLM 失败→静态兜底
+- ✅ Planner._plan_dynamic()：_safe_reason_chat 调 LLM → JSON 解析 → validate_plan → 返回（planner_mode: dynamic/static）
+- ✅ 测试 4 组通过：逐句续讲(第4句)/数学新概念/非法JSON回退/无LLM回退
+
+**待完成**：
+- ⬜ server.py teach_stream 集成：构造 teach_state（从 SESSIONS）+ 调 classify_topic_relation 拿 action → 传 Planner.run
+- ⬜ teach_state 持久化（SESSIONS 存 original_concept/completed_step_ids/history_summary）
+- ⬜ 跨学段完整测试（将进酒逐句/初中数学/大学物理/考研政治 + 跟进提问 + 质量检查）
+
+### 跨学段测试结果（2026-08-18 首轮）
+
+| 主题 | 结果 | 详情 |
+|---|---|---|
+| 语文-将进酒 | ✅ | 逐句进度延续成功（R1原文→R2时代→R3开头四句，不重讲不跑偏）|
+| 数学-勾股定理 | ❌ | R1-R3 输出 tool_calls 原始 JSON（工具调用未处理）|
+| 物理-薛定谔 | ❌ | R1 tool_calls JSON；R2 改写薇依式偏离；R3 才正常 |
+| 政治-剩余价值 | ✅ | R1 学段拦截(economics映射)；R2/R3 正常推进 |
+
+**新问题**：教学主输出 tool_calls JSON 泄漏——Presenter 调 _safe_reason_chat 传 tools，LLM 返回 tool_calls 但未处理/未合并结果。需修复。
+
+- ⬜ 灰度开关 planner_dynamic（paeg_modules.json）

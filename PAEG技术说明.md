@@ -1083,6 +1083,34 @@ since:   <PAEG 版本号>
 **魔搭部署**：创空间"环境变量"配置 `DEEPSEEK_API_KEY`（或任一 fallback key），镜像无需改。
 **验证**：`python -m llm_api`（打印当前 provider + 真实回复）。
 
+### 7.7 教学进度延续 + LLM 动态规划（§3.61/§3.62 · 2026-08-18）
+
+> **背景**：用户实测"逐句讲解《将进酒》→ '继续' → 不延续进度（重讲/跑偏到练习）"。根因：teach_stream 每次把管线当新课程重跑，SESSIONS 无进度状态。
+
+**进度延续架构**（§3.61）：
+
+| 组件 | 设计 |
+|---|---|
+| `teach_state_{learner_id}` | SESSIONS 存 original_concept/completed_step_ids/history_summary/last_response_tail |
+| 续讲识别 | §3.58 classify_topic_relation（followup→续讲 / detour→新主题 / revisit→绕回恢复）|
+| 学生原话保留 | `_student_raw` 入口捕获，followup/revisit 拼接"主题——学生追问：原话"（LLM 理解具体指令）|
+
+**LLM 动态规划**（§3.62）：
+
+| 组件 | 设计 |
+|---|---|
+| `Planner.run(teach_state, action)` | LLM 基于完整上下文（输入/画像/学段/进度/§3.58 action）动态生成 plan；步数动态（逐句=句数）|
+| `pedagogy.PLANNER_SYSTEM_PROMPT` | 策略知识库作为参考（非强制模板）；action 作为方向参考（结合学科取舍）|
+| `pedagogy.validate_plan()` | 防幻觉（schema 校验），非法→静态兜底 |
+| 双层兜底 | LLM 失败/无 LLM → choose_strategy + build_plan_steps（静态，能力保留）|
+| tool_calls 修复 | Presenter 教学主输出不传 tools（生成讲解场景，避免 JSON 泄漏）|
+
+**关键改进**（实测验证）：
+- "这句'天生我材必有用'是什么意思" → LLM 准确回应（原话保留生效）
+- 将进酒逐句进度延续（R1原文→R2时代→R3开头四句）
+- give_example 平衡：古诗自然融入意象/数学具体举例（LLM 按学科取舍）
+- max_tokens 拉高：Presenter 4000 / 全局 4000（支持长文稿）
+
 ## 附录 A 术语表
 
 | 术语 | 含义 |
