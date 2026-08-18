@@ -1,4 +1,4 @@
-﻿"""Flask test_client 验证 /api/avatar v0.36 修复。"""
+"""Flask test_client 验证 /api/avatar v0.36 修复。"""
 import io
 import os
 import sys
