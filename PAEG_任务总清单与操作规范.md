@@ -1965,7 +1965,8 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - ✅ services/topic_stack.py——LRU 主题栈（push/find/recover/summarize，max=5）
 - ✅ server.py teach_stream——4 分支路由（followup 复用 / detour 入栈 / revisit 恢复 / off_topic 引导）+ _llm_intent 显式初始化（修复 500）
 - ✅ user_store.py add_message(topic_meta)——分类结果写入对话历史（Turn 级标注）
-- ✅ eflection_store.py log_topic_relation()——SQLite topic_relation_log 表（可观测）
+- ✅ 
+eflection_store.py log_topic_relation()——SQLite topic_relation_log 表（可观测）
 - ✅ 删除"短输入延续"策略（延续与长短无关）
 
 **验证结果**（分类器直接测试 5 场景全对）：
@@ -2023,7 +2024,8 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 **LaTeX 渲染**（Oracle 诊断）：
 - KaTeX 已加载（index.html L19-21 本地 + CDN 兜底）✓
 - **根因：SSE 流式逐 chunk 推送时未重新触发 renderMath**——新 chunk 不渲染公式
-- 修复：SSE message handler 末尾对最新节点补 enderMath(appendedNode)（每 token 后 <5ms）
+- 修复：SSE message handler 末尾对最新节点补 
+enderMath(appendedNode)（每 token 后 <5ms）
 
 **用户操作清单**（已告知）：魔搭控制台设置→Secrets→DEEPSEEK_API_KEY=sk-xxx→保存→**必须重新部署/重启**（librarian bg_52f78f21 二次确认：Docker 容器 env 在 docker run 时固化，运行时修改无效，必须 redeploy 才生效——这是"配了 key 检测不到"的根因）
 
@@ -2042,7 +2044,8 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - ✅ services/topic_stack.py——LRU 主题栈（push/find/recover/summarize，max=5）
 - ✅ server.py teach_stream——4 分支路由（followup 复用 / detour 入栈 / revisit 恢复 / off_topic 引导）+ _llm_intent 显式初始化（修复 500）
 - ✅ user_store.py add_message(topic_meta)——分类结果写入对话历史（Turn 级标注）
-- ✅ eflection_store.py log_topic_relation()——SQLite topic_relation_log 表（可观测）
+- ✅ 
+eflection_store.py log_topic_relation()——SQLite topic_relation_log 表（可观测）
 - ✅ 删除"短输入延续"策略（延续与长短无关）
 
 **验证结果**（分类器直接测试 5 场景全对）：
@@ -2156,7 +2159,8 @@ ext_step = state["plan"][current_step_id+1] → Presenter.run（跳过 Diagnosto
 
 ### Oracle 方案（bg_b1d5b22b · 2026-08-18 已返回）
 
-**核心**：Planner LLM 动态化——un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文打包（最新输入/§3.58 action/§3.61 teach_state/诊断/17维画像/学段学科/策略知识参考）动态生成 plan；alidate_plan() 防幻觉；LLM 失败→静态 choose_strategy 兜底；灰度开关 planner_dynamic。
+**核心**：Planner LLM 动态化——
+un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文打包（最新输入/§3.58 action/§3.61 teach_state/诊断/17维画像/学段学科/策略知识参考）动态生成 plan；alidate_plan() 防幻觉；LLM 失败→静态 choose_strategy 兜底；灰度开关 planner_dynamic。
 
 **关键设计**：
 1. pedagogy.py 加 PLANNER_SYSTEM_PROMPT（策略知识库 + JSON schema）+ alidate_plan()
@@ -2180,6 +2184,18 @@ ext_step = state["plan"][current_step_id+1] → Presenter.run（跳过 Diagnosto
 - ⬜ server.py teach_stream 集成：构造 teach_state（从 SESSIONS）+ 调 classify_topic_relation 拿 action → 传 Planner.run
 - ⬜ teach_state 持久化（SESSIONS 存 original_concept/completed_step_ids/history_summary）
 - ⬜ 跨学段完整测试（将进酒逐句/初中数学/大学物理/考研政治 + 跟进提问 + 质量检查）
+
+### 跨学段测试结果（2026-08-18 首轮）
+
+| 主题 | 结果 | 详情 |
+|---|---|---|
+| 语文-将进酒 | ✅ | 逐句进度延续成功（R1原文→R2时代→R3开头四句，不重讲不跑偏）|
+| 数学-勾股定理 | ❌ | R1-R3 输出 tool_calls 原始 JSON（工具调用未处理）|
+| 物理-薛定谔 | ❌ | R1 tool_calls JSON；R2 改写薇依式偏离；R3 才正常 |
+| 政治-剩余价值 | ✅ | R1 学段拦截(economics映射)；R2/R3 正常推进 |
+
+**新问题**：教学主输出 tool_calls JSON 泄漏——Presenter 调 _safe_reason_chat 传 tools，LLM 返回 tool_calls 但未处理/未合并结果。需修复。
+
 - ⬜ 灰度开关 planner_dynamic（paeg_modules.json）
 
 ## §3.62 教学规划 LLM 动态决策化（2026-08-18 · 用户洞察：scaffold 死板约束限制大模型能力）
@@ -2220,7 +2236,8 @@ ext_step = state["plan"][current_step_id+1] → Presenter.run（跳过 Diagnosto
 
 ### Oracle 方案（bg_b1d5b22b · 2026-08-18 已返回）
 
-**核心**：Planner LLM 动态化——un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文打包（最新输入/§3.58 action/§3.61 teach_state/诊断/17维画像/学段学科/策略知识参考）动态生成 plan；alidate_plan() 防幻觉；LLM 失败→静态 choose_strategy 兜底；灰度开关 planner_dynamic。
+**核心**：Planner LLM 动态化——
+un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文打包（最新输入/§3.58 action/§3.61 teach_state/诊断/17维画像/学段学科/策略知识参考）动态生成 plan；alidate_plan() 防幻觉；LLM 失败→静态 choose_strategy 兜底；灰度开关 planner_dynamic。
 
 **关键设计**：
 1. pedagogy.py 加 PLANNER_SYSTEM_PROMPT（策略知识库 + JSON schema）+ alidate_plan()
@@ -2244,4 +2261,16 @@ ext_step = state["plan"][current_step_id+1] → Presenter.run（跳过 Diagnosto
 - ⬜ server.py teach_stream 集成：构造 teach_state（从 SESSIONS）+ 调 classify_topic_relation 拿 action → 传 Planner.run
 - ⬜ teach_state 持久化（SESSIONS 存 original_concept/completed_step_ids/history_summary）
 - ⬜ 跨学段完整测试（将进酒逐句/初中数学/大学物理/考研政治 + 跟进提问 + 质量检查）
+
+### 跨学段测试结果（2026-08-18 首轮）
+
+| 主题 | 结果 | 详情 |
+|---|---|---|
+| 语文-将进酒 | ✅ | 逐句进度延续成功（R1原文→R2时代→R3开头四句，不重讲不跑偏）|
+| 数学-勾股定理 | ❌ | R1-R3 输出 tool_calls 原始 JSON（工具调用未处理）|
+| 物理-薛定谔 | ❌ | R1 tool_calls JSON；R2 改写薇依式偏离；R3 才正常 |
+| 政治-剩余价值 | ✅ | R1 学段拦截(economics映射)；R2/R3 正常推进 |
+
+**新问题**：教学主输出 tool_calls JSON 泄漏——Presenter 调 _safe_reason_chat 传 tools，LLM 返回 tool_calls 但未处理/未合并结果。需修复。
+
 - ⬜ 灰度开关 planner_dynamic（paeg_modules.json）
