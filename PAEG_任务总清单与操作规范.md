@@ -2141,6 +2141,19 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
    - 无源码泄漏/无 500/无卡死
    - 语言规范（完整词形、无 AI 腔）
 
+### Oracle 方案（bg_238a0108 · 2026-08-18 已返回）
+
+**关键发现**：server.py:1431-1440 **已有 _is_continuation + 	each_plan_* 半成品**——但 pop 掉旧 plan 又跑新 plan（pop-then-discard bug）。方案是重构为**三层协议**：
+
+1. **状态模型**：SESSIONS["teach_state_{learner_id}"] 单键（替换 teach_plan_* 双键），含 original_concept/original_subject/strategy/plan/completed_step_ids/current_step_id/history/started_at；迁移时 pop 旧键
+2. **续讲识别**：_detect_continuation() 复用 §3.58 classify_topic_relation——teach_state 存在 + 学科未切换 + relation∈{followup,revisit} → 续讲；detour/off_topic → 新主题；低置信兜底续讲
+3. **流程分支**：续讲 → 
+ext_step = state["plan"][current_step_id+1] → Presenter.run（跳过 Diagnostor+Planner）；新主题 → 原管线 + 初始化 state；plan 跑完 → event: plan_completed
+4. **防跑偏**：Presenter 收 concept=original_concept / subject=original_subject / previous=state.history（结构化全量，移除 chat_hist[-6:] 60字截断）
+5. **步粒度**：Planner prompt 微调（plan steps = 内容自然单元数：古诗≈句数），schema 不变
+6. **生命周期**：超时30min/学科切换→清；plan_completed 后保留（再来一遍）
+7. **测试**：pytest 5 场景（将进酒逐句/初中数学/大学物理/考研政治/跟进变体）
+
 ### 实施记录
 
 （完成后更新）
