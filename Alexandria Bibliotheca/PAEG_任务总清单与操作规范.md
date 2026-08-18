@@ -2320,3 +2320,114 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 **新问题**：教学主输出 tool_calls JSON 泄漏——Presenter 调 _safe_reason_chat 传 tools，LLM 返回 tool_calls 但未处理/未合并结果。需修复。
 
 - ⬜ 灰度开关 planner_dynamic（paeg_modules.json）
+
+
+## §3.63 教学"开课宣告"微调（2026-08-18 · 用户洞察：导入时要有清晰元提示防意图误判）
+
+### 背景（用户反馈）
+
+用户"我想学一下将进酒" → 系统先讲"李白生平与盛唐背景"（导入），用户觉得**被曲解/扭转意图**。
+
+### 用户期望
+
+即使做导入，也要有清晰**开课宣告**（元提示），如：
+> "好的，现在我们来学习《将进酒》。首先我们从李白的生平学起。"
+
+让用户知道：**没有偏离意图**，而是**使用讲授策略**（导入 → 新课）。
+
+**用户判断**："架构上做微调就可以。"
+
+### 任务
+
+1. **Oracle 咨询**（bg_f45fc5cb）：开课宣告微调方案（宣告位置/内容/实现层/多步协同）
+2. **实施**：按 Oracle 最小改动落地（Presenter prompt 或 server 事件）
+3. **验证**（TDD）：教学输出第一步含开课宣告（"我们/现在/学习《将进酒》"类）
+
+### 实施纪律
+
+- 最小架构微调（用户判断）
+- 不破坏 §3.61/§3.62（进度延续/动态规划）
+- TDD：先写"开课宣告"失败测试
+
+### 三路调研结论（2026-08-18 已返回）
+
+**explore（bg_aed8dc65）**：agent 完全具备动态提示词拼接——Presenter.run 有 14+ 注入点（follow_instruction/知识图/学段profile/教学模式/用户资料/能力清单/教学记忆/联网上下文/资源门面/个体化画像/风格覆盖/强化note/技能目录），`_MODE_SCENE`（prompts.py:2262）是最匹配的"模式字典→动态注入"范本。
+
+**Oracle（bg_64254615）**：方案 C（静态骨架 + 动态选择）：
+- `PEDAGOGICAL_LANGUAGE` 常量（5 子类：开课宣告/步骤衔接/检查理解/鼓励支持/结束收束，各 2-3 句式 + 触发伪码 + 反例）
+- `render_pedagogical_language(plan_position, evaluator_signal, ...)` 按条件选择性注入
+- 输入绑定：复用 build_presenter_system 已有参数 + 新增 plan_position/evaluator_signal/dialogue_tail（Optional 向后兼容）
+- 拼接：prompts.py LANGUAGE_STYLE 后追加；subagents.py `_inject_skill_catalog` 后调用
+
+**librarian（bg_1021bc80）**：教学用语资源完备——7 类课堂用语句式（导入/过渡/提问/启发/评价/总结/结束）+ GMSL 鼓励框架（ACL 2023）+ 8 条设计原则（教学身份优先/句式按教学动作分类/一次只问一问/反馈具体到学生刚说的话/等待时间参数化等）+ AI 教育实践（Khanmigo 5 原则）。
+
+### 实施记录（完成 · 2026-08-18 · 参考语气版）
+
+**落地**（b9b2fb3）：
+- ✅ `PEDAGOGICAL_LANGUAGE` 常量：5 场景（开课/衔接/检查/鼓励/收尾）**语言风格参考**（"可自然带出，不必逐字套用"）——非结构约束
+- ✅ `render_pedagogical_language(plan_position/evaluator_signal/...)`：按场景提示参考（软引导）
+- ✅ `build_presenter_system` 集成（LANGUAGE_STYLE 后追加，新参数 Optional 向后兼容）
+- ✅ 6 单测 + SURFACE 验证（"我想学一下将进酒"→自然开课语"我们讲《将进酒》..."，非机械套用）
+
+**用户关键修正**：教学用语**作为提示词参考**（告诉大模型"教学模式下使用这些语言"），**非强制输出结构**——与 §3.62 give_example 平衡教训一致。
+
+**三路调研**（已用）：explore 确认拼接能力（_MODE_SCENE 范本）/ Oracle 方案 C（静态骨架+动态选择）/ librarian 教学用语资源（7类句式+GMSL+8原则）
+
+
+
+
+## §3.64 教学用语动态拼接模块（2026-08-18 · 用户洞察：教学用语应是独立动态拼接组件）
+
+### 背景（用户需求）
+
+1. 系统提示词里应有**独立的教学用语模块**（Pedagogical Language Module）——作为提示词的一部分被拼接
+2. **动态输入**：连同用户问题/对话记录/个人画像/对话历史一起输入
+3. **功能**：生成教育专业用语（开课宣告/衔接语/鼓励/检查理解/结束语）
+4. **独立**：模块独立，不混入 WEIL_CORE/LANGUAGE_STYLE
+5. **资源**：网上有丰富教学用语资源可借鉴（librarian bg_1021bc80 检索中）
+6. 先确认 agent 是否有动态提示词拼接功能（explore bg_aed8dc65 排查中）
+
+### 背景关联
+
+- §3.63 开课宣告（导入时"我们现在来学习X，先从生平学起"）——教学用语模块的一个实例
+- 本任务是更广义的：完整教学用语体系（开课/衔接/鼓励/检查/结束）
+
+### 任务
+
+1. **explore 排查**（bg_aed8dc65）：现有动态提示词拼接功能（build_presenter_system 等）
+2. **Oracle 设计**（bg_64254615）：教学用语模块架构（定位/内容结构/生成方式/输入绑定/拼接实现）
+3. **librarian 检索**（bg_1021bc80）：教学用语句式模板资源
+4. **实施**：按方案落地（prompts.py 教学用语模块 + 拼接集成）
+5. **验证**：开课宣告/衔接语/鼓励语在输出中生效
+
+### 实施纪律
+
+- 模块独立（不混入其他模块）
+- 最小改动；不破坏 §3.61/§3.62/§3.63
+- 可测试；简洁可维护
+
+### 三路调研结论（2026-08-18 已返回）
+
+**explore（bg_aed8dc65）**：agent 完全具备动态提示词拼接——Presenter.run 有 14+ 注入点（follow_instruction/知识图/学段profile/教学模式/用户资料/能力清单/教学记忆/联网上下文/资源门面/个体化画像/风格覆盖/强化note/技能目录），`_MODE_SCENE`（prompts.py:2262）是最匹配的"模式字典→动态注入"范本。
+
+**Oracle（bg_64254615）**：方案 C（静态骨架 + 动态选择）：
+- `PEDAGOGICAL_LANGUAGE` 常量（5 子类：开课宣告/步骤衔接/检查理解/鼓励支持/结束收束，各 2-3 句式 + 触发伪码 + 反例）
+- `render_pedagogical_language(plan_position, evaluator_signal, ...)` 按条件选择性注入
+- 输入绑定：复用 build_presenter_system 已有参数 + 新增 plan_position/evaluator_signal/dialogue_tail（Optional 向后兼容）
+- 拼接：prompts.py LANGUAGE_STYLE 后追加；subagents.py `_inject_skill_catalog` 后调用
+
+**librarian（bg_1021bc80）**：教学用语资源完备——7 类课堂用语句式（导入/过渡/提问/启发/评价/总结/结束）+ GMSL 鼓励框架（ACL 2023）+ 8 条设计原则（教学身份优先/句式按教学动作分类/一次只问一问/反馈具体到学生刚说的话/等待时间参数化等）+ AI 教育实践（Khanmigo 5 原则）。
+
+### 实施记录（完成 · 2026-08-18 · 参考语气版）
+
+**落地**（b9b2fb3）：
+- ✅ `PEDAGOGICAL_LANGUAGE` 常量：5 场景（开课/衔接/检查/鼓励/收尾）**语言风格参考**（"可自然带出，不必逐字套用"）——非结构约束
+- ✅ `render_pedagogical_language(plan_position/evaluator_signal/...)`：按场景提示参考（软引导）
+- ✅ `build_presenter_system` 集成（LANGUAGE_STYLE 后追加，新参数 Optional 向后兼容）
+- ✅ 6 单测 + SURFACE 验证（"我想学一下将进酒"→自然开课语"我们讲《将进酒》..."，非机械套用）
+
+**用户关键修正**：教学用语**作为提示词参考**（告诉大模型"教学模式下使用这些语言"），**非强制输出结构**——与 §3.62 give_example 平衡教训一致。
+
+**三路调研**（已用）：explore 确认拼接能力（_MODE_SCENE 范本）/ Oracle 方案 C（静态骨架+动态选择）/ librarian 教学用语资源（7类句式+GMSL+8原则）
+
+
