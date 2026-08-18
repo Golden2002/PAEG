@@ -54,3 +54,8 @@ Library/usr_knowledge/
 
 # 渲染运行时产物（build.ps1 自动生成）
 交付物/文档模板/figures/
+
+# 敏感凭据备份（opencode auth.json——含 API key，绝不提交）
+auth.json
+auth.json.bak
+auth.json.*

@@ -33,6 +33,11 @@ RUN pip install --no-cache-dir manim==0.19.0 imageio-ffmpeg
 # 复制全部源码（server.py + 前端 + Library 等）
 COPY . .
 
+# §3.59 ⭐ opencode auth.json 注入（Docker 无本地凭据——若项目根存在 auth.json 备份则复制，
+# 使 llm_api 的 fallback 链能读到 DeepSeek key；.gitignore 已排除不入库，由部署前手动放置）
+# 注意：auth.json 在 .gitignore 中（敏感），Docker 构建上下文需手动放入项目根
+RUN if [ -f /app/auth.json ]; then mkdir -p /root/.config/opencode && cp /app/auth.json /root/.config/opencode/auth.json && echo "[PAEG] auth.json 已注入 /root/.config/opencode/"; else echo "[PAEG] 无 auth.json（用环境变量/Secrets 配 key）"; fi
+
 # 持久化数据卷（运行时挂载）
 VOLUME ["/app/05_实现原型/users_data", "/app/05_实现原型/downloads", "/app/Library"]
 
