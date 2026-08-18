@@ -826,7 +826,7 @@ def _execute_tool_calls(model, answer: Optional[str], question: str,
         "请基于以上工具结果，直接给出完整、规范的答案（不要重复工具调用）。"
     )
     try:
-        _final = _safe_chat(model, system, user=_final_user, max_tokens=1800)
+        _final = _safe_chat(model, system, user=_final_user, max_tokens=4000)
         if _final:
             return _final
     except Exception:
@@ -931,17 +931,43 @@ class Planner:
         self.kb = kb
 
     def run(self, learner, diagnosis: dict, subject: str, concept: str,
-            tone_info: Optional[dict] = None) -> dict:
-        """计划（v0.9）：基于诊断 + 学科选择教学策略，生成差异化步骤。"""
+            tone_info: Optional[dict] = None,
+            teach_state: Optional[dict] = None,
+            action: Optional[str] = None) -> dict:
+        """§3.62 ⭐ LLM 动态教学规划（Oracle 方案）：
+        LLM 基于完整上下文（最新输入/画像/学段/进度/分类）动态生成 plan；
+        scaffold 策略降为 prompt 参考；LLM 失败/无 LLM → 回退静态规则。
+
+        Args:
+            teach_state: §3.61 结构化进度 {original_concept, completed_step_ids, history_summary}，None=新主题
+            action: §3.58 分类结果（continue_step/re_explain/give_example/switch_angle/...），None=默认
+        """
         from world_view import select_tone
-        from pedagogy import choose_strategy, build_plan_steps
+        from pedagogy import choose_strategy, build_plan_steps, \
+            PLANNER_SYSTEM_PROMPT, validate_plan
 
         if tone_info is None:
             tone_info = select_tone(subject)
 
+        # §3.62 ⭐ 尝试 LLM 动态规划（仅当真实 LLM 可用）
+        _llm_plan = None
+        try:
+            from subagents import _is_real_llm
+            if _is_real_llm(self.model):
+                _llm_plan = self._plan_dynamic(
+                    learner, diagnosis, subject, concept, tone_info,
+                    teach_state=teach_state, action=action,
+                    system_prompt=PLANNER_SYSTEM_PROMPT)
+        except Exception as _pe:
+            print(f"[PAEG][Planner] 动态规划失败回退静态: {_pe}", file=sys.stderr)
+            _llm_plan = None
+
+        if _llm_plan is not None:
+            return _llm_plan
+
+        # 兜底：静态规则（用户认可的"好约束"，能力保留）
         strategy = choose_strategy(learner, diagnosis, subject)
         steps = build_plan_steps(strategy, concept, tone_info["tone"])
-
         return {
             "steps": steps,
             "estimated_total_min": sum(s["duration_min"] for s in steps),
@@ -949,7 +975,67 @@ class Planner:
             "strategy_name": strategy["name"],
             "base_bloom": strategy["base_bloom"],
             "presenter_hint": strategy["presenter_hint"],
+            "planner_mode": "static",
         }
+
+    def _plan_dynamic(self, learner, diagnosis, subject, concept, tone_info,
+                      teach_state=None, action=None, system_prompt=None) -> Optional[dict]:
+        """§3.62 LLM 动态规划内部实现：打包上下文 → LLM → 校验 → 返回 plan。"""
+        try:
+            import json as _json
+            from subagents import _safe_reason_chat
+            from pedagogy import validate_plan as _validate_plan
+
+            # 打包完整上下文（用户批评的"信息没传给 LLM"——全部给到）
+            _grade = str(getattr(learner, "grade_level", ""))
+            _cog = str(getattr(learner, "cognitive_style", ""))
+            _mastery = str(getattr(learner, "self_description", ""))[:200]
+            _depth = diagnosis.get("recommended_depth", "moderate")
+            _gaps = "、".join(str(g) for g in (diagnosis.get("identified_gaps") or []))[:100]
+            _req = "续讲" if teach_state else "新主题"
+            _state_section = ""
+            if teach_state:
+                _state_section = (
+                    f"- 已讲进度：{teach_state.get('completed_step_ids', [])}\n"
+                    f"- 历史摘要：{str(teach_state.get('history_summary', ''))[:200]}\n"
+                    f"- 原始主题：{teach_state.get('original_concept', concept)}\n"
+                    f"- 上轮结尾：{str(teach_state.get('last_response_tail', ''))[:100]}")
+            _action_section = f"- 用户动作：{action}" if action else "- 用户动作：新提问"
+            _user = (
+                f"学生最新输入：{concept}\n"
+                f"当前主题：{teach_state.get('original_concept', concept) if teach_state else concept}\n"
+                f"学科：{subject}\n"
+                f"学段：{_grade}\n"
+                f"画像：认知={_cog} | {_mastery}\n"
+                f"诊断：depth={_depth}, gaps=[{_gaps}]\n"
+                f"请求类型：{_req}\n"
+                + _state_section + "\n" + _action_section)
+
+            _sys = system_prompt or PLANNER_SYSTEM_PROMPT
+            _sys = _sys.replace("{grade}", _grade).replace("{subject}", subject) \
+                .replace("{cognitive_style}", _cog or "未知") \
+                .replace("{mastery}", _mastery or "未知") \
+                .replace("{depth}", _depth).replace("{gaps}", _gaps or "无") \
+                .replace("{request_type}", _req) \
+                .replace("{teach_state_section}", _state_section or "- 无（新主题）") \
+                .replace("{action_section}", _action_section or "-")
+
+            r = _safe_reason_chat(self.model, _sys, _user, subject=subject,
+                                  max_tokens=2000, learner=learner, llm=self.model)
+            if not r:
+                return None
+            r = r.strip().strip("`")
+            _s, _e = r.find("{"), r.rfind("}")
+            if _s < 0 or _e <= _s:
+                return None
+            plan = _json.loads(r[_s:_e + 1])
+            if not _validate_plan(plan):
+                return None
+            plan["planner_mode"] = "dynamic"
+            return plan
+        except Exception as _pe:
+            print(f"[PAEG][Planner] 动态规划异常: {_pe}", file=sys.stderr)
+            return None
 
 
 # ---------------------------------------------------------------------------
@@ -1200,7 +1286,7 @@ class Presenter:
             # — 在所有教学指令（LANGUAGE_STYLE/学科导航/母语迁移/个体化/适配决策）追加完毕后注入，避免覆盖既有策略
             system = _inject_skill_catalog(system)
             content = _safe_reason_chat(
-                self.model, system, user, subject=subject, max_tokens=512, tools=_tools,
+                self.model, system, user, subject=subject, max_tokens=4000, tools=_tools,
                 learner=learner, llm=self.model,  # v0.26 需求B：LLM 选库+关键词引导
                 subagent="presenter",  # v0.51 ⭐ 深度思考（矩阵：A 路径）
             )
@@ -1935,12 +2021,12 @@ class AnswerSolver:
             msgs = assemble_messages(history, user)
             answer = _safe_reason_chat(
                 model, system, messages=msgs, subject=subject,
-                max_tokens=1800, tools=_tools,
+                max_tokens=4000, tools=_tools,
                 subagent="answer_solver")  # v0.51 ⭐ 深度思考（矩阵：A 路径）
         else:
             answer = _safe_reason_chat(
                 model, system, user, subject=subject,
-                max_tokens=1800, tools=_tools,
+                max_tokens=4000, tools=_tools,
                 subagent="answer_solver")  # v0.51 ⭐ 深度思考（矩阵：A 路径）
         # v0.45 ⭐ E2E 修复：LLM 可能返回工具调用 JSON（{"tool_calls":[...]}）而
         # 未执行工具 → 原始 JSON 当答案返回（answer 端点 500）。

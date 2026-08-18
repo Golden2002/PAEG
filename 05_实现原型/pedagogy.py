@@ -182,3 +182,59 @@ def build_plan_steps(strategy: dict, concept: str, tone: str, bloom_level: str =
             "strategy_hint": hint,  # 注入教学策略提示（Presenter 读取）
         })
     return steps
+
+
+# §3.62 ⭐ LLM 动态教学规划：策略知识库作为参考（非强制模板）
+PLANNER_SYSTEM_PROMPT = """你是教学规划专家。根据学生完整上下文，动态生成教学步骤计划。
+
+## 学生上下文
+- 学段/年级：{grade}
+- 学科：{subject}
+- 认知风格：{cognitive_style}
+- 掌握度/薄弱点：{mastery}
+- 诊断：depth={depth}, gaps={gaps}
+- 请求类型：{request_type}
+{teach_state_section}
+{action_section}
+
+## 策略知识库（参考，可自由组合，非强制模板）
+- 苏格拉底式：高阶思维、学生有基础 → 引问/追问/收敛
+- 支架式（ZPD）：完全陌生/基础薄弱 → 示范/带做/放手
+- 掌握式：技能/理科 → 示范/练习/反馈
+- 费曼式：学生能讲但讲不清 → 让学生复述/纠偏
+- 综合式：默认 → 按内容动态组合
+
+## 规划要求
+1. **步数动态**：逐句/逐条讲解时，每内容单元一步（如《将进酒》每句一步）；新主题 3-5 步；深入 5+ 步
+2. **续讲时**：必须从已讲进度之后继续（讲第 N+1 句/下一段），不重复已讲
+3. 每步 topic 具体（≤50字）、bloom 递进、duration 合理
+4. 输出严格 JSON（无 markdown 包裹）：
+{{"strategy": "...", "strategy_name": "...", "base_bloom": "...", "presenter_hint": "≤80字", "rationale": "≤100字", "steps": [{{"step_id": 1, "type": "present|question|guide|practice|feedback", "topic": "≤50字", "bloom": "remember|understand|apply|analyze|evaluate|create", "duration_min": 1-5, "tools_to_use": ["search_subject_kb"], "expected_outcome": "≤30字", "worldview": "balanced"}}]}}"""
+
+
+def validate_plan(plan: dict) -> bool:
+    """§3.62 ⭐ 校验 LLM 生成的 plan（防幻觉）：非法则调用方回退静态。"""
+    try:
+        steps = plan.get("steps") or []
+        if not isinstance(steps, list) or not steps or len(steps) > 20:
+            return False
+        valid_types = {"present", "question", "guide", "practice", "feedback"}
+        valid_blooms = {"remember", "understand", "apply", "analyze", "evaluate", "create"}
+        for i, s in enumerate(steps):
+            if not isinstance(s, dict):
+                return False
+            if s.get("step_id") != i + 1:
+                return False
+            if s.get("type") not in valid_types:
+                return False
+            if s.get("bloom") not in valid_blooms:
+                return False
+            topic = s.get("topic") or ""
+            if not topic or len(topic) > 100:
+                return False
+            d = s.get("duration_min", 3)
+            if not isinstance(d, int) or not (1 <= d <= 10):
+                return False
+        return True
+    except Exception:
+        return False
