@@ -536,6 +536,9 @@ def teach_stream():
 
     concept = data["concept"]
     subject = data["subject"]
+    # §3.62 ⭐ 学生原始输入统一保留（任何分支都携带）——LLM 既能理解结构化指令，
+    # 也能从学生原话自行推理（用户洞察：不仅 followup，所有场景都应保留原话）
+    _student_raw = str(concept).strip()[:200]
     # v0.41.7 ⭐ 修复：重构时 subtopic 定义被误删（同步 teach 端点 L413 有，stream 版丢失）
     # → NameError: subtopic 未定义 → SSE 中途中断 → 教学模式不输出内容
     subtopic = (data.get("subtopic") or "").strip()
@@ -739,7 +742,11 @@ def teach_stream():
             _rel = _follow.get("relation", "followup")
             if _rel == "followup":
                 # 追问：复用上轮主题 + 注入 action 指令
-                concept = _prev_concept
+                # §3.62 ⭐ 保留学生原话（_student_raw 入口原话最可靠）——只传主题名会丢学生意图
+                _orig_user_input = _student_raw or str(concept).strip()[:120]
+                concept = str(_prev_concept)
+                if _orig_user_input and _orig_user_input not in concept:
+                    concept = f"{concept}——学生追问：{_orig_user_input}"
                 _inst = ACTION_INSTRUCTIONS.get(_follow.get("action", ""), "")
                 if _inst:
                     setattr(learner, "_follow_instruction", _inst)
@@ -761,6 +768,10 @@ def teach_stream():
                 from services.topic_stack import find as _stack_find
                 _hit = _stack_find(_hist, _target)
                 if _hit:
+                    # §3.62 ⭐ 恢复主题 + 保留学生原话（绕回时 LLM 也需看到学生说了什么）
+                    concept = str(_hit.get("concept"))
+                    if _student_raw and _student_raw not in concept:
+                        concept = f"{concept}——学生追问：{_student_raw}"
                     concept = _hit.get("concept")
                 _llm_intent = _prev_intent
                 _llm_conf = _follow.get("confidence", 0.5)
@@ -1294,7 +1305,20 @@ def teach_stream():
             # 续讲轮：不重复诊断（诊断已在首轮完成），只推进剩余步骤
             yield f"event: plan\ndata: {json.dumps({'status': 'continuing', 'steps_left': len(_pending_steps)}, ensure_ascii=False)}\n\n"
         else:
-            plan = paeg.planner.run(learner, diagnosis, subject, concept, tone_info)
+            # §3.62 ⭐ LLM 动态规划：传 teach_state（进度）+ action（§3.58 分类）
+            _planner_state = None
+            try:
+                _planner_state = SESSIONS.get(f"teach_state_{learner_id}")
+            except Exception:
+                _planner_state = None
+            _planner_action = None
+            try:
+                if _follow and isinstance(_follow, dict):
+                    _planner_action = _follow.get("action") or _follow.get("relation")
+            except Exception:
+                _planner_action = None
+            plan = paeg.planner.run(learner, diagnosis, subject, concept, tone_info,
+                                    teach_state=_planner_state, action=_planner_action)
             yield f"event: plan\ndata: {json.dumps(plan, ensure_ascii=False)}\n\n"
 
         # v0.26 ⭐ C3-3 P0 修复：teach_stream 补 Individuality 注入 + 用户资料注入
@@ -1704,6 +1728,23 @@ def teach_stream():
                 SESSIONS[f"chat_hist_{learner_id}"] = _hist[-20:]
         except Exception as _eh:
             print(f"[PAEG] teach_stream 写回 chat_hist 失败: {_eh}")
+
+        # §3.62 ⭐ teach_state 持久化（教学进度延续：original_concept/已完成步骤/历史摘要）
+        try:
+            _ts = SESSIONS.get(f"teach_state_{learner_id}") or {}
+            _ts["original_concept"] = _ts.get("original_concept", str(concept)[:60])
+            _ts["subject"] = subject
+            _ts.setdefault("completed_step_ids", [])
+            # 历史摘要：累积已讲内容（简化版——取本轮回复开头，避免额外 LLM 调用）
+            _this_tail = "".join(_assistant_parts)[:200]
+            if _this_tail:
+                _prev_sum = str(_ts.get("history_summary", ""))[:500]
+                _ts["history_summary"] = (_prev_sum + " " + _this_tail).strip()[:800]
+            _ts["last_response_tail"] = "".join(_assistant_parts)[-150:]
+            _ts["updated_at"] = time.time()
+            SESSIONS[f"teach_state_{learner_id}"] = _ts
+        except Exception as _tse:
+            print(f"[PAEG] teach_stream 写回 teach_state 失败: {_tse}")
 
         # v0.42 ⭐ P1 修复：teach_stream 标记调度器活跃——此前只有 chat_stream 调
         # mark_activity()，教学流（含同步/SSE）不标记，周期调度器误判"7 天无活跃"
