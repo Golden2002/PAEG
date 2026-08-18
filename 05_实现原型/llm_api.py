@@ -316,16 +316,19 @@ def _find_opencode_auth() -> dict:
 
 def auto_detect_model_api(verbose: bool = True) -> ModelAPI:
     """按优先级自动选择一个可用模型接口：
-    1. PAEG_API_KEY + PAEG_API_BASE（自定义）
-    2. DEEPSEEK_API_KEY -> DeepSeek
-    3. ANTHROPIC_API_KEY -> Anthropic
-    4. OPENAI_API_KEY -> OpenAI
-    5. opencode auth.json（deepseek 优先）
+    1. PAEG_API_KEY + PAEG_API_BASE（自定义，默认 DeepSeek）
+    2. DEEPSEEK_API_KEY -> DeepSeek（V4-Flash）
+    3. QWEN_API_KEY / DASHSCOPE_API_KEY -> 阿里通义千问（Qwen）
+    4. ANTHROPIC_API_KEY -> Anthropic / OPENAI_API_KEY -> OpenAI
+    5. opencode auth.json（deepseek 优先，本地开发兜底）
     6. 全部不可用 -> MockModelAPI（离线演示）
 
     v0.51 ⭐ 深度思考：PAEG_MODEL=deepseek-v4-pro / PAEG_REASONING=on 时
     返回 ReasonerModelAPI（thinking 模式）；否则默认 V4-Flash 普通对话。
     旧别名 deepseek-chat/deepseek-reasoner 已下线（2026-07-24），自动迁移到 V4。
+
+    §3.55 ⭐ 多模型 fallback（2026-08-16）：魔搭 Docker 无 DeepSeek key 时
+    自动 fallback 到阿里通义千问，避免落到 Mock（"对话不输出"根因修复）。
     """
     def log(msg):
         if verbose:
@@ -355,12 +358,22 @@ def auto_detect_model_api(verbose: bool = True) -> ModelAPI:
         log(f"使用 PAEG_API_KEY（{custom_model} @ {custom_base}）")
         return _maybe_reasoner(custom_key, custom_base, custom_model)
 
-    # 2-4. 标准环境变量
+    # 2. DeepSeek
     if os.environ.get("DEEPSEEK_API_KEY"):
         log("使用 DEEPSEEK_API_KEY")
         return _maybe_reasoner(
             os.environ["DEEPSEEK_API_KEY"], "https://api.deepseek.com/v1",
             _migrate_model(os.environ.get("PAEG_MODEL", "deepseek-v4-flash")))
+
+    # 3. 阿里通义千问（QWEN_API_KEY 或 DASHSCOPE_API_KEY）§3.55
+    _qwen_key = os.environ.get("QWEN_API_KEY") or os.environ.get("DASHSCOPE_API_KEY")
+    if _qwen_key:
+        log("使用 QWEN_API_KEY / DASHSCOPE_API_KEY（阿里通义千问）")
+        _qwen_model = os.environ.get("QWEN_MODEL", "qwen-plus")
+        return OpenAICompatModelAPI(
+            _qwen_key, "https://dashscope.aliyuncs.com/compatible-mode/v1", _qwen_model)
+
+    # 4. Anthropic / OpenAI
     if os.environ.get("ANTHROPIC_API_KEY"):
         log("使用 ANTHROPIC_API_KEY")
         return AnthropicModelAPI(os.environ["ANTHROPIC_API_KEY"])
@@ -369,7 +382,7 @@ def auto_detect_model_api(verbose: bool = True) -> ModelAPI:
         return OpenAICompatModelAPI(
             os.environ["OPENAI_API_KEY"], "https://api.openai.com/v1", "gpt-4o-mini")
 
-    # 5. opencode auth.json
+    # 6. opencode auth.json（本地开发兜底）§3.55
     auth = _find_opencode_auth()
     if auth.get("deepseek"):
         log("使用 opencode auth.json 中的 DeepSeek 凭据")
@@ -380,7 +393,7 @@ def auto_detect_model_api(verbose: bool = True) -> ModelAPI:
         log("使用 opencode auth.json 中的 Anthropic 凭据")
         return AnthropicModelAPI(auth["anthropic"])
 
-    # 6. 兜底
+    # 7. 兜底（离线演示）§3.55
     log("未找到 API 凭据，回退到 MockModelAPI（离线演示模式）")
     return MockModelAPI()
 
