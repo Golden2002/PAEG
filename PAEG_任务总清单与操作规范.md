@@ -2154,6 +2154,19 @@ ext_step = state["plan"][current_step_id+1] → Presenter.run（跳过 Diagnosto
 6. **生命周期**：超时30min/学科切换→清；plan_completed 后保留（再来一遍）
 7. **测试**：pytest 5 场景（将进酒逐句/初中数学/大学物理/考研政治/跟进变体）
 
+### Oracle 方案（bg_b1d5b22b · 2026-08-18 已返回）
+
+**核心**：Planner LLM 动态化——un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文打包（最新输入/§3.58 action/§3.61 teach_state/诊断/17维画像/学段学科/策略知识参考）动态生成 plan；alidate_plan() 防幻觉；LLM 失败→静态 choose_strategy 兜底；灰度开关 planner_dynamic。
+
+**关键设计**：
+1. pedagogy.py 加 PLANNER_SYSTEM_PROMPT（策略知识库 + JSON schema）+ alidate_plan()
+2. Planner.run(learner, diagnosis, subject, concept, tone_info, teach_state=None, action=None)——teach_state=None 新主题，非 None 续讲
+3. LLM 输出 schema 不变（steps[]），步数动态 1-20；解析失败/无LLM/token超限 → 静态兜底
+4. 续讲融合：server.py 调 classify_topic_relation（§3.58）→ action → Planner；teach_state 存 SESSIONS（original_concept/completed_step_ids/history_summary）
+5. §3.58 action→决策映射：continue_step→讲N+1句 / re_explain→小步重讲 / give_example→例子 / switch_angle→换角度 / request_full_content→先全文 / revisit→切回 / new_topic→新规划
+6. 灰度开关 paeg_modules.json planner_dynamic: true
+7. 测试：_StubPlannerLLM 注入 5 case（逐句将进酒/初中数学/大学物理/考研政治/re_explain）+ 质量对比
+
 ### 实施记录
 
 （完成后更新）
@@ -2193,6 +2206,19 @@ ext_step = state["plan"][current_step_id+1] → Presenter.run（跳过 Diagnosto
 - 无正则硬编码
 - 简洁可维护（执行标准）
 - scaffold 作为 LLM 决策的**参考框架**而非**强制模板**（用户认可它是好约束，但不该死板）
+
+### Oracle 方案（bg_b1d5b22b · 2026-08-18 已返回）
+
+**核心**：Planner LLM 动态化——un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文打包（最新输入/§3.58 action/§3.61 teach_state/诊断/17维画像/学段学科/策略知识参考）动态生成 plan；alidate_plan() 防幻觉；LLM 失败→静态 choose_strategy 兜底；灰度开关 planner_dynamic。
+
+**关键设计**：
+1. pedagogy.py 加 PLANNER_SYSTEM_PROMPT（策略知识库 + JSON schema）+ alidate_plan()
+2. Planner.run(learner, diagnosis, subject, concept, tone_info, teach_state=None, action=None)——teach_state=None 新主题，非 None 续讲
+3. LLM 输出 schema 不变（steps[]），步数动态 1-20；解析失败/无LLM/token超限 → 静态兜底
+4. 续讲融合：server.py 调 classify_topic_relation（§3.58）→ action → Planner；teach_state 存 SESSIONS（original_concept/completed_step_ids/history_summary）
+5. §3.58 action→决策映射：continue_step→讲N+1句 / re_explain→小步重讲 / give_example→例子 / switch_angle→换角度 / request_full_content→先全文 / revisit→切回 / new_topic→新规划
+6. 灰度开关 paeg_modules.json planner_dynamic: true
+7. 测试：_StubPlannerLLM 注入 5 case（逐句将进酒/初中数学/大学物理/考研政治/re_explain）+ 质量对比
 
 ### 实施记录
 
