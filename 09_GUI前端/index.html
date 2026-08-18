@@ -417,7 +417,9 @@ body {
 /* v0.28：检索状态徽章——对话输出前的"已完成检索"小标志。
    复用 .step-tag 的 token 体系（accent-soft/border/text-dim），保证视觉一致。 */
 .retrieval-badge {
-  display: inline-flex; align-items: center; gap: 4px;
+  /* v0.68 ⭐ 修复3（§3.65）：display:flex + width:fit-content 让徽章独占一行，
+     避免与 LLM 回复紧贴成"✓知识库检索学生问的是..." */
+  display: flex; width: fit-content; align-items: center; gap: 4px;
   font-size: var(--fs-xs); line-height: 1; padding: 4px 8px;
   margin-bottom: 8px;
   border-radius: 6px;
@@ -759,6 +761,8 @@ body {
   white-space: nowrap; flex-shrink: 0;
 }
 .cmd-trigger:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+/* v0.68 ⭐ 激活态高亮（§3.65 修复2：参考 DeepSeek app 深度思考按钮）*/
+.cmd-trigger.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 600; box-shadow: 0 0 0 1px var(--accent) inset; }
 /* v0.28：学段 / 学科 / 二级学科 — 三件一组统一控件 */
 .subject-select {
   appearance: none; -webkit-appearance: none; -moz-appearance: none;
@@ -2768,6 +2772,14 @@ window._finalizeGeneration = () => {
 
 // ─── 教学主流程（v0.19：流式输出） ───
 async function teach(question, subject, subtopic) {
+  // v0.68 ⭐ 修复2（§3.65）：教学模式发送后同样重置深度思考（原只 generalChat 有）
+  if (STATE && STATE.deepThinkNext) {
+    STATE.deepThinkNext = false;
+    const dtag = document.getElementById('cmd-tag-deepthink');
+    if (dtag) dtag.style.display = 'none';
+    const dbtn = document.getElementById('cmd-trigger-deepthink');
+    if (dbtn) dbtn.classList.remove('active');
+  }
   const thinking = addThinking('teach');
   // v0.41.9 ⭐ 修复：生成中不设 disabled（disabled 按钮不派发 click →
   // 停止键点了无反应）。用 data-generating 标记控制样式与行为。
@@ -3070,6 +3082,9 @@ async function generalChat(text) {
       STATE.deepThinkNext = false;
       const dtag = document.getElementById('cmd-tag-deepthink');
       if (dtag) dtag.style.display = 'none';
+      // v0.68 ⭐ 同步清除按钮高亮（§3.65 修复2）
+      const dbtn = document.getElementById('cmd-trigger-deepthink');
+      if (dbtn) dbtn.classList.remove('active');
     }
     if (!resp.ok) throw new Error(`API ${resp.status}`);
     const reader = resp.body.getReader();
@@ -5199,7 +5214,10 @@ function setPptMode(active) {
 // v0.62 深度思考：per-turn 临时态（不持久化）
 function setDeepThink(active) {
   const tag = document.getElementById('cmd-tag-deepthink');
+  const btn = document.getElementById('cmd-trigger-deepthink');
   if (tag) tag.style.display = active ? 'inline-flex' : 'none';
+  // v0.68 ⭐ 按钮本身高亮（参考 DeepSeek app 激活态，§3.65 修复2）
+  if (btn) btn.classList.toggle('active', !!active);
   STATE.deepThinkNext = !!active;
   if (active) addMsg('paeg', '<b>深度思考已启用</b>：下一条消息将进行深度推理（Reasoner 模式）。发送后自动关闭。');
 }
