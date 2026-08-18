@@ -45,8 +45,24 @@ class ReflectionStore:
                     reflection_json TEXT NOT NULL
                 )
             """)
+            # §3.58 ⭐ 话题关系日志（4 分类可观测：统计准确率/分布/延迟）
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS topic_relation_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts TEXT NOT NULL,
+                    learner_id TEXT NOT NULL,
+                    user_input TEXT DEFAULT '',
+                    current_concept TEXT DEFAULT '',
+                    relation TEXT NOT NULL,
+                    action TEXT DEFAULT '',
+                    confidence REAL DEFAULT 0.0,
+                    target_concept TEXT DEFAULT ''
+                )
+            """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_reflections_learner_ts "
                          "ON reflections(learner_id, ts DESC)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_topic_rel_ts "
+                         "ON topic_relation_log(ts)")
             conn.commit()
 
     def append(self, learner_id: str, reflection: dict,
@@ -75,6 +91,26 @@ class ReflectionStore:
                  for r in reflections],
             )
             conn.commit()
+
+    def log_topic_relation(self, learner_id: str, user_input: str,
+                           current_concept: str, relation: str,
+                           action: str = "", confidence: float = 0.0,
+                           target_concept: str = "") -> None:
+        """§3.58 ⭐ 记录一次话题关系分类（append-only，可观测/统计）。"""
+        try:
+            with _DB_LOCK, sqlite3.connect(str(self.db_path)) as conn:
+                conn.execute(
+                    "INSERT INTO topic_relation_log "
+                    "(ts, learner_id, user_input, current_concept, relation, action, "
+                    " confidence, target_concept) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (datetime.now().isoformat(), str(learner_id), str(user_input or "")[:100],
+                     str(current_concept or "")[:100], str(relation or ""),
+                     str(action or "")[:50], float(confidence or 0.0),
+                     str(target_concept or "")[:100]),
+                )
+                conn.commit()
+        except Exception:
+            pass  # 日志失败不影响主流程
 
     def query(self, learner_id: str, limit: int = 20) -> List[dict]:
         """查询用户最近反思（倒序，供 meta-log 端点）。learner_id="*" 查全量（启动加载用）。"""
