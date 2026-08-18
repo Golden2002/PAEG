@@ -34,6 +34,19 @@ def get_llm() -> Any:
         from config import LLM_MODEL, LLM_PROVIDER
         from llm_adapter import create_llm
 
+        # §3.60 ⭐ 魔搭 Secrets 诊断：打印容器内 LLM 相关环境变量名（只打名字不打值，安全）
+        try:
+            _key_envs = sorted(
+                k for k in os.environ
+                if any(t in k.upper() for t in ("API_KEY", "SECRET", "PAEG_", "LLM"))
+            )
+            print(f"[PAEG Server] LLM 环境变量: {_key_envs if _key_envs else '（无）'}"
+                  f" | DEEPSEEK_API_KEY 存在: {'DEEPSEEK_API_KEY' in os.environ}"
+                  f" | QWEN_API_KEY 存在: {'QWEN_API_KEY' in os.environ}",
+                  file=sys.stderr)
+        except Exception:
+            pass
+
         _llm = create_llm(LLM_PROVIDER, model=LLM_MODEL)
         print(f"[PAEG Server] LLM: {LLM_PROVIDER}/{LLM_MODEL or 'default'} -> {_llm.name}")
         # §3.59 ⭐ 无 key 可观测：mock 兜底时显式警告（魔搭部署诊断关键）
