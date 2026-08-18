@@ -38,7 +38,20 @@ class ModelAPI:
 
 
 class ModelError(Exception):
-    pass
+    """模型调用错误。§3.60 ⭐ 增加分类：http_code + permanent（供运行时 failover 判断）。"""
+
+    def __init__(self, message: str, http_code: int = 0):
+        super().__init__(message)
+        self.http_code = http_code
+        # 401/403 = key 无效（本会话不再重试）；429/5xx/网络 = 临时故障（冷却后重试）
+        self.permanent = http_code in (401, 403)
+        self.failoverable = (
+            http_code in (401, 403, 429) or 500 <= http_code < 600 or http_code == 0
+        )
+
+    @classmethod
+    def from_http(cls, code: int, detail: str) -> "ModelError":
+        return cls(f"HTTP {code}: {detail}", http_code=code)
 
 
 class MockModelAPI(ModelAPI):
@@ -63,7 +76,10 @@ class OpenAICompatModelAPI(ModelAPI):
     name = "openai_compat"
 
     def __init__(self, api_key: str, base_url: str, model: str,
-                 timeout: int = 60, temperature: float = 0.7):
+                 timeout: int = 60, temperature: float = 0.7,
+                 provider_label: str = "openai_compat"):
+        # §3.60 ⭐ provider_label：日志显示 deepseek/qwen 而非 openai_compat（failover 诊断关键）
+        self.provider_label = provider_label
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._model = model
@@ -131,7 +147,7 @@ class OpenAICompatModelAPI(ModelAPI):
             return _content
         except error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")[:300]
-            raise ModelError(f"[{self.name}] HTTP {e.code}: {detail}") from e
+            raise ModelError.from_http(e.code, detail) from e
         except error.URLError as e:
             raise ModelError(f"[{self.name}] 网络错误: {e.reason}") from e
         except (KeyError, IndexError, json.JSONDecodeError) as e:
@@ -223,7 +239,7 @@ class ReasonerModelAPI(OpenAICompatModelAPI):
             }
         except error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")[:300]
-            raise ModelError(f"[{self.name}] HTTP {e.code}: {detail}") from e
+            raise ModelError.from_http(e.code, detail) from e
         except error.URLError as e:
             raise ModelError(f"[{self.name}] 网络错误: {e.reason}") from e
         except (KeyError, IndexError, json.JSONDecodeError) as e:
@@ -271,7 +287,7 @@ class AnthropicModelAPI(ModelAPI):
             return data["content"][0]["text"]
         except error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")[:300]
-            raise ModelError(f"[{self.name}] HTTP {e.code}: {detail}") from e
+            raise ModelError.from_http(e.code, detail) from e
         except error.URLError as e:
             raise ModelError(f"[{self.name}] 网络错误: {e.reason}") from e
         except (KeyError, IndexError, json.JSONDecodeError) as e:
@@ -396,6 +412,76 @@ def auto_detect_model_api(verbose: bool = True) -> ModelAPI:
     # 7. 兜底（离线演示）§3.55
     log("未找到 API 凭据，回退到 MockModelAPI（离线演示模式）")
     return MockModelAPI()
+
+
+def detect_model_candidates(verbose: bool = True) -> list:
+    """§3.60 ⭐ 检测全部可用 LLM provider（有序候选列表，供运行时 failover）。
+
+    与 auto_detect_model_api 同优先级，但**收集所有**有 key 的 provider：
+    [PAEG自定义, DeepSeek, Qwen, Anthropic, OpenAI, auth.json...]（按优先级）
+    零真实 key 时返回 [MockModelAPI]（离线演示，与旧行为一致）。
+    返回 list[ModelAPI]，首个为首选。
+    """
+    def log(msg):
+        if verbose:
+            print(f"[llm_api] {msg}", file=sys.stderr)
+
+    def _migrate_model(m: str) -> str:
+        return "deepseek-v4-flash" if m in ("deepseek-chat", "deepseek-reasoner") else m
+
+    cands = []
+    # 1. 自定义
+    custom_key = os.environ.get("PAEG_API_KEY")
+    if custom_key:
+        cands.append(OpenAICompatModelAPI(
+            custom_key,
+            os.environ.get("PAEG_API_BASE", "https://api.deepseek.com/v1"),
+            _migrate_model(os.environ.get("PAEG_MODEL", "deepseek-v4-flash")),
+            provider_label="custom"))
+    # 2. DeepSeek
+    if os.environ.get("DEEPSEEK_API_KEY"):
+        cands.append(OpenAICompatModelAPI(
+            os.environ["DEEPSEEK_API_KEY"], "https://api.deepseek.com/v1",
+            _migrate_model(os.environ.get("PAEG_MODEL", "deepseek-v4-flash")),
+            provider_label="deepseek"))
+    # 3. Qwen（§3.60 ⭐ 新增——用户配置了但从未被用）
+    _qwen_key = os.environ.get("QWEN_API_KEY") or os.environ.get("DASHSCOPE_API_KEY")
+    if _qwen_key:
+        cands.append(OpenAICompatModelAPI(
+            _qwen_key, "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            os.environ.get("QWEN_MODEL", "qwen-plus"),
+            provider_label="qwen"))
+    # 4. Anthropic / OpenAI
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        cands.append(AnthropicModelAPI(os.environ["ANTHROPIC_API_KEY"]))
+    if os.environ.get("OPENAI_API_KEY"):
+        cands.append(OpenAICompatModelAPI(
+            os.environ["OPENAI_API_KEY"], "https://api.openai.com/v1", "gpt-4o-mini",
+            provider_label="openai"))
+    # 5. auth.json
+    auth = _find_opencode_auth()
+    if auth.get("deepseek"):
+        cands.append(OpenAICompatModelAPI(
+            auth["deepseek"], "https://api.deepseek.com/v1",
+            _migrate_model(os.environ.get("PAEG_MODEL", "deepseek-v4-flash")),
+            provider_label="auth-deepseek"))
+    if auth.get("anthropic"):
+        cands.append(AnthropicModelAPI(auth["anthropic"]))
+
+    # 去重：同 (base_url, api_key[:8]) 只留一个（env + auth.json 同 key 场景）
+    seen, uniq = set(), []
+    for c in cands:
+        key = (getattr(c, "_base_url", ""), str(getattr(c, "_api_key", ""))[:8])
+        if key not in seen:
+            seen.add(key)
+            uniq.append(c)
+    cands = uniq
+
+    if not cands:
+        log("未找到 API 凭据，候选仅 MockModelAPI（离线演示）")
+        return [MockModelAPI()]
+    log(f"检测到 {len(cands)} 个候选: {[getattr(c, 'provider_label', c.name) for c in cands]}")
+    return cands
 
 
 # ---------------------------------------------------------------------------

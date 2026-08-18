@@ -15,12 +15,25 @@ provider 取值：auto（默认，自动发现）/ mock / deepseek / openai / an
 from __future__ import annotations
 
 import os
+import sys
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from llm_api import (ModelAPI, ModelError, MockModelAPI, OpenAICompatModelAPI,
-                     AnthropicModelAPI, auto_detect_model_api)
+                     AnthropicModelAPI, auto_detect_model_api, detect_model_candidates)
+
+
+class AllProvidersFailedError(Exception):
+    """§3.60 ⭐ 全部 LLM provider 均失败（failover 耗尽）。携带各家失败原因。"""
+
+    def __init__(self, candidates: list, last_error: Optional[Exception] = None):
+        labels = [getattr(c, "provider_label", c.name) for c in candidates]
+        self.candidates = candidates
+        self.last_error = last_error
+        super().__init__(
+            f"所有 LLM provider 均失败: {labels}"
+            + (f" | 最后错误: {last_error}" if last_error else ""))
 
 
 @dataclass
@@ -36,11 +49,26 @@ class LLMResponse:
 
 
 class AdapterLLM:
-    """包装 ModelAPI，同时暴露新旧两套接口。"""
+    """包装 ModelAPI，同时暴露新旧两套接口。
 
-    def __init__(self, api: ModelAPI, provider_label: str = "auto"):
-        self._api = api
+    §3.60 ⭐ 运行时 failover：可持多个候选 provider（candidates），
+    chat() 遇可切错误（401/403/429/5xx/网络）自动跳下一家。
+    """
+
+    def __init__(self, api: ModelAPI = None, provider_label: str = "auto",
+                 candidates: Optional[list] = None):
+        # 兼容旧用法：api 单例 → candidates=[api]
+        if candidates:
+            self._candidates = list(candidates)
+            self._api = self._candidates[0]
+        else:
+            self._api = api
+            self._candidates = [api] if api else []
         self._provider_label = provider_label
+        self._dead: set = set()                 # 永久失败（401/403）→ 本会话不再试
+        self._cooldown_until: dict = {}         # 临时失败（429/5xx）→ 冷却截止时间
+        self._COOLDOWN_S = 60.0
+        self.last_used_label: str = ""          # 观测：最近成功 provider
 
     # ---- 新接口（subagents 用） ----
     @property
@@ -50,12 +78,44 @@ class AdapterLLM:
     def chat(self, system: str, messages: list, max_tokens: int = 2000,
              temperature: float = 0.7, tools: Optional[list] = None,
              tool_choice: Optional[str] = None) -> str:
-        return self._api.chat(system, messages, max_tokens=max_tokens,
-                              temperature=temperature, tools=tools,
-                              tool_choice=tool_choice)
+        import time as _t
+        now = _t.time()
+        # 清理过期冷却
+        self._cooldown_until = {k: v for k, v in self._cooldown_until.items() if v > now}
+        last_err = None
+        for api in self._candidates:
+            label = getattr(api, "provider_label", api.name)
+            if label in self._dead:
+                continue
+            if self._cooldown_until.get(label, 0) > now:
+                continue
+            try:
+                r = api.chat(system, messages, max_tokens=max_tokens,
+                             temperature=temperature, tools=tools,
+                             tool_choice=tool_choice)
+                self.last_used_label = label
+                return r
+            except ModelError as e:
+                last_err = e
+                if getattr(e, "failoverable", False):
+                    if getattr(e, "permanent", False):
+                        self._dead.add(label)   # 401/403 → key 坏，本会话不再试
+                        print(f"[llm_failover] {label} 永久失败({e.http_code}) → 标记dead", file=sys.stderr)
+                    else:
+                        self._cooldown_until[label] = now + self._COOLDOWN_S
+                        print(f"[llm_failover] {label} 临时失败({e.http_code}) → 冷却{self._COOLDOWN_S}s", file=sys.stderr)
+                    # 尝试下一家
+                    continue
+                raise  # 非 failoverable（400/404/解析/内容）→ 直接抛
+            except Exception as e:  # 非 ModelError（如网络异常未包装）
+                last_err = e
+                print(f"[llm_failover] {label} 异常({type(e).__name__}) → 试下一家", file=sys.stderr)
+                continue
+        # 全部失败 → 明确抛错（不静默 Mock）
+        raise AllProvidersFailedError(self._candidates, last_err)
 
     def available(self) -> bool:
-        return self._api.available()
+        return any(getattr(c, "available", lambda: False)() for c in self._candidates)
 
     # ---- 旧接口（server.py / test_demo_real_llm.py 用） ----
     def generate(self, messages: List[Dict[str, str]], system: str = "",
@@ -186,9 +246,10 @@ def create_llm(provider: str = "auto", model: Optional[str] = None, **kwargs) ->
 
     # auto：自动发现（真实 provider 优先，降级 mock）
     if provider in ("auto", ""):
-        api = auto_detect_model_api(verbose=False)
+        # §3.60 ⭐ 运行时 failover：收集全部候选，AdapterLLM 持列表失败自动切换
+        cands = detect_model_candidates(verbose=False)
         _ACTIVE_PROVIDER = "auto"
-        return AdapterLLM(api, provider_label="auto")
+        return AdapterLLM(api=cands[0], provider_label="auto", candidates=cands)
 
     # 注册表驱动（dsh Seam：provider 可插拔）
     if provider in PROVIDER_REGISTRY:
