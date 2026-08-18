@@ -545,8 +545,20 @@ def teach_stream():
         try:
             if CONV_STORE is not None and _is_registered(learner_id):
                 _cid = SESSIONS.get(f"conv_{learner_id}")
+                # §3.58 话题元数据：4 分类结果标注到 User Item（Turn 级，向后兼容）
+                _topic_meta = None
+                try:
+                    if _follow and isinstance(_follow, dict):
+                        _topic_meta = {
+                            "topic_relation": _follow.get("relation", ""),
+                            "target_concept": _follow.get("target_concept"),
+                            "confidence": _follow.get("confidence", 0.0),
+                        }
+                except Exception:
+                    _topic_meta = None
                 _cid = CONV_STORE.add_message(
-                    learner_id, mode, str(concept)[:60], "user", concept, conv_id=_cid)
+                    learner_id, mode, str(concept)[:60], "user", concept,
+                    conv_id=_cid, topic_meta=_topic_meta)
                 _full = str(reply_text or "").strip()[:2000] or f"（{mode}：已回复 {concept}）"
                 _cid = CONV_STORE.add_message(
                     learner_id, mode, _full[:30], "assistant", _full, conv_id=_cid)
@@ -699,14 +711,75 @@ def teach_stream():
     if str(concept).strip() in _EXIT_ACK_WORDS or \
             any(str(concept).startswith(w) for w in ("好的", "懂了", "知道了", "不学了")):
         _can_continue = False
-    if _is_short_in and _prev_intent and _can_continue:
-        # 短输入 + 有上轮意图 + 通过安全边界 → 复用（不重跑 LLM 路由）
-        _llm_intent = _prev_intent
-        _llm_conf = 0.95
-        print(f"[PAEG][v0.41.9-INTENT-CONT] 短输入复用上轮意图 {_prev_intent!r} (concept={concept!r})",
-              file=__import__("sys").stderr, flush=True)
-    else:
-        _llm_intent = None
+    # §3.58 ⭐ 话题关系 4 分类路由（Oracle 方案；§3.57 二分类升级为 followup/detour/revisit/off_topic）：
+    # 上轮是教学且通过安全边界 → LLM 分类决定话题走向。修复"先给原文被当新主题"+"教学模式卡死"。
+    _llm_intent = None  # §3.58 ⭐ 显式初始化（此前首轮/异常路径未赋值 → UnboundLocalError 500）
+    _llm_conf = 0.0
+    _follow = None
+    if (_prev_intent in ("teach", "material") and _prev_concept and _can_continue):
+        try:
+            from meta_router import classify_topic_relation, ACTION_INSTRUCTIONS
+            from services.topic_stack import push as _stack_push, recover as _stack_recover
+            _hist = SESSIONS.get(f"concept_history_{learner_id}", [])
+            _follow = classify_topic_relation(
+                str(concept), str(_prev_concept), concept_history=_hist, llm=llm)
+            print(f"[PAEG][§3.58-TOPIC] 判定 {_follow}", file=sys.stderr, flush=True)
+            # §3.58 ⭐ SQLite 联动：记录分类日志（可观测/统计，失败不影响主流程）
+            try:
+                from reflection_store import ReflectionStore
+                _rstore = getattr(ReflectionStore, "_instance", None) or ReflectionStore()
+                if getattr(ReflectionStore, "_instance", None) is None:
+                    ReflectionStore._instance = _rstore
+                _rstore.log_topic_relation(
+                    learner_id, str(concept), str(_prev_concept),
+                    _follow.get("relation", ""), _follow.get("action", ""),
+                    _follow.get("confidence", 0.0), _follow.get("target_concept") or "")
+            except Exception as _le:
+                print(f"[PAEG][§3.58] 日志失败忽略: {_le}", file=sys.stderr, flush=True)
+            _rel = _follow.get("relation", "followup")
+            if _rel == "followup":
+                # 追问：复用上轮主题 + 注入 action 指令
+                concept = _prev_concept
+                _inst = ACTION_INSTRUCTIONS.get(_follow.get("action", ""), "")
+                if _inst:
+                    setattr(learner, "_follow_instruction", _inst)
+                _llm_intent = _prev_intent
+                _llm_conf = _follow.get("confidence", 0.5)
+            elif _rel == "detour":
+                # 游离新话题：当前主题入栈 → 新话题作为 concept（subject 由 steering 处理）
+                _hist = _stack_push(_hist, {"concept": str(_prev_concept),
+                                            "subject": str(data.get("subject", "")),
+                                            "intent": _prev_intent, "summary": "", "ts": 0.0})
+                SESSIONS[f"concept_history_{learner_id}"] = _hist
+                _llm_intent = None  # 新主题走正常教学路由
+                _llm_conf = 0.0
+            elif _rel == "revisit":
+                # 绕回历史话题：从主题栈恢复
+                _target = _follow.get("target_concept") or str(concept)
+                _hist = _stack_recover(_hist, _target)
+                SESSIONS[f"concept_history_{learner_id}"] = _hist
+                from services.topic_stack import find as _stack_find
+                _hit = _stack_find(_hist, _target)
+                if _hit:
+                    concept = _hit.get("concept")
+                _llm_intent = _prev_intent
+                _llm_conf = _follow.get("confidence", 0.5)
+            elif _rel == "off_topic":
+                # 非教学内容（天气/闲聊/情感）：不进入教学（防卡死）——
+                # 生成器给出引导提示，用户可切闲聊模式。保持 current_concept 不变。
+                _llm_intent = None
+                _llm_conf = 0.0
+                _off_topic_hint = (
+                    "这个问题不属于当前教学主题。想聊这个的话，"
+                    "可以在顶部切换到「闲聊~」模式；或者我们继续学当前内容。")
+                try:
+                    setattr(learner, "_off_topic_hint", _off_topic_hint)
+                except Exception:
+                    pass
+        except Exception as _fe:
+            print(f"[PAEG][§3.58-TOPIC] 判定失败回退: {_fe}", file=sys.stderr, flush=True)
+            _follow = None
+    if _llm_intent is None:
         _llm_conf = 0.0
     if _llm_intent is None:
         try:
@@ -745,9 +818,9 @@ def teach_stream():
     if _llm_intent is not None:
         print(f"[PAEG][v0.35-LLM-ROUTE] intent={_llm_intent!r} conf={_llm_conf:.2f} text={concept[:40]!r} mode={data.get('mode')!r}",
               file=__import__("sys").stderr, flush=True)
-    # v0.41.9 ⭐ 写回会话意图（供下一轮短输入复用）——非短输入才更新意图，
-    # 短输入（承接）保持上轮意图不变。
-    if not _is_short_in and _llm_intent is not None:
+    # §3.57 ⭐ 写回会话意图（供下一轮延续判定）——无论长短，有有效意图即写回。
+    # 追问分支已把 concept 设为 prev_concept，写回保持同一主题；新主题写回新值。
+    if _llm_intent is not None:
         SESSIONS[f"current_intent_{learner_id}"] = _llm_intent
         SESSIONS[f"current_concept_{learner_id}"] = concept
         # v0.41.9 ⭐ 补存 subject——供下一轮"学科变化不延续"边界判断
@@ -1079,6 +1152,17 @@ def teach_stream():
         pass
 
     def generate():
+        # §3.58 ⭐ off_topic 引导：非教学话题不进入教学（防卡死），提示切换闲聊
+        _off_hint = getattr(learner, "_off_topic_hint", "")
+        if _off_hint:
+            try:
+                setattr(learner, "_off_topic_hint", "")  # 单轮消费
+                for _i in range(0, len(_off_hint), 60):
+                    yield f"event: seg\ndata: {json.dumps({'text': _off_hint[_i:_i+60]}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'ok': True, 'mode': 'off_topic_hint'}, ensure_ascii=False)}\n\n"
+                return
+            except Exception as _oe:
+                print(f"[PAEG][server.py] off_topic 提示异常: {_oe}")
         # v0.20.3：补 user_model/BDI 推断（原漏洞——手动教学循环没走 paeg.teach 的注入）
         try:
             from context_bundle import inject_user_model
