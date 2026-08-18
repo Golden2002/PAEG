@@ -1774,3 +1774,47 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - 测试：`tests/test_formula_ocr.py` 4 项（可用性/降级/非法输入/接口语义）
 - 引用标注：pix2tex / LaTeX-OCR（https://github.com/lukas-blecher/LaTeX-OCR）
 - 激活方式：pip install pix2tex 后自动启用（无需改代码）
+
+## §3.55 多模型 fallback 链 + 魔搭 Docker 对话修复（2026-08-16 · 用户报告魔搭不可用后登记）
+
+### 背景（用户报告）
+
+魔搭创空间 Docker 部署的 PAEG **对话模式无法正常输出**（闲聊/教学等都不出结果），仅"快速开始"等预定模板正常。
+
+### 根因分析（已诊断）
+
+- Docker 镜像**未配置 LLM API key 环境变量**（DEEPSEEK_API_KEY 等）
+- `llm_api.py auto_detect_model_api()` fallback 链：PAEG_API_KEY → DEEPSEEK_API_KEY → ANTHROPIC → OPENAI → **opencode auth.json**（Docker 里不存在）→ **MockModelAPI**
+- 魔搭 Docker 无 key → 落到 Mock（返回"[模拟回复]"）→ 对话全异常；预定模板不走 LLM → 正常
+- 附：本地 server 曾启动失败（fastmcp MCP 端口 8765 被占用，[Errno 10048]）——需先释放端口再起服务
+
+### 任务
+
+1. **llm_api.py 多模型 fallback 链**（按序检测，全部 key 缺失才落 Mock）：
+   ① PAEG_API_KEY（自定义，默认 DeepSeek）
+   ② DEEPSEEK_API_KEY → DeepSeek（V4-Flash）
+   ③ QWEN_API_KEY / DASHSCOPE_API_KEY → 阿里通义千问
+   ④ ANTHROPIC_API_KEY / OPENAI_API_KEY
+   ⑤ opencode auth.json（本地开发兜底）
+   ⑥ MockModelAPI（离线演示，明确标注）
+2. **.env.example 更新**：增加 QWEN 配置样例
+3. **魔搭部署**：用户需在创空间"环境变量"配置 DEEPSEEK_API_KEY（或 PAEG_API_KEY）；Dockerfile 无需改（env 由平台注入）
+4. **公网隧道重部署**：释放 8765/5000 端口 → 起 server → cloudflared 隧道 → 获得公网 URL
+
+### 实施纪律
+
+- fallback 链必须可观测（verbose 打印当前 provider）
+- 新增 provider 不影响现有 DeepSeek 行为（默认不变）
+- 验证：模拟各 key 缺失场景，确认按序 fallback 到 Mock 而非报错
+
+### 实施记录
+
+- ✅ `llm_api.py auto_detect_model_api()` 多模型链落地（§3.55，2026-08-16）：
+  - ② DeepSeek（V4-Flash）→ ③ 阿里通义千问（QWEN_API_KEY / DASHSCOPE_API_KEY，qwen-plus @ dashscope compatible-mode）→ ④ Anthropic/OpenAI → ⑤ auth.json → ⑥ Mock
+  - 按用户要求**不含腾讯**；Docker 有 env key 时直接走环境变量，不走 auth.json 注册表层（模拟 Docker 验证通过）
+- ✅ `.env.example` 增加 QWEN 配置样例（含魔搭创空间环境变量配置指引）
+- ✅ 本地验证 6 场景 + Mock 兜底全通过（DeepSeek 优先 / QWEN 别名 / DASHSCOPE 别名 / 双 key 优先 DeepSeek / 全无落 Mock）
+- ✅ server 健康检查 ok（知识库 194 节点）；Playwright 网页测试（见 §3.55 测试记录）
+- ✅ 文档同步：技术说明 §7.6 多模型 fallback 表（D2 融入式）+ 需求 §3.55 + .env.example
+- ✅ 提交 + 双远程推送（GitHub API + ModelScope git）+ Release（v1.1.9）
+- ✅ 语言规范补强（用户洞察：靠提示词约束而非语法规则）：LANGUAGE_STYLE 新增单字形容词完整词形规则（乏→疲乏/沉→沉重/累→疲惫等）+ 情绪陪伴链路注入 LANGUAGE_STYLE（原缺失）+ L2 正则补乏/沉 - Playwright 实测情绪回复用'疲惫'规范词形
