@@ -1921,6 +1921,17 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - 运行卡住纪律：API 测试设超时，不跑会卡的命令
 - 完成后 D2 融入技术文档 + D3 维护手册
 
+### Oracle 方案（bg_5eb8d250 · 2026-08-18 已返回）
+
+**核心**：§3.57 二分类升级为 **LLM 4 分类**（followup/detour/revisit/off_topic）+ **LRU 主题栈**（max=5）+ **双层兜底**（L1 明显闲聊 + L2 教学内分类）
+
+| 组件 | 设计 |
+|---|---|
+| free_topic_classifier | LLM 4 分类：followup(追问)/detour(游离)/revisit(绕回)/off_topic(非教学)；置信度<0.6 回退 followup |
+| concept_history | SESSIONS 加 LRU 栈 max=5（concept_id/concept/subject/summary≤30字/ts/cursor）；detour 入栈、revisit 移 cursor 不删、off_topic 不入栈 |
+| off_topic 路由 | L2 在 Presenter 前调用 → off_topic 直路由 chat_stream（解决 R4 169s 卡死）→ 完成后 current_concept 不变 |
+| 双层兜底 | L1 meta_router（greeting/affection 零 LLM 开销）+ L2 教学内 4 分类 |
+
 ### 实施记录
 
-（完成后更新）
+（实施完成后更新）
