@@ -2054,3 +2054,34 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - R4 天气端到端：输出 off_topic 引导提示（"切换到闲聊~模式"），4s 返回不卡死（原 169s）✓
 
 **注意**：端到端 R1-R5 部分超时（LLM 生成 30-40s > 脚本 25s 超时）——是 LLM 响应慢非 bug；分类判定逻辑已独立验证正确。
+
+## §3.60 运行时 LLM 故障切换（failover）（2026-08-18 · 用户实测：DeepSeek key 无效 401 时 QWEN 不切换）
+
+### 背景
+
+魔搭部署：配置 DEEPSEEK_API_KEY（无效）+ QWEN_API_KEY（有效）→ 启动选 DeepSeek → 调用 HTTP 401 → 教学失败。**期望**：DeepSeek 401 时自动重试 QWEN。
+
+### 根因（已核实）
+
+- §3.55 只做**启动时选择**（auto_detect_model_api 返回第一个有 key 的），**无运行时故障切换**
+- llm_adapter.py：fallback/retry/401/switch 全部 0 处——单 API 实例，失败即抛错
+
+### Oracle 方案（bg_9fa94224 · 2026-08-18 已返回）
+
+**核心**：在 AdapterLLM.chat 层做 failover——启动检测返回**有序候选列表**，AdapterLLM 持列表迭代，遇可切错误自动跳下一家；全失败抛 AllProvidersFailedError（不静默 Mock）。
+
+**关键设计**：
+1. OpenAICompatModelAPI 加 provider_label（日志显示 deepseek/qwen 而非 openai_compat）
+2. detect_model_candidates() 返回有序列表（扩展加 QWEN/DASHSCOPE 分支）；auto_detect_model_api 保留为兼容壳
+3. ModelError 分类：permanent(401/403=True, 429/5xx=False) + is_failoverable()（401/403/429/5xx/网络；400/404/解析/内容过滤不切）
+4. AdapterLLM 持 candidates + _dead set + _cooldown dict；chat() 迭代跳过，失败日志切换
+5. AllProvidersFailedError(attempts) 多行摘要
+6. create_llm("auto") 用候选列表；Mock 仅在零真实 key 时进列表（有 key 失败→抛错不静默）
+7. pytest：401→切+标记dead / 429→冷却 / 全失败→AllProvidersFailedError
+
+**去重**：按 (base_url, api_key[:8]) 去重（env + auth.json 同 key 不重试两次）
+**tools 透传**：failover 循环透传全部 kwargs
+
+### 实施记录
+
+（实施完成后更新）
