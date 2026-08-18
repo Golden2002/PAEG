@@ -2082,6 +2082,20 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 **去重**：按 (base_url, api_key[:8]) 去重（env + auth.json 同 key 不重试两次）
 **tools 透传**：failover 循环透传全部 kwargs
 
-### 实施记录
+### 实施记录（验证完成 · 2026-08-18）
 
-（实施完成后更新）
+**代码落地**（6c7e13e）：
+- ✅ llm_api.ModelError 分类：http_code + permanent(401/403) + failoverable(401/403/429/5xx/网络)
+- ✅ llm_api.detect_model_candidates()：收集全部候选（PAEG/DeepSeek/Qwen/Anthropic/OpenAI/auth.json），扩展 QWEN 分支；按 (base_url, key[:8]) 去重
+- ✅ llm_adapter.AdapterLLM：持 candidates + _dead set + _cooldown dict；chat() failover（401/403→dead，429/5xx→冷却60s，网络→试下一家）；非 failoverable(400/404/解析)直接抛
+- ✅ AllProvidersFailedError：全部失败明确抛错（不静默 Mock）
+- ✅ create_llm("auto") 用 candidates
+- ✅ 修复 llm_adapter 缺 import sys（测试抓到，同魔搭崩溃类型）
+
+**测试**（pytest 4 组全过）：
+- 401 → 切 qwen + 二次跳过 dead deepseek ✅
+- 429 → 冷却期内跳过 + 过期重试 ✅
+- 全失败 → AllProvidersFailedError ✅
+- 400 → 不切换直接抛 ✅
+
+**解决场景**：魔搭 DEEPSEEK(401无效) + QWEN(有效) → 自动切 QWEN 成功教学
