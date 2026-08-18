@@ -25,7 +25,7 @@ class ModelAPI:
 
     name = "abstract"
 
-    def chat(self, system: str, messages: list, max_tokens: int = 2000,
+    def chat(self, system: str, messages: list, max_tokens: int = 8000,
              temperature: float = 0.7, tools: Optional[list] = None,
              tool_choice: Optional[str] = None) -> str:
         """一次对话。messages: [{"role": "user"/"assistant", "content": str}, ...]
@@ -62,7 +62,7 @@ class MockModelAPI(ModelAPI):
     def __init__(self, echo: str = "[模拟回复]"):
         self._echo = echo
 
-    def chat(self, system: str, messages: list, max_tokens: int = 2000,
+    def chat(self, system: str, messages: list, max_tokens: int = 8000,
              temperature: float = 0.7) -> str:
         return self._echo
 
@@ -92,7 +92,7 @@ class OpenAICompatModelAPI(ModelAPI):
             return self._base_url + "/chat/completions"
         return self._base_url + "/v1/chat/completions"
 
-    def chat(self, system: str, messages: list, max_tokens: int = 4000,
+    def chat(self, system: str, messages: list, max_tokens: int = 8000,
              temperature: float = 0.7, tools: Optional[list] = None,
              tool_choice: Optional[str] = None) -> str:
         payload = {
@@ -181,7 +181,7 @@ class ReasonerModelAPI(OpenAICompatModelAPI):
                          temperature=temperature)
         self._reasoning_effort = reasoning_effort  # low / high / max
 
-    def chat(self, system: str, messages: list, max_tokens: int = 2000,
+    def chat(self, system: str, messages: list, max_tokens: int = 8000,
              temperature: float = 0.7, tools: Optional[list] = None,
              tool_choice: Optional[str] = None) -> str:
         """保持原 chat() 行为：返回 content 字符串（向后兼容）。
@@ -193,7 +193,7 @@ class ReasonerModelAPI(OpenAICompatModelAPI):
         return r.get("content") or ""
 
     def chat_with_reasoning(self, system: str, messages: list,
-                            max_tokens: int = 4000,
+                            max_tokens: int = 8000,
                             temperature: float = 0.7,
                             tools: Optional[list] = None,
                             tool_choice: Optional[str] = None) -> dict:
@@ -261,7 +261,7 @@ class AnthropicModelAPI(ModelAPI):
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
 
-    def chat(self, system: str, messages: list, max_tokens: int = 2000,
+    def chat(self, system: str, messages: list, max_tokens: int = 8000,
              temperature: float = 0.7) -> str:
         payload = {
             "model": self._model,
