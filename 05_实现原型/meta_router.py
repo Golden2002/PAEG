@@ -773,6 +773,82 @@ def classify_followup(user_input: str, current_concept: str, llm=None,
             "reason": "分类失败，保守视为新主题"}
 
 
+# §3.58 ⭐ 话题关系 4 分类（Oracle 方案：followup/detour/revisit/off_topic）
+TOPIC_RELATION_PROMPT = """你是对话话题判定器。判断用户输入相对于【当前教学主题】的关系。
+四种关系：
+- followup: 对当前主题的追问/指令（要求原文、重讲、举例、继续、换角度、说没听懂）——仍是当前主题
+- detour:   引入新的教学话题（与当前主题不同领域或同领域新概念），且不指回历史话题
+- revisit:  指回历史话题（"回到X""刚才的X""继续讲X那首"），X 在当前主题之前讨论过
+- off_topic: 非教学内容（闲聊、天气、情感、无意义）——不应进入教学
+注意：教学元问题（"这首诗怎么背""你能教我背诵吗"）算 followup 而非 off_topic。
+返回 JSON：{"relation": "followup|detour|revisit|off_topic", "action": str, "confidence": 0~1, "reason": str, "target_concept": str|null}
+action 取值：request_full_content / re_explain / give_example / continue_step / switch_angle / new_topic / unknown
+target_concept：revisit 时指向历史话题名；detour 时给新话题名；其余 null。"""
+
+# §3.58 ⭐ 追问 action → 教学指令模板（可扩展：新增 action 加一项即可）
+ACTION_INSTRUCTIONS = {
+    "request_full_content": (
+        "【用户要求先看完整内容】本轮第一步：先完整呈现当前主题的原文/全文/题目"
+        "（古诗给全文、定义给完整表述、题目给完整题干），然后再继续讲解。"),
+    "re_explain": (
+        "【用户没听懂】本轮用更简单的语言、更小的步子重新讲解当前主题，"
+        "先确认学生卡在哪一步，再针对性重讲。"),
+    "give_example": (
+        "【用户要例子】本轮以具体例子为主：先给 2-3 个由浅入深的例子，"
+        "再回扣概念本身。"),
+    "continue_step": (
+        "【用户要继续】不要重复已讲内容，直接承接当前主题继续往下讲新内容。"),
+    "switch_angle": (
+        "【用户要换角度】换一个与之前不同的角度/方法讲解当前主题"
+        "（如从例子→直觉、从直觉→应用）。"),
+}
+
+
+def classify_topic_relation(user_input: str, current_concept: str,
+                            concept_history: list = None, llm=None) -> dict:
+    """§3.58 ⭐ 教学话题 4 分类（followup/detour/revisit/off_topic，Oracle 方案·无正则）。
+
+    返回 {"relation", "action", "confidence", "reason", "target_concept"}。
+    低置信（<0.6）或异常回退 followup（保守：不误切主题）。
+    """
+    _fallback = {"relation": "followup", "action": "unknown", "confidence": 0.0,
+                 "reason": "回退", "target_concept": None}
+    if not user_input or not current_concept or llm is None:
+        return _fallback
+    _hist = concept_history or []
+    _hist_txt = "\n".join(
+        f"- {h.get('concept', '')}({h.get('subject', '')})" for h in _hist[-5:]) or "（无）"
+    _user = (
+        f"当前教学主题：{current_concept}\n"
+        f"历史话题（最近 {min(len(_hist), 5)} 个）：\n{_hist_txt}\n"
+        f"用户输入：{user_input}\n\n只输出 JSON。"
+    )
+    try:
+        from subagents import _safe_chat
+        import json as _json
+        r = _safe_chat(llm, TOPIC_RELATION_PROMPT, _user, max_tokens=120)
+        if r:
+            _s, _e = r.find("{"), r.rfind("}")
+            if _s >= 0 and _e > _s:
+                data = _json.loads(r[_s:_e + 1])
+                rel = str(data.get("relation", "followup"))
+                conf = float(data.get("confidence", 0.0) or 0.0)
+                if rel not in ("followup", "detour", "revisit", "off_topic"):
+                    rel = "followup"
+                if conf < 0.6 and rel != "followup":
+                    rel = "followup"  # 低置信保守回退
+                return {
+                    "relation": rel,
+                    "action": str(data.get("action", "unknown")),
+                    "confidence": conf,
+                    "reason": str(data.get("reason", "")),
+                    "target_concept": data.get("target_concept"),
+                }
+    except Exception:
+        pass
+    return _fallback
+
+
 def route(text: str, learner=None, session=None, llm=None,
           fallback_to_teach: bool = False, endpoint_hint: Optional[str] = None) -> dict:
     """v0.24：集中路由决策器 —— 替代 server.py 中的 if/elif 链。
