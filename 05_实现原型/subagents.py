@@ -1286,7 +1286,10 @@ class Presenter:
             # — 在所有教学指令（LANGUAGE_STYLE/学科导航/母语迁移/个体化/适配决策）追加完毕后注入，避免覆盖既有策略
             system = _inject_skill_catalog(system)
             content = _safe_reason_chat(
-                self.model, system, user, subject=subject, max_tokens=4000, tools=_tools,
+                self.model, system, user, subject=subject, max_tokens=4000,
+                # §3.62 ⭐ 修复 tool_calls 泄漏：教学主输出不传 tools（生成讲解场景，
+                # LLM 返回 tool_calls 但 _safe_reason_chat 不执行 → JSON 泄漏）；
+                # 工具调用留给 AnswerSolver 等专用 subagent（其 _do_chat 有工具循环）
                 learner=learner, llm=self.model,  # v0.26 需求B：LLM 选库+关键词引导
                 subagent="presenter",  # v0.51 ⭐ 深度思考（矩阵：A 路径）
             )
