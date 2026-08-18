@@ -2167,9 +2167,20 @@ ext_step = state["plan"][current_step_id+1] → Presenter.run（跳过 Diagnosto
 6. 灰度开关 paeg_modules.json planner_dynamic: true
 7. 测试：_StubPlannerLLM 注入 5 case（逐句将进酒/初中数学/大学物理/考研政治/re_explain）+ 质量对比
 
-### 实施记录
+### 实施记录（部分完成 · 2026-08-18）
 
-（完成后更新）
+**已落地**（9e7191b）：
+- ✅ pedagogy.PLANNER_SYSTEM_PROMPT：策略知识库（socratic/scaffolded/mastery/feynman/综合）作为 LLM 参考
+- ✅ pedagogy.validate_plan()：防幻觉（step_id 连续/type/bloom 枚举/topic 非空/duration 范围/steps 1-20）
+- ✅ Planner.run(teach_state=None, action=None)：LLM 动态规划 + 完整上下文打包（最新输入/画像/学段/进度/§3.58 action）；LLM 失败→静态兜底
+- ✅ Planner._plan_dynamic()：_safe_reason_chat 调 LLM → JSON 解析 → validate_plan → 返回（planner_mode: dynamic/static）
+- ✅ 测试 4 组通过：逐句续讲(第4句)/数学新概念/非法JSON回退/无LLM回退
+
+**待完成**：
+- ⬜ server.py teach_stream 集成：构造 teach_state（从 SESSIONS）+ 调 classify_topic_relation 拿 action → 传 Planner.run
+- ⬜ teach_state 持久化（SESSIONS 存 original_concept/completed_step_ids/history_summary）
+- ⬜ 跨学段完整测试（将进酒逐句/初中数学/大学物理/考研政治 + 跟进提问 + 质量检查）
+- ⬜ 灰度开关 planner_dynamic（paeg_modules.json）
 
 ## §3.62 教学规划 LLM 动态决策化（2026-08-18 · 用户洞察：scaffold 死板约束限制大模型能力）
 
@@ -2220,6 +2231,17 @@ ext_step = state["plan"][current_step_id+1] → Presenter.run（跳过 Diagnosto
 6. 灰度开关 paeg_modules.json planner_dynamic: true
 7. 测试：_StubPlannerLLM 注入 5 case（逐句将进酒/初中数学/大学物理/考研政治/re_explain）+ 质量对比
 
-### 实施记录
+### 实施记录（部分完成 · 2026-08-18）
 
-（完成后更新）
+**已落地**（9e7191b）：
+- ✅ pedagogy.PLANNER_SYSTEM_PROMPT：策略知识库（socratic/scaffolded/mastery/feynman/综合）作为 LLM 参考
+- ✅ pedagogy.validate_plan()：防幻觉（step_id 连续/type/bloom 枚举/topic 非空/duration 范围/steps 1-20）
+- ✅ Planner.run(teach_state=None, action=None)：LLM 动态规划 + 完整上下文打包（最新输入/画像/学段/进度/§3.58 action）；LLM 失败→静态兜底
+- ✅ Planner._plan_dynamic()：_safe_reason_chat 调 LLM → JSON 解析 → validate_plan → 返回（planner_mode: dynamic/static）
+- ✅ 测试 4 组通过：逐句续讲(第4句)/数学新概念/非法JSON回退/无LLM回退
+
+**待完成**：
+- ⬜ server.py teach_stream 集成：构造 teach_state（从 SESSIONS）+ 调 classify_topic_relation 拿 action → 传 Planner.run
+- ⬜ teach_state 持久化（SESSIONS 存 original_concept/completed_step_ids/history_summary）
+- ⬜ 跨学段完整测试（将进酒逐句/初中数学/大学物理/考研政治 + 跟进提问 + 质量检查）
+- ⬜ 灰度开关 planner_dynamic（paeg_modules.json）
