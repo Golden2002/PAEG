@@ -2456,6 +2456,18 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 - 可测试；简洁可维护
 - 前端单文件 index.html；后端 Python
 
+### 两路调研方案（2026-08-18 已返回）
+
+**explore（bg_96eea12d）**：前端现状——6 个 cmd-trigger 按钮均无 active 高亮（仅 kmap 有 borderColor hack）；徽章两套实现（气泡顶部 v0.28 + 资源卡片 v0.27）；"学生问的是"在前端无此字样（后端 prompt）；已有 active 范式（.mode-btn.active/.chip.active/.auth-tab.active）可借鉴。
+
+**Oracle（bg_12ed6c2d）**：5 修复最小方案：
+1. **token**：llm_api.py 默认 4000→8000（DeepSeek V4 上限 384K，5 处）
+2. **按钮高亮**：index.html 加 `#cmd-trigger-deepthink.active` CSS + setDeepThink 切 class + 发送后清除（~20 行）
+3. **徽章衔接**：`display:flex; width:fit-content` 让徽章独占一行（2 行）
+4. **措辞**：prompts.py presenter prompt 加"开场禁忌"（禁止"学生问的是/你问的是"开头，直接讲知识）
+5. **守护**：不改 §3.61-§3.64 相关文件（约束清单）
+
 ### 实施记录
 
 （完成后更新）
+
