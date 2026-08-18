@@ -1818,3 +1818,199 @@ server.py = Flask app / CORS / ProxyFix / request-id、rate-limit middleware
 - ✅ 文档同步：技术说明 §7.6 多模型 fallback 表（D2 融入式）+ 需求 §3.55 + .env.example
 - ✅ 提交 + 双远程推送（GitHub API + ModelScope git）+ Release（v1.1.9）
 - ✅ 语言规范补强（用户洞察：靠提示词约束而非语法规则）：LANGUAGE_STYLE 新增单字形容词完整词形规则（乏→疲乏/沉→沉重/累→疲惫等）+ 情绪陪伴链路注入 LANGUAGE_STYLE（原缺失）+ L2 正则补乏/沉 - Playwright 实测情绪回复用'疲惫'规范词形
+
+## §3.56 C 盘安全清理方法论 + 智能体学习文件夹纪律（2026-08-18 · Oracle + 联网检索）
+
+### 背景
+
+用户 C 盘仅剩 3.6 GB（已用 86.1 GB）——需安全清理。用户要求：咨询 Oracle + 联网检索方法论，**固定一套方法下次直接用**，方法保存到项目上级"智能体学习"文件夹。
+
+### 方法论（已固定 · 下次直接执行）
+
+**文件位置**：`D:\桌面\智能体架构与开发（含大模型）\智能体学习\C盘安全清理方法论.md`
+
+**核心原则**：
+- **可重建性为唯一分类标准**：可重建→可删；不可重建→备份或不动
+- **只读扫描 → 分级清单 → 逐项 DryRun → 清理 → 冒烟测试**五步流程
+- 不用递归大目录扫描命令（`Get-ChildItem -Recurse` 在大目录会卡死——纪律 20 教训）
+- 不引第三方清理工具、不动注册表
+
+**分级**（每项标注安全级别 + 命令）：
+- L1 绝对安全：%TEMP% 过期文件、回收站、cleanmgr /lowdisk、浏览器缓存
+- L2 安全：pip cache purge、npm cache clean --force、pnpm store prune、go clean、dotnet nuget locals、Playwright uninstall --all
+- L3 谨慎：DISM StartComponentCleanup（先 AnalyzeComponentStore 评估）、powercfg /hibernate reduced、vssadmin 卷影副本
+- L4 禁止：Windows\System32、Program Files 核心、用户文档、.env/密钥、微信聊天记录（Msg\ 数据库）、项目文件
+
+**本机已探明的大缓存**（只读统计）：ms-playwright 720MB、npm-cache 603MB、Temp 533MB、.claude 247MB、pip 14.5MB
+
+**结构性迁移（长期方案）**：PLAYWRIGHT_BROWSERS_PATH / PIP_CACHE_DIR 迁移到 D:\devcache\，一劳永逸
+
+### 工作纪律（用户强调）
+
+1. **会卡住的命令不用**：递归大目录统计/清理命令可能卡死（纪律 20），必须用安全写法（按时间过滤 + SilentlyContinue + 单步）
+2. **方法论固定复用**：每次清理按"智能体学习\C盘安全清理方法论.md"执行，不临时起意
+3. **记录入需求文档**：本次任务完成即记录（D1）
+4. **智能体学习文件夹**：项目上级 `D:\桌面\智能体架构与开发（含大模型）\智能体学习\` 存放可复用方法论（不随项目同步，是个人知识资产）
+
+### 实施记录
+
+- ✅ Oracle 咨询（bg_44a05b1d）+ librarian 联网检索（bg_037f1d0c）已返回
+- ✅ 方法论文件待写入智能体学习文件夹
+- ✅ 需求文档登记完成（本 §3.56）
+- ⬜ 清理执行（按方法，L1→L2 安全级，等用户确认）
+
+## §3.57 教学追问识别架构修复（2026-08-18 · 用户实测 bug"先给原文被当新主题教学"）
+
+### Bug 现象
+
+1. 用户教学模式问"教我将进酒" → 正常教学（但没先输出原文）
+2. 用户追问"你得先给我原文" → 智能体**把这句话当新教学主题**，开始"教学"这句话本身
+
+### 根因（架构缺口）
+
+- 前端每次发送 `concept: question`（输入框全文）→ 后端 teach_stream 直接当主题
+- **v0.41.9"短输入延续"策略**：仅 `<6 字` 才复用上轮意图——"你得先给我原文"（8 字）绕过 → 走新主题路由
+- 用户洞察：**"延续与否与输入长短无关"**——短输入延续策略本身是错误设计
+
+### 修复方案（Oracle 咨询 bg_532bda5f · 方案 A+C · 无正则）
+
+1. **meta_router.classify_followup()**：LLM 二分类（追问当前主题 vs 新主题），返回 action 枚举：
+   request_full_content(要原文) / re_explain(没懂) / give_example(要例子) / continue_step(继续) / switch_angle(换角度) / new_topic
+2. **teach_stream 集成**：上轮 intent ∈ (teach, material) 且通过安全边界 → classify_followup 判定
+   - 追问 → 复用 prev_concept（SESSIONS current_concept）+ 按 action 生成教学指令存 learner._follow_instruction
+   - 新主题 → 正常切换（写回新 concept）
+3. **删除"短输入延续"**（v0.41.9 _is_short_in 逻辑移除，写回也去掉长短判断——延续与长短无关）
+4. **Presenter.run 消费**：读 learner._follow_instruction 注入 system prompt，单轮消费（防污染）
+
+### 验证（Playwright + API 实测）
+
+- ✅ "教我将进酒" → 正常教学（含"君不见"引用）
+- ✅ "你得先给我原文" → **识别为追问**，复用将进酒 + 输出原文（"上一课我们看见了'君不见黄河之水天上来'"）
+- ✅ "我们学滕王阁序" → **正确切换新主题**（不再延续将进酒）
+- ✅ 语法检查通过 + 提交 a4ede24
+
+### 设计要点
+
+- **判定机制是 LLM 二分类**（非正则）：覆盖"先给原文/继续/换例子/没懂"等任意表达
+- **状态在后端 SESSIONS**（权威），前端不参与判定（仅 UX 镜像）
+- action 枚举可扩展（新增指令类型只加枚举 + 指令模板）
+
+## §3.58 多轮游离对话处理（2026-08-18 · 用户要求实测 + Oracle 咨询）
+
+### 背景
+
+用户要求验证：同主题多轮问话 + 中途游离（学生突然问别的问题/话题），再绕回原主题——本项目能否正确且高质量处理这种"弯绕复杂逻辑"。用户强调按需求文档纪律执行（D1 即时记录 / 纪律 20 运行卡住 / Oracle 咨询 / 实测）。
+
+### 与既有机制的关系
+
+- §3.57 classify_followup（LLM 二分类：追问 vs 新主题）——处理**单轮**追问
+- 本任务是其扩展：**多轮游离**（R2 游离 → R3 绕回时，current_concept 已被游离话题覆盖）
+- 核心难点：绕回识别（学生说"回到将进酒…"需恢复 R1 主题，而非游离的 R2 主题）
+
+### 任务
+
+1. **实测**：API 模拟 5 轮（主题 → 游离1 → 绕回 → 游离2 → 再绕回），记录每轮系统行为（是否识别绕回/游离/新主题）
+2. **Oracle 咨询**：基于实测数据，设计多轮游离处理架构（会话主题栈？绕回识别机制？游离分类？）
+3. **实施**（按 Oracle 方案）：改造会话状态管理（主题栈/最近主题链），支持"绕回"识别
+4. **验证**：多轮游离场景全链路测试 + 回归（§3.57 单轮追问不受影响）
+
+### 实施纪律
+
+- 按需求文档纪律：先登记 → 实测 → Oracle → 实施 → 验证 → 记录
+- 不用正则硬编码（延续与长短无关、与特定词无关）
+- 运行卡住纪律：API 测试设超时，不跑会卡的命令
+- 完成后 D2 融入技术文档 + D3 维护手册
+
+### 执行标准（§3.58 实施必守 · 用户强调）
+
+1. **架构清晰**：模块化分层——分类器（meta_router）、主题栈（独立 services 模块）、路由分支（teach_stream 薄层），各司其职不纠缠
+2. **可扩展**：4 分类用**枚举 + 参数化 prompt 模板**（新增意图只加枚举值和 prompt 描述，不改流程骨架）；主题栈操作用**通用栈函数**（push/pop/recover/cursor），不写死具体主题
+3. **可维护**：不堆砌代码——每个函数 ≤50 行；辅助逻辑抽独立模块；注释说明"为什么"而非"是什么"
+4. **兼容性**：§3.57 单轮追问路径 100% 保留（followup 分支行为不变）；SSE 事件结构不变
+5. **验证**：每步可验证（单测 + R1-R5 端到端重放 + 回归）
+
+### Oracle 方案（bg_5eb8d250 · 2026-08-18 已返回）
+
+**核心**：§3.57 二分类升级为 **LLM 4 分类**（followup/detour/revisit/off_topic）+ **LRU 主题栈**（max=5）+ **双层兜底**（L1 明显闲聊 + L2 教学内分类）
+
+| 组件 | 设计 |
+|---|---|
+| free_topic_classifier | LLM 4 分类：followup(追问)/detour(游离)/revisit(绕回)/off_topic(非教学)；置信度<0.6 回退 followup |
+| concept_history | SESSIONS 加 LRU 栈 max=5（concept_id/concept/subject/summary≤30字/ts/cursor）；detour 入栈、revisit 移 cursor 不删、off_topic 不入栈 |
+| off_topic 路由 | L2 在 Presenter 前调用 → off_topic 直路由 chat_stream（解决 R4 169s 卡死）→ 完成后 current_concept 不变 |
+| 双层兜底 | L1 meta_router（greeting/affection 零 LLM 开销）+ L2 教学内 4 分类 |
+
+### 存储联动设计（Oracle bg_7805f504 + 联网检索 bg_6c5fa42c · 用户要求与SQLite/三层保存接线）
+
+**综合方案**：conversations.json 扩展为主路径 + SQLite 轻量联动 + 三层模型语义映射
+
+| 项 | 设计 | 业界来源 |
+|---|---|---|
+| 存储主路径 | conversations.json：conversation 加 concept_history:[](LRU 5)，message(user) 加 	opic_relation/target_concept/confidence | Oracle 方案A + Khanmigo（可读 plain text 存对话效果最好） |
+| SQLite 联动 | 新增 	opic_relation_log 表（每次分类写一条：relation/confidence/latency/ts）——利用已有 sqlite 基建，可统计分类准确率 | Oracle 方案B轻量 + Cursor SDK LocalAgentStore |
+| 三层模型映射 | Thread=conversation / Turn=user+assistant 对 / Item=message；4分类是 Turn 级元数据（标注在 User Item） | Oracle + AutoTutor plan stack |
+| 重启恢复 | 首次请求从最近 conversation 的 concept_history 载入 SESSIONS；revisit_candidates 从历史 topic_relation=revisit 恢复 | Oracle 步骤3 |
+| 业界借鉴 | Cloudflare writable context block（主题栈可被LLM改）+ NVIDIA 单次调用多字段(relation+action+target) + TIAGE 话题漂移三层定义 | librarian D4/D2/D1 |
+
+**业界关键参考**：
+- TIAGE（EMNLP 2021）：话题漂移四层定义（继续/子话题/相关新话题/无关）——与我们的 followup/detour/revisit/off_topic 对应
+- AutoTutor plan stack：student_initiative（学生跑题）vs tutor_initiative（教学主线）planner——学生主动游离用 student_initiative 分支
+- Cloudflare Session API：writable context block 存 topic stack（LLM 可 set_context 改）+ searchable 存历史主题（绕回检索）
+- Khanmigo AIED 2026：每个 feature 是 chat workflow；分类器决定走哪条推理路线（与我们同构）
+
+### 实施记录
+
+（实施完成后更新）
+
+## §3.59 魔搭创空间部署验证 + LaTeX 渲染修复（2026-08-18 · 用户实测：创空间仍无法正确运行）
+
+### 背景（用户实测魔搭创空间）
+
+用户贴出魔搭创空间实际对话输出：
+- 用户："为我讲解将进酒"
+- 系统回复：**"[balanced] 关于该主题的讲解"** ← 这是 LLM 缺失的兜底产物
+- 后续：检查理解 + "本次教学完成，理解反馈一般 掌握度信号 0.55"
+- **另有 LaTeX 符号未渲染问题**
+
+### 根因分析（初步）
+
+1. **"[balanced] 关于该主题的讲解"** = Presenter 无 LLM 时的规则模板兜底（Presenter.run："真实 LLM 生成讲解；无 LLM 时回退规则模板"）→ **魔搭容器内 LLM 调用失败**
+2. **为何 LLM 失败**：librarian 已查证（2026-08-18）——`ms_deploy.json` 的 `environment_variables` 对 **sdk_type=docker 不生效**（仅 gradio/streamlit/static 生效）；必须用魔搭控制台 **Secrets** 配置 DEEPSEEK_API_KEY。容器内 `os.environ` 才能读到
+3. 多模型 fallback（§3.55）在无 key 时落 Mock——但用户看到的是规则模板兜底（Presenter 层），说明 fallback 链也没 key
+
+### 待办
+
+1. **确认魔搭 Secrets 配置状态**：用户是否已在创空间控制台配置 DEEPSEEK_API_KEY？（需要用户操作确认或通过魔搭 API 查询）
+2. **代码侧改进**：无 LLM key 时**显式可观测**（启动日志/健康检查/API 返回明确提示"未配置 DEEPSEEK_API_KEY"），而不是静默降级——用户才能定位
+3. **魔搭部署验证**：配置 Secrets 后重部署，验证对话输出真实 LLM 内容
+4. **LaTeX 渲染修复**：魔搭前端 LaTeX 未渲染——排查（前端是否加载 KaTeX？SSE 内容里公式格式？）
+5. **本地等价验证**：本地模拟"无 key"场景确认兜底输出 = "[balanced]..."，验证修复后输出真实内容
+
+### 实施纪律
+
+- 按需求文档标准（D1 登记/D2 融入/D3 分层）
+- 不跑会卡住的命令（SSE 流式验证用短超时）
+- Oracle 咨询（bg 启动）
+- 无 key 兜底必须可观测（用户能一眼看出"是 key 没配"而非"部署坏了"）
+
+### Oracle 方案（bg_377e88e5 · 2026-08-18 已返回）
+
+**验证闭环**（改 key 后无需发对话即可确认）：
+1. /api/health 已有 llm_provider/llm_ok 字段——curl 见 "llm_provider":"openai_compat" 即 key 生效（"mock" = 无 key）
+2. 启动横幅 [PAEG Server] LLM: auto/default -> mock = 无 key（魔搭 Studio 日志标签可看）
+3. 改 Secrets **必须重启 Studio**（env 只在容器启动注入）；Secrets 名严格 DEEPSEEK_API_KEY 全大写下划线
+
+**代码改动**（≤30 行，不破 130+ 调用方）：
+1. infra/runtime.py：mock 兜底时启动横幅打印 ⚠️ 提示"请在 Studio Secrets 配置 DEEPSEEK_API_KEY"
+2. subagents.py Presenter 规则回退：content 前置一行"（注：当前未连接大模型，以下为基础讲解）"（tone_used/llm_generated 字段不动）
+
+**LaTeX 渲染**（Oracle 诊断）：
+- KaTeX 已加载（index.html L19-21 本地 + CDN 兜底）✓
+- **根因：SSE 流式逐 chunk 推送时未重新触发 renderMath**——新 chunk 不渲染公式
+- 修复：SSE message handler 末尾对最新节点补 enderMath(appendedNode)（每 token 后 <5ms）
+
+**用户操作清单**（已告知）：魔搭控制台设置→Secrets→DEEPSEEK_API_KEY=sk-xxx→保存→重启 Studio
+
+### 实施记录
+
+（实施完成后更新）
