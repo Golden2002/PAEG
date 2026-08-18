@@ -1,4 +1,4 @@
-﻿"""PAEG 服务配置层(v0.40 P1-1 server.py Phase1 拆分)。
+"""PAEG 服务配置层(v0.40 P1-1 server.py Phase1 拆分)。
 
 集中托管 server.py 的"只读配置":
   - 环境变量(SECRET_KEY / LLM_PROVIDER / LLM_MODEL / PORT / MCP_PORT / PAEG_HOST)
