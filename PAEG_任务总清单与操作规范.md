@@ -2596,6 +2596,10 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
    - 新增 **§7.9 技术栈与前后端联通**：§7.9.1 前端栈（单文件 SPA/marked/KaTeX/手写 SSE 解析器/MediaRecorder/Web Audio）/ §7.9.2 后端栈（Flask+flask-cors+ProxyFix/12 blueprints/SSE/SQLite+JSON/config_loader/llm_api+llm_adapter/MCP 6 server/hooks_hub/infra）/ §7.9.3 API 端点表（55 路由精选）+ SSE 事件表（16 种唯一）+ 前端消费要点 / §7.9.4 部署栈（本地/cloudflared/Docker/ModelScope/双远程/密钥/可观测）
    - 顶部 v1.1.9 更新说明 + 目录更新（第 7 章 v1.1.9 + 附录 C C.1-C.13）+ §7.1 能力口径 56→60 对齐（与 §7.2 C1-C4 一致）
 4. **渲染验证**：v1.1.9 PDF **52 页 · 28 Mermaid SVG 矢量直出 · 零源码泄漏**（fitz 验证：围栏 0 / SVG 0 / HTML 0 / 表格分隔行 0；页 34-35 的 #目标 为 Roadmap 表格序号列 # 正常内容，非泄漏）
+4a. **融贯性修复**（用户质疑：所有内容都往附录添加是否合理——确认不合理）：附录 C 定位为"速览索引指向正文"，C.9-C.13 初始版把实现细节堆进附录导致与 §7.6/§7.7 重复、C.9/C.13 正文悬空。修复：
+   - **正文补支撑**：§7.6 追加「运行时故障切换」小节（§3.60：候选列表/错误分类/状态机/AllProvidersFailedError）→ C.9 落地；§7.7 追加「对象性×个体性四维评估」小节（§3.66：四维矩阵+实测证据）→ C.13 落地
+   - **附录瘦身**：C.9-C.13 改为 1-2 行速览 + 指向正文小节（与 C.1-C.8 同构），删除重复细节
+   - **重渲染**：53 页 · 零泄漏（52→53 因新增正文小节）
 5. **同步**：Alexandria Bibliotheca\技术说明\（md + PDF v1.1.9）
 6. **交付**：微信发送 PDF v1.1.9
 
