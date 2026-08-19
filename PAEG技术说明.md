@@ -1,4 +1,4 @@
-# PAEG 教育智能体 — 简明技术说明（v1.1.8）
+﻿# PAEG 教育智能体 — 简明技术说明（v1.1.8）
 
 > 面向项目所有者：快速恢复对 PAEG 技术实现的全貌认知。
 > 结构：TL;DR → 能力全景（每个功能：技术路线 + 实现方法）→ 分层架构 → 关键流程 → 扩展指南。
@@ -1110,6 +1110,181 @@ since:   <PAEG 版本号>
 - 将进酒逐句进度延续（R1原文→R2时代→R3开头四句）
 - give_example 平衡：古诗自然融入意象/数学具体举例（LLM 按学科取舍）
 - max_tokens 拉高：Presenter 4000 / 全局 4000（支持长文稿）
+
+### 7.8 代码与文件结构详解（§3.67 · 2026-08-18）
+
+> 本节从文件组织、提示词拼接、工具注册、Subagent 架构四个层面，说明 PAEG 在代码层面的组织方式与实现逻辑。内容对应项目真实文件结构（v5323，经重构后）。
+
+#### 7.8.1 整体文件结构总览
+
+项目按「入口层—编排层—执行层—基础设施层」分层组织，核心代码与配置严格分离。以下为核心目录与文件：
+
+```text
+05_实现原型/
+├── server.py                  # 【入口】Flask 服务主文件，全部 API/SSE 端点
+├── paeg.py                    # 【核心编排】教学主流程控制，五阶段闭环实现
+├── meta_router.py             # 意图路由：15 类意图识别与分发（模块级函数）
+├── pedagogy.py                # 教学策略库：STRATEGIES 字典 + choose_strategy 等函数
+├── subagents.py               # 【子Agent层】核心 subagent 类定义（Diagnostor/Planner/Presenter/Evaluator/Adapter 等）
+├── prompts.py                 # 【提示词库】全部静态提示词块、学科/学段配置（build_presenter_system 在 1483 行）
+│
+├── config_hub.py              # 【插件中枢】统一管理工具/技能/钩子/工作流（class ConfigHub @ 32）
+├── config_loader.py           # 配置加载器：三级合并 + 环境变量替换
+├── constraint_engine.py       # L0-L8 动态约束引擎（模块级函数）
+├── skill_registry.py          # Skill 注册与懒加载管理器（class SkillRegistry @ 112）
+├── hooks_hub.py               # 事件钩子执行引擎（class HooksHub @ 197）
+├── workflows_hub.py           # 声明式工作流执行引擎（class WorkflowsHub @ 99）
+├── mcp_tools_loader.py        # MCP 工具配置加载（模块级函数 + 四重安全校验）
+│
+├── blueprints/                # 【HTTP 蓝图层 · Phase 3 已完成】12 模块
+│   ├── chat.py                #   闲聊/流式对话
+│   ├── teaching.py            #   教学模式端点
+│   ├── voice.py               #   语音端点（TTS/STT）
+│   ├── admin.py / modes.py / quiz.py / resources.py / threads.py
+│   ├── conversations.py / proactive.py / self_update.py / uploads.py
+│   └── __init__.py
+├── services/                  # 【业务服务层 · Phase 2 已完成】
+│   ├── handlers/              #   场景处理器（出题/讲义/方法建议等）
+│   ├── retrieval/             #   知识检索（BM25+Tag RRF）
+│   └── 40+ 顶层模块           #   lang_gate / preset_service / teach_strategy / steering 等
+├── infra/                     # 【基础设施层 · Phase 2 已完成】
+│   └── cache / checkpoint / event_types / retry_policy / runtime / sessions / watchdog 等 11 模块
+├── ralph/                     # 【RALPH 子系统】主动自我优化循环
+│   ├── task_registry.py / executor 相关 / evaluator / termination_guard / contracts
+├── self_evolution.py          # 【自我进化】知识蒸馏/教学补丁/工具经验
+├── quality_gate.py            # 四层质量门禁实现
+├── language_refiner.py        # 语言风格矫正与薇依语料校准
+│
+├── config/                    # 【配置目录】数据化配置，改配置不改代码
+│   ├── agents.json / hooks.json / mcp_tools.json / rag.json / skills.json
+│   ├── workflows/             #   工作流 DAG 定义（teach_concept / teach_materials / teach_minimal）
+│   └── profiles/              #   预设模式配置（standard / exam / weil）
+├── data/                      # 【数据层】运行时数据（paeg.db SQLite / 约束规则 / 违禁词等）
+├── skills/                    # 全局 Skill 库（11 个技能包，含 teaching-capability）
+├── Library/                   # 知识库：按学科分类的知识文件（Simone Weil 薇依原著等）
+├── users_data/                # 用户数据：画像、会话历史、反馈日志
+│
+└── 09_GUI前端/                # 【Web 前端】index.html（271KB）+ weather.html + assets
+```
+
+**重构说明**：server.py 经 Phase 1-3 拆分，将 6 个低风险域（voice/threads/admin/conversations/uploads/quiz）迁入 blueprints/，随后 chat/teaching 拆分为独立蓝图；services/ + infra/ 在 Phase 2 完成拆分。**此结构与参考内容（未提及 blueprints/）的差异来自近期重构，本节以真实代码为准。**
+
+#### 7.8.2 提示词动态拼接的实现
+
+**核心设计原则**：确定性骨架装配 + 动态块按需注入。提示词不是一整段写死，而是像搭积木一样按固定规则拼接，同时支持运行时动态增补。
+
+**提示词的积木化拆分**：全部基础提示词块收敛在 `prompts.py` 中，以常量/字典形式独立存储：
+
+| 提示词块 | 存储形式 | 作用 |
+|---|---|---|
+| WEIL_CORE | 字符串常量 | 人格与教育信念基线，全模式通用 |
+| TRUTH_GROUNDING | 字符串常量 | 防幻觉 10 条底线，幂等注入 |
+| SUBJECT_STYLES | 字典（35 键） | 每个学科独立的 persona、语言风格、教学法、例题模板 |
+| GRADE_TEACHING_MODES | 字典（4 学段） | 初中/高中/大学/考研的教学结构、深度、脚手架模板 |
+| LANGUAGE_STYLE | 字符串常量 | 基础语言表达规范（含七项自查口诀） |
+| PEDAGOGICAL_LANGUAGE | 字符串常量 | 教学用语模块（§3.64，语言风格参考） |
+
+**核心装配入口：`build_presenter_system()`**（prompts.py:1483）。每个 Subagent 有专属的提示词装配函数，以讲解核心 Presenter 为例，装配顺序是确定的：
+
+```text
+装配顺序（自上而下）：
+1. 基础身份层：WEIL_CORE
+2. 全局底线层：TRUTH_GROUNDING
+3. 教学判断层：判断用户此刻最关键的信息需求（§3.65 开场自然承接）
+4. 学科专属层：SUBJECT_STYLES[subject] → 教学法、侧重点、例题
+5. 学段适配层：GRADE_TEACHING_MODES[grade] → 讲解结构与深度要求
+6. 画像注入层：LearnerProfile（昵称/认知风格/掌握水平）+ infer_user_model 推断
+7. 语言规范层：LANGUAGE_STYLE
+8. 教学用语层：PEDAGOGICAL_LANGUAGE（§3.64，按场景动态注入）
+9. 后置追加：_inject_skill_catalog / 知识依赖图 / 学段学科 profile / 追问指令（§3.57）
+```
+
+**动态补丁按需调用**：教学经验沉淀的补丁（学科补丁、工具经验）不会全量塞进提示词，而是通过工具化方式按需获取——LLM 在需要时主动调用 `compose_dynamic_prompt` 工具，传入「学科/场景」参数，工具从 `subject_patches.md`、`tool_lessons.md` 检索相关片段返回。优势是上下文占用极小，只有真正需要时才加载。
+
+**后置二次矫正**：输出端还有 `llm.after` 钩子触发的后置矫正——调用 `services/lang_gate.py` 的 `lang_gate_content()`，依次执行违禁词检测、AI 腔矫正、薇依语料风格校准、语法通顺度修正。优势是不占用 LLM 上下文，纯规则执行，速度快、效果可量化。
+
+#### 7.8.3 工具注册与多模式接入
+
+**核心设计原则**：配置驱动、统一入口、权限分层、热更生效。所有工具能力不硬编码在业务逻辑里。
+
+**统一调度中枢：`config_hub.py`**（class ConfigHub @ 32）。对外提供三个核心能力：
+
+| 能力 | 说明 |
+|---|---|
+| `reload_all()` | 全量重载工具、技能、钩子、工作流 |
+| `execute_tool(name, args)` | 统一工具调用入口，所有 LLM 工具请求都走这里（@ 170 行） |
+| `get_available_tools(profile)` | 根据当前模式返回可用工具定义列表 |
+
+所有工具调用不直接调用函数，必须经过 config_hub 路由，以此统一鉴权、审计、防护。
+
+**MCP 工具配置化注册流程**：
+
+定义层（`config/mcp_tools.json`）——每个工具是一个 JSON 对象，包含名称、描述、风险等级、模块、函数、参数 schema。
+
+加载层（`mcp_tools_loader` 模块函数）——读取 JSON 配置后执行**四重安全校验**：模块白名单校验、危险模块黑名单拦截、函数名格式校验、禁止 exec/eval 类函数；通过后动态导入模块、注册函数到工具注册表。
+
+调用层——LLM 发起工具调用 → config_hub 匹配工具名 → 权限校验 → 执行函数 → 结果截断格式化 → 返回给 LLM。
+
+**Skill 技能包**：三级覆盖规则（全局 `/skills/` → 项目 `/config/skills/` → 用户 `~/.paeg/skills/`），高优先级覆盖低优先级。两阶段加载：启动阶段仅扫描 SKILL.md 头部 frontmatter 生成目录索引（轻量）；触发阶段命中时读取完整内容注入上下文。新增一个 Skill 只需新建文件夹写 SKILL.md，无需修改 Python 代码。
+
+**多模式切换：Profile Bundle 分层堆叠**。不同模式（标准/考试/陪伴）通过配置堆叠实现：基础默认配置 → Bundle 配置 → Profile 配置 → 用户自定义补丁逐层覆盖。切换流程：调用 `/api/mode/switch` → `permission.py` 重算可用工具/约束层级 → `config_hub` 更新对外暴露定义 → 后续新会话使用新模式配置，已有会话不受影响。典型例子是 exam 考试模式——禁用写文件/联网/上传工具，约束收紧到 L2，关闭情感陪伴，仅保留知识点讲解、题目解析、基础测评。
+
+#### 7.8.4 Subagent 的架构设计与接入
+
+**核心设计原则**：单一职责、上下文隔离、配置化模型、可插拔替换。每个子 Agent 只负责一件事，彼此独立。
+
+**Subagent 职责**（subagents.py 中为独立类，无共同基类——通过 paeg.py 持有引用统一调度）：
+
+| Subagent | 核心职责 | 输出形式 |
+|---|---|---|
+| Diagnostor（@877） | 学情诊断，定位知识缺口 | JSON：掌握水平、知识缺口、推荐深度 |
+| Planner（@928） | 制定教学步骤与策略 | JSON：步骤列表、每步目标、教学法 |
+| Presenter（@1045） | 知识点流式讲解 | SSE 分片文本流 |
+| Evaluator（@1599） | 掌握度评估 | JSON：得分、困惑点、调整建议 |
+| Adapter（@1857） | 教学策略调整 | JSON：下一步动作、风格切换 |
+| AffectionSupportor | 情感支持与危机识别 | 自然语言回复 + 危机标记 |
+| AnswerSolver | 直接输出答案 | 完整答案 + 解析 |
+| ResourceLibrarian | 知识库检索 | 相关知识片段 |
+| Individuality | 个体化（17 维画像） | 五维控制（语言/风格/深度/节奏/情绪） |
+
+**调度方式：主流程线性编排**（paeg.py `teach()` @ 240）。按教学阶段顺序实例化并调用对应 Subagent，数据单向流转：
+
+```text
+用户输入
+    ↓
+Diagnostor.run(问题, 学科, 学段) → 诊断结果
+    ↓
+Planner.run(诊断结果, 画像) → 教学步骤计划
+    ↓
+循环每一步：
+    Presenter.run(知识点) → 流式讲解输出
+    Checkpoint 等待学生反馈
+    Evaluator.run(讲解内容, 学生反馈) → 掌握度
+    Adapter.run(掌握度) → 调整决策（不达标时 Verify Gate 重讲）
+    ↓ 继续/重讲/进阶
+教学结束
+    ↓
+self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
+```
+
+**PTC-5 策略分派**：`paeg.teach()` 入口通过 `services.teach_strategy.get_strategy()` 注册表支持运行时替换主循环——默认 DefaultTeachStrategy 走原逻辑，注册其他策略可整体替换教学主循环（§3.44 PTC-1~5）。
+
+**模型配置化**：`config/agents.json` 为每个 Subagent 独立配置模型参数（provider/model/temperature/max_tokens/thinking_level）。`config_loader.py` 按「内置默认 → 项目配置 → 用户配置」三级合并，支持 `{env:MODEL_KEY}` 环境变量替换。不同职责匹配不同能力、不同成本的模型——重讲解用大模型，纯规则评估用小模型。
+
+**生命周期与钩子联动**：每个 Subagent 的 `run()` 执行前后自动触发钩子事件（`agent-start` 携带 runId/名称/开始时间；`agent-end` 携带 runId/耗时/状态/结果摘要），通过 `hooks_hub` 统一调度，用于日志审计、性能监控、结果后置处理，新增扩展逻辑无需修改 Subagent 代码。
+
+#### 7.8.5 一次完整请求的代码链路
+
+以「用户问什么是导数」为例：
+
+1. 前端 POST `/api/teach/stream` → server.py 接收请求，建立 SSE 连接
+2. 调用 `meta_router.route()` → 判定意图为 teach_concept
+3. 进入 `paeg.teach_stream()` 主流程（经 `services.teach_strategy` 策略分派）
+4. 实例化 Diagnostor，装配诊断提示词 → 调用 LLM → 返回诊断结果
+5. 实例化 Planner，传入诊断结果 → 生成教学计划（§3.62 LLM 动态规划）
+6. 循环每一步：实例化 Presenter，调用 `build_presenter_system()` 拼接完整提示词 → LLM 流式生成，60 字分片，通过 SSE 推送 → 发送 checkpoint 事件 → 学生提交反馈后 Evaluator 计算掌握度 → Adapter 输出调整策略
+7. 全部步骤完成，发送 done 事件
+8. 后台异步触发 `self_evolution.distill()`，提炼知识点，经 QualityGate 后入库热加载
 
 ## 附录 A 术语表
 
