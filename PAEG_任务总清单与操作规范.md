@@ -2548,6 +2548,18 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 - 渲染纪律（Mermaid dark 主题/表格边框/fitz 验证）
 - 渲染 PDF 保存项目目录 + 返回位置
 
-### 实施记录
+### 实施记录（完成 · 2026-08-18 · 5dc1796/8d6ba45）
 
-（完成后更新）
+**§7.8 代码与文件结构详解已融入技术说明文档**：
+- 5 小节：7.8.1 文件总览（blueprints/services/infra 拆分）/ 7.8.2 提示词拼接（build_presenter_system 9 层装配）/ 7.8.3 工具注册（四重安全 + Profile Bundle）/ 7.8.4 Subagent 架构（9 子代理 + PTC-5 策略分派）/ 7.8.5 完整请求链路
+- **准确反映真实代码**：修正参考内容错误（BaseSubagent 不存在/pedagogy 非类/blueprints 已完成但未提及/Skills 11 个）
+- 语言规范七项自查（主谓宾/词形完整/介词/状语）
+- 渲染纪律（28 mermaid 图 dark 主题/表格边框/fitz 验证）
+- **PDF v1.1.9 渲染**：48 页零泄漏，保存位置见交付
+- Alexandria 同步 + ModelScope 推送（8d6ba45）
+
+**交付**：
+- Markdown: 交付物/技术说明/PAEG技术说明.md（1421 行）+ Alexandria Bibliotheca/技术说明/
+- PDF: 交付物/技术说明/PAEG技术说明_v1.1.9.pdf（48 页零泄漏）
+- 已微信发送用户
+
