@@ -2589,4 +2589,14 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 
 ### 实施记录
 
-（完成后更新）
+1. **Oracle 咨询**（bg_b5656601）：C.9-C.13 五条亮点方案 + §7.9 技术栈章节设计（四小节：前端/后端/API+SSE 联通/部署）
+2. **explore 调研**（bg_5854ac15）：附录 C 现状（C.1-C.8）+ §7.1 能力全景 56 种 + 技术栈缺口确认 + 55 路由清单（32 主入口 + 23 蓝图）+ SSE 事件 16 种唯一（teach_stream 15 + chat_stream 5）
+3. **文档更新**（PAEG技术说明.md → v1.1.9）：
+   - 附录 C 追加 **C.9-C.13**：运行时 LLM 故障自愈链（§3.55/§3.60）/ LLM 动态教学规划+防幻觉双层兜底（§3.62）/ 教学进度状态机 teach_state（§3.61）/ 场景化教学用语参考库 PEDAGOGICAL_LANGUAGE（§3.64）/ 对象性×个体性四维达标评估（§3.66）
+   - 新增 **§7.9 技术栈与前后端联通**：§7.9.1 前端栈（单文件 SPA/marked/KaTeX/手写 SSE 解析器/MediaRecorder/Web Audio）/ §7.9.2 后端栈（Flask+flask-cors+ProxyFix/12 blueprints/SSE/SQLite+JSON/config_loader/llm_api+llm_adapter/MCP 6 server/hooks_hub/infra）/ §7.9.3 API 端点表（55 路由精选）+ SSE 事件表（16 种唯一）+ 前端消费要点 / §7.9.4 部署栈（本地/cloudflared/Docker/ModelScope/双远程/密钥/可观测）
+   - 顶部 v1.1.9 更新说明 + 目录更新（第 7 章 v1.1.9 + 附录 C C.1-C.13）+ §7.1 能力口径 56→60 对齐（与 §7.2 C1-C4 一致）
+4. **渲染验证**：v1.1.9 PDF **52 页 · 28 Mermaid SVG 矢量直出 · 零源码泄漏**（fitz 验证：围栏 0 / SVG 0 / HTML 0 / 表格分隔行 0；页 34-35 的 #目标 为 Roadmap 表格序号列 # 正常内容，非泄漏）
+5. **同步**：Alexandria Bibliotheca\技术说明\（md + PDF v1.1.9）
+6. **交付**：微信发送 PDF v1.1.9
+
+**保持 v1.1.9** ✅（新增内容未升版本号）
