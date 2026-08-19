@@ -1,4 +1,6 @@
-﻿# PAEG 教育智能体 — 简明技术说明（v1.1.8）
+﻿# PAEG 教育智能体 — 简明技术说明（v1.1.9）
+
+> **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
 > 面向项目所有者：快速恢复对 PAEG 技术实现的全貌认知。
 > 结构：TL;DR → 能力全景（每个功能：技术路线 + 实现方法）→ 分层架构 → 关键流程 → 扩展指南。
@@ -18,10 +20,10 @@
 - 第 5A 章 可扩展模块（框架化 · v0.70 ⭐）
 - 第 5B 章 DeepSeek Harness 借鉴蓝图（2026-08-14 调研 · 30 项中 27 项已落地）
 - 第 6 章 未来规划（Roadmap · Oracle 咨询 2026-08-14）
-- 第 7 章 能力全景与引用来源（v1.1.8）
+- 第 7 章 能力全景与引用来源（v1.1.9）
 - 附录 A 术语表
 - 附录 B 核心文件索引
-- 附录 C 技术创新亮点（v0.70 ⭐）
+- 附录 C 技术创新亮点（v0.70 ⭐ · C.1-C.13）
 - 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
 
 ---
@@ -903,11 +905,11 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 3. 多 agent 不换框架（复用 RALPH）；知识图谱先轻量本体（JSON）确认需求再上 Neo4j
 
 
-## 第 7 章 能力全景与引用来源（v1.1.8）
+## 第 7 章 能力全景与引用来源（v1.1.9）
 
-### 7.1 能力全景：56 种能力，一套路由
+### 7.1 能力全景：60 种能力，一套路由
 
-PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可增删，且不改核心代码**。当前共有 **56 种可调用能力**，分五层：
+PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可增删，且不改核心代码**。当前共有 **60 种可调用能力**：五层基础能力 56 种（见下），叠加 §7.2 能力增强的 4 项服务模块（C1-C4，SRS/知识图谱/语义检索/OCR），合计 60。
 
 - **常驻层（22 内置工具）**：web_search、verify_math、fetch_page 等直接调用的基础工具，常驻内存。
 - **配置层（14 标准 MCP 工具）**：normalize_text、constraint 六件套、generate_* 等经 config_hub 统一路由。
@@ -1286,6 +1288,96 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 7. 全部步骤完成，发送 done 事件
 8. 后台异步触发 `self_evolution.distill()`，提炼知识点，经 QualityGate 后入库热加载
 
+### 7.9 技术栈与前后端联通（v1.1.9 · 新增章节）
+
+> 本章把 PAEG 的技术栈分层讲清：前端（单文件 SPA）→ 后端（Flask + 12 蓝图）→ 联通协议（API 端点 + SSE 事件流）→ 部署链路。前后端同源部署（`API_BASE = ''`），默认同进程。
+
+#### 7.9.1 前端技术栈（09_GUI前端/ · 单文件 SPA）
+
+| 层 | 技术 | 角色 |
+|---|---|---|
+| 形态 | 单文件 `index.html`（5454 行，无构建步骤、无框架运行时） | 部署零依赖 |
+| 标记 | 原生 HTML5 + CSS3（无 Tailwind 等框架） | 语义化结构 + 暗色主题 |
+| 行为 | 原生 JavaScript + 事件委托 | 状态管理 / DOM 操作 |
+| Markdown | marked@12.0.2（本地优先 + jsdelivr CDN 兜底） | 流式增量解析 |
+| 数学 | KaTeX@0.16.9（同步渲染 + throwOnError 降级） | 行内/块级公式渲染 |
+| 流消费 | **手写 SSE 解析器**：`fetch` + `resp.body.getReader()` + `TextDecoder('utf-8')` 扫描 `event:` 行（120s 超时保护） | 流式接收 LLM 分片（不用 EventSource，超时可控） |
+| 语音输入 | MediaRecorder API（audio/webm;codecs=opus） | 录音→后端 STT |
+| 语音输出 | Web Audio API（`new Audio().play()`） | 播放 TTS MP3 |
+| 存储 | localStorage + 同源 API（`API_BASE = ''`） | 会话恢复 / 偏好记忆 |
+| 图标 | 内联 SVG（assets/icons/） | 无外部图标依赖 |
+
+#### 7.9.2 后端技术栈（05_实现原型/）
+
+| 层 | 技术 | 角色 |
+|---|---|---|
+| Web 框架 | Flask + flask-cors（CORS_ORIGINS，dev `*` / prod `PAEG_CORS_ORIGINS`） | 入口薄壳 server.py（app factory + 蓝图注册） |
+| 反向代理 | Werkzeug ProxyFix 包装 wsgi_app | 支持 Nginx/Caddy 反代 + HTTPS 头转发 |
+| 路由拆分 | **12 blueprints**：admin / chat / conversations / modes / proactive / quiz / resources / self_update / teaching / threads / uploads / voice（23 路由） | 按域独立维护 |
+| 主入口 | server.py 32 个 `@app.route`（含 teach_stream SSE） | 全系统共 **55 路由** |
+| 流式协议 | SSE（MIME `text/event-stream`；`X-Request-ID` + `Cache-Control: no-cache` 响应头） | LLM 分片推送 + 教学 checkpoint |
+| 数据 | SQLite（paeg.db）+ JSON 文件混合 | 用户/会话/教学记忆 → SQLite；画像/知识库 → JSON |
+| 配置 | config/ + config_loader.py（内置→项目→用户三级合并 + `{env:KEY}` 替换） | 改配置不改代码 |
+| LLM | llm_api.py 多 provider 抽象 + llm_adapter.py 运行时 failover（见 C.9） | DeepSeek / Qwen / OpenAI / Claude + Mock |
+| MCP | 6 server（filesystem/memory/fetch/git/brave-search/pptx）+ 14 标准工具 | 双向打通 |
+| 钩子 | hooks_hub.py（waterfall + matcher + repeat_guard + spill_guard） | 56 类事件 + LLM 输出后置矫正 |
+| 基础设施 | infra/（cache / checkpoint / watchdog / retry_policy / event_types） | 教学中间态 / LLM 重试 / 健康探测 |
+| 启动 | `app.run(host, port, debug=False, threaded=True)` + `start_mcp_server(port)` 旁路 | 前后端同进程 + MCP Server |
+
+#### 7.9.3 前后端联通：API 端点与 SSE 事件协议
+
+**联通骨架**：前端 POST `/api/teach/stream` → 后端 `meta_router` 路由 → `paeg.teach_stream()` 主流程 → LLM 流式生成 → SSE 事件推送 → 前端手写解析器按 `event:` 增量渲染。
+
+**代表性 API 端点**（全量 55 路由，此处列高频 + SSE + 关键管理类）：
+
+| 域 | 端点 | 协议 | 说明 |
+|---|---|---|---|
+| 教学 | `/api/teach/stream` | **SSE** | 教学主流程（diagnosis→plan→step→presentation→checkpoint→evaluation→adjustment→done） |
+| 教学 | `/api/teach` | POST | 同步教学 |
+| 聊天 | `/api/chat/stream` | **SSE** | 一般对话流（seg/tool/retrieval/doc/done） |
+| 语音 | `/api/voice/tts` · `/api/voice/stt` | POST | TTS 合成 / STT 识别 |
+| 模式 | `/api/mode/switch` · `/api/mode/list` | POST | Profile Bundle 重载 |
+| 资源 | `/api/resources` · `/api/upload` | POST | 资料检索 / 文件上传 |
+| 自进化 | `/api/self-update/run` · `/api/self-update/from-feedback` | POST | 自我更新 / 反馈→洞察 |
+| 管理 | `/api/admin/reload` · `/api/admin/health` | POST / GET | 配置热重载 / 健康检查 |
+
+**SSE 事件类型**（teach_stream 15 种 + chat_stream 5 种，去重后 16 种唯一事件）：
+
+| 事件 | 触发时机 | payload 关键字段 |
+|---|---|---|
+| `diagnosis` | 学情诊断 | 诊断结果 JSON |
+| `retrieval` | 知识库/联网检索 | 徽章信息 + subject |
+| `plan` | 教学计划 | steps + steps_left |
+| `step` | 单步开始 | step_id + status |
+| `presentation` | 讲解分片（60 字/片） | step_id + content + step_type |
+| `checkpoint` | 学生理解检查（暂停等反馈） | step_id + question + options |
+| `evaluation` | 掌握度评估 | score + confusion + mastery |
+| `adjustment` | 教学调整决策 | decision + action |
+| `reflection` | 反思日志 | 反思 JSON |
+| `self_update` | 自我更新触发 | history_size |
+| `summary` | 教学总结 | 总结 JSON |
+| `self_evolution` | 自我进化事件流 | events |
+| `doc` | 文档生成 | doc 事件 |
+| `seg` | 段落（off_topic 提示 / 一般对话） | text |
+| `tool` | 工具调用记录 | name + args |
+| `done` | 流终止 | status + resume_at_step |
+
+**前端消费要点**：chunk/presentation 事件用 marked 增量解析；checkpoint 事件暂停生成、收集反馈后 POST 续传；120s 读流超时保护防挂死。
+
+#### 7.9.4 部署技术栈
+
+| 通道 | 技术 | 说明 |
+|---|---|---|
+| 本地 | `python server.py`（:5000） | 开发/调试入口 |
+| 公网隧道 | cloudflared | 免配置 HTTPS——Web Speech API/MediaRecorder 的 HTTPS 前置条件 |
+| 容器化 | Docker + docker-compose（Dockerfile + ms_deploy.json） | apt 段装 ffmpeg/libcairo 等系统库 |
+| 模型托管 | ModelScope 创空间 | 镜像自动读 requirements.txt 构建；Secrets 配 `DEEPSEEK_API_KEY`（下划线） |
+| 双远程 | GitHub（API）+ ModelScope（git oauth2） | sync_check.py --fix |
+| 密钥 | 环境变量 + auth.json（opencode 兼容，不入库） | 0 硬编码 |
+| 可观测 | `/api/admin/health` + observability.py | 结构化日志 / 指标 / 事件流 |
+
+**关键约束**：公网部署必须经 cloudflared 或 TLS 终结（HTTPS 是 STT 前置条件）；Docker 依赖同步纪律见 §7.4；可选重依赖（torch / pix2tex）默认不装、缺失降级。
+
 ## 附录 A 术语表
 
 | 术语 | 含义 |
@@ -1406,6 +1498,35 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 
 - **subagent/descriptor**：构造时 9 核心 subagent + ResourceLibrarian 各一个；**tool-workflow/agent-start/end**：每个 .run() 前后成对（runId UUID 配对 + duration_ms），teach 直调与 workflow 路径双覆盖；hook/invoked/result 包裹钩子链——调试体验如翻阅剧本
 - **多级 skill**：~/.paeg/skills.json（用户级）+ {env:KEY|默认} 替换——用户级技能覆盖项目/全局
+
+### C.9 运行时 LLM 故障自愈链（v1.1.9 §3.55/§3.60 ⭐）
+
+- **启动时 fallback 链**（§3.55）：`llm_api.auto_detect_model_api` 按 PAEG_API_KEY → DEEPSEEK → Qwen/DASHSCOPE → Anthropic/OpenAI → auth.json → Mock 顺序探测，启动即定 provider
+- **运行时故障切换**（§3.60）：`llm_adapter.py` 持候选列表，401/403 → 立即 dead；429/5xx → cooldown 冷却退避；全部失败 → 抛 AllProvidersFailedError（含各 provider 失败原因）
+- **透明自愈**：模型挂了从"运维事故"变为"透明切换"——教学流不中断，日志记录切换轨迹（§7.6 讲启动时选 provider，本条讲运行时换 provider，两者互补）
+
+### C.10 LLM 动态教学规划 + 防幻觉双层兜底（v1.1.9 §3.62 ⭐）
+
+- **Planner 不再绑死模板**：LLM 基于完整上下文（学生原话/17 维画像/学段/进度 teach_state/上一步动作）实时生成 plan，scaffold 降为参考
+- **validate_plan 防幻觉**：schema 校验 + 完整性检查，不合格自动重生成（max_tokens 4000 + tool_calls 泄漏修复）
+- **双层兜底**：LLM 主生成失败/超时 → 静态策略（choose_strategy + build_plan_steps）保底，教学能力不因 LLM 异常而缺失
+
+### C.11 教学进度状态机（teach_state · v1.1.9 §3.61 ⭐）
+
+- **持久化四元组**：`teach_state_{learner_id}` 落盘 original_concept / completed_step_ids / history_summary / last_response_tail
+- **续讲识别**：`classify_topic_relation` 四分类（followup 续讲 / detour 岔路 / revisit 回顾 / off_topic 离题）+ topic_stack LRU——学生说"继续"即接上次《将进酒》逐句讲解
+- **学生原话全场景保留**：`_student_raw` 拼接回 prompt，续讲不丢原话上下文（§3.58 多轮游离处理闭环）
+
+### C.12 场景化教学用语参考库（PEDAGOGICAL_LANGUAGE · v1.1.9 §3.64 ⭐）
+
+- **5 类教学场景语言参考**：开课 / 衔接 / 检查理解 / 鼓励 / 收尾——不是硬约束，而是"参考风格库"
+- **装配位置**：`build_presenter_system()` 第 8 层，与 L0-L8 硬约束正交（§3.65 开场"自然承接"修正：保留昵称/画像/呼应，平衡对象性）
+
+### C.13 对象性 × 个体性四维达标评估（v1.1.9 §3.66 ⭐）
+
+- **四维评估矩阵**：专业（知识准确）/ 教学（教学法得当）/ 对象（回应具体学生）/ 个体（因材施教差异化）——全维度达标
+- **实测验证**：学生说"我喜欢看画面"→ 回应明显区别于匿名对话（17 维画像 + 学段联动 + 对象性元提示 + 个体化修正共同作用）
+- **机制保障**：不开"个体化"= 评分降级——从架构上杜绝"千人一面"
 
 ## 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
 
