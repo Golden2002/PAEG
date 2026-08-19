@@ -1085,6 +1085,18 @@ since:   <PAEG 版本号>
 **魔搭部署**：创空间"环境变量"配置 `DEEPSEEK_API_KEY`（或任一 fallback key），镜像无需改。
 **验证**：`python -m llm_api`（打印当前 provider + 真实回复）。
 
+**运行时故障切换**（§3.60 · 2026-08-18）：上述链只解决"启动时选哪个"；运行中 LLM 调用失败还需自动换轨道——`llm_adapter.AdapterLLM.chat()` 层 failover：
+
+| 机制 | 设计 |
+|---|---|
+| 候选列表 | `detect_model_candidates()` 返回有序候选（含 QWEN 扩展分支），按 `(base_url, key[:8])` 去重（env + auth.json 同 key 不重试）|
+| 错误分类 | `ModelError`：permanent(401/403) + `is_failoverable()`（401/403/429/5xx/网络可切；400/404/解析/内容过滤不切）|
+| 状态机 | 401/403 → 立即标记 dead；429/5xx → cooldown 60s；网络 → 试下一家 |
+| 全失败 | 抛 `AllProvidersFailedError(attempts)` 多行摘要——有真实 key 失败不静默 Mock |
+| 透传 | failover 循环透传全部 kwargs（含 tools）|
+
+**验证**（pytest 4 组）：401 → 切 qwen + 二次跳过 dead deepseek；429 → 冷却期内跳过 + 过期重试；全失败 → AllProvidersFailedError；400 → 不切换直接抛。**解决场景**：魔搭 DEEPSEEK(401 无效) + QWEN(有效) → 自动切 QWEN 成功教学。
+
 ### 7.7 教学进度延续 + LLM 动态规划（§3.61/§3.62 · 2026-08-18）
 
 > **背景**：用户实测"逐句讲解《将进酒》→ '继续' → 不延续进度（重讲/跑偏到练习）"。根因：teach_stream 每次把管线当新课程重跑，SESSIONS 无进度状态。
@@ -1112,6 +1124,17 @@ since:   <PAEG 版本号>
 - 将进酒逐句进度延续（R1原文→R2时代→R3开头四句）
 - give_example 平衡：古诗自然融入意象/数学具体举例（LLM 按学科取舍）
 - max_tokens 拉高：Presenter 4000 / 全局 4000（支持长文稿）
+
+**对象性 × 个体性四维评估**（§3.66 · 2026-08-18）：对照技术文档标准（对象意识 §3.9：自我描述 + infer_user_model 隐式推断；个体化亮点总览 §2.5：17 维画像 + inject_control 五层注入），实测教学对话四维全达标：
+
+| 维度 | 标准 | 实测 |
+|---|---|---|
+| 专业性 | 内容准确 | 李白/将进酒讲解准确 |
+| 教学性 | 完整教学结构 | 引入→概念→推进 |
+| 对象性 | 感知用户个体 | 昵称"小明" + 自述"喜欢画面"被尊重 |
+| 个体性 | 因材施教（同问题不同对待）| 视觉型→画面讲解 / 匿名→通用讲解，明显不同 |
+
+**关键证据**（"讲一讲将进酒"）：小明（自述"喜欢画面"）→"好的，小明，我们开始。你说你喜欢观察画面，那我们从画面进入…"；匿名 →"我们现在开始学习。你要学习的不是标签，而是真正会呼吸的诗人"。机制链：infer_user_model + infer_bdi + Individuality.run + inject_control + build_presenter_system 全链路注入（§3.65 开场"自然承接"修正：去客服腔但保留对象意识）。
 
 ### 7.8 代码与文件结构详解（§3.67 · 2026-08-18）
 
@@ -1501,32 +1524,23 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 
 ### C.9 运行时 LLM 故障自愈链（v1.1.9 §3.55/§3.60 ⭐）
 
-- **启动时 fallback 链**（§3.55）：`llm_api.auto_detect_model_api` 按 PAEG_API_KEY → DEEPSEEK → Qwen/DASHSCOPE → Anthropic/OpenAI → auth.json → Mock 顺序探测，启动即定 provider
-- **运行时故障切换**（§3.60）：`llm_adapter.py` 持候选列表，401/403 → 立即 dead；429/5xx → cooldown 冷却退避；全部失败 → 抛 AllProvidersFailedError（含各 provider 失败原因）
-- **透明自愈**：模型挂了从"运维事故"变为"透明切换"——教学流不中断，日志记录切换轨迹（§7.6 讲启动时选 provider，本条讲运行时换 provider，两者互补）
+LLM 调用失败无需人工重启——**启动时 fallback 链**（§3.55，多 provider 按优先级探测）+ **运行时故障切换**（§3.60，401/403→dead、429/5xx→冷却、全失败抛 AllProvidersFailedError）双层自愈，把"模型挂了"从运维事故变为透明切换。详见 §7.6。
 
 ### C.10 LLM 动态教学规划 + 防幻觉双层兜底（v1.1.9 §3.62 ⭐）
 
-- **Planner 不再绑死模板**：LLM 基于完整上下文（学生原话/17 维画像/学段/进度 teach_state/上一步动作）实时生成 plan，scaffold 降为参考
-- **validate_plan 防幻觉**：schema 校验 + 完整性检查，不合格自动重生成（max_tokens 4000 + tool_calls 泄漏修复）
-- **双层兜底**：LLM 主生成失败/超时 → 静态策略（choose_strategy + build_plan_steps）保底，教学能力不因 LLM 异常而缺失
+Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计划，`validate_plan` 防幻觉 + 静态策略双层兜底，教学能力不因 LLM 异常而缺失。详见 §7.7。
 
 ### C.11 教学进度状态机（teach_state · v1.1.9 §3.61 ⭐）
 
-- **持久化四元组**：`teach_state_{learner_id}` 落盘 original_concept / completed_step_ids / history_summary / last_response_tail
-- **续讲识别**：`classify_topic_relation` 四分类（followup 续讲 / detour 岔路 / revisit 回顾 / off_topic 离题）+ topic_stack LRU——学生说"继续"即接上次《将进酒》逐句讲解
-- **学生原话全场景保留**：`_student_raw` 拼接回 prompt，续讲不丢原话上下文（§3.58 多轮游离处理闭环）
+`teach_state_{learner_id}` 持久化进度四元组 + `classify_topic_relation` 续讲识别 + 学生原话 `_student_raw` 全场景保留——学生说"继续"即接上次逐句讲解。详见 §7.7。
 
 ### C.12 场景化教学用语参考库（PEDAGOGICAL_LANGUAGE · v1.1.9 §3.64 ⭐）
 
-- **5 类教学场景语言参考**：开课 / 衔接 / 检查理解 / 鼓励 / 收尾——不是硬约束，而是"参考风格库"
-- **装配位置**：`build_presenter_system()` 第 8 层，与 L0-L8 硬约束正交（§3.65 开场"自然承接"修正：保留昵称/画像/呼应，平衡对象性）
+5 类教学场景语言参考（开课/衔接/检查理解/鼓励/收尾）——参考风格库而非硬约束，拼入 `build_presenter_system()` 第 8 层，与 L0-L8 硬约束正交。装配见 §7.8.2。
 
 ### C.13 对象性 × 个体性四维达标评估（v1.1.9 §3.66 ⭐）
 
-- **四维评估矩阵**：专业（知识准确）/ 教学（教学法得当）/ 对象（回应具体学生）/ 个体（因材施教差异化）——全维度达标
-- **实测验证**：学生说"我喜欢看画面"→ 回应明显区别于匿名对话（17 维画像 + 学段联动 + 对象性元提示 + 个体化修正共同作用）
-- **机制保障**：不开"个体化"= 评分降级——从架构上杜绝"千人一面"
+专业/教学/对象/个体四维评估矩阵——实测全维度达标，同一问题对画像学生与匿名者明显不同对待，从架构上杜绝"千人一面"。详见 §7.7 四维评估小节。
 
 ## 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
 
