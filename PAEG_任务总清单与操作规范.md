@@ -2637,6 +2637,70 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 - 先 Oracle 咨询再写代码
 - 完成后验证 + 文档落盘
 
+### 设计方案（Oracle bg_bc07039e + 调研整合 · 2026-08-20）
+
+#### 1. 新 subagent：LessonPlanner（第 10 个，不替换现有链路）
+
+**职责边界**：与 Planner（即时教学计划）/ Presenter（单段讲解）区别——备课是**预先**产出整课时物料（45-90 分钟），LLM 强主导 + 三层质量门禁，**闭环外**运行（不调 teach() 任何子代理、不改画像、独立 token 预算 25000）。
+
+**输入输出契约**：
+- 入参：`LessonPlanInput{topic, subject, grade, duration_min, objectives, learner_profile, constraints, user_requested_assets, progressive}`
+- 出参：`LessonPlanOutput{meta, lesson_plan(教案JSON), handout, lecture_script, ppt_outline, video_script, mindmap, quality_report}`
+
+**分层产出（渐进式 8 步）**：教案骨架→确认→完整教案→讲义→讲稿→PPT 大纲→视频脚本→思维导图→一键生成 PPT/视频。`progressive=False` 时一次性全出。
+
+#### 2. 接线架构
+
+| 接线对象 | 方式 | 位置 |
+|---|---|---|
+| 教学物料工具 | 复用 material_pipeline.run_material_pipeline + /api/ppt/generate + /api/manim/generate + /api/teach/video + knowledge_map | server.py 端点 |
+| 动态约束 L0-L8 | constraint_engine 6 API 直调 + data/constraint_layers.json 加备课层 | prompts.py 复用 |
+| 语言规范 | lang_gate_content(out, context="lesson_prep:...") L0+L2 收口 | services/lang_gate.py |
+| system 拼接 | **复用 build_presenter_system 的 9 层部件**（不新建第 10 层函数）：_build_constraint_layers + _build_questionnaire_block + get_style + get_grade_mode + get_grade_scaffold | prompts.py |
+| 注册 | infra/subagent_registry.py 加 ("lesson_prep", LessonPrep, factory) + config/agents.json + SUBAGENT_THINKING_LEVELS | 注册层 ratchet |
+| 生命周期事件 | 复用 _subagent_run() 包裹（agent-start/end 钩子） | paeg.py |
+
+#### 3. 增强功能（Layer A-D）
+
+- **A 系统提示词层**：`LESSON_PLANNER_QUALITY_CRITERIA` 常量（教案六维 + 课件 6×6 法则 + 视频 3b1b 风格 + 思维导图规范），`build_lesson_planner_system()` 复用 Presenter 5 段结构 + 备课质量清单段（放最末段=最强约束）
+- **B 工具 hub 层**：`lesson_plan_check(plan)` 确定性质量检查器（无 LLM）+ `lesson_plan_template(framework)` 教案结构模板库（5E/UbD/ADDIE/BOPPPS）
+- **C 后置质量门禁**：生成后对照三层质量清单打分，维度 <60 自动重生成（最多 2 次），课件 >25 页或每页 >80 字触发拆分重排
+- **D 渐进式产出**：默认渐进（用户可控中断），独立 token 预算防烧钱
+
+#### 4. 魔法词路由
+
+- magic_intent.py（当前未接线，天然挂载点）加 5 个正则：`我要备课|帮我备课|开始备课|备课模式|准备上课|备课.{0,8}(主题|科目|这节|今天)` → `lesson_prep`
+- meta_router.py：VALID_INTENTS 加 lesson_prep + INTENT_TO_CAPABILITY_HINT + rule_fallback_intent 插入 magic 钩子（零 LLM 精确匹配）
+- server.py teach_stream 在 _try_file_operation 前加 lesson_prep fast-path（SSE 流式输出）
+- 快速开始文档（README/技术说明/维护手册）补"我要备课"示例 + 前端加"备课"按钮
+
+#### 5. 质量标准（三源融合：张宇扬课件 18 条 + 教育部课标/UbD/5E/Bloom + Mayer 12 原则）
+
+**教案标准（张宇扬 A1-A4 + 教育部 + UbD）**：三级层次结构、元学习指引（前置知识/目标/难度★评级）、双轨分流（核心/拓展*）、节末总结、三维目标可测动词、学情分析含迷思概念、重点难点各≥2+理由、6 环节（导入/新授/探究/巩固/小结/作业）四要素、板书左右区、反思≥3 条、评价与目标对齐
+
+**课件标准（张宇扬 + 6×6 + Mayer）**：一页一重点（≤6 行×≤6 词）、推导页左→右可视化、颜色编码一致（≤3 色）、对比度≥4.5:1、字号标题36-48/正文24-32、视觉焦点≥60%、Mayer 分段/标记/空间接近原则
+
+**视频脚本标准（3b1b + 张宇扬）**：8-15 秒/画面切换、每节 1 个 aha moment、公式逐步推导不跳结论、颜色编码（蓝正/红负/橙定义）、take-away 总结、真实数据场景例题
+
+**硬性检查清单（12 条）**：结构(三级标题+元指引+节末总结+双轨分流)、内容(每概念绑历史人物+第一手引用+跨学科连接+对比表+真实数据)、教学(名言开头+节末思考题+类比降门槛+公式前直觉+反例)、元信息(写作意图声明+负担透明+检测题答案参考文献)
+
+#### 6. 兼容守护（§3.61-§3.65）
+
+不读写 teach_state（独立 memory key lesson_plan:<uid>:<topic>）、不调 Planner.run()、不调 set_pending_overrides()、不调 render_pedagogical_language()、主动过 lang_gate（比教学链路更严格）、独立 _LESSON_PLAN_BUDGET_MAX=25000
+
+#### 7. 实施步骤（10 步，按 ratchet 最小破坏）
+
+1. magic_intent.py + meta_router.py 加"我要备课"钩子（改动最小可测）
+2. prompts.py 加 LESSON_PLANNER_QUALITY_CRITERIA + build_lesson_planner_system
+3. subagents.py 加 LessonPrep 类（_safe_reason_chat + lang_gate 收口）
+4. infra/subagent_registry.py + config/agents.json + SUBAGENT_THINKING_LEVELS 注册
+5. paeg.py 主类持有 self.lesson_prep
+6. server.py teach_stream 加 fast-path + /api/lesson-plan/stream 端点
+7. config/workflows/lesson_prep.json（复用 teach_materials 7 步骨架）
+8. 前端 index.html 加"备课"按钮 + 快速开始文档补示例
+9. tests/test_lesson_planner.py 端到端测试
+10. §3.69 实施记录 + audit_check + smoke_test + pytest 回归
+
 ### 实施记录
 
 （完成后更新）
