@@ -287,3 +287,28 @@
 {"hash": "3fc4c1580e292c44", "ts": "2026-08-09T21:15:47.855771", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent.prompt"}
 {"hash": "0d3ca65fb2210023", "ts": "2026-08-09T21:15:47.855771", "category": "knowledge_update", "priority": "P1", "target": "memory/PAEG_PEDAGOGY.md"}
 {"hash": "7d4f97f1955204d6", "ts": "2026-08-09T21:15:47.855771", "category": "error_pattern", "priority": "P2", "target": "subagents.SelfUpdateAgent"}
+{"hash": "f95792d79fcab3b1", "ts": "2026-08-15T23:56:05.142841", "category": "prompt_update", "priority": "P1", "target": "system_prompt / 通用教学指令"}
+{"hash": "d2b52a92e5f69aac", "ts": "2026-08-15T23:56:10.845333", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfEvolution"}
+{"hash": "a6cefb22353ff0f1", "ts": "2026-08-15T23:56:10.845333", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfUpdateAgent"}
+{"hash": "ca345b9009f4bc53", "ts": "2026-08-15T23:56:10.845333", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfEvolution (反思过滤提示词)"}
+{"hash": "c96295c7e3ba9d12", "ts": "2026-08-15T23:56:10.845333", "category": "tool_adjustment", "priority": "P2", "target": "ReflectionBuffer (反思输入校验器)"}
+{"hash": "cff5788ee460d431", "ts": "2026-08-16T02:46:35.739480", "category": "prompt_update", "priority": "P1", "target": "system_prompt (teaching_core)"}
+{"hash": "f41a9a8f8f8c676c", "ts": "2026-08-16T02:46:43.366910", "category": "error_pattern", "priority": "P1", "target": "subagents.ReflectionExtractor"}
+{"hash": "3bd3a7c947fbe733", "ts": "2026-08-16T02:46:43.366910", "category": "tool_adjustment", "priority": "P1", "target": "SelfEvolution.reflection_input_validator"}
+{"hash": "463f2f2271636630", "ts": "2026-08-16T02:46:43.366910", "category": "prompt_update", "priority": "P2", "target": "subagents.SelfUpdateAgent 的系统提示词（反思输入要求部分）"}
+{"hash": "7a69c5fcc2bf9319", "ts": "2026-08-16T02:46:43.366910", "category": "error_pattern", "priority": "P1", "target": "subagents.QualityGate"}
+{"hash": "eed1c9a41e10b9cb", "ts": "2026-08-16T02:46:43.366910", "category": "tool_adjustment", "priority": "P2", "target": "SelfEvolution.suggestions_pipeline（去重合并模块）"}
+{"hash": "c7d0a40af3e78921", "ts": "2026-08-16T03:21:08.697676", "category": "prompt_update", "priority": "P1", "target": "system prompt / 教学对话模板"}
+{"hash": "57ec150fdcd70461", "ts": "2026-08-16T03:21:13.259117", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfReflectionAgent"}
+{"hash": "4b2bc2dc8530099c", "ts": "2026-08-16T03:21:13.259117", "category": "prompt_update", "priority": "P1", "target": "subagents.SelfReflectionAgent"}
+{"hash": "c4c4568f0aca5447", "ts": "2026-08-16T03:21:13.259117", "category": "error_pattern", "priority": "P1", "target": "subagents.SelfReflectionAgent"}
+{"hash": "a9960f25fe017fbe", "ts": "2026-08-16T05:25:38.857003", "category": "prompt_update", "priority": "P1", "target": "system_prompt 教学指令段（PAEG_PEDAGOGY 相关章节）"}
+{"hash": "a4348b9bb286fb26", "ts": "2026-08-16T05:25:48.785025", "category": "error_pattern", "priority": "P0", "target": "subagents.SelfReflection"}
+{"hash": "559a327638c0e63d", "ts": "2026-08-16T05:25:48.785025", "category": "prompt_update", "priority": "P0", "target": "subagents.SelfReflection.prompt"}
+{"hash": "8e12f76af6fc947b", "ts": "2026-08-16T05:25:48.785025", "category": "error_pattern", "priority": "P1", "target": "subagents.QualityGate"}
+{"hash": "ffbfd44cf7c32deb", "ts": "2026-08-16T05:25:48.785025", "category": "tool_adjustment", "priority": "P1", "target": "subagents.SelfEvolution.extract_insights"}
+{"hash": "acd32ff1d6d71c05", "ts": "2026-08-16T05:25:48.785025", "category": "knowledge_update", "priority": "P1", "target": "memory/PAEG_PEDAGOGY.md"}
+{"hash": "4b8c1a5f406f764d", "ts": "2026-08-16T05:25:48.785025", "category": "tool_adjustment", "priority": "P2", "target": "subagents.SelfReflection.template_rotation"}
+{"hash": "ceebe1a61fec6a6a", "ts": "2026-08-16T05:36:56.163242", "category": "prompt_update", "priority": "P1", "target": "system_prompt（教学助手主提示词）"}
+{"hash": "b34217c9407e8cc6", "ts": "2026-08-16T05:36:59.549965", "category": "prompt_update", "priority": "P1", "target": "SelfEvolution.reflection_extraction_prompt"}
+{"hash": "c3c2a4c0a050cf5b", "ts": "2026-08-16T05:36:59.549965", "category": "knowledge_update", "priority": "P2", "target": "Library/KnowledgeBase/subjects/learning_tools.json"}

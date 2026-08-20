@@ -175,12 +175,14 @@ class TestMetaLogPersistence:
         assert "self._save()" in su, "append_reflection 必须落盘"
 
     def test_chat_path_uses_append_reflection(self):
-        """server.py chat 路径必须用 append_reflection（而非裸 history.append）。"""
-        srv = open(
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'server.py'),
-            encoding='utf-8').read()
-        # chat 路径（/api/chat/stream 附近）应调用 append_reflection
-        assert "append_reflection" in srv, "server.py 未用 append_reflection"
+        """chat 路径必须用 append_reflection（而非裸 history.append）。
+
+        v1.2.1 ⭐ 修复过期断言：chat 端点已随 §3.46.2 Phase 2 迁移至 blueprints/chat.py，
+        原断言检查 server.py（该符号早已不在）→ 改为检查真实调用点。
+        """
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'blueprints', 'chat.py')
+        src = open(path, encoding='utf-8').read()
+        assert "append_reflection" in src, "blueprints/chat.py 未用 append_reflection"
 
 
 # ---------------------------------------------------------------------------

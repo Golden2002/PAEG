@@ -105,8 +105,11 @@ def test_method_guides_are_not_just_physics_copy():
     assert customized_count >= 10, (
         f"仅 {customized_count}/{len(HIGH_FREQ_SUBJECTS)} 个学科的方法论含学科锚点术语"
     )
-    # 物理本身的指纹显然不同（防止误伤 physics 自身）
-    assert physics_fp != SUBJECT_STYLES["physics"]["method_guide"][:80]
+    # v1.2.1 ⭐ 修复测试自身缺陷：原断言为同一字符串自比
+    # （physics_fp 即 SUBJECT_STYLES["physics"]["method_guide"][:80]），恒为假。
+    # 正确语义：physics 的 method_guide 必须存在且非空（ratchet），
+    # 各学科"非 physics 复读"已由上方 customized_count >= 10 覆盖。
+    assert physics_fp.strip(), "physics 的 method_guide 不能为空（ratchet 铁律）"
 
 
 def test_existing_physics_method_guide_unchanged():

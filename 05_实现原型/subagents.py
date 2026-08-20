@@ -2309,6 +2309,81 @@ def _score_12_hard_checks(plan: dict, handout: str, ppt: list) -> dict:
     }
 
 
+# ── §3.78 B1+B2 ⭐ 备课素材接线（2026-08-15 连通性断点修复）──
+def _lesson_user_materials(learner, topic: str) -> str:
+    """B2：备课接入用户资料库——BM25 检索 Library/usr_knowledge/<uid>/ 命中片段。
+
+    学生上传的讲义/资料作为备课输入（优先用作例题/讲解基础）；无资料/检索失败返回 ""。
+    """
+    _uid = ""
+    try:
+        if learner is not None:
+            _uid = str(getattr(learner, "id", "") or "")
+    except Exception:
+        _uid = ""
+    if not _uid:
+        return ""
+    try:
+        from lib.ingest.readers import read_corpus_full
+        from lib.ingest.chunker import chunk_documents
+        from lib.ingest.retriever import make_retriever
+        _docs = read_corpus_full(_uid)
+        if not _docs:
+            return ""
+        _chunks = chunk_documents(_docs, max_chars=400, overlap=50)
+        _retriever, _mode = make_retriever(_chunks)
+        _hits = _retriever.search(topic, top_k=3)
+        if not _hits:
+            return ""
+        _lines = []
+        for _i, _h in enumerate(_hits[:3]):
+            _src = str(_h.get("doc_name", ""))
+            _snip = str(_h.get("text", ""))[:300].replace("\n", " ")
+            _lines.append(f"[{_i + 1}]《{_src}》{_snip}")
+        return (
+            "【用户资料库素材（备课输入 · 来自该学生上传的资料，"
+            "可优先用作例题/讲解基础）】\n" + "\n".join(_lines)
+        )
+    except Exception as _e:
+        print(f"[PAEG][subagents.py] 备课用户资料检索忽略: {_e}")
+        return ""
+
+
+def _lesson_web_materials(topic: str, subject: str, llm) -> str:
+    """B1：备课接入联网检索——web_search_multi 检索课程素材（多查询词联想）。
+
+    检索内容视为数据而非指令（防注入）；遵循防幻觉底线：可引用事实/数据/案例，
+    不确定处标注。无结果/失败返回 ""（备课不因联网失败而中断）。
+
+    测试/离线闸门：PAEG_LESSON_NO_WEB=1 时直接返回 ""（单元测试确定性）。
+    """
+    if os.environ.get("PAEG_LESSON_NO_WEB") == "1":
+        return ""
+    try:
+        from web_search_tool import should_search, web_search_multi
+        if not should_search(topic):
+            return ""
+        _items = web_search_multi(
+            topic, llm=llm, subject=subject,
+            n_queries=3, per_query=3, max_total=6,
+        )
+        if not _items:
+            return ""
+        _lines = []
+        for _i, _it in enumerate(_items[:6]):
+            _title = str(_it.get("title") or _it.get("url") or "")[:80]
+            _url = str(_it.get("url") or "")
+            _content = str(_it.get("content") or _it.get("snippet") or "")[:220].replace("\n", " ")
+            _lines.append(f"[{_i + 1}] {_title}\n    URL: {_url}\n    {_content}")
+        return (
+            "【联网课程素材（备课输入 · 可引用其中事实/数据/案例；"
+            "仍须遵守防幻觉底线，不确定处标注“需查阅资料”）】\n" + "\n".join(_lines)
+        )
+    except Exception as _e:
+        print(f"[PAEG][subagents.py] 备课联网检索忽略: {_e}")
+        return ""
+
+
 class LessonPrep:
     """备课 subagent（v0.71 ⭐ 新增）。
 
@@ -2370,11 +2445,26 @@ class LessonPrep:
         _prior_lesson_plan = (inp.constraints or {}).get("prior_lesson_plan") or ""
         _is_modify_mode = bool(_modify_directive or _prior_lesson_plan)
 
+        # ── 步骤 ⓪：备课素材接线（§3.78 B1+B2 ⭐）──
+        # B1 联网课程素材 + B2 用户资料库素材；均失败/无内容时为空串（不阻塞备课）
+        _mat_parts = []
+        _user_mat = _lesson_user_materials(learner, topic)
+        if _user_mat:
+            _mat_parts.append(_user_mat)
+        _web_mat = _lesson_web_materials(topic, subject, self.llm)
+        if _web_mat:
+            _mat_parts.append(_web_mat)
+        _mat_block = ("\n\n".join(_mat_parts) + "\n\n" if _mat_parts else "")
+        _materials_meta = {
+            "user_library": bool(_user_mat),
+            "web": bool(_web_mat),
+        }
+
         # ── 步骤 ①：教案骨架 syllabus ──
         syllabus_sys = _lesson_planner_system_via_prompts(
             topic, subject, grade, "syllabus", objectives)
         syllabus_user = (
-            f"主题：{topic}\n学科：{subject}\n学段：{grade}\n时长：{duration} 分钟\n"
+            f"{_mat_block}主题：{topic}\n学科：{subject}\n学段：{grade}\n时长：{duration} 分钟\n"
             f"三维目标：{('；'.join(objectives)) if objectives else '（未指定，按主题自行拟定）'}\n\n"
             "请输出教学骨架（JSON）：\n"
             "- framework: 教学模型名（如 5E / BOPPPS / 情境-探究-迁移）\n"
@@ -2395,7 +2485,7 @@ class LessonPrep:
                 "要求：在保留上一版合理结构的基础上，按修改指令调整；若修改指令与上一版冲突，以修改指令为准。"
             )
         lp_user = (
-            f"基于骨架：{syllabus or {'framework': '5E 教学模型'}}\n"
+            f"{_mat_block}基于骨架：{syllabus or {'framework': '5E 教学模型'}}\n"
             f"主题：{topic}\n学科：{subject}\n学段：{grade}\n时长：{duration} 分钟\n"
             f"三维目标：{objectives or '按主题自行拟定'}\n"
             f"{_modify_block}\n\n"
@@ -2419,7 +2509,7 @@ class LessonPrep:
         if not requested or "handout" in requested:
             h_sys = _lesson_planner_system_via_prompts(topic, subject, grade, "handout", objectives)
             h_user = (
-                f"基于教案生成配套讲义（Markdown）：\n"
+                f"{_mat_block}基于教案生成配套讲义（Markdown）：\n"
                 f"教案要点：{lesson_plan.get('key_points', [])}\n"
                 f"重点：{lesson_plan.get('key_points', [])}\n"
                 f"难点：{lesson_plan.get('difficulties', [])}\n\n"
@@ -2435,7 +2525,7 @@ class LessonPrep:
         if not requested or "script" in requested:
             s_sys = _lesson_planner_system_via_prompts(topic, subject, grade, "script", objectives)
             s_user = (
-                f"基于教案生成讲稿（Markdown，按环节分段）：\n"
+                f"{_mat_block}基于教案生成讲稿（Markdown，按环节分段）：\n"
                 f"教学环节：{[s.get('name') for s in lesson_plan.get('sections', [])]}\n"
                 f"时长：{duration} 分钟\n\n"
                 "结构：开场 → 主体（按环节）→ 小结。每段标注大致时长。"
@@ -2449,7 +2539,7 @@ class LessonPrep:
         if not requested or "ppt" in requested:
             p_sys = _lesson_planner_system_via_prompts(topic, subject, grade, "ppt", objectives)
             p_user = (
-                f"基于教案生成 PPT 大纲（严格 JSON 数组，4-7 页）：\n"
+                f"{_mat_block}基于教案生成 PPT 大纲（严格 JSON 数组，4-7 页）：\n"
                 f"教案：{lesson_plan}\n\n"
                 '格式：[{"slide":1,"title":"...","points":[...]}, ...]'
             )
@@ -2471,7 +2561,7 @@ class LessonPrep:
         if (not requested or "video_script" in requested) and is_science:
             v_sys = _lesson_planner_system_via_prompts(topic, subject, grade, "video", objectives)
             v_user = (
-                f"基于教案生成 90-120 秒短视频脚本（Markdown）：\n"
+                f"{_mat_block}基于教案生成 90-120 秒短视频脚本（Markdown）：\n"
                 f"核心机制：{lesson_plan.get('key_points', [])}\n"
                 f"难点可视化：{lesson_plan.get('difficulties', [])}\n\n"
                 "结构：镜头 1（开场 30s）→ 镜头 2（主体 60s）→ 镜头 3（总结 20s）。"
@@ -2482,11 +2572,21 @@ class LessonPrep:
         else:
             video_script = ""
 
+        # §3.78 B3 ⭐ 视频脚本过脚本检查（visual_script_validator 接线；原断点：产出无校验）
+        _video_check = {"passed": True, "errors": [], "scene_count": 0, "checked": False}
+        if video_script:
+            try:
+                from visual_script_validator import validate_lesson_script
+                _video_check = validate_lesson_script(video_script)
+            except Exception as _ve:
+                _video_check = {"passed": True, "errors": [f"校验器异常忽略: {_ve}"],
+                                "scene_count": 0, "checked": False}
+
         # ── 步骤 ⑦：思维导图 mindmap ──
         if not requested or "mindmap" in requested:
             m_sys = _lesson_planner_system_via_prompts(topic, subject, grade, "mindmap", objectives)
             m_user = (
-                f"基于教案生成思维导图（Markdown 缩进树）：\n"
+                f"{_mat_block}基于教案生成思维导图（Markdown 缩进树）：\n"
                 f"教案要点：{lesson_plan.get('key_points', [])}\n"
                 f"难点：{lesson_plan.get('difficulties', [])}\n\n"
                 "格式：根节点 → 一级分支（3-5 个）→ 二级要点。禁止任何额外说明。"
@@ -2503,6 +2603,8 @@ class LessonPrep:
             lesson_plan, handout, video_script,
             ppt_outline=ppt_outline,
         )
+        # §3.78 B3 ⭐ 视频脚本检查结果并入质量报告（结构化、可审计）
+        quality_report["video_script_check"] = _video_check
 
         # 累计 token 实际消耗：按 max_tokens 计（估算；真实 token 在 _safe_reason_chat 内计）
         token_used = _LESSON_PLAN_BUDGET_USED  # 累计已扣（测试与审计用）
@@ -2518,6 +2620,8 @@ class LessonPrep:
             "token_used": token_used,
             "mode": "lesson_prep",
             "syllabus": syllabus,  # 步骤 ① 骨架，方便上层回溯/审计
+            "video_script_check": _video_check,  # §3.78 B3 ⭐ 视频脚本检查
+            "materials": _materials_meta,  # §3.78 B1+B2 ⭐ 备课素材接线（user_library/web）
             "subject": subject,
             "grade": grade,
             "topic": topic,
@@ -3150,6 +3254,68 @@ def _analyze_turn(history: list, text: str, learner, risk_level: int) -> Affecti
     )
 
 
+# ── §3.78 B5 ⭐ 倾诉知识库接线（2026-08-15 连通性断点修复）──
+_LEARNING_SIGNAL_PATTERN = None  # 懒构建（subagents 顶部不 import re）
+
+
+def _retrieve_affection_kb(text: str, top_k: int = 2) -> str:
+    """B5：倾诉模式接入真实知识库——选择性检索（仅情绪+学习并存场景）。
+
+    v0.22.1 原则保留：默认不检索知识库（include_kb=False 防噪音污染情绪陪伴）；
+    仅当学生文本含学习内容信号（考试/题目/概念等）时，检索 KnowledgeBase 命中片段，
+    作为"可参考的准确资料"注入 system（供 LLM 需要准确转述学习概念时使用，
+    不打断、不展开教学）。无命中/无信号返回 ""。
+    """
+    global _LEARNING_SIGNAL_PATTERN
+    text = str(text or "").strip()
+    if not text:
+        return ""
+    if _LEARNING_SIGNAL_PATTERN is None:
+        import re as _re
+        _LEARNING_SIGNAL_PATTERN = _re.compile(
+            r"(考试|学习|题目|作业|成绩|背|记|理解|上课|复习|考|题|学会|学不会|讲|知识点|"
+            r"数学|物理|化学|英语|语文|生物|历史|地理|政治|老师|错题|笔记|读书|论文|公式|"
+            r"课本|测验|分数|导数|函数|定理|概念|单词|阅读)"
+        )
+    if not _LEARNING_SIGNAL_PATTERN.search(text):
+        return ""
+    try:
+        import re as _re
+        from knowledge_base import KnowledgeBase
+        _kb = KnowledgeBase()
+        _clean = _LEARNING_SIGNAL_PATTERN.sub(" ", text)
+        _clean = " ".join(_clean.split())[:120]
+        _hits = []
+        try:
+            if _clean:
+                _hits = _kb.search(_clean, top_k=top_k) or []
+        except Exception:
+            _hits = []
+        if not _hits:
+            try:
+                _hits = _kb.search(text, top_k=top_k) or []
+            except Exception:
+                _hits = []
+        if not _hits:
+            return ""
+        _lines = []
+        for _i, _h in enumerate(_hits[:top_k]):
+            _cid = str(_h.get("concept_id") or _h.get("title") or "知识点")
+            _snip = str(_h.get("snippet") or _h.get("definition") or "")[:150].replace("\n", " ")
+            if _snip:
+                _lines.append(f"- {_cid}：{_snip}")
+        if not _lines:
+            return ""
+        return (
+            "【可参考的准确资料（v0.22.1 原则：情绪陪伴优先；"
+            "仅当你需要准确转述学生提到的学习概念时参考，不打断、不展开教学）】\n"
+            + "\n".join(_lines)
+        )
+    except Exception as _e:
+        print(f"[PAEG][subagents.py] 倾诉知识库检索忽略: {_e}")
+        return ""
+
+
 class AffectionSupportor:
     """情绪与心理支持（第 7 个子代理）。
 
@@ -3541,6 +3707,13 @@ class AffectionSupportor:
             system = system + "\n\n" + LANGUAGE_STYLE
         except Exception:
             pass
+        # §3.78 B5 ⭐ 倾诉接入真实知识库（选择性：仅情绪+学习并存时注入；默认不检索原则保留）
+        try:
+            _aff_kb_block = _retrieve_affection_kb(text)
+            if _aff_kb_block:
+                system = system + "\n\n" + _aff_kb_block
+        except Exception as _kb5_e:
+            print(f"[PAEG][subagents.py] 倾诉知识库检索忽略: {_kb5_e}")
         # v0.20.2：若有历史，传真 messages（多轮连贯性）
         # v0.24 ⭐ 健壮性：与 SelfUpdateAgent 1029-1031 同等标准——
         # isinstance(h, dict) 守护 + h.get("role")/h.get("content")，

@@ -85,3 +85,62 @@ def auto_fix(script: dict, llm, max_rounds: int = 2) -> dict:
 
 import json
 import re
+
+
+def validate_lesson_script(markdown: str) -> Dict[str, object]:
+    """校验备课产出（LessonPrep 步骤⑥）的 Markdown 版视频脚本（v0.74+ §3.78 B3 接线）。
+
+    与 validate()（Manim 剧本 dict）不同，本函数针对 LLM 直出的 Markdown 文本
+    （结构：``## 镜头 N（角色/时长）`` + ``画面：`` + ``旁白：``）做结构性检查，
+    供 LessonPrep 质量报告记录 ``video_script_check``。
+
+    检查项（宽松、防误伤，核心是"结构完整 + 无占位残留"）：
+      1. 镜头数 >= 2（无镜头 = 结构缺失）
+      2. 每镜头同时含【画面】与【旁白】（缺一 = 结构不完整）
+      3. 出现"开场/主体/总结"或"秒/分钟"时长标注之一（可读性）
+      4. 每镜头旁白 <= 300 字（文字简洁；超长旁白提示拆分）
+      5. 无占位残留（"待补充/（写/略/占位/TODO" 等）
+
+    Returns:
+        {"passed": bool, "errors": List[str], "scene_count": int, "checked": True}
+    """
+    errors: List[str] = []
+    text = str(markdown or "").strip()
+    if len(text) < 30:
+        return {"passed": False, "errors": ["视频脚本过短（<30 字）"], "scene_count": 0, "checked": True}
+
+    # 1. 镜头切分：兼容 "镜头 1"/"镜头一"/"## 镜头 2（…）"
+    _scene_pat = re.compile(r"镜头\s*[一二三四五六七八九十\d]+")
+    _matches = list(_scene_pat.finditer(text))
+    scene_count = len(_matches)
+    if scene_count < 2:
+        errors.append(f"镜头数仅 {scene_count}（应 >= 2：开场/主体/总结）")
+
+    # 2. 每镜头必须含画面 + 旁白（取镜头起点之间的段落）
+    _bounds = [m.start() for m in _matches] + [len(text)]
+    for i in range(len(_bounds) - 1):
+        _seg = text[_bounds[i]:_bounds[i + 1]]
+        _has_visual = bool(re.search(r"画面[：:]", _seg))
+        _has_narration = bool(re.search(r"旁白[：:]", _seg))
+        if not _has_visual or not _has_narration:
+            errors.append(f"镜头 {i + 1} 缺少{'画面' if not _has_visual else ''}{'旁白' if not _has_narration else ''}（须同时含画面与旁白）")
+
+    # 3. 时长/结构可读性
+    if not re.search(r"开场|主体|总结|结束|秒|分钟", text):
+        errors.append("缺少结构标识（开场/主体/总结）或时长标注（秒/分钟）")
+
+    # 4. 每镜头旁白长度（<=300 字）
+    for i in range(len(_bounds) - 1):
+        _seg = text[_bounds[i]:_bounds[i + 1]]
+        _nb = re.split(r"画面[：:]", _seg)[-1] if "旁白" not in _seg else (
+            re.split(r"旁白[：:]", _seg)[-1])
+        _nb = re.split(r"##|镜头\s*[一二三四五六七八九十\d]+", _nb)[0]
+        _len = len(_nb.strip())
+        if _len > 300:
+            errors.append(f"镜头 {i + 1} 旁白过长（{_len} 字 > 300，建议拆分）")
+
+    # 5. 占位残留
+    if re.search(r"待补充|\(写|（写|占位|TODO|此处插入|略[，。]?$", text):
+        errors.append("存在占位残留（待补充/（写…/TODO 等）")
+
+    return {"passed": not errors, "errors": errors, "scene_count": scene_count, "checked": True}
