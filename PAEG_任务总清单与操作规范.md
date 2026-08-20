@@ -2703,4 +2703,25 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 
 ### 实施记录
 
-（完成后更新）
+**全部完成（2026-08-20）**
+
+1. **Oracle 设计**（bg_bc07039e）：LessonPlanner 第 10 subagent 完整设计（职责边界/输入输出契约/接线架构/增强功能四层/魔法词路由/兼容守护）
+2. **调研**：explore 张宇扬课件 18 条质量标准（结构4/内容6/教学法5/元信息3）；explore PAEG 接线点盘点（magic_intent 未接线是天然挂载点）；librarian 优秀教案标准（教育部课标/UbD/ADDIE/5E/Bloom/Mayer 12 原则/Khanmigo 分块法）
+3. **代码落地**（全部验证通过）：
+   - **subagents.py**：LessonPrep 类（184 LOC，8 步渐进式生成器：教案骨架→完整教案→讲义→讲稿→PPT大纲→视频脚本(理科)→思维导图→质量检查）+ LessonPlanInput dataclass；独立 token 预算 25000；_safe_reason_chat + lang_gate_content 收口；静态模板兜底；_score_lesson_plan 确定性打分
+   - **prompts.py**：LESSON_PLANNER_QUALITY_CRITERIA（教案6维/课件6×6/视频脚本/12条硬性检查）+ build_lesson_planner_system（复用 build_presenter_system 9 层部件，不新建第 10 层）+ is_lesson_plan_input_valid
+   - **config/agents.json**：lesson_prep 配置块（temp 0.7/max_tokens 4000/thinking A）
+   - **SUBAGENT_THINKING_LEVELS**：lesson_prep: A
+   - **magic_intent.py**：5 个备课魔法词正则（我要备课/帮我备课/开始备课/备课模式/准备上课 + 主题后缀变体）→ lesson_prep 零 LLM 直达
+   - **infra/subagent_registry.py**：注册 lesson_prep（10 subagent，5 测试全绿）
+   - **meta_router.py**：VALID_INTENTS 加 lesson_prep + INTENT_TO_CAPABILITY_HINT + INTENT_PROMPT 15→16 + rule_fallback_intent 魔法钩子（危机之后 greeting 之前，22 测试无回归）
+   - **paeg.py**：self.lesson_prep 持有（9 个现有 subagent intact）
+   - **server.py**：/api/teach/stream 备课 SSE fast-path（event: lesson_plan/handout/script/ppt_outline/video_script/mindmap/quality_report/done，优先级 crisis→emotion→备课→file→steer→teaching）
+   - **blueprints/teaching.py**：/api/teach 同步 fast-path（jsonify 对称版）
+   - **tests/test_lesson_prep.py**：12 个测试全绿（类/质量标准/系统提示词/校验/魔法词/路由/注册/持有/预算/键集/兜底/质量报告）
+   - **README.md**：备课模式说明 + 快速开始示例
+4. **回归**：test_subagent_registry + test_routing_v024 27 passed；test_lesson_prep 12 passed；魔法词端到端 5/6（"什么是导数"→chat 为无 LLM 兜底既有行为，关键验证普通教学不被备课误拦截 PASS）；audit_check 39/40（1 个既有 P0 gen_unknown 静默异常，与备课无关）；smoke_test 11/13（2 个为环境 LLM key/线程超时，非代码问题）
+5. **快速开始**：README 新增备课模式章节（含 8 步渐进式产出示例 + 质量标准说明 + 独立预算说明）
+
+**保持 v1.1.9**：备课功能作为新能力加入，未升版本号
+

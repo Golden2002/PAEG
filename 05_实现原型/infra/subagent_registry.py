@@ -69,7 +69,7 @@ class Registry:
         reg.register('presenter', MyPresenter)  # 自定义替换内置
     """
 
-    # 任务约定的 9 个 subagent name（与 config/agents.json 的 keys 对齐）
+    # 任务约定的 10 个 subagent name（与 config/agents.json 的 keys 对齐；§3.69 lesson_prep）
     BUILTIN_NAMES: tuple = (
         "diagnostor",
         "planner",
@@ -80,6 +80,7 @@ class Registry:
         "affection_supportor",
         "individuality",
         "resource_librarian",
+        "lesson_prep",
     )
 
     def __init__(self, agents_config: Optional[dict] = None):
@@ -175,12 +176,14 @@ class Registry:
         from subagents import (
             Diagnostor, Planner, Presenter, Evaluator, Adapter,
             AnswerSolver, AffectionSupportor, Individuality, ResourceLibrarian,
+            LessonPrep,
         )
 
         # (name, cls, factory)
         # - 5 个用 (llm, kb) 位置参数
         # - 3 个无参构造（cls()）
         # - 1 个 ResourceLibrarian 用 keyword（model=, kb=）
+        # - 1 个 LessonPrep 用 (llm, kb) 位置参数（§3.69）
         specs = [
             ("diagnostor", Diagnostor, lambda llm, kb, _c, _C=Diagnostor: _C(llm, kb)),
             ("planner", Planner, lambda llm, kb, _c, _C=Planner: _C(llm, kb)),
@@ -197,6 +200,8 @@ class Registry:
             #                                 kb=knowledge_base)
             ("resource_librarian", ResourceLibrarian,
              lambda llm, kb, _c, _C=ResourceLibrarian: _C(model=llm, kb=kb)),
+            # LessonPrep.__init__(self, llm, kb)（§3.69 lesson_prep，与 presenter 同形态）
+            ("lesson_prep", LessonPrep, lambda llm, kb, _c, _C=LessonPrep: _C(llm, kb)),
         ]
 
         for name, cls, factory in specs:

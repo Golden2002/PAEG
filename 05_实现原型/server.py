@@ -607,9 +607,39 @@ def teach_stream():
     except Exception as _e:
         print(f"[PAEG] teach_stream 情绪支持钩子跳过: {_e}")
 
+    # §3.69 ⭐ 备课子代理 fast-path：magic 词命中 → 8 步生成器流式输出
+    # 优先级链：crisis → emotion → lesson_prep → file → steer → teaching
+    # rule_fallback_intent 优先吃"我要备课/帮我备课"/"备课导数"等零 LLM 直达路径。
+    try:
+        from meta_router import rule_fallback_intent as _rfi
+        _rfi_res = _rfi(str(concept)[:120])
+        if _rfi_res.get("intent") == "lesson_prep" and paeg.lesson_prep is not None:
+            from subagents import LessonPlanInput
+            _lpi = LessonPlanInput(
+                topic=str(concept)[:80], subject=str(subject or "通用"),
+                grade=getattr(learner, "grade_level", "high_school"),
+                duration_min=45, objectives=[], learner_profile={},
+                constraints={}, user_requested_assets=[], progressive=True,
+            )
+            _lp_res = paeg.lesson_prep.run(_lpi, learner=learner, progressive=True)
+
+            def gen_lp():
+                _save_teach_turn("lesson_prep", json.dumps(_lp_res, ensure_ascii=False)[:500])
+                yield f"event: lesson_plan\ndata: {json.dumps(_lp_res.get('lesson_plan', {}), ensure_ascii=False)}\n\n"
+                for k in ("handout", "script", "ppt_outline", "video_script", "mindmap", "quality_report"):
+                    payload = _lp_res.get(k)
+                    if payload:
+                        yield f"event: {k}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'lesson_prep', 'token_used': _lp_res.get('token_used', 0)}, ensure_ascii=False)}\n\n"
+            return Response(gen_lp(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except Exception as _lp_e:
+        print(f"[PAEG] lesson_prep fast-path 跳过: {_lp_e}")
+        pass
+
     # v0.43 ⭐ P0-D 文件能力扩展：教学模式同样支持用户文件 4 能力
     # （找答案/讲解/输出原文/重组结构——"按我上传的讲义讲X"等触发）。
-    # 优先级：危机/情绪 > 文件操作 > 学科 Steering > 常规教学。
+    # 优先级：危机/情绪 > 备课 > 文件操作 > 学科 Steering > 常规教学。
     _file_resp = _try_file_operation(learner_id, concept, llm)
     if _file_resp is not None:
         return _file_resp
@@ -742,7 +772,7 @@ def teach_stream():
             _rel = _follow.get("relation", "followup")
             if _rel == "followup":
                 # 追问：复用上轮主题 + 注入 action 指令
-                # §3.62 ⭐ 保留学生原话（_student_raw 入口原话最可靠）——只传主题名会丢学生意图
+                # §3.62 ⭐ 保留学生原话（_student_raw）+ action 指令双注入（LLM 明确执行）
                 _orig_user_input = _student_raw or str(concept).strip()[:120]
                 concept = str(_prev_concept)
                 if _orig_user_input and _orig_user_input not in concept:
@@ -750,6 +780,8 @@ def teach_stream():
                 _inst = ACTION_INSTRUCTIONS.get(_follow.get("action", ""), "")
                 if _inst:
                     setattr(learner, "_follow_instruction", _inst)
+                    # §3.62 ⭐ 双保险：action 指令也拼入 concept（Presenter 一定看到）
+                    concept = f"{concept}\n[{_inst}]"
                 _llm_intent = _prev_intent
                 _llm_conf = _follow.get("confidence", 0.5)
             elif _rel == "detour":

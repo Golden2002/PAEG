@@ -326,6 +326,7 @@ VALID_INTENTS = {
     "interface",      # is_interface_query       (界面操作) — server.py
     "ppt",            # is_ppt_request           (PPT/演示文稿生成) — 本文件新增
     "study_plan",     # is_study_plan_intent     (制定学习计划) — v0.68 新增
+    "lesson_prep",    # is_lesson_prep_intent   （备课生成）— §3.69 新增
     "answer",         # 知识问答/直接回答（无规则函数，纯 LLM 判断）
     "chat",           # 闲聊（无规则函数，纯 LLM 判断）
 }
@@ -339,6 +340,8 @@ INTENT_TO_CAPABILITY_HINT = {
                     "auto_tools": ["verify_math", "mcp__filesystem__web_search"]},
     "study_plan":  {"plan_default": "study_plan_workflow",
                     "auto_tools": ["run_workflow__teach_minimal"]},
+    "lesson_prep": {"plan_default": "lesson_preparation",
+                    "auto_tools": ["run_material_pipeline", "mcp__manim__generate", "api_teach_video"]},
     "knowledge_map": {"plan_default": "generate_map",
                       "auto_tools": ["load_skill__knowledge-map"]},
     "ppt":         {"plan_default": "ppt_workflow",
@@ -353,7 +356,7 @@ INTENT_TO_CAPABILITY_HINT = {
                     "auto_tools": ["mcp__filesystem__web_search"]},
 }
 
-INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务：阅读用户输入，判断它属于下面 15 个意图中的哪一类，**只返回该意图的变量名**（如 "teach" / "interface"），不要做其他任何事。
+INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务：阅读用户输入，判断它属于下面 16 个意图中的哪一类，**只返回该意图的变量名**（如 "teach" / "interface"），不要做其他任何事。
 
 【意图类型定义（每个类型是什么、边界在哪）】
 - teach: 教学请求——用户要开始学习/继续学习/讲解某个学科概念（"教我法语""什么是导数""继续""下一题""讲解这个语法"）。注意：问"概念是什么"但目的是理解 → teach；只是要一句话结论 → answer。
@@ -364,6 +367,7 @@ INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务�
 - recommend: 工具/软件/书/资源推荐——用户要"推荐/用什么好"（"学法语用什么软件""推荐几本英语书"）。
 - method: 学习方法论/认知策略（"怎么记单词""如何高效学习""怎么复习"）。注意：method 是**单次**方法建议；若用户要的是**完整学习计划**（分阶段+资源+时长），应归 study_plan。
 - study_plan: 制定学习计划——用户对某领域感兴趣，想要一份**系统的学习计划**（"我对量子力学感兴趣想系统学习""帮我制定学习计划""想从零学英语该怎么做规划""三个月学会Python""给我一份考研复习计划"）。特征：明确表达**长期/系统/分阶段/规划**的意图。与 method 的区别：method 是"怎么学"的一次性建议，study_plan 是"完整的阶段+资源+时间安排"。
+- lesson_prep: 备课生成——用户要准备一节课的完整教学物料（教案/讲义/讲稿/PPT大纲/视频脚本/思维导图），触发如"我要备课"/"帮我备一下高中物理导数课"；区分 study_plan=学习计划（学生学习路径），lesson_plan=教学设计（老师备课）。
 - emotion: 情绪表达/倾诉/心理支持（"学不下去了""太难了想放弃""我很焦虑"）。
 - problem: 出题/测验/练习（"出10道题""考考我""来道练习"）。
 - meta: 纯身份问题——关于"我是谁"（"你是谁""你叫什么""你是什么"）。注意：**"你能做什么/有什么功能/怎么用"不是 meta**，是 interface（问能力/功能/使用）。
@@ -385,6 +389,9 @@ INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务�
 - "帮我制定一份考研数学学习计划" → study_plan（制定学习计划），不是 method
 - "想从零基础学英语，给我做个规划" → study_plan（学习规划），不是 method
 - "怎么高效背单词" → method（单次方法建议），不是 study_plan
+- "我要备课" → lesson_prep（老师备课），不是 teach
+- "帮我备一下高中物理导数课" → lesson_prep（备课生成），不是 study_plan
+- "我对量子力学感兴趣想系统学习" → study_plan（学生学习），不是 lesson_prep
 - "我学过什么" → knowledge（清点知识库），不是 teach
 - "画个知识框架图" → knowledge_map（思维导图），不是 teach
 - "把这些资料做成PPT" → ppt（生成演示文稿），不是 teach
@@ -396,7 +403,7 @@ INTENT_PROMPT = """你是 PAEG 教育智能体的意图路由器。你的任务�
 {text}
 
 【输出要求】只输出严格 JSON（不要 markdown 代码块、不要任何其他文字）：
-{"intent": "上面 15 个变量名之一", "confidence": 0.0-1.0, "reason": "简短中文原因"}
+{"intent": "上面 16 个变量名之一", "confidence": 0.0-1.0, "reason": "简短中文原因"}
 """
 
 _INTENT_CACHE_V2 = {}
@@ -470,6 +477,14 @@ def rule_fallback_intent(text: str) -> dict:
         res = guard_input(t)
         if res and res.get("blocked") and "self_harm" in (res.get("reason") or []):
             return {"intent": "emotion", "confidence": 0.95, "reason": "rule:emergency"}
+    except Exception:
+        pass
+    # §3.69 ⭐ 备课口令精确匹配（零 LLM）：magic_intent 第一档钩子
+    try:
+        from magic_intent import match_magic
+        _m = match_magic(t)
+        if _m and _m.get("intent") == "lesson_prep":
+            return {"intent": "lesson_prep", "confidence": 0.95, "reason": "rule:magic_lesson_prep"}
     except Exception:
         pass
     if is_greeting(t):
