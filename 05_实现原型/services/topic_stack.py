@@ -47,11 +47,17 @@ def find(history: List[dict], concept: str) -> Optional[dict]:
 
 
 def recover(history: List[dict], concept: str) -> List[dict]:
-    """revisit 恢复：把命中的主题移到栈顶（cursor 语义），不删除。"""
+    """revisit 恢复：把命中的主题移到栈顶（cursor 语义），不删除。
+
+    §3.79 Round 10 ⭐ 防御式修复：entry 可能无 concept_id（调用方原始 dict 入栈），
+    原 `x["concept_id"]` 硬下标会在生产 revisit 时 KeyError（被外层 except 静默吞掉
+    → 绕回功能实际失效）。改用 .get()，无 id 时按 concept 名匹配。
+    """
     e = find(history, concept)
     if e is None:
         return list(history)
-    h = [x for x in history if x["concept_id"] != e["concept_id"]]
+    _eid = e.get("concept_id") or ("noid:" + str(e.get("concept", "")))
+    h = [x for x in history if (x.get("concept_id") or ("noid:" + str(x.get("concept", "")))) != _eid]
     h.append(e)
     return h
 

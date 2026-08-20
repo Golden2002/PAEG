@@ -1117,6 +1117,20 @@ class Presenter:
                 )
             else:
                 teaching_line = f"\n## 本节认知层级：{bloom}\n"
+            # §3.79 Round 10 ⭐ 意图约束注入（detour 绕出 / revisit 绕回）：LLM 必须知道
+            # 学生处于哪种会话路径，才能正确回应（不把"绕出去"当主题切换、不把
+            # "绕回来"当新概念重头讲）。用后即清（单轮消费）。
+            try:
+                _detour_note = getattr(learner, "_detour_note", "") or ""
+                _revisit_note = getattr(learner, "_revisit_note", "") or ""
+                if _detour_note:
+                    teaching_line = teaching_line + f"\n## 会话路径（detour 绕出）\n{_detour_note}\n"
+                    setattr(learner, "_detour_note", "")
+                if _revisit_note:
+                    teaching_line = teaching_line + f"\n## 会话路径（revisit 绕回）\n{_revisit_note}\n"
+                    setattr(learner, "_revisit_note", "")
+            except Exception:
+                pass
             # §3.79 ⭐ 概念图谱接线（孤儿 concept_graph → 教学）：前驱/后继概念指令注入
             # （与 prereq_graph 的 KB 提取互补：本处用内置种子图谱，零依赖兜底）
             try:

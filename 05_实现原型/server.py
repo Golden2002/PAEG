@@ -1227,12 +1227,22 @@ def _teach_stream_gen(data):
                 _llm_conf = _follow.get("confidence", 0.5)
             elif _rel == "detour":
                 # 游离新话题：当前主题入栈 → 新话题作为 concept（subject 由 steering 处理）
+                # §3.79 Round 10 ⭐ 增强：入栈带 summary（供 revisit 接续）+ detour 约束注 LLM
                 _hist = _stack_push(_hist, {"concept": str(_prev_concept),
                                             "subject": str(data.get("subject", "")),
-                                            "intent": _prev_intent, "summary": "", "ts": 0.0})
+                                            "intent": _prev_intent,
+                                            "summary": str(_prev_concept)[:30],
+                                            "ts": time.time()})
                 SESSIONS[f"concept_history_{learner_id}"] = _hist
                 _llm_intent = None  # 新主题走正常教学路由
                 _llm_conf = 0.0
+                try:
+                    setattr(learner, "_detour_note",
+                            f"学生从「{str(_prev_concept)[:30]}」暂时绕到当前话题："
+                            f"先完整回应新话题；若表达自然，结尾可轻提一句"
+                            f"『如果想继续之前的内容，我们可以随时回去』，不强迫。")
+                except Exception:
+                    pass
             elif _rel == "revisit":
                 # 绕回历史话题：从主题栈恢复
                 _target = _follow.get("target_concept") or str(concept)
@@ -1246,6 +1256,15 @@ def _teach_stream_gen(data):
                     if _student_raw and _student_raw not in concept:
                         concept = f"{concept}——学生追问：{_student_raw}"
                     concept = _hit.get("concept")
+                    # §3.79 Round 10 ⭐ 增强：revisit 接续指令（上次主题摘要注入 LLM）
+                    _prev_summary = str(_hit.get("summary") or "")[:30]
+                    try:
+                        setattr(learner, "_revisit_note",
+                                (f"学生绕回之前学的「{_hit.get('concept', '')}」"
+                                 + (f"（上次讲到这里：{_prev_summary}）" if _prev_summary else "")
+                                 + "：先简要衔接上次内容，再继续推进，不要重头重复。"))
+                    except Exception:
+                        pass
                 _llm_intent = _prev_intent
                 _llm_conf = _follow.get("confidence", 0.5)
             elif _rel == "off_topic":
