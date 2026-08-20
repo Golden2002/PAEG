@@ -927,8 +927,8 @@ def teach_stream():
                     "可以在顶部切换到「闲聊~」模式；或者我们继续学当前内容。")
                 try:
                     setattr(learner, "_off_topic_hint", _off_topic_hint)
-                except Exception:
-                    pass
+                except Exception as _ot:
+                    print(f"[PAEG][§3.58-TOPIC] off_topic_hint 设置失败: {_ot}", file=sys.stderr, flush=True)
         except Exception as _fe:
             print(f"[PAEG][§3.58-TOPIC] 判定失败回退: {_fe}", file=sys.stderr, flush=True)
             _follow = None
