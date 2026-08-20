@@ -142,12 +142,23 @@ def render_manim(code: str, scene_class: str = None, quality: str = '-qm',
             scene_class = m.group(1) if m else 'Scene'
         cmd = [_MANIM_CLI, 'render', quality, '--media_dir', temp_dir,
                code_file, scene_class]
-        result = subprocess.run(cmd, capture_output=True, text=True,
-                                cwd=temp_dir, timeout=timeout, shell=False)
+        # §3.79 Round 4 ⭐ 运维修复：Windows 下 manim 输出含 UTF-8 中文/转义码，
+        # 默认 GBK 解码会 UnicodeDecodeError → 指定 utf-8（errors=replace 兜底），
+        # 并禁用 text 模式的 locale 猜测（encoding='utf-8' 显式传入）
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True,
+                                    encoding='utf-8', errors='replace',
+                                    cwd=temp_dir, timeout=timeout, shell=False)
+        except UnicodeDecodeError:
+            # 极老 Python 不支持 encoding 参数：降级 bytes 手动解码
+            result = subprocess.run(cmd, capture_output=True,
+                                    cwd=temp_dir, timeout=timeout, shell=False)
+            result.stdout = result.stdout.decode('utf-8', errors='replace')
+            result.stderr = result.stderr.decode('utf-8', errors='replace')
         if result.returncode != 0:
             return None, result.stderr[-500:]
-        # 定位输出
-        for q in ('480p15', '720p30', '1080p60'):
+        # 定位输出：-qml/-ql/-qm/-qh/-qk 对应 480p15/720p30/1080p60/1440p60/2160p60
+        for q in ('480p15', '720p30', '1080p60', '1440p60', '2160p60'):
             cand = os.path.join(temp_dir, 'videos', os.path.basename(code_file).replace('.py', ''),
                                 q, f'{scene_class}.mp4')
             if os.path.exists(cand):

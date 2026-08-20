@@ -1,3 +1,30 @@
+### v1.2.16 §3.79 数学视频/manim 真实渲染 + 学习计划 format 修复 + 孤儿归零（2026-08-21 ⭐）
+
+**本版定位**：Round 4——"视频/数学视频生产真实联通"实证（用户重点）、E2E 找茬暴露的确定性 bug 修复、孤儿模块归零。
+
+**数学视频/manim 真实渲染 ✅（probe 实证）**：
+- `probe_manim_video.py`：AST 安全校验（危险 import 拒绝/Scene+construct 必需）→ 真实渲染 → **mp4 落盘 4s/h264/854x480/15fps**
+- **运维 bug 修复**：`render_manim` 的 `subprocess.run(text=True)` 未指定 encoding → Windows GBK 解码 manim UTF-8 输出 UnicodeDecodeError（reader 线程崩溃）→ 显式 `encoding='utf-8', errors='replace'` + 旧 Python 降级 bytes 解码
+- **质量档修复**：输出目录匹配扩至 5 档（480p15…2160p60，对应 -ql/-qm/-qh/-qp/-qk；此前漏 -ql 对应）
+- 新增 `test_round14_manim_video.py` 5 测守卫（含 mock subprocess 验证 encoding 参数）
+
+**E2E 找茬暴露的确定性 bug 修复 ✅**：
+- `[PAEG][method.py] 学习计划分流异常: unsupported format string passed to dict.__format__`——`planner.design_phases` 对 `subjects_mastery` 值做 `f"{v:.2f}"`，但画像掌握度数据结构不统一（float vs 嵌套 dict）→ dict 值触发异常使整条学习计划链路静默回退
+- 修复：`_fmt_mastery` 鲁棒格式化（dict 取 level、float 格式化、str 直显、异常回退 "?"）
+- 新增 `test_round14_study_plan.py` 4 测守卫（含 dict 掌握度下 design_phases 不异常）
+
+**孤儿模块归零 ✅**：`production_pipeline.py`（零调用方，与 material_pipeline 重叠）归档至 `归档_废弃副本/`——连通矩阵孤儿从 7 → 0。
+
+**E2E 脚本改进 ✅**：`send_and_wait` 等待 SSE done（此前只等消息数 → 教学流 40-90s 未完成时下一条 Enter 被当作打断，6 连假超时）；前端 done 事件置 `window.__e2eDone` 观测钩子。
+
+**E2E 找茬发现并修复的真实 bug（Round 4 增量）**：
+- **前端 UX bug**：done 事件到达后发送按钮仍"■ 停止"（收尾的蒸馏/hooks 仍在流中）→ 学生发下一条被拦截"正在生成上一条回复"——修复：done 即 `_hideStopBtn`（teach + chat 两处），收尾后台进行
+- E2E 复跑 12 过 4 失败：残余失败为 **LLM 延迟/限流环境噪声**（30 req/min 窗口内 11 个 LLM 用例 + 单 teach 内部 4-8 次 LLM 调用；诊断证实 429 来自 PUT profile 自动保存与 intent/infer；手动验证 teach 完整含 done 35s）——D1 LLM 延迟遗留项
+
+**验证**：Round 4 新增 9/9 + 早退管线 5/5 + 全量回归绿（817）。
+
+**文档**：CHANGELOG + 技术说明 C.28 + 任务清单 NEW-32 + 维护手册 §18.69 + 技术全景 §10.21
+
 ### v1.2.15 §3.79 物料真实产出抽查修复 + 孤儿接线(3→1) + 前端 429/500 UX（2026-08-21 ⭐）
 
 **本版定位**：Round 3——物料生产"真实联通+质量上乘"实证（用户重点）、孤儿模块接线收尾、遗留前端错误 UX 修复。

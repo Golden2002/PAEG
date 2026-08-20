@@ -180,6 +180,28 @@ def _estimate_weekly_hours(learner) -> float:
     return 6.0
 
 
+def _fmt_mastery(v) -> str:
+    """掌握度值鲁棒格式化（§3.79 Round 4 修复：值可能是 float/dict/str）。
+
+    画像 subjects_mastery 的数据结构不统一——有的学科是 float(0.8)，
+    有的是嵌套 dict({'level': 0.8, ...})。`f"{v:.2f}"` 对 dict 抛
+    `unsupported format string passed to dict.__format__`（真实 bug，
+    method 学习计划分流因此异常回退）。统一归一：dict 取 level 字段，
+    其余尽力转 float，失败回退 "?"。
+    """
+    try:
+        if isinstance(v, dict):
+            _lv = v.get("level")
+            if isinstance(_lv, (int, float)):
+                return f"{float(_lv):.2f}"
+            return str(v)[:20]
+        if isinstance(v, (int, float)):
+            return f"{float(v):.2f}"
+        return str(v)[:20]
+    except Exception:
+        return "?"
+
+
 def extract_plan_inputs(text: str, learner, subject: str = "") -> PlanInputs:
     """从输入 + 画像抽取计划参数。
 
@@ -293,7 +315,7 @@ def design_phases(inputs: PlanInputs, resources: List[Resource],
     _skill = _load_study_planner_skill()
     _grade = getattr(learner, "grade_level", "high_school")
     _mastery = getattr(learner, "subjects_mastery", None) or {}
-    _mastery_str = "、".join(f"{k}:{v:.2f}" for k, v in list(_mastery.items())[:5]) or "未知"
+    _mastery_str = "、".join(f"{k}:{_fmt_mastery(v)}" for k, v in list(_mastery.items())[:5]) or "未知"
 
     system = (
         "你是 Émile Novis，一位精通教育学的学习规划师。请为学习者设计一份学习计划的阶段内容。\n"
