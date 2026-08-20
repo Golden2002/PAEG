@@ -1,3 +1,20 @@
+### v1.2.11 §3.79 教学意图解读增强（detour 绕出/revisit 绕回约束）+ §3.8 标准（2026-08-20 ⭐）
+
+**本版定位**：用户"教学模式要格外注重学生需求和意图解读——stick/绕出/绕回/持续深入，Agent 必须正确约束大模型增强其能力，而不是让大模型变傻"。
+
+**§3.8 教学意图解读标准（写入总需求）**：四类会话路径标准表（stick/followup 深化、detour 绕出、revisit 绕回、off_topic）+ 约束要求 + 执行标准。
+
+**现状盘点 ✅**：§3.58 TOPIC 4 分类路由已接线（followup 深化指令 + detour 入栈 + revisit 恢复 + off_topic 引导）；topic_stack 已被消费（连通矩阵"半活"标记为误标）。
+
+**增强实施 ✅（真实缺口修复）**：
+- **detour（绕出）**：入栈带 **summary**（供后续接续）+ 设 `learner._detour_note`（"学生从 X 暂时绕到 Y：先完整回应新话题，若自然轻提可随时回去"）→ Presenter system 注入（**LLM 明确知道学生在绕出**），用后即清
+- **revisit（绕回）**：注入 `_revisit_note`（"学生绕回之前学的 X（上次讲到这里：summary）：先简要衔接上次内容再继续推进，不要重头重复"）→ Presenter system 注入
+- **topic_stack.recover 防御式修复**：原 `x["concept_id"]` 硬下标在原始 dict 入栈场景（生产 detour）会 KeyError 被外层静默吞掉 → **revisit 功能实际失效**；改 .get() 兜底
+
+**验证**：`test_round10_intent_paths.py` 6 测试全绿（detour/revisit 注入 + summary 恢复 + 防御式 recover）+ 全回归 192 全绿。
+
+**文档**：CHANGELOG + 总需求 §3.8 + 技术说明 C.23 + 维护手册 §18.64 + 任务清单 NEW-27
+
 ### v1.2.10 §3.79 学段特征输出守门 + 物料部分请求评分修复（2026-08-20 ⭐）
 
 **本版定位**：承接 Round 8 质量验证结论——LLM 对学段特征遵循度参差（考研样本 0/3）→ 实施"输出特征守门"；物料部分请求评分口径修复。
