@@ -4951,15 +4951,17 @@ since:   <PAEG 版本号>
 
 ### 孤儿模块（已实现未接线）
 
-| 孤儿 | 类型 | 唯一引用 |
-|---|---|---|
-| srs_sm2.py（间隔重复） | 行 | tests/test_srs_sm2.py |
-| concept_graph.py（概念图） | 列 | tests/test_concept_graph.py |
-| production_pipeline.py（内容生产） | 列 | 零调用方（与 material_pipeline 重叠） |
-| condition_eval.py（条件启停） | 列 | tests/test_condition_enable.py |
-| agent_scope.py（子代理作用域） | 列 | tests/test_agent_scope.py |
-| agent_trirole.py（子代理契约） | 列 | tests/test_agent_trirole.py |
-| platform_dual_track.py（平台双轨） | 列 | tests/test_platform_dual_track.py |
+> **§3.79（2026-08-20）✅ 更新**：`srs_sm2.py`（间隔重复）已接线——`services/srs_service.py` 复用其 SM-2 纯函数，教学评估达标入队 + `/api/srs/status` + `/api/srs/review`。孤儿剩 6 个。
+
+| 孤儿 | 类型 | 唯一引用 | §3.79 状态 |
+|---|---|---|---|
+| srs_sm2.py（间隔重复） | 行 | tests/test_srs_sm2.py | ✅ 已接线（srs_service + /api/srs/*，见技术说明 C.20） |
+| concept_graph.py（概念图） | 列 | tests/test_concept_graph.py | ⏳ 待接线 |
+| production_pipeline.py（内容生产） | 列 | 零调用方（与 material_pipeline 重叠） | ⏳ 待评估（与 material_pipeline 合并或废弃） |
+| condition_eval.py（条件启停） | 列 | tests/test_condition_enable.py | ⏳ 待接线 |
+| agent_scope.py（子代理作用域） | 列 | tests/test_agent_scope.py | ⏳ 待接线 |
+| agent_trirole.py（子代理契约） | 列 | tests/test_agent_trirole.py | ⏳ 待接线 |
+| platform_dual_track.py（平台双轨） | 列 | tests/test_platform_dual_track.py | ⏳ 待接线 |
 
 ## §3.77.2 完整行列清单（39 行 × 55 列）
 

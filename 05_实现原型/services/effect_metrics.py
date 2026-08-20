@@ -125,52 +125,109 @@ def compute_retention_rate(window_days: int = 30) -> Dict[str, Any]:
 # ─────────────────────────────────────
 # 2. 学习者坚持率（30 天）
 # ─────────────────────────────────────
+def _user_activity_span(profile_dir: str):
+    """从 users_data/<uid>/conversations.json 提取该用户活跃时间跨度（首/末消息 ts）。
+
+    Returns: (first_ts, last_ts) 或 None（无 conversations.json / 无 ts）。
+    """
+    _cf = os.path.join(profile_dir, "conversations.json")
+    if not os.path.isfile(_cf):
+        return None
+    try:
+        with open(_cf, "r", encoding="utf-8", errors="ignore") as _fh:
+            _data = json.load(_fh)
+        _ts: List[float] = []
+        _convs = _data.get("conversations") if isinstance(_data, dict) else _data
+        if isinstance(_convs, list):
+            for _c in _convs:
+                _msgs = _c.get("messages") if isinstance(_c, dict) else []
+                if isinstance(_msgs, list):
+                    for _m in _msgs:
+                        _t = _m.get("ts") if isinstance(_m, dict) else None
+                        if isinstance(_t, (int, float)):
+                            _ts.append(float(_t))
+        if not _ts:
+            return None
+        return (min(_ts), max(_ts))
+    except Exception:
+        return None
+
+
 def compute_persistence_rate(window_days: int = 30) -> Dict[str, Any]:
     """学习者坚持率（30 天）。
 
-    数据：users_data/*/profile.json 的 mtime（画像更新 = 活跃信号）。
-    代理口径（单点 mtime 限制）：窗口内活跃画像中，"后 14 天仍活跃"的占比——
-    反映"持续使用"而非严格队列保留；严格队列（首段活跃∩末段仍活跃）
-    需多时间点活跃历史（history.jsonl 首末消息时间），下轮增强。
+    数据：users_data/*/（profile.json + conversations.json）。
+    算法（升级版）：
+      1. **严格队列**（首选）：conversations.json 首末消息时间——
+         30 天窗口前 15 天首次活跃的用户中，后 15 天仍活跃（末消息在后半段）的占比
+      2. 代理回退：无 conversations.json 时用 profile.json mtime（后 14 天仍活跃占比）
 
-    Returns: {value, status, target, note, window_active, recent_active}
+    Returns: {value, status, target, note, cohort, retained, window_active, recent_active}
     """
     _dir = _p("users_data")
     if not os.path.isdir(_dir):
         return {"value": None, "status": "no_data", "target": 0.7,
-                "note": "users_data 不存在", "window_active": 0, "recent_active": 0}
+                "note": "users_data 不存在", "cohort": 0, "retained": 0,
+                "window_active": 0, "recent_active": 0}
     _now = _now_ts()
     _window_start = _now - window_days * 86400
     _mid = _now - (window_days // 2) * 86400
+    # 严格队列：首活跃在前半段 ∧ 末活跃在后半段
+    _cohort: List[str] = []
+    _cohort_retained: List[str] = []
+    # 代理：profile mtime 窗口活跃
     _window_active: List[str] = []
     _recent_active: List[str] = []
     try:
         for _root, _dirs, _files in os.walk(_dir):
-            for _f in _files:
-                if _f != "profile.json":
-                    continue
-                _fp = os.path.join(_root, _f)
-                try:
-                    _mt = os.path.getmtime(_fp)
-                except Exception:
-                    continue
-                if _mt >= _window_start:
-                    _window_active.append(_fp)
-                    if _mt >= _mid:
-                        _recent_active.append(_fp)
+            if "profile.json" not in _files:
+                continue
+            _uid = os.path.basename(_root)
+            # 代理信号（mtime）
+            _pf = os.path.join(_root, "profile.json")
+            try:
+                _mt = os.path.getmtime(_pf)
+            except Exception:
+                _mt = 0
+            if _mt >= _window_start:
+                _window_active.append(_root)
+                if _mt >= _mid:
+                    _recent_active.append(_root)
+            # 严格队列信号（conversations 首末消息）
+            _span = _user_activity_span(_root)
+            if _span is not None:
+                _first, _last = _span
+                if _window_start <= _first < _mid:
+                    _cohort.append(_uid)
+                    if _last >= _mid:
+                        _cohort_retained.append(_uid)
     except Exception:
         pass
+    # 优先严格队列（有队列样本才用）
+    if _cohort:
+        return {
+            "value": round(len(_cohort_retained) / len(_cohort), 3),
+            "status": "strict_cohort",
+            "target": 0.7,
+            "note": "严格队列：前 15 天首次活跃用户中后 15 天仍活跃占比（conversations 首末消息）",
+            "cohort": len(_cohort),
+            "retained": len(_cohort_retained),
+            "window_active": len(_window_active),
+            "recent_active": len(_recent_active),
+        }
     if not _window_active:
         return {
             "value": None, "status": "no_data", "target": 0.7,
             "note": f"窗口 {window_days} 天无活跃画像，无法计算（数据积累中）",
+            "cohort": 0, "retained": 0,
             "window_active": 0, "recent_active": 0,
         }
     return {
         "value": round(len(_recent_active) / len(_window_active), 3),
         "status": "proxy_recent_activity",
         "target": 0.7,
-        "note": "代理口径：窗口内活跃画像中后 14 天仍活跃占比（严格队列需多时间点历史，下轮增强）",
+        "note": "代理口径（无 conversations 首末消息）：窗口内活跃画像中后 14 天仍活跃占比",
+        "cohort": 0, "retained": 0,
         "window_active": len(_window_active),
         "recent_active": len(_recent_active),
     }

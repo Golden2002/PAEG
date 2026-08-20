@@ -1804,3 +1804,17 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 **验证**：`tests/test_round4_manifest_token.py` 7 测试全绿 + 回归 155 全绿。
 
+### C.20 间隔重复接线 + PII 脱敏 + 严格队列（v1.2.6 §3.79 ⭐）
+
+**间隔重复复习计划（孤儿 srs_sm2 接线，教学效果）**：
+- `services/srs_service.py`：SM-2 复习卡持久化（users_data/<uid>/srs.json 原子写）——`add_card`（教学评估达标入队，q=5/4）/ `due_cards`（到期卡 due<=today）/ `review_card`（SM-2：答对间隔 1→6→×EF，答错重置）
+- `paeg.py` 教学循环：evaluation `ready_to_advance` → `add_card(uid, question, subject)`（score≥0.8→q=5，否则 q=4）
+- 端点：`GET /api/srs/status`（due/total）+ `POST /api/srs/review`（{learner_id, concept, quality}）
+- 复用原孤儿纯函数 `services/srs_sm2.sm2_review`（Anki SM-2 标准）——连通矩阵孤儿 7→6
+
+**C5 PII 字段级脱敏（合规）**：`services/privacy.py` `mask_pii`——手机号（138****8000）/邮箱（test***@domain）/18 位身份证/长数字串；`/api/parent/conversations` 消息预览与标题应用脱敏（P0-9 合规深化）。
+
+**E1 严格队列坚持率**：`compute_persistence_rate` 升级——首选 conversations.json 首/末消息时间的严格队列（前 15 天首活跃 ∩ 后 15 天仍活跃），无数据回退 profile mtime 代理——设计指标坚持率口径从"代理"升级为"严格队列"。
+
+**验证**：`tests/test_round5_srs_privacy.py` 8 测试全绿 + 回归 163 全绿。
+
