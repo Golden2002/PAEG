@@ -2754,6 +2754,31 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 - 真实教师试用在即——优先保证不破坏现有 PPT 链路
 - 新增能力按渐进式（缺图片不阻塞 PPT 生成）
 
+### 需求补充（2026-08-20 · 用户会话补充）
+
+**补充 1 · API key 本地化到项目 secret 文件夹**：
+- 现状：key 在 `C:\Users\团聚体\.local\share\opencode\auth.json`（系统级，`llm_api._find_opencode_auth()` 三个候选路径的第①个命中）
+- 用户要求：key 应配置在**项目目录的 secret 文件夹**（本地化），git 忽略不推送
+- 实施：创建 `secret/` 文件夹 + `secret/auth.json`（或 .env），配置 DeepSeek key；确认 `.gitignore` 已含忽略规则（现有 `.env` + auth.json 忽略已存在，需确认 secret/ 路径）；llm_api 探测路径加项目 secret 优先级
+- **注意**：auth.json 含 Anthropic key 敏感凭据——绝不可推送
+
+**补充 2 · README 改造参考 ai-job-search**（https://github.com/MadsLorentzen/ai-job-search · 32K★）：
+- 参考结构：真实效果自述 → 是什么 → 前置条件 → 快速开始分步（Fork→安装→配置→使用→进阶）→ 文件结构 → 自定义 → 常见问题 → 贡献 → License
+- 借鉴点：①"真实使用效果"叙事（它让我找到了工作）→ PAEG 用"真实教师试用/备课产出"案例 ② 分步 CLI 工作流呈现 ③ 结构化快速开始
+- PAEG 当前 README 已有快速开始 + 架构 + 亮点，需按此结构重组补充"备课模式"分步示例
+
+**补充 3 · PPT 图片能力增强（§3.70 主体）**：
+- 现状确认：pptx_mcp_server.generate_ppt 仅 add_picture(LOGO_ICON)，**无内容图片**
+- 目标：① 联网检索图片插入 ② 从用户上传资料库（Library/usr_knowledge/<uid>/）提取图片 ③ 用户级/项目级公共文件夹图片
+- uid 参数已存在（预留），可扩展
+
+**补充 4 · 备课 fast-path 未触发排查（§3.69 遗留）**：
+- 现象：真实测试输入"我要备课"→ 走正常教学链路（diagnosis/plan/presentation），lesson_prep fast-path 未触发
+- 已验证：rule_fallback_intent("我要备课") 返回 lesson_prep 正确；server.py L610-638 fast-path 代码存在；后端代码为最新（pyc 已清）
+- 待查：为何 teach_stream 运行时未走 fast-path（可能前端请求未达该分支/异常被吞/emotion 钩子误判）
+- 下一步：加日志定位 teach_stream 实际执行路径
+
 ### 实施记录
 
 （完成后更新）
+
