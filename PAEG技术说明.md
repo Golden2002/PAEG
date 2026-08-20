@@ -1785,3 +1785,22 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 **验证**：`tests/test_round3_slo_usage_guard.py` 10 测试全绿 + 回归 223 过（3 失败均为 test_v028_endpoints 既有顺序依赖 flake，隔离通过）。
 
+### C.19 增强优化策略 + A3 声明化 + D1 token + D2 灰度规范（v1.2.5 §3.79 ⭐）
+
+**§3.7 增强与优化策略**（`总需求与执行标准.md`）：10 部分策略表（代码模块化/结构注释/Agent 架构插件/接线连通/教学对话/内容输出/物料/可观测/安全合规/商业化）——现状（Oracle 评分）+ 策略 + 状态，依据 Oracle 49/100 缺口 + DSH 调研 + 前三轮复盘。
+
+**A3 subagent 声明化（渐进）**：
+- `config/agents.yaml`：10 subagent 职责声明（id/name/role/keywords）
+- `services/subagent_manifest.py`：`get_manifest` / `agent_names` / `validate_against_registry`（声明 ↔ infra/subagent_registry 差集校验，空=一致）
+- 三层分工：声明（yaml）→ 注册（registry，W3）→ 运行参数（agents.json，v0.71 §3.32）；ratchet：只加描述层不改调度
+
+**D1 token 埋点**：`llm_api.chat_with_reasoning` 成功响应 `record_metric("paeg.llm.tokens", total_tokens)`（防御式）；`slo_summary` 输出 `total.tokens` + `total.llm_calls`——SLO 四指标 token 维度补齐（分模式 token 归因为下轮，LLM 适配器无 mode 上下文）。
+
+**D2 灰度回滚规范**（`deploy/灰度回滚规范.md` 定稿）：
+- Canary 阶梯：1-5%→20%→50%→100%（闸门：错误率≤0.5%、P95 不劣化>20%、eval pass rate 不降、72h 观察）
+- Kill switch：module_registry 门控（paeg_modules.json 热重载，60s 止损）+ PAEG_REASONING/PAEG_LESSON_NO_WEB 应急
+- Rollback：git revert + 模型回退（D3）+ smoke_test/pytest 验证，5min 目标
+- 实施脚本（canary.ps1、/api/admin/modules 远程切换）为下轮
+
+**验证**：`tests/test_round4_manifest_token.py` 7 测试全绿 + 回归 155 全绿。
+

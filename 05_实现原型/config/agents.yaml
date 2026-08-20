@@ -1,0 +1,52 @@
+# config/agents.yaml —— §3.79 A3 ⭐ subagent 声明化（渐进第一步）
+#
+# 目的：subagent 的"职责声明"（id/name/role/keywords）从代码中抽到配置，
+# 与 infra/subagent_registry.py（注册层）和 config/agents.json（模型配置层）
+# 三者合一：声明（本文件）→ 注册（registry）→ 运行参数（agents.json）。
+#
+# 铁律（ratchet）：本文件**只增加描述层**，不改变任何调度行为；
+# services/subagent_manifest.validate_against_registry() 保证声明与注册一致。
+version: 1
+_comment: "PAEG 10 subagent 声明清单（A3 渐进；模型参数见 config/agents.json）"
+
+agents:
+  - id: diagnostor
+    name: 诊断子代理
+    role: 评估学生当前水平（前置知识规则 + LLM 判断 recommended_depth/identified_gaps）
+    keywords: [诊断, 学情, 前置]
+  - id: planner
+    name: 计划子代理
+    role: 设计本次教学路径（策略选择 + 步骤编排，LLM 动态规划）
+    keywords: [计划, 路径, 策略]
+  - id: presenter
+    name: 呈现子代理
+    role: 多模态讲解（35 学科 × 4 学段提示词 + 约束层 + 语言规范）
+    keywords: [讲解, 呈现, 多模态]
+  - id: evaluator
+    name: 评估子代理
+    role: 确定性启发式评分（0.6 讲解质量 + 0.4 学生状态，可复现）
+    keywords: [评估, 掌握度, 评分]
+  - id: adapter
+    name: 调整子代理
+    role: 实时调整（switch_style/reinforce/continue + 6 风格选项，确定性）
+    keywords: [调整, 风格, 适配]
+  - id: answer_solver
+    name: 找答案子代理
+    role: 直接输出完整答案（强制知识库检索 + 暴露工具，不走教学引导）
+    keywords: [找答案, 直接回答]
+  - id: affection_supportor
+    name: 情绪陪伴子代理
+    role: 情绪与心理支持（现象学倾听→薇依注意力→尼采自我克服 + 危机协议）
+    keywords: [倾诉, 情绪, 陪伴, 危机]
+  - id: individuality
+    name: 个体化子代理
+    role: 17 维学生画像（LLM 增量建模 + inject_control 五层注入）
+    keywords: [画像, 因材施教, 个性化]
+  - id: resource_librarian
+    name: 资料检索员
+    role: 聚合检索（知识库 + Library + 用户资料 + 互联网，scope 过滤）
+    keywords: [查资料, 检索, 资源]
+  - id: lesson_prep
+    name: 备课子代理
+    role: 8 步渐进式备课（教案/讲义/讲稿/PPT/视频脚本/导图/质量报告，独立 25000 token 预算）
+    keywords: [备课, 教案, 物料]
