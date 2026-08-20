@@ -127,14 +127,15 @@ def test_presenter_no_notes_unchanged():
 
 
 def test_detour_note_flexible_guidance_strategy():
-    """§3.79 Round 11 策略定稿：不强制拉回、但保留柔性引导（提醒主线+询问选择）。"""
+    """§3.79 Round 11/12 策略：不强制拉回、柔性引导；问句成分完整（去 AI 味）。"""
     _p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                       "server.py")
     src = open(_p, encoding="utf-8").read()
     # 柔性引导：提醒主线"随时告诉我" + 主动询问选择
     assert "柔性引导" in src
-    assert "随时告诉我" in src
-    assert "继续学这个新话题" in src
+    # 完整句式（主语+状语+修饰语，用户示例风格），非省略句
+    assert "我们接下来是继续学习这个新话题，还是回去接着刚才的内容学习？" in src
+    assert "你随时告诉我你的想法就可以" in src
     # 不强制：明确"把选择权交给学生，不强迫"
     assert "不强迫" in src
     assert "不打断" in src

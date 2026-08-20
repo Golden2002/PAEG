@@ -1,4 +1,4 @@
-# PAEG 教育智能体 — 简明技术说明（v1.1.9）
+﻿﻿# PAEG 教育智能体 — 简明技术说明（v1.1.9）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -1828,3 +1828,36 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 **验证**：`tests/test_round6_ops_graph.py` 6 测试全绿 + 六轮回归 217 全绿。
 
+
+### C.22 孤儿接线 + 学段质量验证 + 学段特征守门（v1.2.9/v1.2.10 §3.79 ⭐）
+
+**孤儿接线（7→3）**：agent_scope→subagent_manifest.validate_scopes（作用域一致性）；condition_eval→hooks_hub 钩子 `when` 条件启停；production_pipeline 定性废弃候选（与 material_pipeline 重叠）。孤儿成因：历史包袱（设计超前于接线）+ 重叠未决 + 功能缺陷修复优先（如 Round 7 教学流 Bug）。
+
+**学段×学科质量验证**（grade_quality_probe.py）：接线层 4/4 全过（4 学段骨架+深度阶梯+方法论注入 system）；输出层 LLM 遵循度参差（考研样本 0/3）→ 实施**学段特征输出守门**（grade_quality_gate：4 学段特征确定性检查 + 缺特征轻量补充段 + paeg.py 接线）。
+
+**物料部分请求评分修复**：requested 未含 PPT/视频时 overall 按已产出维度重算（scope=partial）。
+
+### C.23 教学意图解读（v1.2.11 §3.79 ⭐）
+
+§3.8 四类会话路径标准（stick/followup 深化、detour 绕出、revisit 绕回、off_topic）；§3.58 TOPIC 4 分类路由 + topic_stack（入栈带 summary + recover 防御式修复：concept_id 硬下标 KeyError 被吞 → revisit 失效，改 .get() 兜底）；detour/revisit 约束注入 Presenter system（_detour_note/_revisit_note，用后即清）。
+
+### C.24 绕出策略定稿 + 输出/物料两轮强化（v1.2.12 §3.79 ⭐）
+
+**绕出策略定稿**（不强制拉回 + 保留柔性引导）：detour 完全尊重新话题，结尾柔性引导完整句式——『我们接下来是继续学习这个新话题，还是回去接着刚才的内容学习？你随时告诉我你的想法就可以。』（Round 12 去 AI 味：补主语/状语/修饰语、句子成分完整）；把选择权交给学生，不强迫。
+
+**教学输出强化 R1**：内容深度五要素守门（定义→机制→例子→**数据**→小结，≥3 达标；Round 12 新增"数据"要素——张宇扬课件真实数据例题特征）grade_quality_gate.check_content_depth + refine_content_depth（高中/大学/考研接线）。
+
+**教学材料强化 R2**：check_handout +真实数据例题+练习思考；check_lecture_script +口语过渡句+生活化例子（张宇扬课件特征落地）。
+
+### C.25 调研参考与张宇扬课件知识库（v1.2.13 §3.79 ⭐）
+
+**调研参考项目（本版升级依据）**：
+- [Chinese-Teaching-AI-Agent](https://github.com/shiguangzhe666/Chinese-Teaching-AI-Agent)：面向语文教师的大模型备课助手——结构化 Prompt 模板/角色定义/输出格式限制/分步生成策略/多维配置（学段/年级/授课风格/学情），可一键导出 Markdown/Word——PAEG 备课模式（LessonPrep 8 步渐进 + agents.yaml 声明 + 学段/学科/风格配置）与之对齐
+- [知识增强 LLM 教案生成](https://link.springer.com/article/10.1057/s41599-025-06004-2)：知识增强 LLM 教案生成——PAEG 备课素材注入（B1 联网 + B2 用户资料库）即知识增强路径
+- [EduPlanner 多智能体教学设计](https://eric.ed.gov/?id=EJ1469583)：LLM 多智能体定制教学设计——PAEG 10 subagent 分诊（诊断/计划/呈现/评估/调整）对齐
+- [LectūraAgents 多智能体自适应讲座生成](https://arxiv.org/html/2606.16428v2)：个性化讲座内容生成——PAEG 学段 lecture 式骨架（GRADE_SCAFFOLDS undergraduate）对齐
+- [Mini Lecture Slide Generator](https://dlib.iit.ac.lk/xmlui/handle/123456789/3248)：LLM 讲座幻灯片生成——PAEG PPT 大纲生成链路
+
+**张宇扬课件知识库**：`Library/common/张宇扬课件/`（§3.79 Round 12 加入，公共 scope 可检索）——7 门生物课程 25 文件/466MB（演化/生态/生物信息/实验设计/生统/发育/群体遗传+题库）；质量特征（文献锚定/精确概念定义/机制解释/真实数据例题/分层递进）已吸收进 material_quality 检查器与 grade_quality_gate 深度守门；大文件不入 git（.gitignore），部署从源 `张宇扬.rar` 复制。
+
+**验证**：全回归 197+ 全绿（R11/R12 问句去 AI 味 + 数据要素 + 知识库加入）。
