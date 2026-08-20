@@ -304,8 +304,16 @@ class AnthropicModelAPI(ModelAPI):
 def _find_opencode_auth() -> dict:
     """在 opencode auth.json 中查找 deepseek / anthropic 凭据。
     返回 {"deepseek": key} 或 {"anthropic": key} 等，找不到返回 {}。
+
+    §3.70 ⭐ 项目级优先：先查项目目录 secret/auth.json（本地化配置，
+    不入 git——.gitignore 已忽略 auth.json 系列），再查 opencode 系统级。
     """
+    # 项目级 secret/auth.json（§3.70 本地化配置——最高优先级）
+    project_secret = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "secret", "auth.json"
+    )
     candidates = [
+        project_secret,  # §3.70 ⭐ 项目本地化（用户级/项目级公共配置）
         os.path.expanduser("~/.local/share/opencode/auth.json"),
         os.path.expanduser("~/.config/opencode/auth.json"),
         os.path.join(os.environ.get("APPDATA", ""), "opencode", "auth.json"),
