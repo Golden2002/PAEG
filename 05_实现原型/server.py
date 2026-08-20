@@ -613,6 +613,8 @@ def teach_stream():
     try:
         from meta_router import rule_fallback_intent as _rfi
         _rfi_res = _rfi(str(concept)[:120])
+        with open(r"C:\Users\团聚体\AppData\Local\Temp\opencode\lesson_prep_trace.log", "a", encoding="utf-8") as _tf:
+            _tf.write(f"[teach_stream] concept={str(concept)[:30]!r} rfi={_rfi_res}\n")
         if _rfi_res.get("intent") == "lesson_prep" and paeg.lesson_prep is not None:
             from subagents import LessonPlanInput
             _lpi = LessonPlanInput(
@@ -2195,6 +2197,65 @@ def submit_feedback():
         return jsonify({"ok": True, "recorded": True, "rating": _rating})
     except Exception as _fb_e:
         return jsonify({"ok": False, "error": str(_fb_e)}), 500
+
+
+# v0.74+ ⭐ lesson_prep 质量自评反馈（聚合评分的人工复核 / 用户反馈）
+# 数据来源：前端"重新评分"按钮 / 人工审计员 / 用户对 quality_report 的反馈
+# 用途：写入 memory/lesson_prep_feedback.jsonl，供后续 LLM 微调 / 规则补丁消费
+@app.route("/api/lesson_prep/feedback", methods=["POST"])
+def submit_lesson_prep_feedback():
+    """v0.74+ ⭐ 备课质量反馈（针对 quality_report 的人工评分）。
+
+    请求：{"run_id": str, "scores": {dim: 0-5}, "notes"?: str}
+      - run_id：lesson_prep 运行的唯一 ID（必填，非空字符串）
+      - scores：维度→0-5 整数评分（lesson_plan/handout/video_script/ppt_outline/hard_checks）
+      - notes：可选文本备注（≤1000 字）
+
+    响应：{"ok": True, "saved": True}（成功）/ {"ok": False, "error": "..."}（失败，400/500）
+    """
+    try:
+        _data = request.get_json(force=True) or {}
+        _run_id = str(_data.get("run_id") or "").strip()
+        if not _run_id:
+            return jsonify({"ok": False, "error": "run_id 必填且非空"}), 400
+
+        _scores = _data.get("scores")
+        if not isinstance(_scores, dict) or not _scores:
+            return jsonify({"ok": False, "error": "scores 必填且为非空 dict"}), 400
+
+        # 校验 scores：键为已知维度名，值为 0-5 的数字
+        _ALLOWED_DIMS = {
+            "lesson_plan", "handout", "video_script", "ppt_outline", "hard_checks",
+        }
+        _norm_scores: dict = {}
+        for _k, _v in _scores.items():
+            if _k not in _ALLOWED_DIMS:
+                return jsonify({"ok": False, "error": f"未知维度 {_k!r}（允许：{sorted(_ALLOWED_DIMS)}）"}), 400
+            try:
+                _iv = int(_v)
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "error": f"维度 {_k} 评分需为整数（0-5），收到 {_v!r}"}), 400
+            if _iv < 0 or _iv > 5:
+                return jsonify({"ok": False, "error": f"维度 {_k} 评分 {_iv} 超出范围（0-5）"}), 400
+            _norm_scores[_k] = _iv
+
+        _notes = str(_data.get("notes") or "")[:1000]
+
+        # 写入 memory/lesson_prep_feedback.jsonl（追加模式，目录按需创建）
+        _mem = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")
+        os.makedirs(_mem, exist_ok=True)
+        _log_path = os.path.join(_mem, "lesson_prep_feedback.jsonl")
+        with open(_log_path, "a", encoding="utf-8") as _f:
+            _f.write(json.dumps({
+                "ts": datetime.now().isoformat(),
+                "run_id": _run_id,
+                "scores": _norm_scores,
+                "notes": _notes,
+            }, ensure_ascii=False) + "\n")
+
+        return jsonify({"ok": True, "saved": True, "run_id": _run_id})
+    except Exception as _lpfb_e:
+        return jsonify({"ok": False, "error": str(_lpfb_e)}), 500
 
 
 # §3.45 ⭐ uploads 2 路由（upload/avatar）已迁至 blueprints/uploads.py（行为字节级不变）
