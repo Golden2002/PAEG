@@ -21,9 +21,9 @@ MAGIC_PATTERNS = [
     # 界面/使用口令
     (re.compile(r'^(怎么使用|怎么用|如何使用|操作指南|这个网站怎么用|这个页面怎么用|这个界面怎么用)$'), 'interface', 'magic:usage'),
     # §3.69 备课子代理（v0.69+ ⭐）—— 零 LLM 直达 lesson_prep
-    (re.compile(r'^(我要备课|帮我备课|开始备课|备课模式|准备上课|这节课要备|备这节课|开始备这节课|备一下|备课一下)$'), 'lesson_prep', 'magic:lesson_prep'),
-    # 备课 + 主题/科目后缀（"备课导数" / "帮我备一下高中物理" / "帮我备一下高中物理导数课"）—— 主体可带后缀，关键词后允许 1 个汉字尾缀（课/章/下/上 等）
-    (re.compile(r'^(我要|帮我|开始|准备)?(备课|备一下|备这节课|备一下课)(.{0,15}(主题|科目|这节|今天|明天|下周|数学|语文|英语|物理|化学|生物|历史|地理|政治|导数).?)?$'), 'lesson_prep', 'magic:lesson_prep_topic'),
+    # §3.73 ⭐ 独立激活词："我要备课"（纯词 → 引导分支；带后缀 → 直接生成）
+    (re.compile(r'^我要备课$'), 'lesson_prep', 'magic:lesson_prep'),
+    (re.compile(r'^我要备课[:：\s、,，]*(.{1,60}?)$'), 'lesson_prep', 'magic:lesson_prep_topic'),
 ]
 
 
@@ -35,8 +35,15 @@ def match_magic(text: str) -> dict:
         return None
     t_clean = re.sub(r'[。？！!?，,、\s]+$', '', t)
     for pattern, intent, reason in MAGIC_PATTERNS:
-        if pattern.match(t_clean):
-            return {'intent': intent, 'reason': reason, 'matched_text': t_clean}
+        m = pattern.match(t_clean)
+        if m is None:
+            continue
+        # §3.73 ⭐ 空残余守卫：lesson_prep_topic 后缀仅由分隔符构成（"备课："）→ 不匹配
+        if reason == 'magic:lesson_prep_topic':
+            tail = m.groups()[-1] or ''
+            if not tail.strip(' :：、,，　'):
+                continue
+        return {'intent': intent, 'reason': reason, 'matched_text': t_clean}
     return None
 
 
@@ -70,6 +77,11 @@ if __name__ == '__main__':
         ('帮我备一下高中物理', 'lesson_prep', True),
         ('备课导数', 'lesson_prep', True),
         ('备这节课', 'lesson_prep', True),
+        # §3.73 备课主题后缀正则 + 空残余守卫
+        ('备课: 导数', 'lesson_prep', True),
+        ('备一下：高中物理', 'lesson_prep', True),
+        ('帮我备这节课，光合作用', 'lesson_prep', True),
+        ('备课：', None, False),   # 退化：无后缀不匹配
     ]
     for t, exp_intent, exp_hit in tests:
         r = match_magic(t)

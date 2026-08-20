@@ -465,6 +465,203 @@ def route_intent(text: str, llm=None, use_cache: bool = True, mode: str = None) 
         return {"intent": "chat", "confidence": 0.0, "reason": f"llm_error:{type(e).__name__}"}
 
 
+# ─────────────────────────────────────────────
+# v0.70 ⭐ 备课主题提取（零 LLM 纯正则）
+# ─────────────────────────────────────────────
+# 给 rule_fallback_intent 兜底阶段用：捕捉"备一下XX课"自然语言口令，
+# 提取 {topic, subject, grade, duration_min, extra_requirement}，
+# 用于 lesson_prep 工作流的参数化输入。
+#
+# 提取顺序（关键）：先剥离 extra_requirement → 再学科/学段 → 再时长 → topic 终值校验。
+
+# 学科映射（中文 → 英文 key）
+_SUBJECT_MAP = {
+    "数学": "math", "语文": "chinese", "英语": "english",
+    "物理": "physics", "化学": "chemistry", "生物": "biology",
+    "历史": "history", "地理": "geography", "政治": "politics",
+    "科学": "science", "信息技术": "it", "通用技术": "general_tech",
+}
+
+# 学段映射（中文 → 英文 key）
+# ⚠️ 顺序敏感：必须按字符串长度降序（"高一/高二/高三"优先于"高中"），
+# 因为"高一"含"高"前缀，若先匹配"高中"会吃掉前缀而失败。
+_GRADE_MAP = {
+    "高一": "high_school", "高二": "high_school", "高三": "high_school",
+    "高中": "high_school",
+    "初中": "junior", "小学": "primary",
+    "大学": "undergraduate", "本科": "undergraduate",
+    "考研": "exam",
+}
+_GRADE_KEYS_SORTED = sorted(_GRADE_MAP.keys(), key=len, reverse=True)
+
+# 备课附加要求正则（重点讲X/侧重X/需要X/主要讲X/围绕X 等）
+_EXTRA_PATTERNS = [
+    # 重点讲/重点是/重点放在/重点突出/重点强调、着重讲、主讲、主要讲
+    re.compile(r'(?:重点(?:讲|是|放在|突出|强调)|着重讲|主(?:要讲|讲))(.{2,40}?)(?=[，,。.!！?？；;]|$)'),
+    # 侧重/着重/突出/围绕
+    re.compile(r'(?:侧重|着重|突出|围绕)(.{2,30}?)(?=[，,。.!！?？；;]|$)'),
+    # 需要/要/包含/加入 + 教学形式词（板书/实验/讨论/互动/多媒体/视频/动画/例题/习题）
+    re.compile(r'(?:需要|要|包含|加入)(.{2,30}?(?:板书|实验|讨论|互动|多媒体|视频|动画|例题|习题)(?:.{0,20}?))(?=[，,。.!！?？；;]|$)'),
+    # 尤其是/特别是/也包括
+    re.compile(r'(?:尤其是|特别是|也包括)(.{2,40}?)(?=[，,。.!！?？；;]|$)'),
+    # ",/、X相关/方面/内容/环节"
+    re.compile(r'[,，、]\s*(.+?)(?:相关|方面|内容|环节)(?=[，,。.!！?？]|$)'),
+]
+
+
+def _extract_lesson_topic(text: str) -> dict:
+    """v0.70 ⭐ 备课主题提取（零 LLM 纯正则）。
+
+    从用户输入提取 {topic, subject, grade, duration_min, extra_requirement}：
+      - topic: 课题（必填，<2 字或纯前缀 → 返回 {} 触发引导）
+      - subject: 学科英文 key（math/physics/...）
+      - grade: 学段英文 key（primary/junior/high_school/undergraduate/exam）
+      - duration_min: 时长（分钟），课时/学时/一节 → 45
+      - extra_requirement: list[str]，多段去重保序（消费方按需用分号拼接）
+
+    提取顺序（关键）：先剥离 extra_requirement → 再学科/学段 → 再时长 → topic 终值校验。
+    """
+    raw = (text or "").strip()
+    if not raw:
+        return {}
+
+    # ── 第 1 步：定位附加要求区间（重点讲X/侧重X/需要X/围绕X 等）──
+    # 用 group(0) 而非 group(1) 以保留触发动词上下文（与 spec 示例 "重点讲光反应" 一致）
+    extra_list: list[str] = []
+    for pat in _EXTRA_PATTERNS:
+        for m in pat.finditer(raw):
+            payload = (m.group(0) or "").strip()
+            # 第 5 个 pattern 的 group(0) 可能带前导 ",/、"，剥掉
+            payload = re.sub(r'^[,，、\s]+', '', payload).strip()
+            if len(payload) >= 3:
+                extra_list.append(payload)
+
+    # ── 第 2 步：剥离前缀（"我要备课"独立激活词，ULW 风格）──
+    body = raw
+    prefix_pat = re.compile(
+        r'^我要备课[:：\s、,，]*'
+    )
+    m_prefix = prefix_pat.match(body)
+    prefix_only = False
+    if m_prefix:
+        body = body[m_prefix.end():]
+        # 剥离后只剩空/标点 → 视为"纯前缀"，topic 校验会返 {}
+        if not body.strip(r" ：:、,，。.!！?？；;\s"):
+            prefix_only = True
+        body = body.strip()
+
+    # ── 第 3 步：从 body 中抹掉 extra 文本（保留顺序 & 去重）──
+    for extra in extra_list:
+        if extra in body:
+            body = body.replace(extra, " ")
+    # 清理多余标点/空白
+    body = re.sub(r'[，,。.!！?？；;]\s*', ' ', body)
+    body = re.sub(r'\s+', ' ', body).strip()
+    # 尾部清理（的/啊/呗/呢/吧/？/。/！/，/空白；"课"是合法 topic 后缀，保留）
+    # 先剥离"的课/这节课/这一课"等组合尾缀（"导数课"单字"课"是合法后缀，保留）
+    body = re.sub(r'(?:的课|这节课|这一课|的一节课|的课啊|的课吧)$', '', body)
+    body = re.sub(r'[的啊呗呢吧？。！,，\s]+$', '', body)
+
+    # ── 第 4 步：学段（按字符串长度降序，"高一"优先于"高中"）──
+    grade = None
+    for g in _GRADE_KEYS_SORTED:
+        if g in body:
+            grade = _GRADE_MAP[g]
+            body = body.replace(g, " ", 1)
+            break
+
+    # ── 第 5 步：学科 ──
+    subject = None
+    for s in _SUBJECT_MAP.keys():
+        if s in body:
+            subject = _SUBJECT_MAP[s]
+            body = body.replace(s, " ", 1)
+            break
+
+    # ── 第 6 步：时长 ──
+    duration_min = None
+    m_dur = re.search(r'(?:大约?\s*)?(\d{1,3})\s*(分钟|分|min|课时|学时|一节)', body)
+    if m_dur:
+        n = int(m_dur.group(1))
+        unit = m_dur.group(2)
+        if unit in ("课时", "学时", "一节"):
+            duration_min = 45  # 默认一课时 45 分钟
+        else:
+            duration_min = n
+        body = body[:m_dur.start()] + body[m_dur.end():]
+        body = body.strip()
+
+    # ── 第 7 步：topic 终值校验 ──
+    body = body.strip(r" ：:、,，。.!！?？；;\s")
+    if not body or len(body) < 2 or prefix_only:
+        return {}
+
+    result: dict = {"topic": body}
+    if subject:
+        result["subject"] = subject
+    if grade:
+        result["grade"] = grade
+    if duration_min is not None:
+        result["duration_min"] = duration_min
+    if extra_list:
+        # 多段去重保序（消费方按需拼接为分号串）
+        result["extra_requirement"] = list(dict.fromkeys(extra_list))
+    return result
+
+
+def is_lesson_prep_supplement(text: str) -> bool:
+    """v0.70 ⭐ 判断文本是否是"备课主题/约束补充句"（用于 lesson_prep 工作流）。
+
+    特征：
+      - 长度 2-200
+      - 排除聊天意图（什么是/为什么/怎么.../你好/再见/谢谢/...）
+      - 排除 match_magic 命中（已有 magic 路由接管）
+      - 学科/时长/课题词命中 ≥2
+        学科：数学/语文/英语/物理/化学/生物/历史/地理/政治/科学/信息技术/通用技术
+        时长：分钟/分/min/课时/学时/一节 + 数字
+        课题词：函数/导数/光合作用/牛顿/电场/磁场/语法/诗词/文言文/算法/受力/
+                基因/三角函数/向量/圆锥曲线/电磁/有机
+    """
+    t = (text or "").strip()
+    if not t or not (2 <= len(t) <= 200):
+        return False
+    # 排除聊天意图
+    if re.match(r"^(什么是|为什么|怎么[样做做]|你好|再见|谢谢|辛苦了|那[个么们])", t):
+        return False
+    # 排除 match_magic 命中（已有 magic 路由接管）
+    try:
+        from magic_intent import match_magic
+        if match_magic(t):
+            return False
+    except Exception:
+        pass
+    # 学科/时长/课题词命中统计
+    _SUBJECT_KEYS = list(_SUBJECT_MAP.keys())
+    _TOPIC_KEYS = [
+        "函数", "导数", "光合作用", "牛顿", "电场", "磁场",
+        "语法", "诗词", "文言文", "算法", "受力", "基因",
+        "三角函数", "向量", "圆锥曲线", "电磁", "有机",
+        "课", "课题", "知识点",  # §3.73 ⭐ 通用课题提示（"45分钟的课"/"一节关于X的课"）
+    ]
+    _TIME_RE = re.compile(r"\d{1,3}\s*(分钟|分|min|课时|学时|一节)")
+    hits = 0
+    for s in _SUBJECT_KEYS:
+        if s in t:
+            hits += 1
+            if hits >= 2:
+                return True
+    if _TIME_RE.search(t):
+        hits += 1
+        if hits >= 2:
+            return True
+    for w in _TOPIC_KEYS:
+        if w in t:
+            hits += 1
+            if hits >= 2:
+                return True
+    return False
+
+
 def rule_fallback_intent(text: str) -> dict:
     """v0.35 ⭐ 规则降级兜底：LLM 失败/低置信度时用。
     危机/自伤必须 fast-path（安全 > 延迟）；其余按现有规则函数判定。
