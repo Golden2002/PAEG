@@ -14,9 +14,20 @@ class MockModel:
         return {"content": [{"text": "[演示]"}]}
 
 
+def _paeg():
+    """构造测试 PAEG：use_agents_config=False 隔离 agents.json 的 per-subagent 真实 LLM 配置。
+
+    v1.2.14 ⭐ 回归适配：v0.71 §3.32 后 PAEG 默认按 config/agents.json 给 subagent
+    分配真实 LLM（planner 走 LLM 动态规划，返回 steps.worldview 全为 prompt 示例值
+    "balanced"），会覆盖静态规划的学科语气（physics→rigorous_cold）。
+    本文件测试意图是"纯 mock 端到端 + 世界观语气随学科变化"，故显式关闭 agents 配置。
+    """
+    return PAEG(MockModel(), KnowledgeBase(), use_agents_config=False)
+
+
 def test_e2e_physics():
     learner = LearnerProfile(id="001", nickname="小李", grade_level="high_school", age=17)
-    paeg = PAEG(MockModel(), KnowledgeBase())
+    paeg = _paeg()
     result = paeg.teach(learner, "什么是熵？", "physics")
     assert result["summary"]["avg_score"] > 0
     print("✓ test_e2e_physics")
@@ -24,7 +35,7 @@ def test_e2e_physics():
 
 def test_e2e_literature():
     learner = LearnerProfile(id="001", nickname="小李", grade_level="high_school", age=17)
-    paeg = PAEG(MockModel(), KnowledgeBase())
+    paeg = _paeg()
     result = paeg.teach(learner, "为什么特洛伊战争持续十年？", "literature")
     assert result["summary"]["avg_score"] > 0
     print("✓ test_e2e_literature")
@@ -32,7 +43,7 @@ def test_e2e_literature():
 
 def test_e2e_ethics():
     learner = LearnerProfile(id="001", nickname="小李", grade_level="high_school", age=17)
-    paeg = PAEG(MockModel(), KnowledgeBase())
+    paeg = _paeg()
     result = paeg.teach(learner, "电车难题该拉开关吗？", "ethics")
     assert result["summary"]["avg_score"] > 0
     print("✓ test_e2e_ethics")
@@ -40,7 +51,7 @@ def test_e2e_ethics():
 
 def test_e2e_math():
     learner = LearnerProfile(id="001", nickname="小李", grade_level="high_school", age=17)
-    paeg = PAEG(MockModel(), KnowledgeBase())
+    paeg = _paeg()
     result = paeg.teach(learner, "为什么负负得正？", "math")
     assert result["summary"]["avg_score"] > 0
     print("✓ test_e2e_math")
@@ -48,7 +59,7 @@ def test_e2e_math():
 
 def test_e2e_phenomenology():
     learner = LearnerProfile(id="001", nickname="小李", grade_level="high_school", age=17)
-    paeg = PAEG(MockModel(), KnowledgeBase())
+    paeg = _paeg()
     result = paeg.teach(learner, "为什么人会感到孤独？", "phenomenology")
     assert result["summary"]["avg_score"] > 0
     print("✓ test_e2e_phenomenology")
@@ -57,7 +68,7 @@ def test_e2e_phenomenology():
 def test_all_subjects_with_world_view_blend():
     """验证：每个学科的呈现都使用了对应的世界观比例。"""
     learner = LearnerProfile(id="001", nickname="小李", grade_level="high_school", age=17)
-    paeg = PAEG(MockModel(), KnowledgeBase())
+    paeg = _paeg()
 
     expected = {
         "physics": "rigorous_cold",

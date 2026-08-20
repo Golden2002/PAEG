@@ -15,6 +15,7 @@
 """
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -107,6 +108,21 @@ def test_paeg_wiring_marker_exists():
     src = open(_p, encoding="utf-8").read()
     assert "学段特征输出守门" in src
     assert "grade_refined" in src
+
+
+def test_paeg_os_import_present():
+    """paeg.py 必须 import os（守门开关 PAEG_GRADE_GATE 依赖）。
+
+    §3.79 v1.2.14 ⭐ 回归：此前 paeg.py 缺 `import os`，sync 路径守门
+    每次抛 NameError 被 except 吞掉（日志 "学段守门忽略: name 'os' is not defined"），
+    grade_refined 永不触发。
+    """
+    _p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                      "paeg.py")
+    src = open(_p, encoding="utf-8").read()
+    assert re.search(r"^import os\b", src, re.M), "paeg.py 缺 import os"
+    # 守门开关必须引用 os.environ
+    assert "os.environ.get(\"PAEG_GRADE_GATE\"" in src
 
 
 # ────────────────────────────────────────────

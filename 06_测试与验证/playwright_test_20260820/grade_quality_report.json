@@ -1,13 +1,13 @@
 {
- "ts": "2026-08-21T00:09:04",
+ "ts": "2026-08-21T01:14:13",
  "cases": [
   {
    "grade": "middle_school",
    "subject": "math",
    "concept": "什么是负数",
    "ok": true,
-   "elapsed": 43.6,
-   "chars": 701,
+   "elapsed": 36.2,
+   "chars": 771,
    "features": {
     "感官/生活化": true,
     "可视化": true,
@@ -20,12 +20,12 @@
    "subject": "math",
    "concept": "导数的几何意义",
    "ok": true,
-   "elapsed": 47.5,
-   "chars": 1253,
+   "elapsed": 46.9,
+   "chars": 1415,
    "features": {
     "定义+公式": true,
     "题型方法": true,
-    "反例/误区": false
+    "反例/误区": true
    },
    "has_depth_ladder": false
   },
@@ -34,12 +34,12 @@
    "subject": "math",
    "concept": "微积分基本定理",
    "ok": true,
-   "elapsed": 49.3,
-   "chars": 1351,
+   "elapsed": 50.3,
+   "chars": 1467,
    "features": {
     "lecture式严格定义": true,
     "高屋建瓴方法论": true,
-    "应用/学科视野": false
+    "应用/学科视野": true
    },
    "has_depth_ladder": false
   },
@@ -48,16 +48,16 @@
    "subject": "math",
    "concept": "二重积分计算",
    "ok": true,
-   "elapsed": 47.2,
-   "chars": 1392,
+   "elapsed": 38.4,
+   "chars": 1602,
    "features": {
-    "考点定位": false,
-    "题型套路": false,
-    "得分/易错": false
+    "考点定位": true,
+    "题型套路": true,
+    "得分/易错": true
    },
    "has_depth_ladder": false
   }
  ],
- "all_features_pass": 1,
+ "all_features_pass": 4,
  "total": 4
 }

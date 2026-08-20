@@ -60,8 +60,12 @@ _ROUTE_INTENT_PLAN = {
     "你好": ("greeting", 0.95),
     "换深色模式": ("interface", 0.80),
 }
-def _fake_route_intent(text, llm=None, use_cache=True):
+def _fake_route_intent(text, llm=None, use_cache=True, mode=None):
+    """v0.41.6+ 签名对齐：server 调用传 mode 关键字（此前缺失 → TypeError → 路由静默降级）。"""
     t = (text or "").strip()
+    # mode 短路对齐 server 行为（v0.41.6）
+    if mode in ("teach", "chat", "answer", "method", "knowledge", "affection", "ppt", "problem"):
+        return {"intent": mode, "confidence": 0.95, "reason": f"stub:mode:{mode}"}
     for key, (intent, conf) in _ROUTE_INTENT_PLAN.items():
         if t == key or t.startswith(key[:6]):
             return {"intent": intent, "confidence": conf, "reason": f"stub:{intent}"}

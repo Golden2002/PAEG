@@ -1,3 +1,22 @@
+### v1.2.14 §3.79 物料工作流联通修复 + teach_stream 学段/深度守门接线（2026-08-21 ⭐）
+
+**本版定位**：R2 验证暴露两类真实断链——①`teach_materials` 工作流 outline 步 Planner 签名不匹配 + knowledge_map/keyword_doc 工具未注册；②学段特征守门只在 sync 路径 `paeg.teach` 接线，GUI 实际走的 `/api/teach/stream` 从不执行 gate → probe 0/4。
+
+**物料工作流联通修复 ✅（真实端到端验证）**：
+- `_run_subagent` planner 分支适配真实签名 `run(learner, diagnosis, subject, concept)`（此前通用调用形状缺参 → `Planner.run() missing 2 required positional arguments`）
+- `_run_tool` 注册 `knowledge_map`/`keyword_doc` workflow 工具兜底（优先复用 `knowledge_map.handle_knowledge_map`，失败回退 LLM 生成 Markdown 树/结构化讲义）
+- 真实运行 `teach_materials`（主题"函数单调性"）：outline/knowledge_map/keyword_doc/ppt/script/lecture/package **7 步全 ✓**，失败检测 False；产物过全部增强检查器
+
+**teach_stream 学段/深度守门接线 ✅（probe 0/4 → 4/4）**：
+- 根因：`grade_quality_gate` 只挂 `paeg.teach`（sync）；`server.py _teach_stream_gen` 手写循环从未调用 → GUI 路径缺学段特征（初中感官/高中题型/大学视野/考研考点）从不补
+- 修复：主循环 presentation 生成后（分片 yield 前）接入 `check_grade_features`/`refine_for_grade` + `check_content_depth`/`refine_content_depth`（与 paeg.teach 同门控：`llm_generated` + `PAEG_GRADE_GATE`）
+- 验证：重启 server 后真实 probe 4/4 全特征通过；日志确认 `teach_stream ★ 学段特征补充：graduate_exam 缺失 ['真题示范'] → 已追加`
+- 顺带修复 `on_session_end` 报错 `'str' object has no attribute 'get'`（dialogue_summary 对 str 列表元素调 `.get` → isinstance 分支）
+
+**验证**：`test_round_workflow_fixes`（planner 签名/knowledge_map 兜底/keyword_doc 兜底）4/4 + `test_round12_teach_stream_gate`（接线回归守卫）4/4 + 全回归绿 + probe 4/4。
+
+**文档**：CHANGELOG + 技术说明 C.26 + 任务清单 NEW-30 + 维护手册 §18.67
+
 ### v1.2.13 §3.79 张宇扬课件入库 + 问句去 AI 味 + 技术说明调研引用（2026-08-20 ⭐）
 
 **本版定位**：用户小需求（张宇扬课件 → Library 公共知识库）+ 绕出问句去 AI 味（句子成分完整）+ 技术说明引用参考项目。

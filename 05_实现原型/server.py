@@ -2014,6 +2014,47 @@ def _teach_stream_gen(data):
             except Exception as _e:
                 print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
                 pass
+            # §3.79 Round 9 ⭐ 学段特征输出守门（teach_stream 接入；原仅在 paeg.teach sync 路径）
+            # Round 12 验证：probe 打 /api/teach/stream 时 gate 从不执行 → 特征缺失 0/4。
+            # 与 paeg.py teach 的 512-554 对齐：LLM 输出缺学段特征 → 一次轻量补充。
+            try:
+                if presentation.get("llm_generated") and os.environ.get("PAEG_GRADE_GATE", "1") != "0":
+                    from services.grade_quality_gate import (
+                        check_grade_features, refine_for_grade)
+                    _ggrade = str(getattr(learner, "grade_level", "high_school") or "high_school")
+                    _chk = check_grade_features(presentation.get("content", ""), _ggrade)
+                    if _chk["missing"]:
+                        _add = refine_for_grade(
+                            paeg.model, presentation.get("content", ""),
+                            _ggrade, _chk["missing"], subject=subject, concept=concept)
+                        if _add:
+                            presentation["content"] = str(presentation.get("content") or "") + _add
+                            presentation["grade_refined"] = True
+                            presentation["grade_refined_missing"] = _chk["missing"]
+                            print(f"[PAEG] teach_stream ★ 学段特征补充：{_ggrade} 缺失 {_chk['missing']} → 已追加")
+            except Exception as _gg_e:
+                print(f"[PAEG][server.py] 学段守门忽略: {_gg_e}")
+                pass
+            # §3.79 Round 11 ⭐ 内容深度四要素守门（teach_stream 接入；仅高中/大学/考研）
+            try:
+                if presentation.get("llm_generated") and os.environ.get("PAEG_GRADE_GATE", "1") != "0":
+                    from services.grade_quality_gate import (
+                        check_content_depth, refine_content_depth)
+                    _dgrade = str(getattr(learner, "grade_level", "high_school") or "high_school")
+                    if _dgrade in ("high_school", "undergraduate", "graduate_exam"):
+                        _dchk = check_content_depth(presentation.get("content", ""), _dgrade)
+                        if not _dchk["passed"] and _dchk["missing"]:
+                            _dadd = refine_content_depth(
+                                paeg.model, presentation.get("content", ""),
+                                _dchk["missing"], subject=subject, concept=concept)
+                            if _dadd:
+                                presentation["content"] = str(presentation.get("content") or "") + _dadd
+                                presentation["depth_refined"] = True
+                                presentation["depth_refined_missing"] = _dchk["missing"]
+                                print(f"[PAEG] teach_stream ★ 内容深度补充：缺失 {_dchk['missing']} → 已追加")
+            except Exception as _dd_e:
+                print(f"[PAEG][server.py] 深度守门忽略: {_dd_e}")
+                pass
             _assistant_parts.append(presentation.get("content") or "")  # v0.21.3
             _prev_presentations.append(presentation)  # v0.21.8：累积讲解供下一轮参考
             # v0.40.2 ⭐ 修复：教学主循环 presentation 分片 yield（此前整段一次性 yield → 前端"等很久突然一大段"）
@@ -2189,7 +2230,8 @@ def _teach_stream_gen(data):
                 except Exception:
                     ema_delta = 0.0
                 dialogue_summary = "；".join(
-                    (p.get("content") or "")[:100] for p in (_assistant_parts[:2])
+                    (p[:100] if isinstance(p, str) else (p.get("content") or "")[:100])
+                    for p in (_assistant_parts[:2])
                 ) or concept
                 _entry = paeg.evolver.on_session_end(
                     student_id=learner.id,

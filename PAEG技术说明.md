@@ -1,4 +1,4 @@
-﻿﻿# PAEG 教育智能体 — 简明技术说明（v1.1.9）
+﻿# PAEG 教育智能体 — 简明技术说明（v1.1.9）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -1861,3 +1861,17 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 **张宇扬课件知识库**：`Library/common/张宇扬课件/`（§3.79 Round 12 加入，公共 scope 可检索）——7 门生物课程 25 文件/466MB（演化/生态/生物信息/实验设计/生统/发育/群体遗传+题库）；质量特征（文献锚定/精确概念定义/机制解释/真实数据例题/分层递进）已吸收进 material_quality 检查器与 grade_quality_gate 深度守门；大文件不入 git（.gitignore），部署从源 `张宇扬.rar` 复制。
 
 **验证**：全回归 197+ 全绿（R11/R12 问句去 AI 味 + 数据要素 + 知识库加入）。
+
+### C.26 物料工作流联通 + teach_stream 学段/深度守门接线（v1.2.14 §3.79 ⭐）
+
+**背景（R2 真实验证暴露两类断链）**：
+1. **物料工作流**：`teach_materials` 工作流真实运行（probe_material_flow.py）暴露 outline 步 `Planner.run() missing 2 required positional arguments` + `未知工具: knowledge_map/keyword_doc`。
+2. **学段守门**：学段特征/内容深度守门只挂 sync 路径 `paeg.teach`（512-554 行）；GUI 实际走的 `/api/teach/stream`（server.py `_teach_stream_gen` 手写循环）从不执行 → `grade_quality_probe.py` 0/4（初中缺感官、高中缺题型/误区、大学缺视野、考研缺考点）。
+
+**修复（v1.2.14）**：
+- `workflows_hub._run_subagent`：planner 专用分支 `run(learner, diagnosis={}, subject, concept)`（§3.79 Round 2）
+- `workflows_hub._run_tool`：`knowledge_map`/`keyword_doc` workflow 工具兜底（优先 `knowledge_map.handle_knowledge_map`，异常回退 LLM 生成 Markdown 树/结构化讲义）
+- `server.py _teach_stream_gen`：presentation 生成后、分片 yield 前接入 `check_grade_features`/`refine_for_grade` + `check_content_depth`/`refine_content_depth`（同门控：`llm_generated` + `PAEG_GRADE_GATE`）——与 paeg.teach 对齐
+- 顺带修复 `on_session_end`：dialogue_summary 对 str 元素 `.get` → isinstance 保护
+
+**验证**：物料工作流 7 步全 ✓ 失败检测 False；probe 0/4 → **4/4**（重启 server 后复测，日志确认 `teach_stream ★ 学段特征补充：graduate_exam 缺失 ['真题示范']`）；test_round_workflow_fixes 4/4 + test_round12_teach_stream_gate 4/4 + 全回归绿。
