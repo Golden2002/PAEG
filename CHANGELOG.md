@@ -1,3 +1,20 @@
+### v1.2.10 §3.79 学段特征输出守门 + 物料部分请求评分修复（2026-08-20 ⭐）
+
+**本版定位**：承接 Round 8 质量验证结论——LLM 对学段特征遵循度参差（考研样本 0/3）→ 实施"输出特征守门"；物料部分请求评分口径修复。
+
+**学段特征输出守门 ✅（内容输出质量关键项）**：新模块 `services/grade_quality_gate.py`——
+- `check_grade_features(content, grade)`：4 学段确定性特征检查（初中：生活化/可视化/复述引导；高中：定义公式/例题/误区；大学：严格定义/定理证明/应用/学科视野=lecture 式；考研：考点定位/题型套路/真题示范/易错得分）
+- `refine_for_grade(llm, ...)`：缺特征 → 一次轻量 LLM 补充段（≤200 字，不重复，衔接自然；失败静默降级）
+- paeg.py 教学循环接线：LLM 生成且缺特征 → 补充段追加到 presentation + `grade_refined` 标记 + transcript grade_refine 事件（PAEG_GRADE_GATE=0 可关）
+
+**物料部分请求评分修复 ✅**：LessonPrep 用户指定产出子集（未含 PPT/视频）时，overall 按已产出维度重算（scope=partial + overall_score_partial）——不再因未请求维度误判 FAIL（真实探针发现：教案 0.962 却整体 FAIL 0.586）。
+
+**物料真实联通验证 ✅**：LessonPrep 真实调用（无 LLM 静态兜底）——handout/script/mindmap 检查器全接入且 passed、产出联通、materials 元数据正常。
+
+**验证**：新增 10 测试全绿（test_round9_grade_gate.py + partial scoring）+ 相关 72 全绿。
+
+**文档**：CHANGELOG + 总需求 §4.7 + 技术说明 C.22 + 维护手册 §18.63 + 任务清单 NEW-26
+
 ### v1.2.9 §3.79 孤儿接线（5→3）+ 学段×学科教学质量真实验证（2026-08-20 ⭐）
 
 **本版定位**：回答"为何仍有孤儿模块" + 学段差异化教学质量真实验证（大学生 lecture 式/方法论/题型/举一反三是否满足）。

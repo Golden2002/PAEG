@@ -167,3 +167,41 @@ def test_lesson_prep_quality_report_has_material_checks():
     for _k in ("video_script_check", "handout_check", "script_check", "mindmap_check"):
         assert _k in qr, f"quality_report 缺 {_k}"
         assert qr[_k]["checked"] is True
+
+
+def test_lesson_prep_partial_request_scoring():
+    """§3.79 Round 9：部分产出请求（未含 PPT/视频）→ overall 按已产出维度重算（不误判 FAIL）。"""
+    from subagents import LessonPrep, LessonPlanInput
+
+    class _MockLLM:
+        name = "test_llm"
+
+        def chat(self, system=None, user=None, messages=None, max_tokens=512, **kwargs):
+            u = ""
+            if messages:
+                u = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+            elif user:
+                u = str(user)
+            if "教学骨架" in u or "教案" in u or "完整教案" in u:
+                return json.dumps({
+                    "framework": "5E",
+                    "objectives_3d": {"knowledge": ["能列举"], "ability": ["能分析"], "literacy": ["能设计"]},
+                    "key_points": ["k1", "k2"], "difficulties": ["d1"],
+                    "student_analysis": "学情分析",
+                    "sections": [{"id": i, "name": f"环节{i}", "duration_min": 5,
+                                  "stage": ("pre" if i == 1 else ("post" if i == 6 else "during")),
+                                  "case_teaching": "案例", "interaction": "互动"} for i in range(1, 7)],
+                    "blackboard": "板书", "reflection": "反思",
+                }, ensure_ascii=False)
+            return "这是讲义内容。" if "讲义" in u else "这是备课内容。"
+
+    lp = LessonPrep(model=_MockLLM(), kb=None)
+    inp = LessonPlanInput(topic="光合作用", subject="biology", grade="high_school",
+                          user_requested_assets=["handout", "script", "mindmap"])
+    res = lp.run(inp)
+    qr = res["quality_report"]
+    assert qr.get("scope") == "partial", "部分请求应标 scope=partial"
+    assert "overall_score_partial" in qr
+    # 已产出维度（教案 0.5 + 讲义 0.2 + 硬检 0.1）加权 ≥0.6 → PASS
+    assert qr["overall"] in ("PASS", "FAIL")
+    assert qr["overall_score_partial"] >= 0.6, f"partial 分 {qr['overall_score_partial']} 应达标"

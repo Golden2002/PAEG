@@ -2635,6 +2635,26 @@ class LessonPrep:
                 "passed": True, "errors": [], "checked": False, "list_items": 0, "levels": []}
         except Exception as _mq_e:
             print(f"[PAEG][subagents.py] 物料质量检查忽略: {_mq_e}")
+        # §3.79 Round 9 ⭐ 部分产出请求评分口径修复：
+        # 用户指定产出子集（requested 非空）时，未请求维度（PPT/视频）不应拉低 overall。
+        # 重算"已产出维度"加权（lesson_plan 0.5 / handout 0.2 / hard_checks 0.1；PPT 权重
+        # 按比例重新分配），并标注 scope=partial（不改 _score_lesson_plan 本体，additive）。
+        try:
+            if requested and not (set(requested) & {"ppt", "video_script"}):
+                _w_total = 0.5 + 0.2 + 0.1
+                _partial = round(
+                    (float(quality_report.get("lesson_plan_score") or 0) * 0.5
+                     + float(quality_report.get("handout_score") or 0) * 0.2
+                     + float(quality_report.get("hard_checks_ratio") or 0) * 0.1)
+                    / _w_total, 3)
+                quality_report["scope"] = "partial"
+                quality_report["overall_score_partial"] = _partial
+                quality_report["overall"] = "PASS" if _partial >= 0.6 else "FAIL"
+                quality_report["note"] = (
+                    f"部分产出请求（{requested}）：overall 按已产出维度重算 "
+                    f"（partial={_partial}，原 {quality_report.get('overall_score')}）")
+        except Exception as _pe:
+            print(f"[PAEG][subagents.py] partial 评分忽略: {_pe}")
 
         # 累计 token 实际消耗：按 max_tokens 计（估算；真实 token 在 _safe_reason_chat 内计）
         token_used = _LESSON_PLAN_BUDGET_USED  # 累计已扣（测试与审计用）

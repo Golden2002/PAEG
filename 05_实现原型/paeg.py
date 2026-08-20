@@ -506,6 +506,30 @@ class PAEG:
                 print(f"[PAEG][paeg.py] quality_signal 异常忽略: {_e}")
                 pass
                 pass
+            # §3.79 Round 9 ⭐ 学段特征输出守门：LLM 输出缺学段特征 → 补充段追加
+            # （Round 8 验证：考研/大学样本 LLM 遵循度参差；此处确定性检查 + 一次轻量补充）
+            try:
+                if presentation.get("llm_generated") and os.environ.get("PAEG_GRADE_GATE", "1") != "0":
+                    from services.grade_quality_gate import (
+                        check_grade_features, refine_for_grade)
+                    _ggrade = str(getattr(learner, "grade_level", "high_school") or "high_school")
+                    _chk = check_grade_features(presentation.get("content", ""), _ggrade)
+                    if _chk["missing"]:
+                        _add = refine_for_grade(
+                            self.model, presentation.get("content", ""),
+                            _ggrade, _chk["missing"], subject=subject, concept=question)
+                        if _add:
+                            presentation["content"] = str(presentation.get("content") or "") + _add
+                            presentation["grade_refined"] = True
+                            presentation["grade_refined_missing"] = _chk["missing"]
+                            self._log(f"   ★ 学段特征补充：{_ggrade} 缺失 {_chk['missing']} → 已追加")
+                            if _tr:
+                                _tr("grade_refine", grade=_ggrade,
+                                    missing="、".join(_chk["missing"]))
+            except Exception as _gg_e:
+                print(f"[PAEG][paeg.py] 学段守门忽略: {_gg_e}")
+                pass
+                pass
 
             # 4. 评估（每个呈现步骤后）—— v0.24 真正评估学生
             self._log(f"   -> 评估子代理：检查学生理解...")
