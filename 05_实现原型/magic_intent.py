@@ -20,6 +20,10 @@ MAGIC_PATTERNS = [
     (re.compile(r'^(你学过什么|你学过哪些|你学了什么|你懂什么|你掌握什么|你会什么|你了解什么|你的知识库|你有什么知识|你收藏了什么资料|你收着什么资料)$'), 'knowledge', 'magic:knowledge'),
     # 界面/使用口令
     (re.compile(r'^(怎么使用|怎么用|如何使用|操作指南|这个网站怎么用|这个页面怎么用|这个界面怎么用)$'), 'interface', 'magic:usage'),
+    # §3.69 备课子代理（v0.69+ ⭐）—— 零 LLM 直达 lesson_prep
+    (re.compile(r'^(我要备课|帮我备课|开始备课|备课模式|准备上课|这节课要备|备这节课|开始备这节课|备一下|备课一下)$'), 'lesson_prep', 'magic:lesson_prep'),
+    # 备课 + 主题/科目后缀（"备课导数" / "帮我备一下高中物理" / "帮我备一下高中物理导数课"）—— 主体可带后缀，关键词后允许 1 个汉字尾缀（课/章/下/上 等）
+    (re.compile(r'^(我要|帮我|开始|准备)?(备课|备一下|备这节课|备一下课)(.{0,15}(主题|科目|这节|今天|明天|下周|数学|语文|英语|物理|化学|生物|历史|地理|政治|导数).?)?$'), 'lesson_prep', 'magic:lesson_prep_topic'),
 ]
 
 
@@ -57,6 +61,15 @@ if __name__ == '__main__':
         ('什么是导数', None, False),
         ('今天天气怎么样', None, False),
         ('你好', None, False),          # 问候 → greeting 不走 magic
+        # §3.69 备课魔法词（v0.69+ ⭐）
+        ('我要备课', 'lesson_prep', True),
+        ('帮我备课', 'lesson_prep', True),
+        ('开始备课', 'lesson_prep', True),
+        ('备课模式', 'lesson_prep', True),
+        ('准备上课', 'lesson_prep', True),
+        ('帮我备一下高中物理', 'lesson_prep', True),
+        ('备课导数', 'lesson_prep', True),
+        ('备这节课', 'lesson_prep', True),
     ]
     for t, exp_intent, exp_hit in tests:
         r = match_magic(t)

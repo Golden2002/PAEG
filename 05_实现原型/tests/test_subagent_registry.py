@@ -2,10 +2,10 @@
 """test_subagent_registry.py —— §3.42 W3 ⭐ subagent provider registry 测试
 
 借鉴 deepseek-harness subagent registry：声明式注册（config 驱动启用/禁用/替换），
-不破坏现有调用（ratchet：9 个 subagent 类不动）。
+不破坏现有调用（ratchet：10 个（含 §3.69 lesson_prep） subagent 类不动）。
 
 测试覆盖：
-- test_registry_lists_all_subagents：registry 列出 9 个 subagent（name）
+- test_registry_lists_all_subagents：registry 列出 10 个（含 §3.69 lesson_prep） subagent（name）
 - test_registry_get_by_name：get("presenter") 返回 Presenter 类实例
 - test_registry_enable_disable：config 禁用某 subagent → get 返回 None
 - test_registry_custom_provider：注册自定义 provider 替换内置
@@ -27,7 +27,7 @@ if _ROOT not in sys.path:
 
 
 # ────────────────────────────────────────────────────────────
-# 9 个 subagent 类（import 自 subagents.py，ratchet：类本身不动）
+# 10 个（含 §3.69 lesson_prep） subagent 类（import 自 subagents.py，ratchet：类本身不动）
 # ────────────────────────────────────────────────────────────
 from subagents import (
     Diagnostor, Planner, Presenter, Evaluator, Adapter,
@@ -35,8 +35,8 @@ from subagents import (
 )
 
 
-# 任务约定的 9 个 subagent name（registry 默认注册的全部）
-NINE_SUBAGENT_NAMES = (
+# 任务约定的 10 个（含 §3.69 lesson_prep） subagent name（registry 默认注册的全部）
+TEN_SUBAGENT_NAMES = (
     "diagnostor",
     "planner",
     "presenter",
@@ -46,6 +46,7 @@ NINE_SUBAGENT_NAMES = (
     "affection_supportor",
     "individuality",
     "resource_librarian",
+    "lesson_prep",
 )
 
 
@@ -61,22 +62,22 @@ class _MockLLM:
 
 
 # ────────────────────────────────────────────────────────────
-# 1. registry 列出 9 个 subagent（name）
+# 1. registry 列出 10 个（含 §3.69 lesson_prep） subagent（name）
 # ────────────────────────────────────────────────────────────
 
 def test_registry_lists_all_subagents():
-    """registry.list() 应返回全部 9 个 subagent 的 name。"""
+    """registry.list() 应返回全部 10 个（含 §3.69 lesson_prep） subagent 的 name。"""
     from infra.subagent_registry import Registry
 
     reg = Registry()
     names = set(reg.list())
 
-    # 任务约定的 9 个必须全在
-    for n in NINE_SUBAGENT_NAMES:
+    # 任务约定的 10 个（含 §3.69 lesson_prep）必须全在
+    for n in TEN_SUBAGENT_NAMES:
         assert n in names, f"registry 缺少 {n}，实际有 {names}"
 
-    # 必须恰好 9 个（ratchet：不偷偷加新的）
-    assert len(names) == 9, f"registry 应恰好 9 个 subagent，实际 {len(names)}: {names}"
+    # 必须恰好 10 个（含 §3.69 lesson_prep）（ratchet：不偷偷加新的）
+    assert len(names) == 10, f"registry 应恰好 10 个 subagent，实际 {len(names)}: {names}"
 
 
 # ────────────────────────────────────────────────────────────
@@ -223,10 +224,10 @@ def test_registry_paeg_integration():
     assert out is not None
     assert out.get("session") is not None or out.get("summary", {}).get("mode") == "affection_bypass"
 
-    # 5c) get_default_registry() 返回单例且包含 9 个 subagent
+    # 5c) get_default_registry() 返回单例且包含 10 个（含 §3.69 lesson_prep） subagent
     default_reg = get_default_registry()
     assert default_reg is not None
-    assert len(default_reg.list()) == 9
+    assert len(default_reg.list()) == 10
 
     # 5d) 用 config 禁用某个 subagent → PAEG 该属性为 None（兼容 getattr 默认值语义）
     from infra.subagent_registry import configure_global_registry

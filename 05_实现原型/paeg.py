@@ -95,7 +95,7 @@ class PAEG:
         else:
             self._llm_for = lambda name: model_api
 
-        # v0.24 ⭐ 持有全部 9 个 subagent
+        # v0.24 ⭐ 持有全部 10 个 subagent（含 §3.69 lesson_prep）
         # §3.42 W3 ⭐ subagent provider registry：8 个核心 subagent 改用 registry.get()
         # 统一构造（config/agents.json enabled:false → 跳过/None），self_update_agent
         # 仍走 _get_self_update_agent() 懒加载（v0.42 P1 设计——教学路径不创建僵尸实例）。
@@ -139,6 +139,9 @@ class PAEG:
             llm=self._llm_for("resource_librarian"),
             kb=knowledge_base,
         )
+        # 10. 备课生成器（§3.69 第10个 subagent ⭐）—— 教案+讲义+讲稿+PPT+视频脚本+思维导图 8 步产出
+        self.lesson_prep = _registry.get("lesson_prep",
+                                         llm=self._llm_for("lesson_prep"), kb=knowledge_base)
         self.self_updater = SelfUpdater(knowledge_base) if enable_self_update else None
         # v0.12：语言优化 Agent（薇依语料矫正，去除 AI 痕迹）
         self.refiner = None

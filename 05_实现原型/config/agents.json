@@ -85,12 +85,21 @@
       "max_tokens": 800,
       "thinking_level": "OFF",
       "enabled": true
+    },
+    "lesson_prep": {
+      "provider": "auto",
+      "model": null,
+      "temperature": 0.7,
+      "max_tokens": 4000,
+      "thinking_level": "A",
+      "enabled": true
     }
   },
   "_usage_examples": {
     "为 presenter 换模型": "改 agents.presenter.model 为 'deepseek-v4-flash' 或改 provider 为 'openai' + model 'gpt-4o-mini'",
     "关闭某 subagent": "改 agents.evaluator.enabled 为 false（回退确定性规则）",
     "调温度": "改 agents.presenter.temperature 为 0.5（更严谨）或 0.9（更有创意）",
-    "思考级别": "A=深度思考链 / B=普通chat / OFF=不调用LLM（确定性规则）"
+    "思考级别": "A=深度思考链 / B=普通chat / OFF=不调用LLM（确定性规则）",
+    "lesson_prep": "新 §3.69 subagent，备课 8 步生成器（教案+讲义+讲稿+PPT+视频脚本+思维导图）"
   }
 }

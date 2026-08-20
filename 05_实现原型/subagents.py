@@ -18,7 +18,7 @@ from __future__ import annotations  # 延迟求值注解，避免与 paeg.py 的
 import os  # v0.42 ⭐ P0 修复：_pre_retrieve 的 Library 分支使用 os.path，此前顶层缺 import 导致每次调用抛 NameError，三线检索只剩 KB 一线
 
 from typing import Optional
-from dataclasses import dataclass  # v0.48 ⭐ 判读层 AffectionTurnAnalysis 用
+from dataclasses import dataclass, field  # v0.48 ⭐ 判读层 AffectionTurnAnalysis 用；v0.71 备课 LessonPlanInput 默认值用
 
 from prompts import build_presenter_system, build_presenter_user, normalize_subject
 from prompts import _build_questionnaire_block  # v0.43 ⭐ 注册问卷固定提示词（answer/affection 共用）
@@ -570,6 +570,7 @@ def _safe_chat_with_retrieval(model, system: str, user: str = None,
 SUBAGENT_THINKING_LEVELS: dict = {
     # A 路径：生成型（开放式长文本，受益于真思考链）
     "presenter": "A",       # 教学讲解
+    "lesson_prep": "A",  # §3.69 备课生成器（开放式长文本产出，受益于深度思考链）
     "answer_solver": "A",   # 复杂解答
     # B 路径：混合型（含少量生成，但 JSON/结构化输出需防思考链污染）
     "diagnostor": "B",      # JSON（枚举+列表+narrative）
@@ -1128,10 +1129,12 @@ class Presenter:
             )
             # §3.57 ⭐ 教学追问指令注入（Oracle 方案）：teach_stream 判定追问后
             # 把 action 指令存 learner._follow_instruction，此处注入 system prompt
+            # §3.62 ⭐ 强化：指令放 system 最开头（最高优先级，避免被其他指令淹没——
+            # 曾导致 give_example 被理解成'换方式'而非'给例子'）
             try:
                 _follow_inst = getattr(learner, "_follow_instruction", "")
                 if _follow_inst:
-                    system = system + "\n\n" + _follow_inst
+                    system = _follow_inst + "\n\n" + system
                     # 单轮消费，避免污染后续教学
                     setattr(learner, "_follow_instruction", "")
             except Exception:
@@ -1587,6 +1590,530 @@ class ResourceLibrarian:
             "scope": _scope,
             "keywords": _kw,
             "ppt_outline": _outline,
+        }
+
+
+# ---------------------------------------------------------------------------
+# v0.71 ⭐ 备课 subagent（LessonPrep）
+# 8 步渐进式生成：①教案骨架（syllabus）→ ②完整教案（lesson_plan）→ ③讲义（handout）
+# → ④讲稿（script）→ ⑤PPT 大纲（ppt_outline）→ ⑥视频脚本（video_script，理科才生成）
+# → ⑦思维导图（mindmap）→ ⑧质量检查（quality_report）
+#
+# 设计契约（参照 Planner / ResourceLibrarian / Presenter 模式）：
+# - 每步 max_tokens=3000，8 步累计 24000 ≤ 25000 预算（独立 token 池，不抢教学池）
+# - 每步走 _safe_reason_chat + subagent="lesson_prep"（矩阵已声明 A 路径，§3.69）
+# - LLM 失败 / 无 LLM / 超预算 → 静态模板兜底（确定性、可测试）
+# - 用户面向的 text 类输出走 services.lang_gate.lang_gate_content(...) 守门
+# - system 提示词优先用 prompts.build_lesson_planner_system（T2 任务会补），缺失回退简版
+# ---------------------------------------------------------------------------
+
+# 备课 token 预算（独立锁，避免与教学 _TOKEN_BUDGET 互抢；累计输出 token 上限 25000）
+_LESSON_PLAN_BUDGET_MAX = 25000
+_LESSON_PLAN_BUDGET_USED = 0
+_LESSON_PLAN_BUDGET_LOCK = _threading.Lock()
+
+
+def _consume_lesson_plan_budget(tokens: int) -> bool:
+    """备课 token 预算闸门；超限返回 False（调用方降级到静态模板）。"""
+    global _LESSON_PLAN_BUDGET_USED
+    with _LESSON_PLAN_BUDGET_LOCK:
+        if _LESSON_PLAN_BUDGET_USED + tokens > _LESSON_PLAN_BUDGET_MAX:
+            return False
+        _LESSON_PLAN_BUDGET_USED += tokens
+        return True
+
+
+def _reset_lesson_plan_budget() -> None:
+    """测试钩子：重置备课预算。"""
+    global _LESSON_PLAN_BUDGET_USED
+    with _LESSON_PLAN_BUDGET_LOCK:
+        _LESSON_PLAN_BUDGET_USED = 0
+
+
+def _lang_gate_safe(text: str, step: str) -> str:
+    """对生成内容做语言规范守门（异常时静默回退原文）。
+
+    step 取值：syllabus / lesson_plan / handout / script / ppt / video / mindmap / quality。
+    """
+    if not text or not text.strip():
+        return text or ""
+    try:
+        from services.lang_gate import lang_gate_content
+        return lang_gate_content(text, context=f"lesson_prep:{step}")
+    except Exception:
+        return text
+
+
+def _lesson_planner_system_via_prompts(topic: str, subject: str, grade: str,
+                                        step: str, objectives: list) -> str:
+    """优先走 prompts.build_lesson_planner_system（T2 任务会建）；缺失则回退简版。"""
+    try:
+        from prompts import build_lesson_planner_system
+        return build_lesson_planner_system(
+            topic=topic, subject=subject, grade=grade,
+            step=step, objectives=objectives or [],
+        )
+    except Exception:
+        # 兜底：9 层结构（参照 build_presenter_system：角色/学科/学段/主题/步骤/任务/输出/语调/反AI味）
+        _obj = "；".join(str(o) for o in (objectives or []))[:200] or "（未指定三维目标）"
+        return (
+            f"你是 PAEG 的备课教师（{subject} · {grade}）。\n"
+            f"主题：{topic}\n当前步骤：{step}\n三维目标：{_obj}\n\n"
+            "## 输出要求\n"
+            "- 严格按本步骤说明的 JSON / Markdown 字段输出，不要额外解释\n"
+            "- 严禁编造事实，不确定处明确写'需查阅资料'\n"
+            "- 用规范中文：主谓宾完整、动宾搭配正确、避免省略句\n"
+            "- 反对 AI 味：不堆砌'赋能/抓手/闭环'等口水词\n\n"
+            "## 薇依语调\n"
+            "- 真实优先：不粉饰、不虚构、贴近学生认知\n"
+            "- 朴素克制：少形容词，多事实与具体例子\n"
+        )
+
+
+# 学科分类（理科才生成视频脚本；其余学科跳过步骤 6）
+_SCIENCE_SUBJECTS = frozenset({
+    "biology", "chemistry", "physics", "math", "science",
+    "生物", "化学", "物理", "数学", "理综", "科学",
+})
+
+
+@dataclass
+class LessonPlanInput:
+    """备课输入契约（v0.71 ⭐ 新增）。
+
+    - topic 必填（如"光合作用"）
+    - subject 默认 biology（与生物方向教学主流程一致）
+    - grade 默认 high_school；四档：junior / high_school / undergrad / exam
+    - objectives 三维目标（知识与技能 / 过程与方法 / 情感态度价值观）
+    - constraints {constraint_layer, lang_gate, framework} —— 上游约束层透传
+    - user_requested_assets 用户明确索要的产出；空 list = 默认全产出
+    """
+    topic: str
+    subject: str = "biology"
+    grade: str = "high_school"
+    duration_min: int = 45
+    objectives: list = field(default_factory=list)
+    learner_profile: dict = field(default_factory=dict)
+    constraints: dict = field(default_factory=dict)
+    user_requested_assets: list = field(default_factory=list)
+    progressive: bool = True
+
+
+# 静态兜底模板（LLM 失败 / 预算耗尽时返回；确定性、可测试）
+def _static_lesson_plan_template(topic: str, subject: str, grade: str,
+                                 duration_min: int) -> dict:
+    return {
+        "framework": "5E 教学模型（引入→探究→解释→精化→评价）",
+        "objectives_3d": {
+            "knowledge_skill": [f"理解「{topic}」的核心概念"],
+            "process_method": [f"能用所学解释「{topic}」相关现象"],
+            "affection": [f"体会「{topic}」与日常生活的关联"],
+        },
+        "key_points": [f"{topic} 的定义与原理"],
+        "difficulties": [f"{topic} 的内在机理（易混淆点）"],
+        "student_analysis": f"学段：{grade}；主题：{topic}",
+        "sections": [
+            {"id": 1, "name": "导入", "duration_min": max(3, duration_min // 12)},
+            {"id": 2, "name": "新授", "duration_min": duration_min // 4},
+            {"id": 3, "name": "探究", "duration_min": duration_min // 4},
+            {"id": 4, "name": "练习", "duration_min": duration_min // 6},
+            {"id": 5, "name": "小结", "duration_min": duration_min // 12},
+            {"id": 6, "name": "作业", "duration_min": 1},
+        ],
+        "blackboard": f"【板书】\n{topic}\n  ├─ 定义\n  └─ 关键要点",
+        "reflection": "课后记录：学生掌握度 + 改进点",
+        "_static_fallback": True,
+    }
+
+
+def _static_handout(topic: str) -> str:
+    return (
+        f"# 讲义：{topic}\n\n"
+        f"## 一、学习目标\n理解 {topic} 的核心概念与应用。\n\n"
+        f"## 二、核心内容\n（按教学环节展开）\n\n"
+        f"## 三、典型例题\n\n\n## 四、巩固练习\n\n\n## 五、小结\n"
+    )
+
+
+def _static_script(topic: str, duration_min: int) -> str:
+    return (
+        f"# 讲稿：{topic}（约 {duration_min} 分钟）\n\n"
+        f"## 开场（约 3 分钟）\n同学们好，今天我们学习 {topic}。\n\n"
+        f"## 主体（约 {max(5, duration_min - 8)} 分钟）\n（按教案环节逐段讲解）\n\n"
+        f"## 小结（约 3 分钟）\n本节核心要点回顾。\n"
+    )
+
+
+def _static_ppt_outline(topic: str) -> list:
+    return [
+        {"slide": 1, "title": f"导入：{topic}", "points": ["生活实例", "问题引入"]},
+        {"slide": 2, "title": f"{topic} 定义", "points": ["核心概念", "关键术语"]},
+        {"slide": 3, "title": f"{topic} 原理", "points": ["机制 1", "机制 2"]},
+        {"slide": 4, "title": f"{topic} 应用", "points": ["案例 1", "案例 2"]},
+        {"slide": 5, "title": "小结", "points": ["核心要点回顾", "思考题"]},
+    ]
+
+
+def _static_video_script(topic: str) -> str:
+    return (
+        f"# 视频脚本：{topic}\n\n"
+        f"## 镜头 1（开场 30 秒）\n画面：实验室/生活场景；旁白：引入 {topic}。\n\n"
+        f"## 镜头 2（主体 60 秒）\n画面：动画/示意图；旁白：核心机制拆解。\n\n"
+        f"## 镜头 3（总结 20 秒）\n画面：回顾要点；旁白：要点复述。\n"
+    )
+
+
+def _static_mindmap(topic: str) -> str:
+    return (
+        f"# 思维导图：{topic}\n\n"
+        f"- {topic}\n"
+        f"  - 定义\n"
+        f"  - 原理\n"
+        f"    - 子要点 A\n"
+        f"    - 子要点 B\n"
+        f"  - 应用\n"
+        f"  - 误区\n"
+    )
+
+
+def _parse_json_safely(text: str) -> Optional[dict]:
+    """从 LLM 文本中抽取 JSON 块（兼容 ```json ... ``` 包裹或裸 JSON）。"""
+    if not text:
+        return None
+    t = text.strip().strip("`")
+    # 去常见 markdown 包裹
+    for _prefix in ("json\n", "JSON\n"):
+        if t.startswith(_prefix):
+            t = t[len(_prefix):]
+    _s, _e = t.find("{"), t.rfind("}")
+    if _s < 0 or _e <= _s:
+        return None
+    try:
+        import json as _json
+        return _json.loads(t[_s:_e + 1])
+    except Exception:
+        return None
+
+
+def _score_lesson_plan(plan: dict, handout: str, video_script: str) -> dict:
+    """确定性六维质量打分（无 LLM，可测试可复现）。
+
+    教案六维（每维 0-1，加权合成）：
+      1. 三维目标可测动词（25%）：含'理解/能/体会'等可观察动词
+      2. 学情分析（10%）：student_analysis 非空
+      3. 重点难点（15%）：key_points + difficulties 双非空
+      4. 教学环节 6 段（25%）：sections 长度 6 且每段有 name+duration_min
+      5. 板书（10%）：blackboard 非空
+      6. 反思（15%）：reflection 非空
+
+    附加维度：讲义（handout）字数、视频脚本（理科）非空。
+
+    返回：{lesson_plan_score, handout_score, video_script_score,
+           violations: [{dim, msg}], overall: 'PASS'|'FAIL', overall_score}
+    PASS 阈值：overall_score >= 0.6 且 violations 不含致命违规。
+    """
+    violations = []
+    plan = plan or {}
+
+    # 1. 三维目标可测动词
+    obj = plan.get("objectives_3d") or {}
+    obj_flat = []
+    if isinstance(obj, dict):
+        for _v in obj.values():
+            if isinstance(_v, list):
+                obj_flat.extend(str(x) for x in _v)
+    measurable = sum(
+        1 for x in obj_flat if any(k in x for k in ("理解", "能", "会", "体会", "掌握", "运用"))
+    )
+    score_obj = min(1.0, measurable / 3.0) if obj_flat else 0.0
+    if not obj_flat:
+        violations.append({"dim": "三维目标", "msg": "三维目标为空"})
+    elif measurable < 2:
+        violations.append({"dim": "三维目标", "msg": f"可测动词仅 {measurable} 个（>=2 才达标）"})
+
+    # 2. 学情分析
+    student_analysis = str(plan.get("student_analysis") or "").strip()
+    score_analysis = 1.0 if student_analysis else 0.0
+    if not student_analysis:
+        violations.append({"dim": "学情分析", "msg": "缺少 student_analysis"})
+
+    # 3. 重点难点
+    kp = plan.get("key_points") or []
+    df = plan.get("difficulties") or []
+    score_kd = (min(1.0, len(kp) / 2.0) + min(1.0, len(df) / 1.0)) / 2.0 if (kp or df) else 0.0
+    if not kp:
+        violations.append({"dim": "重点", "msg": "缺少 key_points"})
+    if not df:
+        violations.append({"dim": "难点", "msg": "缺少 difficulties"})
+
+    # 4. 教学环节 6 段
+    secs = plan.get("sections") or []
+    if len(secs) == 6 and all(
+        isinstance(s, dict) and s.get("name") and s.get("duration_min")
+        for s in secs
+    ):
+        score_secs = 1.0
+    elif 3 <= len(secs) <= 8:
+        score_secs = 0.6  # 部分达标
+        violations.append({"dim": "教学环节", "msg": f"教学环节 {len(secs)} 段（建议 6 段）"})
+    else:
+        score_secs = 0.0
+        violations.append({"dim": "教学环节", "msg": f"教学环节数 {len(secs)} 异常"})
+
+    # 5. 板书
+    board = str(plan.get("blackboard") or "").strip()
+    score_board = 1.0 if board else 0.0
+    if not board:
+        violations.append({"dim": "板书", "msg": "缺少 blackboard"})
+
+    # 6. 反思
+    refl = str(plan.get("reflection") or "").strip()
+    score_refl = 1.0 if refl else 0.0
+    if not refl:
+        violations.append({"dim": "反思", "msg": "缺少 reflection"})
+
+    # 教案综合（加权）
+    lesson_plan_score = (
+        score_obj * 0.25
+        + score_analysis * 0.10
+        + score_kd * 0.15
+        + score_secs * 0.25
+        + score_board * 0.10
+        + score_refl * 0.15
+    )
+    lesson_plan_score = round(lesson_plan_score, 3)
+
+    # 讲义（字数 + 含目标词）
+    handout_chars = len(handout or "")
+    if handout_chars >= 300:
+        handout_score = min(1.0, handout_chars / 800.0)
+    elif handout_chars > 0:
+        handout_score = 0.4
+        violations.append({"dim": "讲义", "msg": f"讲义字数 {handout_chars} 偏短（>=300 达标）"})
+    else:
+        handout_score = 0.0
+        violations.append({"dim": "讲义", "msg": "讲义为空"})
+
+    # 视频脚本（仅参考分，不计入 PASS 致命）
+    video_chars = len(video_script or "")
+    if video_chars == 0:
+        video_script_score = None  # 文科不生成
+    elif video_chars >= 200:
+        video_script_score = min(1.0, video_chars / 600.0)
+    else:
+        video_script_score = 0.5
+        violations.append({"dim": "视频脚本", "msg": f"视频脚本字数 {video_chars} 偏短"})
+
+    # 整体 PASS/FAIL
+    overall_score = lesson_plan_score * 0.7 + handout_score * 0.3
+    overall_score = round(overall_score, 3)
+    fatal = [v for v in violations if v["dim"] in ("三维目标", "教学环节")]
+    overall = "PASS" if (overall_score >= 0.6 and not fatal) else "FAIL"
+
+    return {
+        "lesson_plan_score": lesson_plan_score,
+        "handout_score": round(handout_score, 3),
+        "video_script_score": round(video_script_score, 3) if video_script_score is not None else None,
+        "violations": violations,
+        "overall": overall,
+        "overall_score": overall_score,
+    }
+
+
+class LessonPrep:
+    """备课 subagent（v0.71 ⭐ 新增）。
+
+    8 步渐进式生成：syllabus → lesson_plan → handout → script → ppt_outline
+    → video_script（理科）→ mindmap → quality_report。
+
+    返回 dict 必有键：lesson_plan / handout / script / ppt_outline / video_script /
+    mindmap / quality_report / token_used / mode="lesson_prep"。
+    """
+
+    def __init__(self, model, kb=None):
+        self.model = model
+        self.kb = kb
+        self.llm = model  # 与 Presenter/ResourceLibrarian 一致：暴露 llm 别名
+
+    # ── 内部：单步 LLM 调用（统一封装） ──
+    def _step_chat(self, system: str, user: str, step: str,
+                   max_tokens: int = 3000) -> Optional[str]:
+        """单步 LLM 调用；模型非真实/预算超限 → None（调用方走静态模板）。
+
+        step 命名：syllabus / lesson_plan / handout / script / ppt / video / mindmap / quality
+        """
+        if not _is_real_llm(self.model):
+            return None
+        if not _consume_lesson_plan_budget(max_tokens):
+            return None
+        try:
+            return _safe_reason_chat(
+                self.model, system, user,
+                max_tokens=max_tokens,
+                subagent="lesson_prep",
+                enable_reasoning=True,
+            )
+        except Exception:
+            return None
+
+    # ── 主入口 ──
+    def run(self, inp: "LessonPlanInput", learner=None,
+            progressive: bool = True) -> dict:
+        """8 步渐进式备课；任一步失败走静态模板兜底。
+
+        Args:
+            inp: LessonPlanInput（topic 必填，其余有默认）
+            learner: 学习者画像（可选；用于丰富 system 上下文）
+            progressive: 是否逐步生成（True=8 步；False=单次 LLM 直出骨架——预留接口，
+                当前实现仍走渐进式以保质量门禁生效；未来可加 fast_path）
+
+        Returns:
+            dict 含 7 主键 + token_used + mode
+        """
+        topic = inp.topic
+        subject = inp.subject
+        grade = inp.grade
+        duration = int(inp.duration_min or 45)
+        objectives = list(inp.objectives or [])
+        requested = list(inp.user_requested_assets or [])
+
+        # ── 步骤 ①：教案骨架 syllabus ──
+        syllabus_sys = _lesson_planner_system_via_prompts(
+            topic, subject, grade, "syllabus", objectives)
+        syllabus_user = (
+            f"主题：{topic}\n学科：{subject}\n学段：{grade}\n时长：{duration} 分钟\n"
+            f"三维目标：{('；'.join(objectives)) if objectives else '（未指定，按主题自行拟定）'}\n\n"
+            "请输出教学骨架（JSON）：\n"
+            "- framework: 教学模型名（如 5E / BOPPPS / 情境-探究-迁移）\n"
+            "- outline: 3-6 段教学环节名（仅名字，不要展开）\n"
+            "- key_themes: 3-5 个核心主题词"
+        )
+        syllabus_raw = self._step_chat(syllabus_sys, syllabus_user, "syllabus")
+        syllabus = _parse_json_safely(syllabus_raw) if syllabus_raw else None
+
+        # ── 步骤 ②：完整教案 lesson_plan ──
+        lp_sys = _lesson_planner_system_via_prompts(topic, subject, grade, "lesson_plan", objectives)
+        lp_user = (
+            f"基于骨架：{syllabus or {'framework': '5E 教学模型'}}\n"
+            f"主题：{topic}\n学科：{subject}\n学段：{grade}\n时长：{duration} 分钟\n"
+            f"三维目标：{objectives or '按主题自行拟定'}\n\n"
+            "请输出完整教案（严格 JSON，键固定）：\n"
+            "{\n"
+            '  "framework": "...",\n'
+            '  "objectives_3d": {"knowledge_skill": [...], "process_method": [...], "affection": [...]},\n'
+            '  "key_points": [...], "difficulties": [...],\n'
+            '  "student_analysis": "...",\n'
+            '  "sections": [{"id":1,"name":"...","duration_min":..}, ... 6 段],\n'
+            '  "blackboard": "...",\n'
+            '  "reflection": "..."\n'
+            "}"
+        )
+        lp_raw = self._step_chat(lp_sys, lp_user, "lesson_plan")
+        lesson_plan = _parse_json_safely(lp_raw) if lp_raw else None
+        if lesson_plan is None:
+            lesson_plan = _static_lesson_plan_template(topic, subject, grade, duration)
+
+        # ── 步骤 ③：讲义 handout ──
+        if not requested or "handout" in requested:
+            h_sys = _lesson_planner_system_via_prompts(topic, subject, grade, "handout", objectives)
+            h_user = (
+                f"基于教案生成配套讲义（Markdown）：\n"
+                f"教案要点：{lesson_plan.get('key_points', [])}\n"
+                f"重点：{lesson_plan.get('key_points', [])}\n"
+                f"难点：{lesson_plan.get('difficulties', [])}\n\n"
+                "格式：\n# 讲义：{topic}\n## 一、学习目标\n## 二、核心内容\n"
+                "## 三、典型例题\n## 四、巩固练习\n## 五、小结"
+            )
+            h_raw = self._step_chat(h_sys, h_user, "handout")
+            handout = _lang_gate_safe(h_raw or "", "handout") if h_raw else _static_handout(topic)
+        else:
+            handout = ""
+
+        # ── 步骤 ④：讲稿 script ──
+        if not requested or "script" in requested:
+            s_sys = _lesson_planner_system_via_prompts(topic, subject, grade, "script", objectives)
+            s_user = (
+                f"基于教案生成讲稿（Markdown，按环节分段）：\n"
+                f"教学环节：{[s.get('name') for s in lesson_plan.get('sections', [])]}\n"
+                f"时长：{duration} 分钟\n\n"
+                "结构：开场 → 主体（按环节）→ 小结。每段标注大致时长。"
+            )
+            s_raw = self._step_chat(s_sys, s_user, "script")
+            script = _lang_gate_safe(s_raw or "", "script") if s_raw else _static_script(topic, duration)
+        else:
+            script = ""
+
+        # ── 步骤 ⑤：PPT 大纲 ppt_outline ──
+        if not requested or "ppt" in requested:
+            p_sys = _lesson_planner_system_via_prompts(topic, subject, grade, "ppt", objectives)
+            p_user = (
+                f"基于教案生成 PPT 大纲（严格 JSON 数组，4-7 页）：\n"
+                f"教案：{lesson_plan}\n\n"
+                '格式：[{"slide":1,"title":"...","points":[...]}, ...]'
+            )
+            p_raw = self._step_chat(p_sys, p_user, "ppt")
+            ppt_parsed = _parse_json_safely(p_raw) if p_raw else None
+            if isinstance(ppt_parsed, list):
+                ppt_outline = ppt_parsed
+            else:
+                # 文本兜底：拆行转 list
+                _lines = [ln.strip() for ln in (p_raw or "").split("\n") if ln.strip()]
+                ppt_outline = _lines if _lines else _static_ppt_outline(topic)
+        else:
+            ppt_outline = []
+
+        # ── 步骤 ⑥：视频脚本 video_script（仅理科） ──
+        is_science = subject in _SCIENCE_SUBJECTS or any(
+            k in subject for k in ("bio", "chem", "phys", "math")
+        )
+        if (not requested or "video_script" in requested) and is_science:
+            v_sys = _lesson_planner_system_via_prompts(topic, subject, grade, "video", objectives)
+            v_user = (
+                f"基于教案生成 90-120 秒短视频脚本（Markdown）：\n"
+                f"核心机制：{lesson_plan.get('key_points', [])}\n"
+                f"难点可视化：{lesson_plan.get('difficulties', [])}\n\n"
+                "结构：镜头 1（开场 30s）→ 镜头 2（主体 60s）→ 镜头 3（总结 20s）。"
+                "每镜头含【画面】+【旁白】。"
+            )
+            v_raw = self._step_chat(v_sys, v_user, "video")
+            video_script = _lang_gate_safe(v_raw or "", "video") if v_raw else _static_video_script(topic)
+        else:
+            video_script = ""
+
+        # ── 步骤 ⑦：思维导图 mindmap ──
+        if not requested or "mindmap" in requested:
+            m_sys = _lesson_planner_system_via_prompts(topic, subject, grade, "mindmap", objectives)
+            m_user = (
+                f"基于教案生成思维导图（Markdown 缩进树）：\n"
+                f"教案要点：{lesson_plan.get('key_points', [])}\n"
+                f"难点：{lesson_plan.get('difficulties', [])}\n\n"
+                "格式：根节点 → 一级分支（3-5 个）→ 二级要点。禁止任何额外说明。"
+            )
+            m_raw = self._step_chat(m_sys, m_user, "mindmap")
+            mindmap = _lang_gate_safe(m_raw or "", "mindmap") if m_raw else _static_mindmap(topic)
+        else:
+            mindmap = ""
+
+        # ── 步骤 ⑧：质量检查 quality_report（确定性，无 LLM） ──
+        quality_report = _score_lesson_plan(lesson_plan, handout, video_script)
+
+        # 累计 token 实际消耗：按 max_tokens 计（估算；真实 token 在 _safe_reason_chat 内计）
+        token_used = _LESSON_PLAN_BUDGET_USED  # 累计已扣（测试与审计用）
+
+        return {
+            "lesson_plan": lesson_plan,
+            "handout": handout,
+            "script": script,
+            "ppt_outline": ppt_outline,
+            "video_script": video_script,
+            "mindmap": mindmap,
+            "quality_report": quality_report,
+            "token_used": token_used,
+            "mode": "lesson_prep",
+            "syllabus": syllabus,  # 步骤 ① 骨架，方便上层回溯/审计
+            "subject": subject,
+            "grade": grade,
+            "topic": topic,
         }
 
 

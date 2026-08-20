@@ -77,6 +77,27 @@ def teach():
     # v0.26 ⭐ 二级学科/子主题（前端 SUBFIELD_TREE 三级选择；可空=未选）
     subtopic = (data.get("subtopic") or "").strip()
 
+    # §3.69 ⭐ 备课子代理 sync fast-path（与 SSE 版对称）
+    # magic_intent 命中"我要备课"/"帮我备课"/"备课 X"等 → lesson_prep 8 步生成器直出。
+    # 失败静默退化到正常教学链路（_rfi/registry 不可用不影响 teach）。
+    try:
+        from meta_router import rule_fallback_intent as _rfi
+        _rfi_res = _rfi(str(concept)[:120])
+        if _rfi_res.get("intent") == "lesson_prep":
+            _paeg_instance = _paeg()
+            if getattr(_paeg_instance, "lesson_prep", None) is not None:
+                from subagents import LessonPlanInput
+                _lpi = LessonPlanInput(
+                    topic=str(concept)[:80], subject=str(subject or "通用"),
+                    grade=getattr(learner, "grade_level", "high_school"),
+                    duration_min=45, objectives=[], learner_profile={},
+                    constraints={}, user_requested_assets=[], progressive=True,
+                )
+                _lp_res = _paeg_instance.lesson_prep.run(_lpi, learner=learner, progressive=True)
+                return jsonify({"mode": "lesson_prep", **_lp_res})
+    except Exception as _lp_e:
+        print(f"[PAEG] lesson_prep sync fast-path 跳过: {_lp_e}")
+
     # v0.19.26：Agent Steering — 自动识别学科并覆盖用户设定（在拦截器之前）
     try:
         _steer = _steer_subject(concept, subject, learner, learner_id, llm=llm, evolver=_evolver())

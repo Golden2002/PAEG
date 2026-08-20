@@ -1480,6 +1480,289 @@ def _build_questionnaire_block(learner) -> str:
         return ""
 
 
+# ============================================================
+# v0.72 ⭐ 备课质量标准 + Lesson Planner 系统提示词构建
+# 三层质量标准（教案 / 课件 / 视频脚本）+ 12 条硬性检查清单
+# 源： 张宇扬课件 18 条 + 教育部课标 / UbD / 5E / Bloom 修订版 + Mayer 12 原则
+# 注入点： build_lesson_planner_system， 复用 build_presenter_system 的所有
+#         部件（get_style / _GRADE_GUIDE / get_grade_mode / get_grade_scaffold /
+#         _build_questionnaire_block / _build_constraint_layers / TRUTH_GROUNDING /
+#         LANGUAGE_STYLE 等）， 不复制教学对话规则（备课是结构化产出， 不是教学）。
+# ============================================================
+LESSON_PLANNER_QUALITY_CRITERIA = {
+    "lesson_plan": {
+        "objectives_3d": "三维目标（知识/能力/素养）用可观测动词（能列举/能分析/能设计），禁止'了解/掌握/熟悉'独立使用",
+        "student_analysis": "学情分析须含前备知识、认知特征、迷思概念预判",
+        "key_difficult": "重点难点各≥2条且附理由；难点给突破策略",
+        "sections": "教学环节≥5段（导入/新授/探究/巩固/小结/作业），每段含教师活动/学生活动/设计意图/时长",
+        "blackboard": "板书设计含主区（结构化推导）+辅区（易错提示）布局描述",
+        "reflection": "教学反思≥3条具体改进点（禁空话）",
+    },
+    "slides": {
+        "rule_6x6": "单页≤6行文字×每行≤6词（英文≤8词），超则拆页",
+        "one_theme": "一页一重点，每页1-2个核心概念",
+        "derivation": "推导页左→右逐步可视化，不直接跳最终公式",
+        "colors": "配色≤3种，对比度≥4.5:1，深底浅字或浅底深字",
+        "font": "标题36-48pt，正文24-32pt",
+        "visual_focus": "每页必有1个视觉焦点（图/公式/大字），无'全是文字'页",
+    },
+    "video_script": {
+        "pace": "每8-15秒一个画面切换",
+        "aha": "每节至少1个'啊哈时刻'（可视化揭示直觉）",
+        "derivation": "公式逐步推导不跳结论，配合手写笔迹感",
+        "color_code": "颜色编码一致：正向=蓝/负向=红/中性=灰/定义=橙",
+        "takeaway": "收尾必给take-away一句话总结",
+    },
+    "hard_checks": [
+        "三级层次结构（总章/节/小节）清晰",
+        "元学习指引（前置知识/学习目标/难度评级）",
+        "节末有3-5行总结",
+        "核心/拓展内容显式分流（*号或标注）",
+        "每核心概念绑定≥1位历史人物",
+        "≥1处第一手文献引用",
+        "≥1处跨学科连接",
+        "易混概念配对比表",
+        "例题用真实数据场景（非虚构数字）",
+        "每节≥1个启发式思考题",
+        "抽象概念配类比/隐喻",
+        "公式出现前先给直觉解释",
+    ],
+}
+
+
+def is_lesson_plan_input_valid(inp: dict) -> list:
+    """验证备课输入参数（供测试与上层路由使用）。
+
+    返回错误信息列表， 空列表 = 合法。覆盖三类错误：
+      - input 不是 dict
+      - topic / subject / grade 为空
+      - subject 不在 SUBJECT_STYLES（用 normalize_subject 归一化后判定）
+      - grade 不在 _GRADE_GUIDE（合法学段：all_grades/middle_school/high_school/undergraduate/graduate_exam）
+    """
+    errors = []
+    if not isinstance(inp, dict):
+        return ["input 必须为 dict"]
+    topic = (inp.get("topic") or "").strip() if isinstance(inp.get("topic"), str) else ""
+    if not topic:
+        errors.append("topic 不能为空")
+    subject_raw = inp.get("subject")
+    subject = (subject_raw or "").strip() if isinstance(subject_raw, str) else ""
+    if not subject:
+        errors.append("subject 不能为空")
+    else:
+        try:
+            subj_key = normalize_subject(subject)
+        except Exception:
+            subj_key = "default"
+        # normalize_subject 把未知输入归一为 "default"（"default" 本身是 SUBJECT_STYLES 的回退键，
+        # 不代表真实学科）。判定"学科已知"：归一结果不是 "default"，且 _SUBJECT_ALIASES 有该输入。
+        alias_hit = subject.lower() in _SUBJECT_ALIASES or subject in _SUBJECT_ALIASES
+        if subj_key == "default" or not alias_hit:
+            errors.append(
+                f"学科未知：{subject}（normalize_subject={subj_key}，"
+                f"未在 _SUBJECT_ALIASES 中命中）"
+            )
+    grade_raw = inp.get("grade")
+    grade = (grade_raw or "").strip() if isinstance(grade_raw, str) else ""
+    valid_grades = sorted(_GRADE_GUIDE.keys())
+    if not grade:
+        errors.append("grade 不能为空")
+    elif grade not in _GRADE_GUIDE:
+        errors.append(f"学段非法：{grade}（合法值：{valid_grades}）")
+    return errors
+
+
+def build_lesson_planner_system(topic: str, subject: str, grade: str,
+                                learner=None) -> str:
+    """构建 Lesson Planner 的 system prompt（v0.72 ⭐）。
+
+    角色定位： 10 年教学经验的 {grade} {subject} 教师， 正在为「{topic}」备课。
+    产出将被一线教师直接采用， 须严格按 LESSON_PLANNER_QUALITY_CRITERIA
+    三层质量标准 + 12 条硬性检查清单输出严格 JSON。
+
+    复用 build_presenter_system 的所有可复用部件（详见模块顶部注释），
+    不复制其教学对话规则（备课是结构化产出， 不是面向学生的实时讲解）。
+
+    Args:
+        topic:   备课主题（必填， 非空）
+        subject: 学科 key 或中文名（经 normalize_subject 归一化）
+        grade:   学段 key（all_grades/middle_school/high_school/undergraduate/graduate_exam）
+        learner: 可选， 注册画像（问卷答案）对象， 同 build_presenter_system
+    Returns:
+        完整 system prompt 字符串。
+    """
+    topic = (topic or "").strip() or "未指定主题"
+    subject_raw = (subject or "").strip() or "default"
+    grade_raw = (grade or "").strip() or "high_school"
+
+    # 复用 1：学科风格（persona / language / structure / emphasis / subfield / method）
+    style = get_style(subject_raw)
+
+    # 复用 2：学段适配（depth / tone_extra）
+    grade_key = grade_raw if grade_raw in _GRADE_GUIDE else "high_school"
+    g = _GRADE_GUIDE[grade_key]
+    grade_line = (f"\n## 学段适配（{g['label']}）\n"
+                  f"讲解深度与方式：{g['depth']}\n"
+                  f"语气：{g['tone_extra']}")
+
+    # 复用 3：6 维教学法结构骨架
+    try:
+        _gm = get_grade_mode(grade_key)
+        grade_mode_line = "\n" + _gm["system"]
+    except Exception:
+        grade_mode_line = ""
+
+    # 复用 4：5 段可执行结构骨架
+    try:
+        _scaf = get_grade_scaffold(grade_key)
+        scaffold_line = render_scaffold_to_system(_scaf, subject_raw)
+    except Exception:
+        scaffold_line = ""
+
+    # 复用 5：用户专属画像（问卷答案）
+    questionnaire_line = ""
+    try:
+        _q = _build_questionnaire_block(learner)
+        if _q:
+            questionnaire_line = "\n\n" + _q
+    except Exception:
+        questionnaire_line = ""
+
+    # 复用 6：8 层约束分级
+    try:
+        constraint_layers_line = "\n\n" + _build_constraint_layers()
+    except Exception:
+        constraint_layers_line = ""
+
+    grade_cn = g["label"]
+    subject_cn = style["label"]
+
+    # 角色 + 三维目标撰写规范
+    role_block = f"""## 角色定位（v0.72 ⭐）
+你是一位有 10 年教学经验的 {grade_cn} {subject_cn} 教师， 正在为「{topic}」备课。
+你产出的教案/课件/视频脚本将被一线教师**直接采用**——它必须今天就能用，
+不是教学参考， 而是"明天上课就拿着讲"的那种落地材料。
+请始终以这个身份思考： 这份材料到了另一位老师手里， 他能直接用吗？
+
+## 三维目标撰写规范（v0.72 ⭐ 关键）
+目标必须落到三维， 每维用**可观测动词**书写
+（能列举/能分析/能设计/能比较/能评价/能迁移），
+**禁止**使用"了解/掌握/熟悉/理解/认识"等模糊动词独立成条。
+
+- **知识维度**： 学生能说出/列举/复述的事实性知识
+  （例： 能列举光合作用两阶段的产物）
+- **能力维度**： 学生能做的认知操作
+  （例： 能分析光反应与暗反应的耦合关系）
+- **素养维度**： 学生能迁移应用/设计/评价的高阶能力
+  （例： 能设计实验验证光合作用必要条件）
+
+每条目标必须满足"动词 + 对象 + 条件"三要素
+（Bloom 修订版 + Anderson 2001 修订）。"""
+
+    # 输出格式要求（严格 JSON schema）
+    output_format_block = f"""## 输出格式要求（v0.72 ⭐ 严格 JSON）
+你必须**只输出严格 JSON**， 禁止任何额外说明/注释/Markdown 包裹。
+直接以 {{ 开头， 以 }} 结尾。字段名/类型/嵌套结构必须严格符合下述 schema。
+
+{{
+  "topic": "{topic}",
+  "subject": "{subject_raw}",
+  "grade": "{grade_key}",
+  "objectives_3d": {{
+    "knowledge": ["能列举..."],
+    "ability":   ["能分析..."],
+    "literacy":  ["能设计..."]
+  }},
+  "student_analysis": {{
+    "prior_knowledge": ["..."],
+    "cognition":       "...",
+    "misconceptions":  ["..."]
+  }},
+  "key_points": [{{"point": "...", "reason": "..."}}],
+  "difficult_points": [{{"point": "...", "reason": "...", "breakthrough": "..."}}],
+  "sections": [
+    {{
+      "name":             "导入",
+      "teacher_activity": "...",
+      "student_activity": "...",
+      "design_intent":    "...",
+      "duration":         "5min"
+    }}
+  ],
+  "blackboard": {{
+    "main": "主区： 结构化推导...",
+    "aux":  "辅区： 易错提示..."
+  }},
+  "reflection": ["具体改进点 1", "具体改进点 2", "具体改进点 3"],
+  "slides": [
+    {{
+      "page":         1,
+      "title":        "...",
+      "key_points":   ["..."],
+      "visual_focus": "公式/图/大字",
+      "layout":       "左→右推导"
+    }}
+  ],
+  "video_script": [
+    {{
+      "section":   "...",
+      "duration":  "30s",
+      "scenes":    ["..."],
+      "narration": "...",
+      "takeaway":  "一句话总结"
+    }}
+  ]
+}}"""
+
+    # 备课质量标准（最强约束， 位于最末段）
+    qc = LESSON_PLANNER_QUALITY_CRITERIA
+    criteria_block = "## 备课质量标准（v0.72 ⭐ 最强约束 · 位于最末段， 违反任何一条即视为不合格）\n\n"
+    criteria_block += "### 第一层 · 教案质量（lesson_plan）\n"
+    for k, v in qc["lesson_plan"].items():
+        criteria_block += f"- **{k}**： {v}\n"
+    criteria_block += "\n### 第二层 · 课件质量（slides）\n"
+    for k, v in qc["slides"].items():
+        criteria_block += f"- **{k}**： {v}\n"
+    criteria_block += "\n### 第三层 · 视频脚本质量（video_script）\n"
+    for k, v in qc["video_script"].items():
+        criteria_block += f"- **{k}**： {v}\n"
+    criteria_block += (
+        "\n### 12 条硬性检查清单（hard_checks）\n"
+        "源： 张宇扬课件 18 条 + 教育部课标 / UbD / 5E / Bloom 修订版 + Mayer 12 原则。\n"
+        "每一条都必须在输出中明确体现， 缺一即视为不合格：\n"
+    )
+    for i, item in enumerate(qc["hard_checks"], 1):
+        criteria_block += f"{i}. {item}\n"
+
+    return f"""{TRUTH_GROUNDING}
+
+{role_block}
+
+## 当前任务： 备课（v0.72 ⭐ Lesson Planner）
+- 主题： {topic}
+- 学科： {subject_cn}
+- 学段： {grade_cn}
+{grade_line}
+{grade_mode_line}
+{scaffold_line}
+{questionnaire_line}
+{constraint_layers_line}
+
+## 学科教学风格（v0.72 ⭐ 复用 SUBJECT_STYLES）
+- 角色定位： {style['persona']}
+- 怎么讲： {style['language']}
+- 备课节奏： {style['structure']}
+- 教学侧重： {style['emphasis']}
+{('## 学科分支导航（v0.26 ⭐ 本学科特有， 若已定义则必须遵守）\n' + style['subfield_guide']) if style.get('subfield_guide') else ''}
+{('## 解题方法论（v0.66+ ⭐ 本学科特有， 若已定义则必须遵守）\n' + style['method_guide']) if style.get('method_guide') else ''}
+
+{LANGUAGE_STYLE}
+
+{output_format_block}
+
+{criteria_block}"""
+
+
 def build_presenter_system(subject: str, tone: str,
                            learner=None, kb_node: Optional[dict] = None,
                            strategy_line: str = "",
