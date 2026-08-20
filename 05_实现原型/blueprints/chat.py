@@ -265,10 +265,10 @@ def general_chat():
                 "4) 用规范流利的中文自然对话。"
             )
             search_user = f"[检索到的资料]\n{search_result}\n\n[学生的问题]\n{text}\n\n请基于以上资料回答，标注 [来源 N]。"
-            reply = _safe_chat(llm, search_sys, search_user, max_tokens=1500) or \
-                _safe_chat(llm, system, user, max_tokens=1500)
+            reply = _safe_chat(llm, search_sys, search_user, max_tokens=3000) or \
+                _safe_chat(llm, system, user, max_tokens=3000)
         else:
-            reply = _safe_chat(llm, system, user, max_tokens=1500)
+            reply = _safe_chat(llm, system, user, max_tokens=3000)
 
     # v0.18：专业深度守门员——回答生成后评估，不足则让 LLM 改进一次（任务1）
     try:
@@ -723,7 +723,7 @@ def general_chat_stream():
         except Exception:
             reply = None
         if not reply or reply.startswith("（模型调用失败"):
-            reply = _safe_chat(llm, system, user, max_tokens=1500) or \
+            reply = _safe_chat(llm, system, user, max_tokens=3000) or \
                 f"我听到你说：{text}。想多说说吗？我会认真听。"
             # v0.37.2 ⭐ Oracle P2 修复：兜底分支也发 retrieval 徽章（此前缺失，
             # 前端看不到"已完成知识库检索"——看似没检索）
