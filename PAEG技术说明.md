@@ -1401,11 +1401,11 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 
 **关键约束**：公网部署必须经 cloudflared 或 TLS 终结（HTTPS 是 STT 前置条件）；Docker 依赖同步纪律见 §7.4；可选重依赖（torch / pix2tex）默认不装、缺失降级。
 
-### 7.10 备课模式（§3.69/§3.73 · v1.1.9+ 第 10 个 subagent）
+### 7.10 备课模式（§3.69/§3.73/§3.75 · v1.1.9+ 第 10 个 subagent）
 
 > **「我要备课」是备课模式的独立激活词**（ULW 风格）——在教学模式下，**在输入内容前加上「我要备课」** 即进入备课模式，启用 LessonPrep 备课 subagent，按张宇扬课件级质量标准渐进式产出完整教学物料。
 
-**两种使用方式**：
+**三种使用方式**（§3.73/§3.75）：
 
 ```
 方式一：一步到位（推荐）
@@ -1414,24 +1414,28 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 
 方式二：先激活后补充
   用户：我要备课
-  PAEG：（引导）你想备哪门课、哪个知识点？大概多长时间？有什么特别要求吗？
+  PAEG：（引导·结构化缺失提示）我还需要：1.学科+学段 2.知识点 3.课时长度（已填字段自动剔除）
   用户：高中数学，函数单调性，45分钟
-  PAEG：自动合并需求 → 产出
+  PAEG：确定性短路识别补充句 → 自动合并产出
+
+方式三：多轮修改（§3.75）
+  用户：（生成后）重点讲图像变换
+  PAEG：识别修改指令 → 基于上一版重新生成（mode=lesson_prep_modify）
 ```
 
 **技术实现**：
 
 | 组件 | 说明 |
 |---|---|
-| `magic_intent.py` | 独立激活词正则：`^我要备课$`（纯词→引导）与 `^我要备课[:：\s、,，]*(.{1,60}?)$`（带需求→直接生成） |
-| `meta_router._extract_lesson_topic()` | 零 LLM 提取 {topic, subject, grade, duration_min, extra_requirement}；先剥离"我要备课"前缀 → 再 extra（重点讲X）→ 学科/学段 → 时长；topic <2 字返回 {} 触发引导 |
-| `meta_router.is_lesson_prep_supplement()` | 引导后第二轮识别（学科/时长/课题词命中 ≥2，排除聊天意图）——支持"先激活后补充" |
-| `server.py` fast-path | 三分类：topic 完整→直接生成；topic 空→引导分支（零 LLM SSE）；session 标记（10 分钟 TTL）合并引导后补充 |
-| `LessonPrep`（subagents.py） | 8 步渐进式生成：教案骨架→完整教案→讲义→讲稿→PPT 大纲→视频脚本（理科）→思维导图→质量报告；独立 token 预算 25000 |
+| `magic_intent.py` | 独立激活词正则：`^我要备课$`（纯词→引导）与 `^我要备课[:：\s、,，]*(.{1,60}?)$`（带需求→直接生成）；不做变体匹配 |
+| `meta_router._extract_lesson_topic()` | 零 LLM 提取 {topic, subject, grade, duration_min, extra_requirement}；先剥离"我要备课"前缀 → 再 extra（重点讲X）→ 学科/学段 → 时长；topic 空但有 subject/grade → 返回部分 dict（供引导剔除已填字段） |
+| `server.py` fast-path | 三分类：topic 完整→直接生成；topic 空→引导分支（零 LLM SSE + intent_frame 结构化）；pending 标记 + 确定性短路→引导后补充合并 |
+| `server.py` 多轮修改 | `_MODIFY_RE` 修改指令识别（独立于 rfi intent）+ `lesson_prep_last_{learner_id}` 状态 + 修改路由（mode=lesson_prep_modify） |
+| `LessonPrep`（subagents.py） | 8 步渐进式生成：教案骨架→完整教案→讲义→讲稿→PPT 大纲→视频脚本（理科）→思维导图→质量报告；独立 token 预算 25000；`run` 支持 `prior_lesson_plan`（多轮修改基于上一版） |
 
-**质量标准（三源融合）**：张宇扬课件 18 条（历史人物锚定/原典引用/真实数据例题/节末思考题）+ 教育部课标/UbD/5E/Bloom（三维目标可测动词/学情含迷思概念/评价与目标对齐）+ Mayer 多媒体 12 原则（一页一重点/6×6 法则/推导可视化）。
+**质量标准（三源融合 + §3.75 教师AI指引）**：张宇扬课件 18 条 + 教育部课标/UbD/5E/Bloom + Mayer 多媒体 12 原则；**§3.75 新增**——教案须分课前/课中/课后三维（stage: pre/during/post），课中段必含 1 案例教学 + 1 互动环节（均含设计目的/实施步骤/预期效果）。
 
-**质量守门（§3.71）**：每份产出过四类评分（教案 6 维 / 讲义 / PPT 大纲 5 维 / 视频脚本）+ **12 条硬性检查**（7 自动 + 5 LLM 评审），产出 `dim_scores` 与 `eval_mode`；`/api/lesson_prep/feedback` 收集教师反馈（L3 人工评估）。**PPT 自动配图**：三级来源（用户资料库 → 公共文件夹 → 联网 Bing 免 key）+ 缓存，缺图不阻塞。
+**质量守门（§3.71/§3.75）**：每份产出过四类评分（教案 6 维 / 讲义 / PPT 大纲 5 维 / 视频脚本）+ **15 条硬性检查**（7 自动 + 5 LLM 评审 + 3 条 §3.75：三维结构/案例教学/互动环节），产出 `dim_scores` 与 `eval_mode`；`/api/lesson_prep/feedback` 收集教师反馈（L3 人工评估）。**PPT 自动配图**：三级来源（用户资料库 → 公共文件夹 → 联网 Bing 免 key）+ 缓存，缺图不阻塞。
 
 ## 附录 A 术语表
 
