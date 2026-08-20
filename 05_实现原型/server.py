@@ -607,21 +607,79 @@ def teach_stream():
     except Exception as _e:
         print(f"[PAEG] teach_stream 情绪支持钩子跳过: {_e}")
 
-    # §3.69 ⭐ 备课子代理 fast-path：magic 词命中 → 8 步生成器流式输出
+    # §3.69/§3.73 ⭐ 备课子代理 fast-path："我要备课"独立激活词（ULW 风格）
     # 优先级链：crisis → emotion → lesson_prep → file → steer → teaching
-    # rule_fallback_intent 优先吃"我要备课/帮我备课"/"备课导数"等零 LLM 直达路径。
+    # 三分类：topic 完整→直接生成；topic 空→引导分支（零 LLM）；session 标记合并引导后补充
     try:
-        from meta_router import rule_fallback_intent as _rfi
+        from meta_router import rule_fallback_intent as _rfi, _extract_lesson_topic as _elt
+        from magic_intent import match_magic as _mm
         _rfi_res = _rfi(str(concept)[:120])
-        with open(r"C:\Users\团聚体\AppData\Local\Temp\opencode\lesson_prep_trace.log", "a", encoding="utf-8") as _tf:
-            _tf.write(f"[teach_stream] concept={str(concept)[:30]!r} rfi={_rfi_res}\n")
-        if _rfi_res.get("intent") == "lesson_prep" and paeg.lesson_prep is not None:
+        _lp_pending_key = f"lesson_prep_pending_{learner_id}"
+        _pending = SESSIONS.get(_lp_pending_key)
+        # ── 引导后补充合并：pending 标记 + 确定性短路（A+ 方案：结构化 intent_frame）──
+        # §3.73/Oracle A+：不拼接"备课需求："字符串，不用 LLM followup 判定——
+        # 用结构化 frame {intent, pending} + 字段正则短路（命中即补充，零 LLM）
+        _force_lesson_prep = False
+        if _pending and (time.time() - _pending.get("asked_at", 0)) < 600:
+            try:
+                _t = str(concept)[:200]
+                _has_field = bool(
+                    re.search(r'数学|语文|英语|物理|化学|生物|历史|地理|政治|科学|信息技术|初中|高中|大学|考研', _t)
+                    or re.search(r'\d{1,3}\s*(分钟|分|min|课时|学时|一节)', _t, re.I)
+                    or re.search(r'函数|导数|光合作用|牛顿|电场|磁场|语法|诗词|文言文|算法|受力|基因|三角|向量|圆锥|电磁|有机|酸碱|氧化还原', _t)
+                )
+                if _has_field and not _mm(str(concept)):
+                    _force_lesson_prep = True
+            except Exception as _me:
+                print(f"[PAEG] 备课补充判定跳过: {_me}")
+
+        if (_rfi_res.get("intent") == "lesson_prep" or _force_lesson_prep) and paeg.lesson_prep is not None:
+            # ── 合并提取：优先补充句，其次魔法词后缀 ──
+            _merged = None
+            if _force_lesson_prep:
+                _merged = _elt(str(concept)[:200])
+                if _merged.get("topic"):
+                    SESSIONS.pop(_lp_pending_key, None)
+            _extracted = _merged if _merged else _elt(str(concept)[:200])
+
+            # ── 引导分支：纯"我要备课"无主题 → 零 LLM 单轮追问 ──
+            if not _extracted or not _extracted.get("topic"):
+                _guide_msg = (
+                    "好的，咱们来备课\n\n"
+                    "为了备出贴合你班级的教案，请告诉我三件事：\n\n"
+                    "1. 学科 + 学段：例如「高中数学」「初二物理」\n"
+                    "2. 知识点 / 课题：例如「函数的单调性」「光合作用」\n"
+                    "3. 课时长度：例如「45 分钟」「一课时」\n\n"
+                    "也可以一次说全：`我要备课：高中数学，函数单调性，45分钟，重点讲图像变换`\n"
+                    "有特别要求（实验器材、跨学科融合、特定题型等）也可以一并告诉我"
+                )
+                # 引导分支：写入 pending 标记 + 结构化 intent_frame（A+ 方案）
+                # ——引导后补充句用确定性短路识别（字段正则），无需 LLM followup 判定
+                SESSIONS[_lp_pending_key] = {"asked_at": time.time(), "source": str(concept)[:80]}
+                SESSIONS[f"current_intent_{learner_id}"] = "lesson_prep"
+                SESSIONS[f"current_intent_frame_{learner_id}"] = {
+                    "intent": "lesson_prep", "pending": ["subject", "topic", "duration"]}
+
+                def gen_guide():
+                    _save_teach_turn("lesson_prep_guide", _guide_msg)
+                    yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _guide_msg, 'step_type': 'lesson_prep_guide'}, ensure_ascii=False)}\n\n"
+                    yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'lesson_prep_guide', 'guide': True, 'needs_topic': True}, ensure_ascii=False)}\n\n"
+                return Response(gen_guide(), mimetype="text/event-stream",
+                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+            # ── 直接生成分支：用提取字段构造 LessonPlanInput（含 extra_requirement）──
             from subagents import LessonPlanInput
+            _constraints = {}
+            _objectives = list(_extracted.get("extra_requirement") or [])
+            if _extracted.get("extra_requirement"):
+                _constraints["extra_requirement"] = _extracted["extra_requirement"]
             _lpi = LessonPlanInput(
-                topic=str(concept)[:80], subject=str(subject or "通用"),
-                grade=getattr(learner, "grade_level", "high_school"),
-                duration_min=45, objectives=[], learner_profile={},
-                constraints={}, user_requested_assets=[], progressive=True,
+                topic=_extracted["topic"][:80],
+                subject=_extracted.get("subject") or str(subject or "通用"),
+                grade=_extracted.get("grade") or getattr(learner, "grade_level", "high_school"),
+                duration_min=int(_extracted.get("duration_min") or 45),
+                objectives=_objectives, learner_profile={},
+                constraints=_constraints, user_requested_assets=[], progressive=True,
             )
             _lp_res = paeg.lesson_prep.run(_lpi, learner=learner, progressive=True)
 
