@@ -2705,6 +2705,7 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 
 **全部完成（2026-08-20）**
 
+
 1. **Oracle 设计**（bg_bc07039e）：LessonPlanner 第 10 subagent 完整设计（职责边界/输入输出契约/接线架构/增强功能四层/魔法词路由/兼容守护）
 2. **调研**：explore 张宇扬课件 18 条质量标准（结构4/内容6/教学法5/元信息3）；explore PAEG 接线点盘点（magic_intent 未接线是天然挂载点）；librarian 优秀教案标准（教育部课标/UbD/ADDIE/5E/Bloom/Mayer 12 原则/Khanmigo 分块法）
 3. **代码落地**（全部验证通过）：
@@ -2780,5 +2781,37 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 
 ### 实施记录
 
-（完成后更新）
+**真实教师试用 QA 与本地化配置（2026-08-20 更新）**
+
+#### 1. secret 本地化配置（用户第 4 项要求 · 已完成 ✅）
+
+- **现状**：key 原在 `C:\Users\团聚体\.local\share\opencode\auth.json`（系统级）
+- **完成**：创建项目 `secret/auth.json`（复制系统级凭据，含 deepseek/anthropic）；`llm_api._find_opencode_auth()` 探测链**新增项目 secret 最高优先级**（§3.70 本地化）
+- **git 安全**：`.gitignore` 已有 `auth.json` 系列忽略规则（auth.json/auth.json.bak/auth.json.*）——`secret/auth.json` 自动被忽略，**绝不推送** ✅
+- **验证**：无 env 注入下探测成功读 deepseek key（sk-e4296...）
+
+#### 2. 备课功能真实用户 QA（§3.69 遗留 · 已跑通 ✅）
+
+**"卡住"根因排查结论**（三层）：
+1. **端口冲突**：旧 PAEG 实例（PID 7224，2 天前启动）一直占用 5000/8765——所有测试请求打到旧代码。已清理（clean_ports.py 逻辑）
+2. **生成耗时**：lesson_prep.run() 真实 LLM 8 步串行 ≈ **82-84s**，curl/Playwright 60s 默认超时 → 显示"卡住"。功能本身正常
+3. **前端缺渲染**：SSE 解析器无 lesson_plan/handout/script/ppt_outline/video_script/mindmap/quality_report 分支——后端 8 事件全发出但前端丢弃。**已修复**（index.html 加备课事件渲染：标签卡片 + JSON/Markdown 展示）
+
+**修复清单**：
+- `09_GUI前端/index.html`：备课 7 事件渲染分支（📋教案/📄讲义/🎙讲稿/🖥PPT大纲/🎬视频脚本/🧠思维导图/✅质量报告）
+- `llm_api.py`：`_find_opencode_auth()` 加项目 secret/auth.json 最高优先级
+- `secret/auth.json`：创建（本地化凭据，git 忽略）
+
+**最终验证**（真实 LLM + 真实后端 + Playwright）：
+- `/api/teach/stream` 返回全部 8 事件（lesson_plan→handout→script→ppt_outline→video_script→mindmap→quality_report→done）
+- 教案质量分 **lesson_plan_score=1.0**，`_static_fallback: False`（真实 LLM 生成，非模板兜底）
+- Playwright 页面渲染出全部备课卡片
+- 快速开始文档（README）含"我要备课"引导（§3.69 已写）
+
+**遗留**：生成耗时 82s 可优化（8 步串行→可考虑并行/降步数/流式逐步呈现，列入后续）
+
+#### 3. 待办（用户第 2/3 项）
+- [ ] README 改造参考 ai-job-search（32K★ 结构：真实效果→快速开始分步→文件结构→自定义）
+- [ ] PPT 图片增强（§3.70 主体——联网检索图/资料库提取/公共文件夹，Oracle 咨询中）
+
 

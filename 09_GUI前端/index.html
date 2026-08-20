@@ -2931,6 +2931,32 @@ async function teach(question, subject, subtopic) {
           addMsg('paeg', `已生成${typeCn}：<b>${escapeHtml(obj.filename || '')}</b><br><br>` +
             `<a class="download-link" href="${obj.md_url}" download><img class="link-icon" src="assets/icons/download.svg" alt="下载"/> 下载 ${typeCn}</a>` +
             (obj.html_url ? ` <a class="download-link" href="${obj.html_url}" target="_blank" style="margin-left:10px">预览</a>` : ''));
+        } else if (event === 'lesson_plan' || event === 'handout' || event === 'script' ||
+                   event === 'ppt_outline' || event === 'video_script' || event === 'mindmap' ||
+                   event === 'quality_report') {
+          // §3.69 ⭐ 备课事件渲染：lesson_prep 8 步产出的各资产渲染为可见气泡
+          const LABELS = {
+            lesson_plan: '📋 教案', handout: '📄 讲义', script: '🎙 讲稿',
+            ppt_outline: '🖥 PPT 大纲', video_script: '🎬 视频脚本',
+            mindmap: '🧠 思维导图', quality_report: '✅ 质量报告'
+          };
+          const label = LABELS[event] || event;
+          let pretty;
+          try { pretty = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2); } catch (e) { pretty = String(obj); }
+          // 事件带标题的组件直接展开；纯 JSON 转 Markdown 代码块
+          let inner;
+          if (typeof obj === 'object' && obj !== null && (obj.title || obj.content || obj.plan || obj.sections)) {
+            inner = typeof marked !== 'undefined'
+              ? marked.parse(pretty)
+              : `<pre>${escapeHtml(pretty)}</pre>`;
+          } else {
+            inner = `<pre style="white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;margin:6px 0;">${escapeHtml(pretty)}</pre>`;
+          }
+          addMsg('paeg', `<div style="margin:4px 0 8px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);">
+            <div style="font-weight:600;margin-bottom:6px;font-size:13px;">${label}</div>
+            ${inner}
+          </div>`);
+          chatWin.scrollTop = chatWin.scrollHeight;
         } else if (event === 'done') {
           // v0.27：消费 done 事件——自动维护学科/学段下拉
           try {
