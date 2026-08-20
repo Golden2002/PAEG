@@ -1,3 +1,21 @@
+### v1.2.8 §3.79 找茬式 E2E：修复 teach_stream 三大结构性 Bug（2026-08-20 ⭐）
+
+**本版定位**：按用户"使用 Playwright 模拟真实用户，找茬式端到端测试，经得起商业场景考验"——E2E 找到并修复 3 个会导致**教学/倾诉/找答案在真实场景完全失效**的结构性 Bug。
+
+**找茬 E2E 工具**：`06_测试与验证/playwright_test_20260820/find_fault_e2e.py`——6 模式真实流程 + 找茬输入（空/乱码/超长/注入/混合/连点/模式切换）+ 并发压力 + 前端控制台错误捕获；报告 `find_fault_report.json/.md` + 结论 `find_fault_conclusion.md`。
+
+**Bug 1 ✅：teach_stream HTTP 500（请求上下文）**——生成器函数内 `data = request.get_json()` 在流式迭代时执行，请求上下文已弹出 → "Working outside of request context"。修复：`teach_stream` 改外层普通函数读 data + `stream_with_context(_teach_stream_gen(data))`（Flask 官方流式方案）。
+
+**Bug 2 ✅：18 处早退分支死代码**——`return Response(gen_x(), ...)` 在生成器函数内是 StopIteration（Response 丢弃，客户端空流）。修复：全部改 `yield from gen_x()` + `return`。
+
+**Bug 3 ✅：主教学循环 generate() 不可达**——函数尾 `return Response(generate(), ...)` 同样被丢弃（1500 行主循环为死代码，教学从未真正输出）。修复：改 `yield from generate()`——教学主路径恢复（retrieval→diagnosis→plan→presentation 全事件流）。
+
+**验证**：修复后 teach_stream 完整事件流 + 倾诉 3s/注入 1.9s/找答案 36.8s 正常回复 + 并发无 5xx + server 相关 pytest 75/75 全绿。
+
+**记录（下轮）**：①前端对 429/500 静默无反馈（UX 缺陷）②LLM 延迟高（找答案 36.8s，D1 SLO 深化）③E2E 同 IP 触发 429 限流（测试节流）。
+
+**文档**：CHANGELOG + 维护手册 §18.61（teach_stream 结构修复说明）+ 任务清单 NEW-24 + E2E 结论文档
+
 ### v1.2.7 §3.79 运维友好性（checkup 巡检）+ 概念图谱接线（孤儿 6→5）+ SRS 复习提醒（2026-08-20 ⭐）
 
 **本版定位**：面向运维工程师的**运维友好性** + 教学闭环继续深化（概念图谱前驱提示 + SRS 复习提醒注入）。

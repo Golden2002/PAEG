@@ -792,8 +792,22 @@ def teach_stream():
     """流式教学接口（SSE）。
 
     与 /api/teach 相同请求，但响应是 Server-Sent Events 流。
+    §3.79 v1.2.7 ⭐ 修复（找茬 E2E 发现）：原函数是生成器函数，`data = request.get_json`
+    在流式迭代时才惰性执行——此时请求上下文已弹出 → "Working outside of request context" 500。
+    现改为：外层普通函数在请求上下文内读 data + `stream_with_context` 包裹内层生成器
+    （Flask 官方 streaming 方案，流式期间请求上下文全程保持）。
     """
     data = request.get_json(force=True)
+    from flask import stream_with_context
+    return Response(
+        stream_with_context(_teach_stream_gen(data)),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+def _teach_stream_gen(data):
+    """teach_stream 流式生成器（原函数体；data 由外层传入，不再在流式期间访问 request）。"""
 
     # §3.42 W2 ⭐ trace_id 全链路：请求入口生成（events 自动携带）
     try:
@@ -919,8 +933,8 @@ def teach_stream():
                 _save_teach_turn("affection", _aff_reply.get("content", ""))  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _aff_reply.get('content', ''), 'step_type': 'affection'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'affection'}, ensure_ascii=False)}\n\n"
-            return Response(gen_aff(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_aff()
+            return
     except Exception as _e:
         print(f"[PAEG] teach_stream 情绪支持钩子跳过: {_e}")
 
@@ -982,8 +996,8 @@ def teach_stream():
                     if payload:
                         yield f"event: {k}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'lesson_prep_modify', 'token_used': _lp_res.get('token_used', 0)}, ensure_ascii=False)}\n\n"
-            return Response(gen_lp_mod(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_lp_mod()
+            return
 
         if (_rfi_res.get("intent") == "lesson_prep" or _force_lesson_prep) and paeg.lesson_prep is not None:
             # ── 合并提取：优先补充句，其次魔法词后缀 ──
@@ -1023,8 +1037,8 @@ def teach_stream():
                     _save_teach_turn("lesson_prep_guide", _guide_msg)
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _guide_msg, 'step_type': 'lesson_prep_guide'}, ensure_ascii=False)}\n\n"
                     yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'lesson_prep_guide', 'guide': True, 'needs_topic': True}, ensure_ascii=False)}\n\n"
-                return Response(gen_guide(), mimetype="text/event-stream",
-                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+                yield from gen_guide()
+                return
 
             # ── 直接生成分支：用提取字段构造 LessonPlanInput（含 extra_requirement）──
             from subagents import LessonPlanInput
@@ -1058,8 +1072,8 @@ def teach_stream():
                     if payload:
                         yield f"event: {k}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'lesson_prep', 'token_used': _lp_res.get('token_used', 0)}, ensure_ascii=False)}\n\n"
-            return Response(gen_lp(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_lp()
+            return
     except Exception as _lp_e:
         print(f"[PAEG] lesson_prep fast-path 跳过: {_lp_e}")
         pass
@@ -1102,8 +1116,8 @@ def teach_stream():
                     for i in range(0, len(_gb_content), 60):
                         yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _gb_content[i:i+60], 'step_type': 'grade_blocked_subject'}, ensure_ascii=False)}\n\n"
                     yield f"event: done\ndata: {json.dumps({'status': 'completed', 'grade_blocked': True, 'required_grade': (_steer.get('response').get_json().get('required_grade', '') if _steer.get('response') is not None else '')}, ensure_ascii=False)}\n\n"
-                return Response(gen_grade_blocked(), mimetype="text/event-stream",
-                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+                yield from gen_grade_blocked()
+                return
         if _steer.get("unknown"):
             # 未收录学科 → SSE 推反馈
             _unk = _steer_unknown_response(concept, learner, learner_id,
@@ -1122,8 +1136,8 @@ def teach_stream():
                 for i in range(0, len(_unk_content), 60):
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _unk_content[i:i+60], 'step_type': 'unregistered_subject'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed', 'unregistered_subject': True}, ensure_ascii=False)}\n\n"
-            return Response(gen_unknown(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_unknown()
+            return
         if _steer.get("switched"):
             subject = _steer["subject"]
     except Exception as _steer_e:
@@ -1307,8 +1321,8 @@ def teach_stream():
                 for i in range(0, len(_ui_reply), 60):
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _ui_reply[i:i+60], 'step_type': 'interface'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-            return Response(gen_ui(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_ui()
+            return
     except Exception as _e:
         print(f"[PAEG][server.py] gen_ui 异常忽略: {_e}")
         pass
@@ -1332,8 +1346,8 @@ def teach_stream():
                 for i in range(0, len(_rec_content), 60):
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _rec_content[i:i+60], 'step_type': 'recommend'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-            return Response(gen_rec(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_rec()
+            return
     except Exception as _e:
         print(f"[PAEG][server.py] gen_rec 异常忽略: {_e}")
         pass
@@ -1351,8 +1365,8 @@ def teach_stream():
                 for i in range(0, len(_kb_content), 60):
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _kb_content[i:i+60], 'step_type': 'knowledge'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-            return Response(gen_kb(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_kb()
+            return
     except Exception as _e:
         print(f"[PAEG][server.py] gen_kb 异常忽略: {_e}")
         pass
@@ -1379,8 +1393,8 @@ def teach_stream():
                 for i in range(0, len(_map_content), 60):
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _map_content[i:i+60], 'step_type': 'knowledge_map'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-            return Response(gen_map(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_map()
+            return
     except Exception as _e:
         print(f"[PAEG][server.py] gen_map 异常忽略: {_e}")
         pass
@@ -1412,8 +1426,8 @@ def teach_stream():
                 _save_teach_turn("chat", _grep)  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _grep, 'step_type': 'chat'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-            return Response(gen_composite(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_composite()
+            return
     except Exception as _e:
         print(f"[PAEG][server.py] gen_composite 异常忽略: {_e}")
         pass
@@ -1445,8 +1459,8 @@ def teach_stream():
                 _save_teach_turn("ppt", _ppt_reply)  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _ppt_reply, 'step_type': 'ppt'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'ppt'}, ensure_ascii=False)}\n\n"
-            return Response(gen_ppt(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_ppt()
+            return
     except Exception as _e:
         print(f"[PAEG][server.py] gen_ppt 异常忽略: {_e}")
         pass
@@ -1493,8 +1507,8 @@ def teach_stream():
                 _save_teach_turn("chat", g_reply)  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': g_reply, 'step_type': 'chat'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-            return Response(gen_intent(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_intent()
+            return
         else:
             # v0.34 ⭐ 兜底二次防御：LLM 误判（返回 chat/其他不明类型）但用户显式选了具体学科
             # → 强制教学（教学端点语义契约：进入 /api/teach/stream 即视为教学意图）
@@ -1523,8 +1537,8 @@ def teach_stream():
                     _save_teach_turn("chat", g_reply)  # v0.36.2 早退分支补保存
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': g_reply, 'step_type': 'chat'}, ensure_ascii=False)}\n\n"
                     yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-                return Response(gen_intent(), mimetype="text/event-stream",
-                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+                yield from gen_intent()
+                return
     except Exception as _e:
         print(f"[PAEG][server.py] gen_intent 异常忽略: {_e}")
         pass
@@ -1541,8 +1555,8 @@ def teach_stream():
                 _save_teach_turn("method", _ma_content)  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _ma_content, 'step_type': 'method'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-            return Response(gen_ma(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_ma()
+            return
     except Exception as _e:
         print(f"[PAEG][server.py] gen_ma 异常忽略: {_e}")
         pass
@@ -1558,8 +1572,8 @@ def teach_stream():
                 _save_teach_turn("solve", _pr_content)  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _pr_content, 'step_type': 'problem'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-            return Response(gen_pr(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_pr()
+            return
     except Exception as _e:
         print(f"[PAEG][server.py] gen_pr 异常忽略: {_e}")
         pass
@@ -1579,8 +1593,8 @@ def teach_stream():
                 for i in range(0, len(_emo_content), 60):
                     yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _emo_content[i:i+60], 'step_type': 'affection'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'affection'}, ensure_ascii=False)}\n\n"
-            return Response(gen_emo(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_emo()
+            return
     except Exception as _e:
         print(f"[PAEG][server.py] gen_emo 异常忽略: {_e}")
         pass
@@ -1615,8 +1629,8 @@ def teach_stream():
                 _save_teach_turn("chat", m_reply)  # v0.36.2 早退分支补保存
                 yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': m_reply, 'step_type': 'meta'}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-            return Response(gen_meta(), mimetype="text/event-stream",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield from gen_meta()
+            return
     except Exception as _e:
         print(f"[PAEG][server.py] gen_meta 异常忽略: {_e}")
         pass
@@ -2289,8 +2303,10 @@ def teach_stream():
                 print(f"[PAEG][server.py] 静默异常 {type(_e).__name__}: {_e}")
                 pass
 
-    return Response(generate(), mimetype="text/event-stream",
-                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    # §3.79 v1.2.7 ⭐ 修复（找茬 E2E）：原 `return Response(generate(), ...)` 在生成器函数内
+    # 是 StopIteration（Response 被丢弃 → 主教学循环 generate() 从未真正输出）。
+    # 现改为 `yield from generate()`——SSE 头已由外层 teach_stream 包装器统一设置。
+    yield from generate()
 
 class _FakeSession:
     """流式 API 中用的轻量 SessionContext。"""

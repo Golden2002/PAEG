@@ -1,0 +1,100 @@
+{
+ "ts": "2026-08-20T23:51:30",
+ "base_url": "http://127.0.0.1:5000",
+ "passed": [
+  {
+   "name": "A1 首页加载+模式按钮可见",
+   "ok": true,
+   "detail": "",
+   "ts": "2026-08-20T23:43:46"
+  },
+  {
+   "name": "A2 教学-概念 有回复",
+   "ok": true,
+   "detail": "回复前 60 字: É\n✓\n已完成\n知识库检索\n复制",
+   "ts": "2026-08-20T23:43:50"
+  },
+  {
+   "name": "B1 空输入 不崩溃",
+   "ok": true,
+   "detail": "",
+   "ts": "2026-08-20T23:47:56"
+  },
+  {
+   "name": "B3 超长输入 有回复",
+   "ok": true,
+   "detail": "回复 16 字",
+   "ts": "2026-08-20T23:48:46"
+  },
+  {
+   "name": "B6 快速连续发送 页面存活",
+   "ok": true,
+   "detail": "",
+   "ts": "2026-08-20T23:51:22"
+  },
+  {
+   "name": "D1 模式快速切换 稳定",
+   "ok": true,
+   "detail": "",
+   "ts": "2026-08-20T23:51:26"
+  },
+  {
+   "name": "B7 非法 learner_id 不 500",
+   "ok": true,
+   "detail": "HTTP 404",
+   "ts": "2026-08-20T23:51:26"
+  },
+  {
+   "name": "C1 并发 health×20 无 5xx",
+   "ok": true,
+   "detail": "5xx=0",
+   "ts": "2026-08-20T23:51:30"
+  },
+  {
+   "name": "C2 并发 teach/stream×6 无 5xx",
+   "ok": true,
+   "detail": "5xx=0；错误/超时=6",
+   "ts": "2026-08-20T23:51:30"
+  }
+ ],
+ "issues": [
+  {
+   "name": "A2 教学-追问",
+   "ok": false,
+   "detail": "Page.wait_for_function: Timeout 60000ms exceeded.",
+   "ts": "2026-08-20T23:44:52"
+  },
+  {
+   "name": "A3 倾诉-危机信号",
+   "ok": false,
+   "detail": "Page.wait_for_function: Timeout 90000ms exceeded.",
+   "ts": "2026-08-20T23:46:23"
+  },
+  {
+   "name": "A4 找答案",
+   "ok": false,
+   "detail": "Page.wait_for_function: Timeout 90000ms exceeded.",
+   "ts": "2026-08-20T23:47:55"
+  },
+  {
+   "name": "B2 乱码输入",
+   "ok": false,
+   "detail": "Page.wait_for_function: Timeout 45000ms exceeded.",
+   "ts": "2026-08-20T23:48:42"
+  },
+  {
+   "name": "B4 注入尝试",
+   "ok": false,
+   "detail": "Page.wait_for_function: Timeout 60000ms exceeded.",
+   "ts": "2026-08-20T23:49:47"
+  },
+  {
+   "name": "B5 情绪+学习混合",
+   "ok": false,
+   "detail": "Page.wait_for_function: Timeout 90000ms exceeded.",
+   "ts": "2026-08-20T23:51:18"
+  }
+ ],
+ "passed_count": 9,
+ "issue_count": 6
+}
