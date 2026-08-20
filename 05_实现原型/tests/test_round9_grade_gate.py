@@ -107,3 +107,38 @@ def test_paeg_wiring_marker_exists():
     src = open(_p, encoding="utf-8").read()
     assert "学段特征输出守门" in src
     assert "grade_refined" in src
+
+
+# ────────────────────────────────────────────
+# §3.79 Round 11 内容深度四要素守门
+# ────────────────────────────────────────────
+from services.grade_quality_gate import (
+    check_content_depth, refine_content_depth,
+)
+
+
+def test_content_depth_missing_detected():
+    """缺机制/例子/小结 → missing 检出、passed False。"""
+    r = check_content_depth("导数是函数的变化率。", "high_school")
+    assert r["passed"] is False
+    assert "例子" in r["missing"]
+
+
+def test_content_depth_pass():
+    r = check_content_depth(
+        "导数是指函数在某一点的瞬时变化率。为什么这样定义？因为要描述变化的快慢。"
+        "比如汽车速度表。所以导数是微积分的核心概念。", "undergraduate")
+    assert r["passed"] is True
+
+
+def test_content_depth_refine_degrades():
+    class _BadLLM:
+        def chat(self, *a, **k):
+            raise RuntimeError("fail")
+
+    assert refine_content_depth(_BadLLM(), "内容", ["例子", "小结"]) == ""
+
+
+def test_content_depth_refine_no_missing():
+    assert refine_content_depth(None, "内容", []) == ""
+

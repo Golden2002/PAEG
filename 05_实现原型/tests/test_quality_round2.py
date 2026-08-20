@@ -107,10 +107,14 @@ def test_check_handout_fail_sparse():
 
 def test_check_lecture_script_pass():
     md = ("# 讲稿\n\n## 开场（约 2 分钟）\n同学们好，今天我们学习导数。\n\n"
-          "## 主体（约 35 分钟）\n首先讲定义，其次讲几何意义，最后讲应用。\n\n"
-          "## 小结（约 3 分钟）\n核心要点回顾。")
+          "## 主体（约 35 分钟）\n首先讲定义，其次讲几何意义——比如像斜坡的陡峭程度那样理解，"
+          "最后讲应用。\n\n"
+          "## 小结（约 3 分钟）\n核心要点回顾，接下来我们做练习。")
     r = mq.check_lecture_script(md)
     assert r["passed"] is True
+    # §3.79 Round 11 增强项
+    assert r["has_transition"] is True
+    assert r["has_example"] is True
 
 
 def test_check_lecture_script_fail():
