@@ -123,37 +123,52 @@ _LOGIN_FAILS: dict = {}
 # Flask 应用初始化
 # ─────────────────────────────────────
 
-app = Flask(__name__, static_folder=None)
-# v0.51 ⭐ P0-1（Oracle）：CORS 白名单——开发默认 *，生产用 PAEG_CORS_ORIGINS 显式收敛
-CORS(app, resources={r"/api/*": {"origins": CORS_ORIGINS}})
-# v0.51 ⭐ P1-1（Oracle）：HTTPS 反代支持——信任 X-Forwarded-Proto（Nginx/Caddy/cloudflared 前置）
-# 生产安全 Cookie：PAEG_ENV=production 时 cookie 仅 HTTPS 传输
-try:
-    from werkzeug.middleware.proxy_fix import ProxyFix
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-except Exception as _e:
-    print(f"[PAEG][server.py] ProxyFix 不可用（生产环境 HTTPS 反代受影响）: {_e}")
-if PAEG_ENV == "production":
-    app.config["SESSION_COOKIE_SECURE"] = True
-    app.config["SESSION_COOKIE_HTTPONLY"] = True
+def create_app(config: Optional[dict] = None):
+    """v1.2.2 ⭐ Q2 App Factory（Oracle I1 渐进落地：行为不变，ratchet 铁律）。
 
-# §3.45 ⭐ 蓝图注册（组合根职责：app 装配 → 注册蓝图 → 启动）
-# 6 个低风险域已迁至 blueprints/（voice/threads/admin/conversations/uploads/quiz），
-# 行为字节级不变；依赖经 infra.runtime 懒加载单例注入（与 server 模块级全局同引用）。
-app.register_blueprint(_voice_bp)
-app.register_blueprint(_threads_bp)
-app.register_blueprint(_admin_bp)
-app.register_blueprint(_conversations_bp)
-app.register_blueprint(_uploads_bp)
-app.register_blueprint(_quiz_bp)
-# §3.46.2 Phase 2 ⭐（W9）：4 域蓝图注册
-app.register_blueprint(_proactive_bp)
-app.register_blueprint(_resources_bp)
-app.register_blueprint(_modes_bp)
-app.register_blueprint(_self_update_bp)
-# §3.46.2 Phase 3 ⭐（W10）：chat/teaching 蓝图注册
-app.register_blueprint(_chat_bp)
-app.register_blueprint(_teaching_bp)
+    组合根职责收口：创建 Flask → CORS 白名单 → ProxyFix（HTTPS 反代）→
+    生产 Cookie 策略 → 蓝图注册。模块级 ``app = create_app()`` 保持既有入口
+    （``from server import app`` / gunicorn ``server:app``）不变。
+
+    Args:
+        config: 可选 {PAEG_ENV: str} 覆盖（测试可注入配置，Oracle I1 验收点）。
+    """
+    _app = Flask(__name__, static_folder=None)
+    # v0.51 ⭐ P0-1（Oracle）：CORS 白名单——开发默认 *，生产用 PAEG_CORS_ORIGINS 显式收敛
+    CORS(_app, resources={r"/api/*": {"origins": CORS_ORIGINS}})
+    # v0.51 ⭐ P1-1（Oracle）：HTTPS 反代支持——信任 X-Forwarded-Proto（Nginx/Caddy/cloudflared 前置）
+    try:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        _app.wsgi_app = ProxyFix(_app.wsgi_app, x_proto=1, x_host=1)
+    except Exception as _e:
+        print(f"[PAEG][server.py] ProxyFix 不可用（生产环境 HTTPS 反代受影响）: {_e}")
+    # 生产安全 Cookie：PAEG_ENV=production 时 cookie 仅 HTTPS 传输（config 可注入覆盖）
+    _env = (config or {}).get("PAEG_ENV") or PAEG_ENV
+    if _env == "production":
+        _app.config["SESSION_COOKIE_SECURE"] = True
+        _app.config["SESSION_COOKIE_HTTPONLY"] = True
+    # §3.45 ⭐ 蓝图注册（组合根职责：app 装配 → 注册蓝图 → 启动）
+    # 6 个低风险域已迁至 blueprints/（voice/threads/admin/conversations/uploads/quiz），
+    # 行为字节级不变；依赖经 infra.runtime 懒加载单例注入（与 server 模块级全局同引用）。
+    _app.register_blueprint(_voice_bp)
+    _app.register_blueprint(_threads_bp)
+    _app.register_blueprint(_admin_bp)
+    _app.register_blueprint(_conversations_bp)
+    _app.register_blueprint(_uploads_bp)
+    _app.register_blueprint(_quiz_bp)
+    # §3.46.2 Phase 2 ⭐（W9）：4 域蓝图注册
+    _app.register_blueprint(_proactive_bp)
+    _app.register_blueprint(_resources_bp)
+    _app.register_blueprint(_modes_bp)
+    _app.register_blueprint(_self_update_bp)
+    # §3.46.2 Phase 3 ⭐（W10）：chat/teaching 蓝图注册
+    _app.register_blueprint(_chat_bp)
+    _app.register_blueprint(_teaching_bp)
+    return _app
+
+
+# 模块级实例（既有入口兼容：from server import app / gunicorn server:app）
+app = create_app()
 
 # ═══════════════════════════════════════════════════════════
 # v0.51 ⭐ P0-3（Oracle）：全局滑动窗口限流

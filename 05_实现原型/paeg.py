@@ -492,6 +492,20 @@ class PAEG:
                 print(f"[PAEG][paeg.py] teach 异常忽略: {_e}")
                 pass
                 pass
+            # §3.79 Q6 ⭐ 教学输出质量信号（确定性、无 LLM）——供 E1 管道与质量看板
+            try:
+                from services.presentation_quality import signal_presentation
+                _sig = signal_presentation(
+                    presentation.get("content", ""),
+                    step_type=step.get("type", ""),
+                    subject=subject,
+                )
+                if _tr: _tr("quality_signal", step_id=i + 1, **{k: _sig[k] for k in
+                            ("length_ok", "has_examples", "has_structure", "score", "chars")})
+            except Exception as _e:
+                print(f"[PAEG][paeg.py] quality_signal 异常忽略: {_e}")
+                pass
+                pass
 
             # 4. 评估（每个呈现步骤后）—— v0.24 真正评估学生
             self._log(f"   -> 评估子代理：检查学生理解...")
