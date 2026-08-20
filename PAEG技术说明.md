@@ -1,4 +1,4 @@
-﻿# PAEG 教育智能体 — 简明技术说明（v1.1.9）
+﻿﻿# PAEG 教育智能体 — 简明技术说明（v1.1.9）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -1590,3 +1590,118 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 **工作流**：任务核对 → 按优先级执行 → 每项完成更新状态 → 完成验证 → 调研落盘 → 重大改动回归 → 更新技术快照
 
 **元技能**：**"先记录，后执行"是第一纪律**——需求文档是团队记忆的外部载体，也是版本化的决策日志；没有需求文档的工作流不可追溯、不可复盘、不可交接。
+
+### C.14 功能×模块连通性矩阵（v1.1.9 §3.77 ⭐）
+
+## §3.77.1 功能×模块连通性矩阵（2026-08-20 盘点）
+
+> 盘点范围：全项目 58 路由 + 16 意图 + magic 3 类口令 + 4 文件意图（39 功能行） × 53 services + 根模块 + infra/lib/ralph/blueprints（55 模块列）。
+> 本节聚焦**五大核心功能 × 六大公共模块**的接线状态（含证据行号），完整行列清单见 §3.77.2。
+
+### 矩阵总览（✅ 已接线 / ⚠️ 部分·间接 / ❌ 未接线 / — 不适用）
+
+| 核心功能 | 联网检索 | 知识库检索 | 用户资料库 | 语言质量门槛 | 引导提示词 | 脚本检查 |
+|---|---|---|---|---|---|---|
+| **备课**（LessonPrep） | ❌ 未接 | ⚠️ kb 注入 | ❌ 未接 | ✅ 4 处 | ✅ 有 | ❌ 未接 |
+| **教学**（teach_stream） | ✅ 11 处 | ✅ 1 处 | ✅ 1 处 | ✅ 11+22 | ✅ 有 | ✅ manim/video |
+| **倾诉**（Affection） | ⚠️ 仅提示词示例 | ⚠️ 仅提示词示例 | ❌ 未接 | ✅ server 收口 | ✅ 自建 | — |
+| **查资料**（file_operation） | ❌ 未接 | ✅ BM25 | ✅ 4 意图 | ✅ chat 收口 | ✅ handlers | — |
+| **找答案**（AnswerSolver） | ⚠️ 工具暴露 | ✅ 强制检索 | ⚠️ 经工具 | ✅ v0.42.3 收口 | ✅ 自建 | — |
+
+### 证据明细
+
+| 功能 | 模块 | 状态 | 证据 |
+|---|---|---|---|
+| 备课 | 联网检索 | ❌ | LessonPrep 类内 web_search 0 引用（subagents.py） |
+| 备课 | 知识库检索 | ⚠️ | self.kb = kb 构造注入（subagents.py LessonPrep）；无显式检索调用 |
+| 备课 | 用户资料库 | ❌ | usr_knowledge 0 / BM25 0 / material 0（LessonPrep 类内） |
+| 备课 | 语言质量门槛 | ✅ | _lang_gate_safe ×4（subagents.py L2430 handout/L2444 script/L2481 video/L2495 mindmap） |
+| 备课 | 引导提示词 | ✅ | build_lesson_planner_system（prompts.py L1581，subagents.py 引用 L1607/1649-1652） |
+| 备课 | 脚本检查 | ❌ | visual_script 0 / manim 0 / script_service 0 / validator 0；产出视频脚本未过校验 |
+| 教学 | 联网检索 | ✅ | web_search ×11 + web_search_tool ×2（server.py L1007/1011/1332/1361/1364） |
+| 教学 | 知识库检索 | ✅ | KnowledgeBase@L1342（gen_kb 分支） |
+| 教学 | 用户资料库 | ✅ | _try_file_operation@L753（teach_stream 入口） |
+| 教学 | 语言质量门槛 | ✅ | lang_gate ×11 + polish ×22（gen_lp/gen_grade_blocked/gen_kb/gen_composite/gen_pr/generate 全过） |
+| 教学 | 引导提示词 | ✅ | build_presenter_system（prompts.py L1775） |
+| 教学 | 脚本检查 | ✅ | manim×5/video×12/generate_teaching_video×2/generate_manim_video×2（server.py） |
+| 倾诉 | 联网检索 | ⚠️ | web_search 命中为提示词示例文本（"tool_adjustment": ...web_search...），非真实调用 |
+| 倾诉 | 知识库检索 | ⚠️ | KnowledgeBase 命中为提示词示例（knowledge_update 建议），非真实调用 |
+| 倾诉 | 用户资料库 | ❌ | 无引用 |
+| 倾诉 | 语言质量门槛 | ✅ | server.py L1258 _polish_text(_emo_result) + modes.py lang_gate×2 + teaching.py lang_gate×2 |
+| 倾诉 | 引导提示词 | ✅ | 自建 system（_build@L3240，system/prompt 引用 19+13 处） |
+| 查资料 | 联网检索 | ❌ | file_operation.py web_search 0 |
+| 查资料 | 知识库检索 | ✅ | BM25×2（file_operation.py L6/L29）+ services/retrieval/knowledge_retriever.py |
+| 查资料 | 用户资料库 | ✅ | 4 文件意图（file_qa/file_explain/file_quote/file_restructure，file_operation.py L60-62）+ intent_router@L33 |
+| 查资料 | 语言质量门槛 | ✅ | blueprints/chat.py lang_gate×3 + polish×7（出口统一收口） |
+| 查资料 | 引导提示词 | ✅ | services/handlers/ 6 个 handler 自带提示词 |
+| 找答案 | 联网检索 | ⚠️ | web_search@L2949 暴露为 LLM 工具（tool_registry get_tools），非强制调用 |
+| 找答案 | 知识库检索 | ✅ | v0.22.1 回答前强制检索知识库（subagents.py AnswerSolver.run） |
+| 找答案 | 用户资料库 | ⚠️ | 经工具暴露（web_search/verify_math），非直接 file_operation |
+| 找答案 | 语言质量门槛 | ✅ | server.py L2777-2782 v0.42.3 P1 修复：answer 语言规范收口 _polish_text |
+| 找答案 | 引导提示词 | ✅ | AnswerSolver.run 自建 user prompt（"学生的问题：{question}...请直接给出完整答案"） |
+
+### 断点清单（需要接线但未接线）
+
+| # | 断点 | 位置 | 说明 | 建议 |
+|---|---|---|---|---|
+| B1 | 备课未接联网检索 | subagents.py LessonPrep | 备课素材全凭 LLM 内部知识，无 web_search 补充 | 备课引导时可选联网获取课程素材 |
+| B2 | 备课未接用户资料库 | subagents.py LessonPrep | 学生上传的讲义/资料未作为备课输入 | LessonPrep 检索 usr_knowledge/<uid>/ 作为材料源 |
+| B3 | 备课视频脚本未过脚本检查 | subagents.py L2481 | 产出 video_script 无 visual_script_validator 校验 | 接入 visual_script_validator.py |
+| B4 | 查资料未接联网检索 | services/file_operation.py | BM25 仅本地，无 web_search 兜底 | 本地无匹配 → web_search_tool 补充（与找答案一致） |
+| B5 | 倾诉未接真实联网/知识库 | subagents.py AffectionSupportor | 提示词示例提及但无实际调用 | 若需引用资料辅助疏导，接 KnowledgeBase |
+
+### 孤儿模块（已实现未接线）
+
+| 孤儿 | 类型 | 唯一引用 |
+|---|---|---|
+| srs_sm2.py（间隔重复） | 行 | tests/test_srs_sm2.py |
+| concept_graph.py（概念图） | 列 | tests/test_concept_graph.py |
+| production_pipeline.py（内容生产） | 列 | 零调用方（与 material_pipeline 重叠） |
+| condition_eval.py（条件启停） | 列 | tests/test_condition_enable.py |
+| agent_scope.py（子代理作用域） | 列 | tests/test_agent_scope.py |
+| agent_trirole.py（子代理契约） | 列 | tests/test_agent_trirole.py |
+| platform_dual_track.py（平台双轨） | 列 | tests/test_platform_dual_track.py |
+
+## §3.77.2 完整行列清单（39 行 × 55 列）
+
+### 行：功能项（39）
+
+**五大核心**：备课 / 教学 / 倾诉 / 找答案 / 查资料（文件问答·文件讲解·输出原文·重组结构 4 子能力）
+
+**知识学习**：知识学习 / 知识导图 / 知识库清点 / 知识检索
+
+**学习辅助**：学习方法 / 学习规划 / 做题解题 / 交互式测验 / 间隔重复记忆（孤儿）/ 推荐
+
+**内容生产**：PPT生成 / 视频生成 / Manim动画 / 文件生成 / 每日一言
+
+**身份画像**：用户画像诊断 / 界面身份口令 / 闲聊问候 / 注册登录 / 上传头像
+
+**系统功能**：自我进化 / 会话线程模型 / 历史会话管理 / 主动问候 / 反馈闭环 / 配置热重载 / 模块门控 / 学科树 / 意图推断 / 技能清单 / 元日志·批处理·健康
+
+### 列：模块/库/工具（55）
+
+**公共能力 6**：联网检索 / 知识库检索 / 用户资料库 / 语言质量门槛（lang_gate→polish→language_refiner+ai_taste_detector 4 模块链）/ 引导提示词 / 脚本检查
+
+**13 subagent**：Diagnostor / Planner / Presenter / ResourceLibrarian / LessonPrep / Evaluator / Adapter / AnswerSolver / AffectionSupportor / SelfUpdateAgent / Individuality
+
+**安全守卫 4**：安全守卫 safety.py / 专家守卫 expert_guard.py / 质量门禁 quality_gate.py（仅自进化路径）/ 约束引擎 constraint_engine.py
+
+**记忆上下文 4**：三层记忆 memory_system / 上下文压缩 compaction / 上下文打包 context_manager+bundle / 教学记忆 teaching_memory
+
+**图谱管线 6**：前置知识图谱 prereq_graph（活）/ 概念图 concept_graph（孤儿）/ 物料管线 material_pipeline / 内容生产管线 production_pipeline（孤儿）/ 教学策略 teach_strategy / 教学预设 teaching_presets（半活）
+
+**工具链 8**：PPT生产 / 视频Manim生产 / 文件生成器 / OCR / STT-TTS / 语义检索 / MCP / 工具注册
+
+**方法论 5**：世界观映射 world_view / 教学法库 pedagogy / 反思存储 reflection_store / 画像簇（student_trait+profile_bundle+profile_staleness+grade_subject）/ 路由辅助（subject_detector+steering+routing+session_mode_lock+topic_stack+model_routing）
+
+**治理 4（仅测试）**：条件启停 condition_eval / 子代理作用域 agent_scope / 子代理契约 agent_trirole / 平台双轨 platform_dual_track
+
+**基础设施 7**：可观测性 / 工具健壮性（tool_recovery+tool_cache+retry+watchdog）/ 三Hub（config+hooks+workflows）/ Ralph循环（半活）/ infra 9 模块 / 配置层 / 审计工具（audit_check+arch_check+api_sweep+smoke_test）
+
+### 接线状态统计
+
+- **五大核心 × 6 公共模块 = 30 格**：✅ 15 / ⚠️ 7 / ❌ 8 / — 4（N/A）
+- **断点 5 处**（B1-B5）：备课×3、查资料×1、倾诉×1
+- **孤儿 7 个**：srs_sm2、concept_graph、production_pipeline、condition_eval、agent_scope、agent_trirole、platform_dual_track
+- **接线率**：五大核心已接线 15/26 适用格 ≈ **58%**（不含 N/A）
+
