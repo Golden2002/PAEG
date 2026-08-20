@@ -61,4 +61,7 @@ auth.json.bak
 auth.json.*
 
 # §3.79 Round 12 ⭐ 张宇扬课件（本地知识库，466MB 大文件不入库——部署时从源复制或走 Release 附件）
-Library/common/张宇扬课件/
+Library/common/张宇扬课件/**/*.pdf
+Library/common/张宇扬课件/**/*.zip
+Library/common/张宇扬课件/**/*.txt
+
