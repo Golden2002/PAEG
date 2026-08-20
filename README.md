@@ -171,7 +171,7 @@ gunicorn -w 1 -k gthread --threads 8 -b 0.0.0.0:5000 server:app
 
 **独立预算**：备课任务使用独立 token 池（上限 25000），不占用教学会话预算；渐进式产出可随时中断续做。
 
-**质量守门（v1.1.9+）**：每份产出落地前过四类评分（教案 6 维 / 讲义 / PPT 大纲 5 维 / 视频脚本）+ **12 条硬性检查**（7 条自动 + 5 条 LLM 评审），产出 `dim_scores` 与 `eval_mode`（auto/hybrid）写入质量报告。`/api/lesson_prep/feedback` 收集教师反馈（L3 人工评估）回流到评分器。**PPT 自动配图（v1.1.9+）**：备课模式与 PPT 生成现支持三级来源自动配图——用户资料库（`Library/usr_knowledge/<uid>/`）→ 公共文件夹（`Library/ppt_images/` + `~/.paeg/ppt_images/`）→ 联网检索（Bing 图片，免 key）；优先级链：资料库 > 公共 > 联网 > 缓存 > 无图（**永不阻塞**，缺图保持文字版）。`generate_ppt` 支持 `enable_images=True/False`。
+**质量守门（v1.1.9+ · §3.75 教师AI应用指引）**：每份产出落地前过四类评分（教案 6 维 / 讲义 / PPT 大纲 5 维 / 视频脚本）+ **15 条硬性检查**（含 §3.75 新增：课前/课中/课后三维 + 课中必含 1 案例教学 + 课中必含 1 互动环节——均须含设计目的/实施步骤/预期效果），产出 `dim_scores` 与 `eval_mode`（auto/hybrid）写入质量报告。`/api/lesson_prep/feedback` 收集教师反馈（L3 人工评估）回流到评分器。**多轮修改（§3.75）**：生成后可继续对话优化（如"重点讲图像变换"→ 基于上一版重新生成，mode=lesson_prep_modify）。**PPT 自动配图（v1.1.9+）**：备课模式与 PPT 生成现支持三级来源自动配图——用户资料库（`Library/usr_knowledge/<uid>/`）→ 公共文件夹（`Library/ppt_images/` + `~/.paeg/ppt_images/`）→ 联网检索（Bing 图片，免 key）；优先级链：资料库 > 公共 > 联网 > 缓存 > 无图（**永不阻塞**，缺图保持文字版）。`generate_ppt` 支持 `enable_images=True/False`。
 
 ---
 
