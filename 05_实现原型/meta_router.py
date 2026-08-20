@@ -595,7 +595,19 @@ def _extract_lesson_topic(text: str) -> dict:
 
     # ── 第 7 步：topic 终值校验 ──
     body = body.strip(r" ：:、,，。.!！?？；;\s")
+    # topic 终值校验：空且无其他字段 → {}（纯引导）；空但有 subject/grade/duration → 返回部分（供 pending 剔除）
     if not body or len(body) < 2 or prefix_only:
+        if subject or grade or duration_min is not None:
+            result: dict = {}
+            if subject:
+                result["subject"] = subject
+            if grade:
+                result["grade"] = grade
+            if duration_min is not None:
+                result["duration_min"] = duration_min
+            if extra_list:
+                result["extra_requirement"] = list(dict.fromkeys(extra_list))
+            return result
         return {}
 
     result: dict = {"topic": body}

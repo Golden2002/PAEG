@@ -633,42 +633,42 @@ def teach_stream():
             except Exception as _me:
                 print(f"[PAEG] 备课补充判定跳过: {_me}")
 
+        # ── §3.75 ⭐ 多轮修改识别（独立于 rfi intent）：上一轮产出 lesson_plan → 本轮修改指令 ──
+        _last_lp_key = f"lesson_prep_last_{learner_id}"
+        _last_lp = SESSIONS.get(_last_lp_key)
+        _MODIFY_RE = re.compile(r'(改|调整|修改|重写|突出|加重|把.{0,15}改成|重点讲|删除|删掉|不要|换一个|重新|再讲|换成|加上|添加|去掉|补充)')
+        _is_modify = bool(_last_lp) and _MODIFY_RE.search(str(concept)[:200]) and not _mm(str(concept))
+        if _is_modify and paeg.lesson_prep is not None:
+            from subagents import LessonPlanInput
+            _lpi_m = LessonPlanInput(
+                topic=_last_lp.get("topic", str(concept)[:80]),
+                subject=_last_lp.get("subject") or str(subject or "通用"),
+                grade=_last_lp.get("grade") or getattr(learner, "grade_level", "high_school"),
+                duration_min=int(_last_lp.get("duration_min") or 45),
+                objectives=_last_lp.get("objectives", []),
+                learner_profile={},
+                constraints={"modify_directive": str(concept)[:300],
+                             "prior_lesson_plan": _last_lp.get("lesson_plan", "")},
+                user_requested_assets=[], progressive=True,
+            )
+            _lp_res = paeg.lesson_prep.run(_lpi_m, learner=learner, progressive=True)
+            SESSIONS[_last_lp_key] = {
+                "topic": _last_lp.get("topic", ""), "subject": _last_lp.get("subject", ""),
+                "grade": _last_lp.get("grade", ""), "duration_min": _last_lp.get("duration_min", 45),
+                "objectives": _last_lp.get("objectives", []), "lesson_plan": _lp_res.get("lesson_plan", {})}
+
+            def gen_lp_mod():
+                _save_teach_turn("lesson_prep_modify", json.dumps(_lp_res, ensure_ascii=False)[:500])
+                yield f"event: lesson_plan\ndata: {json.dumps(_lp_res.get('lesson_plan', {}), ensure_ascii=False)}\n\n"
+                for k in ("handout", "script", "ppt_outline", "video_script", "mindmap", "quality_report"):
+                    payload = _lp_res.get(k)
+                    if payload:
+                        yield f"event: {k}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'lesson_prep_modify', 'token_used': _lp_res.get('token_used', 0)}, ensure_ascii=False)}\n\n"
+            return Response(gen_lp_mod(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
         if (_rfi_res.get("intent") == "lesson_prep" or _force_lesson_prep) and paeg.lesson_prep is not None:
-            # ── §3.75 ⭐ 多轮修改识别：上一轮已产出 lesson_plan，本轮是对它的修改指令 ──
-            _last_lp_key = f"lesson_prep_last_{learner_id}"
-            _last_lp = SESSIONS.get(_last_lp_key)
-            _MODIFY_RE = re.compile(r'(改|调整|修改|重写|突出|加重|把.{0,15}改成|重点讲|删除|删掉|不要|换一个|重新|再讲|换成)')
-            _is_modify = bool(_last_lp) and _MODIFY_RE.search(str(concept)[:200]) and not _mm(str(concept))
-            if _is_modify:
-                from subagents import LessonPlanInput
-                _lpi_m = LessonPlanInput(
-                    topic=_last_lp.get("topic", str(concept)[:80]),
-                    subject=_last_lp.get("subject") or str(subject or "通用"),
-                    grade=_last_lp.get("grade") or getattr(learner, "grade_level", "high_school"),
-                    duration_min=int(_last_lp.get("duration_min") or 45),
-                    objectives=_last_lp.get("objectives", []),
-                    learner_profile={},
-                    constraints={"modify_directive": str(concept)[:300],
-                                 "prior_lesson_plan": _last_lp.get("lesson_plan", "")},
-                    user_requested_assets=[], progressive=True,
-                )
-                _lp_res = paeg.lesson_prep.run(_lpi_m, learner=learner, progressive=True)
-                SESSIONS[_last_lp_key] = {
-                    "topic": _last_lp.get("topic", ""), "subject": _last_lp.get("subject", ""),
-                    "grade": _last_lp.get("grade", ""), "duration_min": _last_lp.get("duration_min", 45),
-                    "objectives": _last_lp.get("objectives", []), "lesson_plan": _lp_res.get("lesson_plan", {})}
-
-                def gen_lp_mod():
-                    _save_teach_turn("lesson_prep_modify", json.dumps(_lp_res, ensure_ascii=False)[:500])
-                    yield f"event: lesson_plan\ndata: {json.dumps(_lp_res.get('lesson_plan', {}), ensure_ascii=False)}\n\n"
-                    for k in ("handout", "script", "ppt_outline", "video_script", "mindmap", "quality_report"):
-                        payload = _lp_res.get(k)
-                        if payload:
-                            yield f"event: {k}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
-                    yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'lesson_prep_modify', 'token_used': _lp_res.get('token_used', 0)}, ensure_ascii=False)}\n\n"
-                return Response(gen_lp_mod(), mimetype="text/event-stream",
-                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
             # ── 合并提取：优先补充句，其次魔法词后缀 ──
             _merged = None
             if _force_lesson_prep:
