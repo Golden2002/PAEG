@@ -97,18 +97,21 @@ def test_lesson_plan_input_valid():
 def test_magic_intent_lesson_prep():
     r = match_magic("我要备课")
     assert r is not None and r["intent"] == "lesson_prep"
-    r2 = match_magic("帮我备课")
+    r2 = match_magic("我要备课：光合作用")
     assert r2 is not None and r2["intent"] == "lesson_prep"
     assert match_magic("你好") is None
     assert match_magic("什么是导数") is None
+    # §3.73 ⭐ 独立激活词：变体不匹配（用户要求只认"我要备课"）
+    assert match_magic("帮我备课") is None
 
 
 def test_meta_router_lesson_prep_intent():
     assert "lesson_prep" in VALID_INTENTS
     r = rule_fallback_intent("我要备课")
     assert r is not None and r.get("intent") == "lesson_prep"
+    # §3.73 ⭐ 独立激活词：变体不再触发 lesson_prep
     r2 = rule_fallback_intent("帮我备一下高中物理导数课")
-    assert r2 is not None and r2.get("intent") == "lesson_prep"
+    assert r2 is None or r2.get("intent") != "lesson_prep"
 
 
 def test_registry_lists_10_subagents():
@@ -157,3 +160,23 @@ def test_lesson_prep_run_quality_report(lesson_prep):
     qr = res["quality_report"]
     assert isinstance(qr, dict)
     assert "overall" in qr or "lesson_plan_score" in qr
+
+
+def test_magic_intent_lesson_prep_independent_activation():
+    """§3.73 ⭐ '我要备课'独立激活词（ULW 风格）——只认该词，不做变体匹配。"""
+    cases = [
+        ("我要备课", True),                # 纯词 → 引导
+        ("我要备课：光合作用", True),       # 带需求 → 直接生成
+        ("我要备课 高中数学函数单调性45分钟", True),
+        ("帮我备课", False),                # 变体不匹配
+        ("备课：导数", False),               # 变体不匹配
+        ("备一下课", False),
+        ("你好", False),
+        ("我要备课：", False),              # 退化：空后缀
+    ]
+    for text, expect_hit in cases:
+        r = match_magic(text)
+        assert (r is not None) == expect_hit, f"{text!r}: 期望命中={expect_hit}, 实际 {r}"
+        if expect_hit:
+            assert r["intent"] == "lesson_prep"
+
