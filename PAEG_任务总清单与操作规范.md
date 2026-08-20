@@ -2850,7 +2850,27 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 
 ### 实施记录
 
-（完成后更新）
+**三项工作全部完成（2026-08-20）**
+
+**A. README 改造**（commit 6e659f7）：
+- 14 章结构（参考 ai-job-search 32K★）：真实用户故事 3 段（情绪+物理混合/学生说我撑不住了/11 learner 跨学科真实提问）→ 这是什么 → 核心能力 8 项 → 架构全景 → 快速开始分步 → 备课模式升格独立章 → 目录结构 → 技术栈 → Customization → Tips → 文档 → 贡献 → License + 附录架构维护
+- 8 个单行小节合并为"最近新增能力表"；多端一致原则下沉附录；9→10 subagent 更新；版本 v1.2.0；346 行 ≤ 350 上限；13 内部锚点全部命中
+
+**B. PPT 图片增强**（commit 7e72a31）：
+- `pptx_image_supplier.py`：find_images_for_slide 五级优先级链（①用户资料库 jieba 匹配 ②公共文件夹 ③联网 Bing 图片免key 5s超时 ④缓存 md5 ⑤无图返回[]），永不阻塞
+- `pptx_mcp_server.py`：generate_ppt 加 enable_images=True；_add_slide_image 右侧插图；bullets 宽度 11.7→6.7 让出图片区；封面/logo 不动
+- `requirements.txt`：Pillow 依赖声明；E2E 测试（含图插入 + 无图不插，2 passed）
+
+**C. 完整质量评估**（commit 0357988）：
+- `_score_ppt_outline`：PPT 大纲 5 维评分（6×6/单一主题/视觉焦点/页数4-7/标题≤20字）
+- `_score_12_hard_checks`：12 条硬性检查（7 自动正则 + 5 LLM 标记 unverified）
+- `_score_lesson_plan` 聚合：四类产出（教案6维/讲义/PPT5维/视频脚本）+ dim_scores + overall 加权（0.5/0.2/0.2/0.1）+ eval_mode
+- `/api/lesson_prep/feedback`：教师 L3 人工反馈端点（写 memory/lesson_prep_feedback.jsonl）
+
+**验证**：44 tests passed（备课12/PPT评分8/硬性9/质量报告2/E2E2/图片供应6/registry5）；ModelScope 已推送；GitHub 网络暂失败（本地安全，稍后重试）
+
+**额外完成**：§3.72 闲聊模式 placeholder 修正（chat→"想聊什么都可以，我听着…"；knowledge→"查看我的知识库：输入关键词检索你收着的资料…"，Playwright 双模式验证）
+
 
 
 ## §3.72 闲聊模式 placeholder 文案修正（2026-08-20）
