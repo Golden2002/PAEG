@@ -3020,4 +3020,21 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 
 ### 实施记录
 
-（完成后更新）
+**全部完成（2026-08-20）**
+
+1. **Oracle 优化方案**（bg_71ddad72）：基于《教师生成式AI应用指引》设计 4 方面优化——A 质量标准扩展 / B 引导结构化 / C 多轮修改 / D 提示词对照
+2. **S1 质量标准扩展**（commit 9baaa79）：
+   - `LESSON_PLANNER_QUALITY_CRITERIA.lesson_plan` 加 3 条：three_stage_teaching（课前/课中/课后）/ mid_case_required（课中必含案例教学）/ mid_interaction_required（课中必含互动环节）
+   - `hard_checks` 从 12 扩到 **15 条**（新增课前课后三维/案例/互动）
+3. **S2 引导结构化**（commit 3a03912）：引导文案从"请告诉我三件事"改为**按 pending 剔除已填字段**的缺失提示（`_render_lesson_prep_guide` 逻辑）；`_extract_lesson_topic` 部分提取（有 subject 无 topic）返回部分 dict 供剔除
+4. **S3 多轮修改**（commit 3a03912）：`_MODIFY_RE` 修改指令识别（独立于 rfi intent）+ `lesson_prep_last_{learner_id}` 状态 + 修改路由（mode=lesson_prep_modify）+ `LessonPrep.run` 支持 `prior_lesson_plan`（constraints.modify_directive 注入，基于上一版重生成）
+5. **S3c 质量门禁**（commit f891e58）：`_score_lesson_plan` 检查 stage 分布（pre/during/post）+ 课中段案例/互动完整性（缺失加 violations）
+6. **端到端验证**（真实后端，SOP 启动）：
+   - S2a 纯词引导显示全部缺失字段 ✅
+   - S2b "我要备课：高中数学" 引导只问知识点+课时（学科已剔除）✅
+   - S3 R1 生成 → R2 "重点讲图像变换" 触发 lesson_prep_modify 重新生成 ✅
+   - 54 tests 全绿 ✅
+7. **D4 待同步**：README 备课模式补充多轮修改说明（后续补）
+
+**commit**：9baaa79 + f891e58 + 3a03912
+
