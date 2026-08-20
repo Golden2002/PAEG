@@ -155,4 +155,32 @@ def review_card(uid: str, concept: str, quality: int) -> Optional[Dict[str, Any]
         return None
 
 
+def build_reminder(uid: str, subject: str = "",
+                   max_items: int = 2) -> str:
+    """生成复习提醒文本（teach 入口注入；无到期卡返回空串）。
+
+    规则：到期卡中优先同 subject 的卡（复习与当前学习相关性强），
+    其次任意到期卡；最多 max_items 条。薇依式克制语气。
+    """
+    try:
+        _due = due_cards(uid)
+        if not _due:
+            return ""
+        if subject:
+            _same = [c for c in _due if c.get("subject") == subject]
+            if _same:
+                _due = _same
+        _items = _due[:max_items]
+        _names = "、".join(c.get("concept", "") for c in _items if c.get("concept"))
+        if not _names:
+            return ""
+        _line = (
+            f"（上次学的 {_names} 到复习时间了——先花 1 分钟回忆一下，"
+            f"想不起来随时问我，我会带你过一遍；记忆需要间隔重复才会牢固。）"
+        )
+        return _line
+    except Exception:
+        return ""
+
+
 __all__ = ["add_card", "card", "all_cards", "due_cards", "review_card"]

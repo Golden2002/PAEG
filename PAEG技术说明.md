@@ -1818,3 +1818,13 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 **验证**：`tests/test_round5_srs_privacy.py` 8 测试全绿 + 回归 163 全绿。
 
+### C.21 运维友好性 + 概念图谱接线 + SRS 复习提醒（v1.2.7 §3.79 ⭐）
+
+**运维友好性（面向运维工程师）**：`ops/checkup.ps1` 一键巡检——①进程/端口（netstat 反查 + CPU/内存）②`/api/health`（llm/db/mcp/skills/version）③`/api/metrics`（SLO：reqs/P95/错误率/tokens/llm_calls）④`/api/metrics/effects`（四指标 + 目标）⑤日志尾部异常信号 ⑥磁盘/transcripts/users_data 规模。只读、零第三方依赖、端点不可达降级提示；配套维护手册 §18.60 命令速查。
+
+**孤儿 concept_graph 接线（6→5，教学对话增强）**：Presenter 教学 system 注入"**概念定位（知识图谱）**"——`ConceptGraph.prerequisites/successors` 内置种子（数学/物理前驱链：函数→极限→导数→积分…）→ "前置知识（若学生明显陌生先补基础）+ 掌握后可继续学"指令句；零依赖兜底，与 prereq_graph（KB 提取）互补。
+
+**SRS 复习提醒注入对话**：`srs_service.build_reminder(uid, subject)`——到期卡优先同 subject，薇依式克制语气（"上次学的 X 到复习时间了…记忆需要间隔重复"）；teach_stream 入口诊断前注入 `step_type="srs_reminder"` 事件；无到期卡不发（零侵入）。
+
+**验证**：`tests/test_round6_ops_graph.py` 6 测试全绿 + 六轮回归 217 全绿。
+

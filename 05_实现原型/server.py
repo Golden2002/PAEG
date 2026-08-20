@@ -1642,6 +1642,15 @@ def teach_stream():
         except Exception as _e:
             print(f"[PAEG][server.py] generate 异常忽略: {_e}")
             pass
+        # §3.79 ⭐ SRS 复习提醒注入（间隔重复教学闭环：到期卡温和提醒，不打断）
+        try:
+            from services.srs_service import build_reminder
+            _srs_note = build_reminder(str(learner_id), subject=str(subject))
+            if _srs_note:
+                yield (f"event: presentation\ndata: {json.dumps({'step_id': 0, 'content': _srs_note, 'step_type': 'srs_reminder'}, ensure_ascii=False)}\n\n")
+        except Exception as _srs_e:
+            print(f"[PAEG][server.py] srs_reminder 忽略: {_srs_e}")
+            pass
         # 诊断
         yield f"event: diagnosis\ndata: {json.dumps({'status': 'diagnosing'})}\n\n"
         # v0.27 ⭐ 需求：对话输出前检索状态标志（前端小徽章"已完成知识库检索"）
