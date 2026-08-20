@@ -1893,3 +1893,24 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 - `friendlyHttpError(resp)` 共享函数：解析 JSON error/message → 429"请求过于频繁（每日额度）" / 500"服务内部错误（后端日志可查）" / 其他 HTTP 状态
 - teach_stream（L2814）与 generalChat 两处 `throw new Error('API '+status)` → `throw await friendlyHttpError(resp)`
 - node --check 全部 script 块语法通过
+
+### C.28 数学视频/manim 真实渲染 + 学习计划 format 修复 + 孤儿归零（v1.2.16 §3.79 ⭐）
+
+**数学视频/manim 真实出片（Round 4 实证）**：
+- `probe_manim_video.py`：①AST 安全校验（`validate_manim_code`：危险 import/call 拒绝 + Scene 子类 + construct 必需）②`render_manim` 真实渲染预置安全代码 → mp4 落盘（4s/h264/854x480/15fps）
+- **运维 bug（Windows 编码）**：`subprocess.run(cmd, capture_output=True, text=True)` 未指定 encoding——manim 输出含 UTF-8 中文/转义码，Windows 默认 GBK 解码在 reader 线程抛 UnicodeDecodeError，`render_manim` 返回 `'NoneType' object is not subscriptable`（异常被泛化吞噬，排障困难）。修复：`encoding='utf-8', errors='replace'` + 旧 Python 降级 bytes 解码
+- **质量档**：输出目录匹配扩至 480p15/720p30/1080p60/1440p60/2160p60（-ql/-qm/-qh/-qp/-qk）；实测 -ql 落盘 480p15
+
+**学习计划 format 修复（E2E 找茬暴露的确定性 bug）**：
+- 现象：`[PAEG][method.py] 学习计划分流异常: unsupported format string passed to dict.__format__`——method 模式学习计划整链路静默回退普通咨询
+- 根因：`planner.design_phases` 对 `learner.subjects_mastery` 值 `f"{v:.2f}"`；画像数据结构不统一（float vs 嵌套 dict `{'level': 0.8}`）→ dict 触发 format 异常
+- 修复：`_fmt_mastery(v)` 鲁棒归一（dict 取 level、float 格式化、str 直显、异常回退 "?"）
+
+**孤儿归零**：production_pipeline.py（零调用方、与 material_pipeline 重叠）归档 `归档_废弃副本/production_pipeline.py.archived_20260821`——连通矩阵孤儿 7 → 0。
+
+**E2E 脚本**：`send_and_wait` 等待 SSE done（`window.__e2eDone` 钩子）；此前只等消息数，教学流 40-90s 未完成时下一条 Enter 被当作打断 → 6 连假超时。
+
+**前端 UX bug（E2E 找茬发现，Round 4 增量）**：
+- 现象：done 事件到达后发送按钮仍"■ 停止"（teach finally 要等流完全结束——done 后还有蒸馏/hooks 收尾 yield）→ 学生立即发下一条被拦截：`正在生成上一条回复，请先点击「■ 停止」再发送新内容`
+- 修复：done 事件处理里 `_hideStopBtn()` 即时恢复（teach + chat 两处），收尾后台进行
+- E2E 复跑 12 过 4：残余失败为 LLM 延迟/限流环境噪声（30 req/min 窗口；单 teach 内部 4-8 次 LLM 调用；429 来自 PUT profile 自动保存 + intent/infer）；手动验证 teach 流完整含 done 35s——产品行为正常，D1 延迟遗留

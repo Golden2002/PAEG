@@ -2968,6 +2968,12 @@ async function teach(question, subject, subtopic) {
           </div>`);
           chatWin.scrollTop = chatWin.scrollHeight;
         } else if (event === 'done') {
+          // §3.79 Round 4 ⭐ E2E 观测钩子：done 事件置位（find_fault_e2e 等待流完整结束）
+          try { window.__e2eDone = (window.__e2eDone || 0) + 1; } catch (e) {}
+          // §3.79 Round 4 ⭐ UX 修复：done 到达即恢复发送按钮（此前等流完全结束
+          // finally 才恢复——done 后还有蒸馏/hooks 收尾，学生会看到按钮仍"■ 停止"、
+          // 发下一条被拦截"正在生成上一条回复"）。主流程已结束，收尾可后台进行。
+          try { window._hideStopBtn && window._hideStopBtn(); } catch (e) {}
           // v0.27：消费 done 事件——自动维护学科/学段下拉
           try {
             // subject_steered=true 时同步一级学科到 subject_steered_to
@@ -3186,6 +3192,9 @@ async function generalChat(text) {
             `<a class="download-link" href="${obj.md_url}" download><img class="link-icon" src="assets/icons/download.svg" alt="下载"/> 下载 ${typeCn}</a>` +
             (obj.html_url ? ` <a class="download-link" href="${obj.html_url}" target="_blank" style="margin-left:10px">预览</a>` : ''));
         } else if (event === 'done') {
+          // §3.79 Round 4 ⭐ done 即恢复按钮（与 teach 路径对齐，防"正在生成上一条"拦截）
+          try { window.__e2eDone = (window.__e2eDone || 0) + 1; } catch (e) {}
+          try { window._hideStopBtn && window._hideStopBtn(); } catch (e) {}
           break;
         }
       }
