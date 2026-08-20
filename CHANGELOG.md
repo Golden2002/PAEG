@@ -1,3 +1,21 @@
+### v1.2.9 §3.79 孤儿接线（5→3）+ 学段×学科教学质量真实验证（2026-08-20 ⭐）
+
+**本版定位**：回答"为何仍有孤儿模块" + 学段差异化教学质量真实验证（大学生 lecture 式/方法论/题型/举一反三是否满足）。
+
+**孤儿接线（孤儿 5→3）✅**：
+- **agent_scope.py（子代理作用域）接线**：subagent_manifest 新增 `validate_scopes()` 消费点（10 subagent 作用域一致性）；agent_scope 补 lesson_prep/resource_librarian 默认作用域（与 registry 对齐）
+- **condition_eval.py（条件启停）接线**：hooks_hub 钩子支持 `when` 条件表达式（evaluate_condition 求值；无 when 保持原 enabled，ratchet；条件异常默认关闭）
+- **孤儿定性**：production_pipeline → **废弃候选**（与 material_pipeline 重叠）；agent_trirole/platform_dual_track → 下轮 F6 平台化
+- 结论文档化：孤儿成因 = 历史包袱（设计超前于接线）+ 重叠未决 + 优先级（功能缺陷修复优先，如 Round 7 教学流 Bug）
+
+**学段×学科教学质量验证 ✅（工具 + 结论）**：`grade_quality_probe.py` 真实调用 4 学段 teach_stream + `grade_quality_conclusion.md`：
+- **接线层 4/4 全过**：初中（现象钩子/复述引导）+ 高中（定义/公式/误区）+ 大学本科（**严格定义/定理框架/推导/应用/学科视野**——满足 lecture 式要求）+ 考研（**考什么/怎么考/解题套路/真题演示/易错点**——满足题型+得分要求）+ 深度阶梯 + 学科方法论全部注入 system
+- **输出层 🟡 LLM 遵循度参差**：初中 3/3、高中/大学 2/3、**考研样本 0/3**（考点/题型/易错字样缺失）——非接线缺口，是 LLM 对长 system 学段骨架的遵循漂移 → 下轮"学段特征输出守门"（考研优先）
+
+**验证**：孤儿接线测试 19/19（test_round8_orphan_wiring.py）+ 既有回归全绿。
+
+**文档**：CHANGELOG + 技术全景 §10.21（孤儿 5→3 + 成因结论）+ 总需求 §4.7 + 任务清单 NEW-25 + 维护手册 §18.62 + grade_quality_conclusion
+
 ### v1.2.8 §3.79 找茬式 E2E：修复 teach_stream 三大结构性 Bug（2026-08-20 ⭐）
 
 **本版定位**：按用户"使用 Playwright 模拟真实用户，找茬式端到端测试，经得起商业场景考验"——E2E 找到并修复 3 个会导致**教学/倾诉/找答案在真实场景完全失效**的结构性 Bug。

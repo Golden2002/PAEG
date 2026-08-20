@@ -87,4 +87,20 @@ def validate_against_registry(manifest: Optional[Dict[str, Any]] = None) -> List
     return _errors
 
 
+def validate_scopes(manifest: Optional[Dict[str, Any]] = None) -> List[str]:
+    """agent_scope 消费点（§3.79 孤儿接线）：manifest 声明的 subagent 均应有默认作用域。
+
+    Returns:
+        缺少作用域的 subagent 列表；空列表 = 全部已注册（一致）。
+    """
+    _m = manifest or get_manifest()
+    _declared = agent_names(_m)
+    try:
+        from services.agent_scope import DEFAULT_AGENT_SCOPES
+    except Exception:
+        return ["agent_scope 不可用，无法校验"]
+    _missing = [a for a in _declared if a not in DEFAULT_AGENT_SCOPES]
+    return _missing
+
+
 __all__ = ["get_manifest", "agent_names", "validate_against_registry", "_MANIFEST_PATH"]
