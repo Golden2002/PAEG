@@ -4817,7 +4817,8 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
       ? '输入你想学习的内容…'
       : (isAnswer ? '输入题目，直接给你完整答案（论述/计算/证明）…'
          : (isMethod ? '问这门课该怎么学、怎么复习、怎么规划…'
-            : (isAffection ? '难过、焦虑、迷茫……想说什么都可以' : '输入任意内容，查看我的知识库…')));
+            : (isKnowledge ? '查看我的知识库：输入关键词检索你收着的资料…'
+               : (isAffection ? '难过、焦虑、迷茫……想说什么都可以' : '想聊什么都可以，我听着…'))));
     // v0.x ⭐ 修复：聊天头部动态模式 tag——切换时更新（用户能直观看到当前模式）
     const _modeTag = document.getElementById('current-mode-tag');
     if (_modeTag) {
