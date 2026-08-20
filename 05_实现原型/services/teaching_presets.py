@@ -46,6 +46,15 @@ TEACHING_PRESETS: Dict[str, Dict[str, Any]] = {
         "permission_preset": "standard",
         "persona": "weil",
     },
+    # v1.2.1 ⭐ §3.79 C1 补缺口：考试模式教学预设（对应总需求 TOP-2）
+    # permission_preset="exam" 联动 tool_registry.PERMISSION_PRESETS["exam"]
+    # （sandbox=read-only + approval=never + allow_write=False → 禁讲义/PPT/视频/动画/save_document）
+    "exam": {
+        "desc": "考试模式：锁定写工具（禁讲义/PPT/视频/动画/文档生成，专注解题评估；对学校/家长最硬卖点）",
+        "teaching_mode": "normal",
+        "permission_preset": "exam",
+        "persona": "weil",
+    },
 }
 
 # 默认教学预设（兼容现状——不改默认行为，ratchet 铁律）

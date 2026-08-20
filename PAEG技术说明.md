@@ -1723,3 +1723,25 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 **验证**：新增 18 测试全过（`tests/test_connectivity_b1_b5.py`）+ 全量回归绿。接线率 58% → 81%。
 
+### C.16 效果指标管道 + 考试模式 Preset（v1.2.2 §3.79 ⭐）
+
+**E1 设计指标测量管道**（TOP-1，`services/effect_metrics.py`）：
+
+| 指标 | 目标 | 口径（当前实现） | 状态 |
+|---|---|---|---|
+| 学习者坚持率 | ≥0.7 | 代理：窗口内活跃画像（profile mtime）中后 14 天仍活跃占比 | 可计算（`/api/metrics/effects`） |
+| 知识保留率 | ≥0.6 | 代理：transcripts 会话内末次评估≥首次评估占比 | 可计算 |
+| 元认知准确率 | ≥0.7 | 需自我评估事件埋点（reflection 无结构化自评字段） | None + 下轮增强 |
+| 自我更新采纳率 | ≥0.5 | 需采纳/拒绝事件埋点（现报告提议数/采纳痕迹） | None + 下轮增强 |
+
+- 端点 `GET /api/metrics/effects?window_days=30`；月报导出 `export_monthly_report()` → `data/effects/effect_report_YYYY-MM.{json,md}`
+- 铁律：无数据指标返回 None + reason，**不编造达标**；代理口径如实标注
+
+**C1 考试模式 Permission Preset**（TOP-2）：
+- 机制（v0.68 已具备，本轮复核）：`tool_registry.PERMISSION_PRESETS` 4 档（read_only/standard/exam/full）+ `_WRITE_TOOLS` 黑名单（save_document/generate_handout/generate_ppt/generate_video/...）+ `permission/preset` 事件回放 + 物料生成路径拦截
+- 本轮补缺口：`teaching_presets` 新增 **exam 教学预设**（permission_preset="exam" → allow_write=False）
+- 新端点：`GET /api/preset/list`（含权限档解析）/ `POST /api/preset/apply`（一键切换：会话级 `SESSIONS[permission_preset_<uid>]` + tool_registry 激活 + 事件审计；未知预设 400）
+- 教师一键"考试模式 = 禁写工具"——对学校/家长最硬卖点
+
+**验证**：`tests/test_effect_metrics_and_preset.py` 10 测试全绿 + teaching_presets/permission/invariants/connectivity 47 全绿。
+

@@ -1,3 +1,27 @@
+### v1.2.2 §3.79 效果指标管道（E1）+ 考试模式 Preset 落地（C1）（2026-08-20 ⭐）
+
+**本版定位**：按 `总需求与执行标准.md §5` 最优先项实施——**E1 设计指标测量管道**（TOP-1）+ **C1 考试模式 Permission Preset**（TOP-2）落地。
+
+**E1 效果指标测量管道 ✅（TOP-1）**：
+- 新模块 `services/effect_metrics.py`：四指标只读聚合（transcripts/users_data/evolve_data/memory）
+  - 知识保留率（代理：会话内末次评估≥首次评估占比，target 0.6）
+  - 学习者坚持率（代理：窗口内活跃画像中后 14 天仍活跃占比，target 0.7）
+  - 元认知准确率（无自我评估埋点 → 诚实 None + 下轮增强计划，target 0.7）
+  - 自我更新采纳率（无采纳事件 → 报告提议数/采纳痕迹 + 下轮增强计划，target 0.5）
+- `GET /api/metrics/effects` 端点（window_days 参数）
+- 月报导出 `export_monthly_report()` → `data/effects/effect_report_YYYY-MM.{json,md}`
+- 原则：无数据指标返回 None + reason，**不编造达标**；埋点增强（采纳/自我评估事件）明示下轮
+
+**C1 考试模式 Permission Preset ✅（TOP-2）**：
+- 机制复核：tool_registry 4 档权限（read_only/standard/exam/full）+ _WRITE_TOOLS 黑名单 + permission/preset 事件回放 + 物料生成拦截（v0.68 已具备）
+- 补缺口：`services/teaching_presets.py` 新增 **exam 教学预设**（permission_preset="exam" → allow_write=False，禁讲义/PPT/视频/动画/save_document）
+- 新增端点：`GET /api/preset/list`（含权限档解析）+ `POST /api/preset/apply`（一键切考试模式：会话级 SESSIONS 记录 + tool_registry 激活 + 事件审计；未知预设 400）
+- 对学校/家长最硬卖点：教师一键"考试模式=禁写工具"
+
+**验证**：新增 10 测试全过（`tests/test_effect_metrics_and_preset.py`）+ 既有 teaching_presets/permission/invariants/connectivity 47 全绿。
+
+**文档**：总需求与执行标准 §4.7 状态 + 技术说明 C.16 + 维护手册 §18.55 + 任务清单 NEW-18 + 本 CHANGELOG
+
 ### v1.2.1 §3.78 连通性断点修复 B1-B5 + 总需求落地（2026-08-15 ⭐）
 
 **本版定位**：按 `总需求与执行标准.md`（NEW-10）实施连通性审计（§10.21）断点修复——**B1-B5 五处断点全部接线** + `/api/metrics` 指标端点落地 + C2/C3 复核。

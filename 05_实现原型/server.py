@@ -478,6 +478,98 @@ def metrics():
         "timestamp": datetime.now().isoformat(),
     })
 
+
+# §3.79 ⭐ /api/metrics/effects —— 效果指标（总需求 E1 TOP-1：设计指标测量管道）
+@app.route("/api/metrics/effects", methods=["GET"])
+def metrics_effects():
+    """效果指标四件套（坚持率/保留率/元认知准确率/自我更新采纳率）。
+
+    数据源：transcripts/users_data/evolve_data/memory 只读聚合；
+    代理口径与无数据项诚实标注（None 不编造达标）；月报导出走
+    services/effect_metrics.export_monthly_report()。
+    """
+    try:
+        _wd = int(request.args.get("window_days") or 30)
+    except Exception:
+        _wd = 30
+    try:
+        from services.effect_metrics import compute_effect_metrics
+        return jsonify(compute_effect_metrics(_wd))
+    except Exception as _e:
+        return jsonify({"error": f"效果指标计算失败: {_e}"}), 500
+
+
+# §3.79 ⭐ /api/preset —— 考试模式 Permission Preset（总需求 C1 TOP-2 落地）
+@app.route("/api/preset/list", methods=["GET"])
+def preset_list():
+    """教学预设列表（含权限档解析）。"""
+    try:
+        from services.teaching_presets import list_teaching_presets, resolve_preset
+        _names = list_teaching_presets()
+        _items = []
+        for _n in _names:
+            try:
+                _items.append(resolve_preset(_n))
+            except Exception:
+                continue
+        return jsonify({"presets": _items, "count": len(_items)})
+    except Exception as _e:
+        return jsonify({"error": f"预设列表失败: {_e}", "presets": []}), 500
+
+
+@app.route("/api/preset/apply", methods=["POST"])
+def preset_apply():
+    """一键应用教学预设（v1.2.1 §3.79 ⭐）：考试模式=禁写工具。
+
+    请求：{preset: "exam"|"standard"|"minimal"|"code-mode"|"weil-classical"|自定义, learner_id?}
+    行为：
+      1. 校验预设存在（未知 → 400）
+      2. 按会话记录 SESSIONS[permission_preset_<learner_id>]（会话级，可查询/审计）
+      3. 激活 tool_registry 权限档（全局生效：物料生成路径 is_tool_allowed_by_preset 即时拦截写工具）
+      4. 记录 permission/preset 事件（可回放审计，dsh log-only 语义）
+    响应：{ok, preset, permission_preset, allow_write, allow_web, teaching_mode, persona}
+    """
+    data = request.get_json(force=True)
+    _preset = str(data.get("preset") or "").strip()
+    _learner_id = str(data.get("learner_id") or "") or None
+    try:
+        from services.teaching_presets import TEACHING_PRESETS, get_teaching_preset, resolve_preset
+        if not _preset or _preset not in TEACHING_PRESETS:
+            return jsonify({"error": f"未知预设: {_preset or '(空)'}"}), 400
+        _cfg = get_teaching_preset(_preset)
+        _perm = str(_cfg.get("permission_preset") or "standard")
+        # 会话级记录（SESSIONS 键规范：permission_preset_<learner_id>）
+        if _learner_id:
+            SESSIONS[f"permission_preset_{_learner_id}"] = _perm
+        # 激活 tool_registry 权限档（物料/写工具拦截即时生效）
+        try:
+            from tool_registry import set_permission_preset
+            set_permission_preset(_perm)
+        except Exception as _pe:
+            print(f"[PAEG][server.py] preset 权限档激活忽略: {_pe}")
+        # permission/preset 事件（可回放审计）
+        try:
+            from observability import emit_event_typed
+            emit_event_typed("permission/preset", data={
+                "preset": _preset, "permission": _perm,
+                "learner_id": _learner_id or "", "from": "preset/apply",
+            })
+        except Exception as _ee:
+            pass
+        _res = resolve_preset(_preset)
+        return jsonify({
+            "ok": True,
+            "preset": _preset,
+            "permission_preset": _perm,
+            "allow_write": _res.get("allow_write", True),
+            "allow_web": _res.get("allow_web", True),
+            "teaching_mode": _res.get("teaching_mode", "normal"),
+            "persona": _res.get("persona", "weil"),
+            "desc": _cfg.get("desc", ""),
+        })
+    except Exception as _e:
+        return jsonify({"error": f"预设应用失败: {_e}"}), 500
+
 @app.route("/api/subject-tree", methods=["GET"])
 def subject_tree():
     """学科-学段-二级学科 层级树（v0.26 ⭐ 前端三级级联下拉数据源）。
