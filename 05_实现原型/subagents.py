@@ -1874,6 +1874,24 @@ def _score_lesson_plan(
         score_secs = 0.0
         violations.append({"dim": "教学环节", "msg": f"教学环节数 {len(secs)} 异常"})
 
+    # 4a. §3.75 ⭐ 课前/课中/课后三维 + 案例/互动强制（《教师生成式AI应用指引》）
+    _stages = {str(s.get("stage", "")) for s in secs if isinstance(s, dict)}
+    _has_pre = "pre" in _stages
+    _has_during = "during" in _stages
+    _has_post = "post" in _stages
+    _three_stage_ok = _has_pre and _has_during and _has_post
+    if not _three_stage_ok:
+        _missing = [st for st, ok in (("pre", _has_pre), ("during", _has_during), ("post", _has_post)) if not ok]
+        violations.append({"dim": "课前课中课后", "msg": f"缺失阶段: {_missing}（应含 pre/during/post）"})
+    # 课中段案例/互动
+    _during_secs = [s for s in secs if isinstance(s, dict) and s.get("stage") == "during"]
+    _has_case = any(s.get("case_teaching") for s in _during_secs)
+    _has_interaction = any(s.get("interaction") for s in _during_secs)
+    if _during_secs and not _has_case:
+        violations.append({"dim": "案例教学", "msg": "课中段缺少 case_teaching（设计目的/步骤/预期效果）"})
+    if _during_secs and not _has_interaction:
+        violations.append({"dim": "互动环节", "msg": "课中段缺少 interaction（设计目的/步骤/预期效果）"})
+
     # 5. 板书
     board = str(plan.get("blackboard") or "").strip()
     score_board = 1.0 if board else 0.0
@@ -2347,6 +2365,10 @@ class LessonPrep:
         duration = int(inp.duration_min or 45)
         objectives = list(inp.objectives or [])
         requested = list(inp.user_requested_assets or [])
+        # §3.75 ⭐ 多轮修改支持：constraints 携带修改指令与上一版教案
+        _modify_directive = (inp.constraints or {}).get("modify_directive") or ""
+        _prior_lesson_plan = (inp.constraints or {}).get("prior_lesson_plan") or ""
+        _is_modify_mode = bool(_modify_directive or _prior_lesson_plan)
 
         # ── 步骤 ①：教案骨架 syllabus ──
         syllabus_sys = _lesson_planner_system_via_prompts(
@@ -2364,10 +2386,19 @@ class LessonPrep:
 
         # ── 步骤 ②：完整教案 lesson_plan ──
         lp_sys = _lesson_planner_system_via_prompts(topic, subject, grade, "lesson_plan", objectives)
+        _modify_block = ""
+        if _is_modify_mode:
+            # §3.75 ⭐ 多轮修改：基于上一版 + 修改指令重新生成
+            _modify_block = (
+                f"\n\n[修改指令] {_modify_directive or '请优化上一版教案'}\n"
+                f"[上一版教案] {str(_prior_lesson_plan)[:1500]}\n"
+                "要求：在保留上一版合理结构的基础上，按修改指令调整；若修改指令与上一版冲突，以修改指令为准。"
+            )
         lp_user = (
             f"基于骨架：{syllabus or {'framework': '5E 教学模型'}}\n"
             f"主题：{topic}\n学科：{subject}\n学段：{grade}\n时长：{duration} 分钟\n"
-            f"三维目标：{objectives or '按主题自行拟定'}\n\n"
+            f"三维目标：{objectives or '按主题自行拟定'}\n"
+            f"{_modify_block}\n\n"
             "请输出完整教案（严格 JSON，键固定）：\n"
             "{\n"
             '  "framework": "...",\n'
