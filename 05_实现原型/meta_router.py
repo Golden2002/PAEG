@@ -488,6 +488,7 @@ _SUBJECT_MAP = {
 _GRADE_MAP = {
     "高一": "high_school", "高二": "high_school", "高三": "high_school",
     "高中": "high_school",
+    "初一": "junior", "初二": "junior", "初三": "junior",
     "初中": "junior", "小学": "primary",
     "大学": "undergraduate", "本科": "undergraduate",
     "考研": "exam",
@@ -543,12 +544,13 @@ def _extract_lesson_topic(text: str) -> dict:
     )
     m_prefix = prefix_pat.match(body)
     prefix_only = False
-    if m_prefix:
-        body = body[m_prefix.end():]
-        # 剥离后只剩空/标点 → 视为"纯前缀"，topic 校验会返 {}
-        if not body.strip(r" ：:、,，。.!！?？；;\s"):
-            prefix_only = True
-        body = body.strip()
+    if not m_prefix:
+        return {}  # §3.73 ⭐ 非"我要备课"激活词输入 → 不提取（提取器只服务激活词场景）
+    body = body[m_prefix.end():]
+    # 剥离后只剩空/标点 → 视为"纯前缀"，topic 校验会返 {}
+    if not body.strip(r" ：:、,，。.!！?？；;\s"):
+        prefix_only = True
+    body = body.strip()
 
     # ── 第 3 步：从 body 中抹掉 extra 文本（保留顺序 & 去重）──
     for extra in extra_list:
