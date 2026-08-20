@@ -68,11 +68,16 @@ DEFAULT_AGENT_SCOPES: Dict[str, AgentScope] = {}
 
 
 def _register_default_scopes() -> None:
-    """注册 9 个内置 subagent 默认作用域（幂等）。"""
+    """注册内置 subagent 默认作用域（幂等）。
+
+    §3.79 v1.2.8 ⭐ 补全：与 subagent_registry（10 个）对齐——新增
+    lesson_prep / resource_librarian（默认全工具，ratchet）。
+    """
     _names = [
         "diagnostor", "planner", "presenter", "evaluator",
         "adapter", "answer_solver", "affection_supportor",
         "self_update_agent", "individuality",
+        "lesson_prep", "resource_librarian",
     ]
     for _n in _names:
         if _n not in DEFAULT_AGENT_SCOPES:

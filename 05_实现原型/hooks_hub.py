@@ -217,13 +217,23 @@ class HooksHub:
                     if _event not in VALID_EVENTS:
                         print(f"[hooks_hub] 跳过未知事件 {_event}（钩子 {_h.get('id')}）")
                         continue
+                    # §3.79 ⭐ condition_eval 接线（孤儿 → 钩子条件启停）：when 表达式求值
+                    # 用法：{"id": "...", "event": "...", "when": "module('x') and env('PAEG_EXAM')=='1'"}
+                    _enabled = bool(_h.get("enabled", True))
+                    _when = _h.get("when")
+                    if _when and _enabled:
+                        try:
+                            from services.condition_eval import evaluate_condition
+                            _enabled = bool(evaluate_condition(str(_when)))
+                        except Exception:
+                            _enabled = False  # 条件异常 → 关闭（安全默认）
                     _h2 = Hook(
                         hook_id=str(_h.get("id") or f"{_event}_{len(self.hooks)}"),
                         event=_event,
                         module=str(_h.get("module") or ""),
                         function=str(_h.get("function") or ""),
                         priority=int(_h.get("priority") or 100),
-                        enabled=bool(_h.get("enabled", True)),
+                        enabled=_enabled,
                         blocking=bool(_h.get("blocking", False)),
                         match=_h.get("match"),
                         timeout=_h.get("timeout"),
