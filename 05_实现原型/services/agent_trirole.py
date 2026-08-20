@@ -99,6 +99,18 @@ DEFAULT_SERVICE_DEFINITIONS: Dict[str, ServiceDefinition] = {
         input_schema={"text": "str", "learner": "object"},
         output_schema={"profile_prompt": "str"},
     ),
+    # §3.79 Round 3 ⭐ 补全：v0.43/v0.69 新增 subagent 的服务契约
+    # （此前契约只有 9 个，manifest 校验接入后 resource_librarian/lesson_prep 缺契约会报缺失）
+    "resource_librarian": ServiceDefinition(
+        name="resource_librarian", desc="资料检索员：知识库+Library+用户资料+联网聚合检索",
+        input_schema={"query": "str", "scope": "str", "learner": "object"},
+        output_schema={"chunks": "list", "has_any": "bool"},
+    ),
+    "lesson_prep": ServiceDefinition(
+        name="lesson_prep", desc="备课生成器：教案+讲义+讲稿+PPT大纲+视频脚本+思维导图",
+        input_schema={"topic": "str", "subject": "str", "grade": "str"},
+        output_schema={"lesson_plan": "dict", "quality_report": "dict"},
+    ),
 }
 
 

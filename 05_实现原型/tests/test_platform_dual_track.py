@@ -48,3 +48,41 @@ def test_platform_key_fallback():
     cfg = {"tool": {"common": "generic-tool"}}  # 无平台特定，只有 common
     val = resolve_platform_value(cfg, "tool")
     assert val == "generic-tool"
+
+
+# ────────────────────────────────────────────────
+# §3.79 Round 3 ⭐ 孤儿接线：subprocess_spawn 消费平台双轨
+# ────────────────────────────────────────────────
+
+
+def test_spawner_uses_platform_templates():
+    """Spawner._resolve_exe 消费 platform_dual_track 双轨模板（孤儿 → 接线）。"""
+    from services.subprocess_spawn import Spawner
+    from services.platform_dual_track import get_platform
+
+    sp = Spawner("ffmpeg")  # 不显式给 executable → 走平台双轨
+    exe = sp._resolve_exe()
+    assert exe  # 非空
+    if get_platform() == "win32":
+        assert exe.lower().endswith(".exe") or "ffmpeg" in exe.lower()
+    else:
+        assert "ffmpeg" in exe
+
+
+def test_spawner_explicit_executable_wins():
+    """显式 executable 优先于平台双轨（不破坏既有配置）。"""
+    from services.subprocess_spawn import Spawner
+
+    sp = Spawner("ffmpeg", executable="C:/custom/ffmpeg.exe")
+    assert sp._resolve_exe() == "C:/custom/ffmpeg.exe"
+
+
+def test_spawner_python_platform_resolve():
+    """python spawner 平台解析：win32 → python.exe / posix → python3 或 sys.executable。"""
+    from services.subprocess_spawn import get_spawner, Spawner
+
+    sp = get_spawner("python")
+    assert sp is not None
+    exe = sp._resolve_exe()
+    assert exe  # 非空即可（win32 下 sys.executable 为 python.exe 路径）
+    assert Spawner("python")._resolve_exe()  # 无显式配置也能解析

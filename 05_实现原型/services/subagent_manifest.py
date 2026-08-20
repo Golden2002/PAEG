@@ -103,4 +103,27 @@ def validate_scopes(manifest: Optional[Dict[str, Any]] = None) -> List[str]:
     return _missing
 
 
-__all__ = ["get_manifest", "agent_names", "validate_against_registry", "_MANIFEST_PATH"]
+def validate_contracts(manifest: Optional[Dict[str, Any]] = None) -> List[str]:
+    """agent_trirole 消费点（§3.79 Round 3 孤儿接线）：manifest 声明的 subagent
+    均应有三角色服务契约（ServiceDefinition）。
+
+    接线背景：services/agent_trirole.py（Definition/Provider/Consumer 三角色，
+    dsh ctx.shell 借鉴）此前零调用方（孤儿）——只有契约层没有消费点。
+    本函数把 trirole 契约集接入 manifest 校验链：声明 → 契约 必须一致，
+    Provider/Consumer 才能安全基于抽象契约协作（Rule vs LLM 可插拔）。
+
+    Returns:
+        缺少契约的 subagent 列表；空列表 = 全部已声明（一致）。
+    """
+    _m = manifest or get_manifest()
+    _declared = set(agent_names(_m))
+    try:
+        from services.agent_trirole import DEFAULT_SERVICE_DEFINITIONS
+    except Exception:
+        return ["agent_trirole 不可用，无法校验"]
+    _missing = [a for a in sorted(_declared) if a not in DEFAULT_SERVICE_DEFINITIONS]
+    return _missing
+
+
+__all__ = ["get_manifest", "agent_names", "validate_against_registry",
+           "validate_scopes", "validate_contracts", "_MANIFEST_PATH"]

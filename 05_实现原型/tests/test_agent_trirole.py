@@ -115,3 +115,41 @@ def test_register_custom_definition():
         assert "test_sd" in DEFAULT_SERVICE_DEFINITIONS
     finally:
         DEFAULT_SERVICE_DEFINITIONS.pop("test_sd", None)
+
+
+# ────────────────────────────────────────────────
+# §3.79 Round 3 ⭐ 孤儿接线：manifest 校验消费 trirole 契约
+# ────────────────────────────────────────────────
+
+
+def test_manifest_contracts_wired():
+    """subagent_manifest.validate_contracts 消费 agent_trirole（孤儿 → 接线）。"""
+    from services.subagent_manifest import validate_contracts
+
+    missing = validate_contracts()
+    assert missing == [], f"manifest 声明的 subagent 缺三角色契约: {missing}"
+
+
+def test_trirole_definitions_cover_all_manifest_agents():
+    """trirole 契约集合覆盖 manifest 全部 subagent（含 resource_librarian/lesson_prep）。"""
+    from services.agent_trirole import DEFAULT_SERVICE_DEFINITIONS
+    from services.subagent_manifest import agent_names
+
+    declared = set(agent_names())
+    contracted = set(DEFAULT_SERVICE_DEFINITIONS.keys())
+    # 契约覆盖声明（双向差集为空）
+    assert declared - contracted == set(), f"声明但无契约: {declared - contracted}"
+    # 允许契约多声明（如 test_sd 之类的运行时注册），但核心 11 个应齐
+    for core in ("diagnostor", "planner", "presenter", "evaluator", "adapter",
+                 "answer_solver", "affection_supportor", "self_update_agent",
+                 "individuality", "resource_librarian", "lesson_prep"):
+        assert core in contracted, f"缺核心契约: {core}"
+
+
+def test_contracts_schema_nonempty():
+    """核心 subagent 契约的 input/output schema 非空（契约可执行性）。"""
+    from services.agent_trirole import DEFAULT_SERVICE_DEFINITIONS
+    for name in ("diagnostor", "planner", "presenter", "resource_librarian", "lesson_prep"):
+        sd = DEFAULT_SERVICE_DEFINITIONS[name]
+        assert sd.input_schema, f"{name} 缺 input_schema"
+        assert sd.output_schema, f"{name} 缺 output_schema"
