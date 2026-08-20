@@ -265,14 +265,40 @@ def compute_self_update_acceptance() -> Dict[str, Any]:
                 _traces += sum(1 for _l in _fh if _l.strip() and not _l.strip().startswith("#"))
         except Exception:
             pass
+    # §3.79 E1 ⭐ 采纳事件（feedback/record kind=adopted，self_evolution 蒸馏入库发射）
+    _adopted = 0
+    _evf = _p("events.jsonl")
+    if os.path.isfile(_evf):
+        try:
+            with open(_evf, "r", encoding="utf-8", errors="ignore") as _fh:
+                for _line in _fh:
+                    _line = _line.strip()
+                    if not _line:
+                        continue
+                    try:
+                        _rec = json.loads(_line)
+                    except Exception:
+                        continue
+                    if _rec.get("type") != "feedback/record":
+                        continue
+                    _data = _rec.get("data") or {}
+                    if _data.get("kind") == "adopted":
+                        _adopted += 1
+        except Exception:
+            _adopted = 0
+    # 采纳率 = 采纳事件 / 提议建议数（采纳事件存在才计算；否则 None 诚实标注）
+    _rate = None
+    if _proposals > 0 and _adopted > 0:
+        _rate = round(_adopted / _proposals, 3)
     return {
-        "value": None,
-        "status": "needs_adoption_event",
+        "value": _rate,
+        "status": "adopted_events" if _rate is not None else "needs_adoption_event",
         "target": 0.5,
-        "note": "无采纳/拒绝事件埋点，采纳率不可精确计算；"
-               f"提议建议 {_proposals} 条、采纳痕迹 {_traces} 条（insights+patches 代理）；"
-               "下轮在 self_update 采纳处补 feedback/record 事件后启用",
+        "note": ("采纳率 = feedback/record(adopted) 事件数 / 提议建议数" if _rate is not None
+                 else "暂无采纳事件（self_evolution 蒸馏入库后才发射），建议数 "
+                      f"{_proposals}、采纳痕迹 {_traces}；数据积累后自动出值"),
         "proposals": _proposals,
+        "adopted_events": _adopted,
         "adopted_traces": _traces,
     }
 
