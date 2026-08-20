@@ -2605,6 +2605,19 @@ class LessonPrep:
         )
         # §3.78 B3 ⭐ 视频脚本检查结果并入质量报告（结构化、可审计）
         quality_report["video_script_check"] = _video_check
+        # §3.79 Q7 ⭐ 讲义/讲稿/思维导图结构检查（services/material_quality 对称补齐）
+        try:
+            from services.material_quality import (
+                check_handout, check_lecture_script, check_mindmap)
+            quality_report["handout_check"] = check_handout(handout) if handout else {
+                "passed": True, "errors": [], "checked": False, "sections_found": []}
+            quality_report["script_check"] = check_lecture_script(script) if script else {
+                "passed": True, "errors": [], "checked": False,
+                "has_open": False, "has_body": False, "has_close": False, "has_duration": False}
+            quality_report["mindmap_check"] = check_mindmap(mindmap) if mindmap else {
+                "passed": True, "errors": [], "checked": False, "list_items": 0, "levels": []}
+        except Exception as _mq_e:
+            print(f"[PAEG][subagents.py] 物料质量检查忽略: {_mq_e}")
 
         # 累计 token 实际消耗：按 max_tokens 计（估算；真实 token 在 _safe_reason_chat 内计）
         token_used = _LESSON_PLAN_BUDGET_USED  # 累计已扣（测试与审计用）

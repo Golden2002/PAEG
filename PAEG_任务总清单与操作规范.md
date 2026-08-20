@@ -1,4 +1,4 @@
-﻿# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
+# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
 
 > 创建日期：2026-08-14
 > 性质：**本文件是操作的唯一依据**——所有未完成任务、用户指示、调研要求固定于此，每次操作前先读此文件，完成后更新状态。
@@ -531,6 +531,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | **NEW-16** | **总需求落地选取项（本轮）** 🔄：①C2 存储安全三项复核 ✅（PBKDF2/原子写/登录限流 v0.46 已落地，本轮验证无缺口）②C3 CORS 白名单复核 ✅（v0.51 已落地）③`/api/metrics` 指标端点 ✅（uptime+metrics+events_count）④A1 workflows_hub 复核 ✅（teach_minimal/teach_concept 已落地）⑤E1 效果指标管道/D1 SLO 深化/C5 家长可见性等大项 ⏳ 未完成——如实标注并纳入目标模式后续轮次 | 总需求与执行标准.md §4/§5；B1-B5 验证：test_connectivity_b1_b5.py 18 测试全绿 |
 | **NEW-17** | **残留问题清除（v1.2.0 测试红 → 全绿）✅ 已完成**：①P0-1 补 11 科 method_guide/worked_example（含锚点词）②P0-2 考研分键 politics_exam/math_exam（样式+别名+学段档）③P0-3 四学段收尾问题模板 closing_question_template ④P0-4 SUBJECT_GRADE_DEPTH 20 条 + build_presenter_system 注入 ⑤修复 test_method_guides_are_not_just_physics_copy 自身缺陷（自比恒假）| 用户指示"全面清除残留问题"；test_grade_subject_optimization.py 62/62 全绿；对应 prompts.py + 测试文件改动 |
 | **NEW-18** | **§3.79 E1 效果指标管道 + C1 考试模式 Preset（总需求 TOP-1/2）✅ 已完成**：①`services/effect_metrics.py` 四指标聚合（坚持/保留/元认知/采纳率，代理口径诚实标注，无数据 None）+ `/api/metrics/effects` + 月报导出 data/effects/ ②exam 教学预设（禁写工具）+ `/api/preset/list` + `/api/preset/apply` 一键切换（会话级 SESSIONS 记录 + tool_registry 激活 + 事件审计）| 用户指示"继续实施下轮计划"；test_effect_metrics_and_preset.py 10 测试全绿 + 相关 47 全绿；埋点增强（采纳/自我评估事件）与严格队列坚持率为下轮 |
+| **NEW-19** | **§3.79 质量标准 + Q2/Q6/Q7 落地（目标模式 Round 2）✅ 已完成**：①§3.6 六维质量标准（Q1-Q8）写入总需求文档 ②Q2 App Factory：`server.create_app(config)` 提取（创建+CORS+ProxyFix+Cookie+蓝图注册），config 可注入 PAEG_ENV，模块级 app 兼容 ③Q6 教学输出质量信号：`services/presentation_quality.py` + paeg.py 每步写 quality_signal 事件 ④Q7 物料结构检查：`services/material_quality.py`（handout/script/mindmap）+ LessonPrep 接线入 quality_report | 用户指示"先提质量标准，优化代码架构与教学/物料能力"；test_quality_round2.py 13 测试全绿 + 回归 155 全绿；Q1/Q3/Q5 持续执行，连通矩阵登记下轮补全 |
 
 ---
 

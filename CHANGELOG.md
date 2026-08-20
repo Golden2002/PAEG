@@ -1,3 +1,19 @@
+### v1.2.3 §3.79 质量标准落地：App Factory + 教学输出质量信号 + 物料结构检查（2026-08-20 ⭐）
+
+**本版定位**：按用户"先提质量标准、再优化代码架构与教学/物料能力"指示——**§3.6 六维质量标准**（Q1-Q8）定稿 + Q2/Q6/Q7 落地。
+
+**§3.6 质量标准（写入总需求与执行标准）**：Q1 代码模块化 / Q2 App Factory / Q3 注释质量 / Q4 插件可移植独立 / Q5 接线连通 / Q6 教学对话质量 / Q7 内容输出质量 / Q8 物料生产能力——每条含验收点，依据 Oracle 30 准则 + 技术全景 §5B DSH 借鉴。
+
+**Q2 App Factory ✅（Oracle I1）**：`server.py` 提取 `create_app(config)`——创建 Flask + CORS 白名单 + ProxyFix + 生产 Cookie + 蓝图注册收口；`config` 可注入 `PAEG_ENV`（测试可注入配置）；模块级 `app = create_app()` 保持 `from server import app` / gunicorn `server:app` 入口兼容（ratchet 铁律）。
+
+**Q6 教学输出质量信号 ✅**：新模块 `services/presentation_quality.py`——每步教学输出确定性信号（长度 0.4 + 具体性 0.3 + 结构 0.3，无 LLM 无延迟）；paeg.py 教学循环每步写 transcript `quality_signal` 事件；`aggregate_signals` 会话级聚合（供 E1 管道/质量看板/前端质量徽章）。
+
+**Q7 物料结构检查 ✅**：新模块 `services/material_quality.py`——`check_handout`（5 节结构）/ `check_lecture_script`（开场主体小结+时长）/ `check_mindmap`（缩进树层级）确定性检查（对称 B3 video_script_check）；LessonPrep 步骤③④⑦ 接线，结果写入 `quality_report.handout_check/script_check/mindmap_check`——6 类物料产出全部可过结构检查进质量报告。
+
+**验证**：新增 13 测试全绿（`tests/test_quality_round2.py`）+ 本轮回归 155 全绿。
+
+**文档**：总需求 §3.6 + §4.7 状态 + 技术说明 C.17 + 维护手册 §18.56 + 任务清单 NEW-19 + 本 CHANGELOG
+
 ### v1.2.2 §3.79 效果指标管道（E1）+ 考试模式 Preset 落地（C1）（2026-08-20 ⭐）
 
 **本版定位**：按 `总需求与执行标准.md §5` 最优先项实施——**E1 设计指标测量管道**（TOP-1）+ **C1 考试模式 Permission Preset**（TOP-2）落地。

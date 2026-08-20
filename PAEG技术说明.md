@@ -1745,3 +1745,24 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 **验证**：`tests/test_effect_metrics_and_preset.py` 10 测试全绿 + teaching_presets/permission/invariants/connectivity 47 全绿。
 
+### C.17 质量标准落地：App Factory + 教学质量信号 + 物料结构检查（v1.2.3 §3.79 ⭐）
+
+**§3.6 六维质量标准**（写入 `总需求与执行标准.md`）：Q1 代码模块化 / Q2 App Factory / Q3 注释 / Q4 插件可移植独立 / Q5 接线连通 / Q6 教学对话质量 / Q7 内容输出质量 / Q8 物料生产能力——每条含验收点。
+
+**Q2 App Factory（Oracle I1 渐进）**：
+- `server.create_app(config=None)`：创建 Flask + CORS 白名单 + ProxyFix + 生产 Cookie + 全部蓝图注册收口
+- `config={"PAEG_ENV": "production"}` 可注入（测试可注入配置，Oracle 验收点）
+- 模块级 `app = create_app()` 保持既有入口（`from server import app` / gunicorn `server:app`）——ratchet 铁律
+
+**Q6 教学输出质量信号**（`services/presentation_quality.py`）：
+- `signal_presentation(content, step_type, subject)`：确定性三维（长度 0.4 / 具体性 0.3 / 结构 0.3，无 LLM）
+- paeg.py 教学循环每步写 transcript `quality_signal` 事件（length_ok/has_examples/has_structure/score/chars）
+- `aggregate_signals` 会话级聚合 → E1 管道/质量看板/前端质量徽章数据源
+
+**Q7 物料结构检查**（`services/material_quality.py`）：
+- `check_handout`（学习目标/核心内容/典型例题/巩固练习/小结 ≥3 节）/ `check_lecture_script`（开场主体小结 + 时长）/ `check_mindmap`（缩进树 ≥2 层）
+- LessonPrep 步骤③④⑦ 接线 → `quality_report.handout_check / script_check / mindmap_check`（对称 B3 video_script_check）
+- 6 类物料（教案/讲义/讲稿/PPT/视频脚本/思维导图）全部可过确定性结构检查进质量报告
+
+**验证**：`tests/test_quality_round2.py` 13 测试全绿 + 本轮回归 155 全绿。
+
