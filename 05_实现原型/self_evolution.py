@@ -85,6 +85,16 @@ class SelfEvolution:
 
         # 写入 evolved_*.json（avg>=0.7 即"环境验证"通过 → 直接入库）
         self._append_evolved_node(knowledge, subject)
+        # §3.79 E1 ⭐ 采纳事件（feedback/record）——自我更新采纳率可计算（effect_metrics 读取）
+        try:
+            from observability import emit_event_typed
+            emit_event_typed("feedback/record", data={
+                "kind": "adopted", "target": "knowledge",
+                "concept": str(concept)[:80], "subject": str(subject),
+                "source": "self_evolution.distill_knowledge",
+            })
+        except Exception:
+            pass
         self._log(f"知识库新增: {concept} ({subject})")
         return {"distilled": 1, "node": knowledge, "rejected": []}
 

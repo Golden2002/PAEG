@@ -170,6 +170,49 @@ def create_app(config: Optional[dict] = None):
 # 模块级实例（既有入口兼容：from server import app / gunicorn server:app）
 app = create_app()
 
+
+# §3.79 D1 ⭐ SLO 分模式指标接线（before/after request；耗时=首字节延迟，流式全量时长待 SSE 埋点）
+_SLO_MODE_BY_PATH = (
+    ("/api/teach/stream", "teach"), ("/api/teach", "teach"),
+    ("/api/chat/stream", "chat"), ("/api/chat", "chat"),
+    ("/api/lesson_prep", "lesson_prep"),
+    ("/api/knowledge", "knowledge"), ("/api/affection", "affection"),
+    ("/api/method", "method"), ("/api/resources", "resources"),
+)
+
+
+def _slo_mode(path: str) -> str:
+    for _p, _m in _SLO_MODE_BY_PATH:
+        if path.startswith(_p):
+            return _m
+    return "other"
+
+
+@app.before_request
+def _slo_before():
+    try:
+        from flask import g as _g
+        _g._slo_start = time.time()
+    except Exception:
+        pass
+
+
+@app.after_request
+def _slo_after(resp):
+    try:
+        from flask import g as _g
+        _start = getattr(_g, "_slo_start", None)
+        if _start is not None:
+            from services.slo_metrics import record_request
+            record_request(
+                _slo_mode(request.path),
+                (time.time() - _start) * 1000.0,
+                ok=(resp.status_code < 500),
+            )
+    except Exception:
+        pass
+    return resp
+
 # ═══════════════════════════════════════════════════════════
 # v0.51 ⭐ P0-3（Oracle）：全局滑动窗口限流
 # ═══════════════════════════════════════════════════════════
@@ -483,12 +526,20 @@ def metrics():
                 _ev_count = sum(1 for _ in _fh)
     except Exception:
         _ev_count = 0
+    # §3.79 D1 ⭐ SLO 分模式摘要（P95/错误率/token）
+    _slo = {}
+    try:
+        from services.slo_metrics import slo_summary
+        _slo = slo_summary()
+    except Exception:
+        _slo = {}
     return jsonify({
         "status": "ok",
         "version": "0.74.0",
         "uptime_seconds": round(time.time() - _METRICS_START_TS, 1),
         "metrics": _m,
         "events_count": _ev_count,
+        "slo": _slo,
         "note": "P95/错误率/token 成本分模式埋点深化为下轮（总需求与执行标准 D1）",
         "timestamp": datetime.now().isoformat(),
     })
@@ -585,6 +636,54 @@ def preset_apply():
     except Exception as _e:
         return jsonify({"error": f"预设应用失败: {_e}"}), 500
 
+
+# §3.79 C5 ⭐ 家长/教师视图：查看孩子/学生每日使用与聊天记录（教育合规硬门槛 P0-9）
+@app.route("/api/parent/conversations/<child_uid>", methods=["GET"])
+def parent_conversations(child_uid):
+    """家长/教师视角：孩子会话列表 + 每日使用摘要。
+
+    响应：
+      - usage: usage_guard.usage_summary（每日会话次数/上限）
+      - conversations: 会话列表（含 id/title/mode/message_count/created）
+      - messages?: 可选 ?full=1 时返回每个会话的消息摘要（时间/角色/内容前 120 字）
+    说明：家长视图为教育合规最低要求（可见性）；PII 字段级脱敏为下轮 D 域深化。
+    """
+    _out = {"child_uid": child_uid}
+    # 每日使用摘要
+    try:
+        from services.usage_guard import usage_summary
+        _out["usage"] = usage_summary(SESSIONS, str(child_uid))
+    except Exception:
+        _out["usage"] = {"error": "usage 不可用"}
+    # 会话列表
+    try:
+        _cs = get_conv_store()
+        _convs = []
+        if _cs is not None:
+            _convs = _cs.list_conversations(str(child_uid)) or []
+        _out["conversations"] = _convs
+        if request.args.get("full") == "1":
+            _msgs = []
+            for _c in _convs[:10]:
+                _cid = _c.get("id") if isinstance(_c, dict) else str(_c)
+                try:
+                    _conv = _cs.get_conversation(str(child_uid), _cid)
+                    _items = (_conv or {}).get("messages") or []
+                    _msgs.append({
+                        "conv_id": _cid,
+                        "messages": [
+                            {"role": m.get("role"), "content": str(m.get("content") or "")[:120],
+                             "ts": m.get("ts")}
+                            for m in _items[-20:]
+                        ],
+                    })
+                except Exception:
+                    continue
+            _out["message_preview"] = _msgs
+        return jsonify(_out)
+    except Exception as _e:
+        return jsonify({"child_uid": child_uid, "error": str(_e)}), 500
+
 @app.route("/api/subject-tree", methods=["GET"])
 def subject_tree():
     """学科-学段-二级学科 层级树（v0.26 ⭐ 前端三级级联下拉数据源）。
@@ -673,6 +772,19 @@ def teach_stream():
     learner_id = data.get("learner_id") or _anon_learner_id(data)
     # v0.42 ⭐ 重构提取至 services/_learner_session.py（等价原 L1091 内联，无 elif / 无 target_exam）
     learner = ensure_learner_session(learner_id, data, SESSIONS)
+
+    # §3.79 C5 ⭐ 每日使用限制（家长/教师合规：默认每日 20 次教学会话，PAEG_DAILY_SESSION_LIMIT 可调）
+    try:
+        from services.usage_guard import is_over_limit
+        if is_over_limit(SESSIONS, str(learner_id)):
+            _limit_msg = ("今天的学习会话次数已经用完了。休息一下，明天再继续吧——"
+                          "连续学习太久反而记不住，间隔休息是记忆的一部分。")
+            yield (f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _limit_msg, 'step_type': 'usage_limit'}, ensure_ascii=False)}\n\n")
+            yield (f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'usage_limit', 'usage_limit': True}, ensure_ascii=False)}\n\n")
+            return
+    except Exception as _ug_e:
+        print(f"[PAEG][server.py] usage_guard 检查忽略: {_ug_e}")
+        pass
     _hydrate_learner(learner, data)  # v0.32 ⭐ 每次请求同步学段（修复缓存陈旧）
 
     # v0.43 ⭐ 输出效果约束 3 参数（DIRECT/EMOTION/PREF → Presenter 读取）
@@ -690,6 +802,12 @@ def teach_stream():
     # v0.36.2 ⭐ 统一历史保存（15 个早退分支曾跳过 CONV_STORE；统一出口 _save_teach_turn）
     def _save_teach_turn(mode: str, reply_text: str):
         try:
+            # §3.79 C5 ⭐ 教学会话完成即登记今日使用（统一出口，覆盖全部 15 个分支）
+            try:
+                from services.usage_guard import register_usage
+                register_usage(SESSIONS, str(learner_id))
+            except Exception:
+                pass
             if CONV_STORE is not None and _is_registered(learner_id):
                 _cid = SESSIONS.get(f"conv_{learner_id}")
                 # §3.58 话题元数据：4 分类结果标注到 User Item（Turn 级，向后兼容）

@@ -1121,3 +1121,52 @@
 {"ts": 1787237688.292, "type": "subagent/descriptor", "seq": -1, "data": {"name": "affection_supportor", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.affection_supportor"}}
 {"ts": 1787237688.293, "type": "subagent/descriptor", "seq": -1, "data": {"name": "individuality", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.individuality"}}
 {"ts": 1787237688.294, "type": "subagent/descriptor", "seq": -1, "data": {"name": "resource_librarian", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.resource_librarian"}}
+{"ts": 1787237996.838, "type": "subagent/descriptor", "seq": -1, "data": {"name": "diagnostor", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.diagnostor"}}
+{"ts": 1787237996.839, "type": "subagent/descriptor", "seq": -1, "data": {"name": "planner", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.planner"}}
+{"ts": 1787237996.84, "type": "subagent/descriptor", "seq": -1, "data": {"name": "presenter", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.presenter"}}
+{"ts": 1787237996.841, "type": "subagent/descriptor", "seq": -1, "data": {"name": "evaluator", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.evaluator"}}
+{"ts": 1787237996.842, "type": "subagent/descriptor", "seq": -1, "data": {"name": "adapter", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.adapter"}}
+{"ts": 1787237996.843, "type": "subagent/descriptor", "seq": -1, "data": {"name": "answer_solver", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.answer_solver"}}
+{"ts": 1787237996.844, "type": "subagent/descriptor", "seq": -1, "data": {"name": "affection_supportor", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.affection_supportor"}}
+{"ts": 1787237996.845, "type": "subagent/descriptor", "seq": -1, "data": {"name": "individuality", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.individuality"}}
+{"ts": 1787237996.846, "type": "subagent/descriptor", "seq": -1, "data": {"name": "resource_librarian", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.resource_librarian"}}
+{"ts": 1787238024.735, "type": "subagent/descriptor", "seq": -1, "data": {"name": "diagnostor", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.diagnostor"}}
+{"ts": 1787238024.736, "type": "subagent/descriptor", "seq": -1, "data": {"name": "planner", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.planner"}}
+{"ts": 1787238024.737, "type": "subagent/descriptor", "seq": -1, "data": {"name": "presenter", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.presenter"}}
+{"ts": 1787238024.739, "type": "subagent/descriptor", "seq": -1, "data": {"name": "evaluator", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.evaluator"}}
+{"ts": 1787238024.74, "type": "subagent/descriptor", "seq": -1, "data": {"name": "adapter", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.adapter"}}
+{"ts": 1787238024.741, "type": "subagent/descriptor", "seq": -1, "data": {"name": "answer_solver", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.answer_solver"}}
+{"ts": 1787238024.742, "type": "subagent/descriptor", "seq": -1, "data": {"name": "affection_supportor", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.affection_supportor"}}
+{"ts": 1787238024.744, "type": "subagent/descriptor", "seq": -1, "data": {"name": "individuality", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.individuality"}}
+{"ts": 1787238024.745, "type": "subagent/descriptor", "seq": -1, "data": {"name": "resource_librarian", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.resource_librarian"}}
+{"ts": 1787238061.607, "type": "permission/preset", "seq": -1, "data": {"preset": "standard", "permission": "standard", "learner_id": "u_c1_test", "from": "preset/apply"}}
+{"ts": 1787238061.614, "type": "permission/preset", "seq": -1, "data": {"preset": "exam", "permission": "exam", "learner_id": "u_c1_test", "from": "preset/apply"}}
+{"ts": 1787238061.619, "type": "permission/preset", "seq": -1, "data": {"preset": "standard", "permission": "standard", "learner_id": "", "from": "preset/apply"}}
+{"ts": 1787238121.401, "type": "subagent/descriptor", "seq": -1, "data": {"name": "diagnostor", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.diagnostor"}}
+{"ts": 1787238121.403, "type": "subagent/descriptor", "seq": -1, "data": {"name": "planner", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.planner"}}
+{"ts": 1787238121.404, "type": "subagent/descriptor", "seq": -1, "data": {"name": "presenter", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.presenter"}}
+{"ts": 1787238121.406, "type": "subagent/descriptor", "seq": -1, "data": {"name": "evaluator", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.evaluator"}}
+{"ts": 1787238121.407, "type": "subagent/descriptor", "seq": -1, "data": {"name": "adapter", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.adapter"}}
+{"ts": 1787238121.409, "type": "subagent/descriptor", "seq": -1, "data": {"name": "answer_solver", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.answer_solver"}}
+{"ts": 1787238121.41, "type": "subagent/descriptor", "seq": -1, "data": {"name": "affection_supportor", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.affection_supportor"}}
+{"ts": 1787238121.411, "type": "subagent/descriptor", "seq": -1, "data": {"name": "individuality", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.individuality"}}
+{"ts": 1787238121.413, "type": "subagent/descriptor", "seq": -1, "data": {"name": "resource_librarian", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.resource_librarian"}}
+{"ts": 1787238133.739, "type": "hook/invoked", "seq": -1, "data": {"event": "tool.before", "source": "web_search", "matched": 1}}
+{"ts": 1787238133.741, "type": "hook/result", "seq": -1, "data": {"event": "tool.before", "listener_count": 1, "verdict": "allow"}}
+{"ts": 1787238133.749, "type": "hook/invoked", "seq": -1, "data": {"event": "tool.before", "source": "x", "matched": 2}}
+{"ts": 1787238133.75, "type": "hook/result", "seq": -1, "data": {"event": "tool.before", "listener_count": 2, "verdict": "allow"}}
+{"ts": 1787238133.76, "type": "hook/invoked", "seq": -1, "data": {"event": "tool.before", "source": "y", "matched": 3}}
+{"ts": 1787238134.063, "type": "hook/result", "seq": -1, "data": {"event": "tool.before", "listener_count": 3, "verdict": "allow"}}
+{"ts": 1787238134.072, "type": "hook/invoked", "seq": -1, "data": {"event": "tool.before", "source": "s", "matched": 3}}
+{"ts": 1787238134.674, "type": "hook/result", "seq": -1, "data": {"event": "tool.before", "listener_count": 3, "verdict": "allow"}}
+{"ts": 1787238134.708, "type": "hook/invoked", "seq": -1, "data": {"event": "tool.before", "source": "z", "matched": 2}}
+{"ts": 1787238134.71, "type": "hook/result", "seq": -1, "data": {"event": "tool.before", "listener_count": 2, "verdict": "allow"}}
+{"ts": 1787238151.101, "type": "subagent/descriptor", "seq": -1, "data": {"name": "diagnostor", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.diagnostor"}}
+{"ts": 1787238151.102, "type": "subagent/descriptor", "seq": -1, "data": {"name": "planner", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.planner"}}
+{"ts": 1787238151.103, "type": "subagent/descriptor", "seq": -1, "data": {"name": "presenter", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.presenter"}}
+{"ts": 1787238151.104, "type": "subagent/descriptor", "seq": -1, "data": {"name": "evaluator", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.evaluator"}}
+{"ts": 1787238151.105, "type": "subagent/descriptor", "seq": -1, "data": {"name": "adapter", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.adapter"}}
+{"ts": 1787238151.107, "type": "subagent/descriptor", "seq": -1, "data": {"name": "answer_solver", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.answer_solver"}}
+{"ts": 1787238151.108, "type": "subagent/descriptor", "seq": -1, "data": {"name": "affection_supportor", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.affection_supportor"}}
+{"ts": 1787238151.11, "type": "subagent/descriptor", "seq": -1, "data": {"name": "individuality", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.individuality"}}
+{"ts": 1787238151.111, "type": "subagent/descriptor", "seq": -1, "data": {"name": "resource_librarian", "model": "", "kb_ref": "knowledge_base", "descriptor_path": "subagents.resource_librarian"}}

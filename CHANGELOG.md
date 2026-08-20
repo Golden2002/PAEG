@@ -1,3 +1,21 @@
+### v1.2.4 §3.79 D1 SLO 分模式 + C5 每日使用限制/家长视图 + E1 采纳事件（2026-08-20 ⭐）
+
+**本版定位**：总需求下轮计划继续——**D1 SLO 四指标深化**（分模式 P95/错误率）+ **C5 家长/教师可见性**（教育合规 P0-9）+ **E1 采纳事件埋点** + **Q5 连通矩阵登记**。
+
+**D1 SLO 分模式指标 ✅**：新模块 `services/slo_metrics.py`——`record_request(mode, duration_ms, ok, tokens)` + `slo_summary()`（每模式 count/avg/P95/error_rate/tokens + 总体）+ `persist()`（data/slo.json）；server.py before/after_request 按 path 归 10 模式自动埋点（防御式，不影响既有请求）；`/api/metrics` 增加 `slo` 字段。
+
+**C5 每日使用限制 + 家长视图 ✅**（教育特有合规）：
+- `services/usage_guard.py`：每日会话次数额度（默认 20 次，`PAEG_DAILY_SESSION_LIMIT` 可调；跨天自动轮换）；teach_stream 入口超限拦截（薇依式温和提示），`_save_teach_turn` 统一出口登记（覆盖全部 15 分支）
+- `GET /api/parent/conversations/<child_uid>`：家长/教师视图——每日使用摘要 + 会话列表 + `?full=1` 消息预览（合规最低要求；PII 字段级脱敏为下轮）
+
+**E1 采纳事件埋点 ✅**：`self_evolution.distill_knowledge` 蒸馏入库时发射 `feedback/record(kind=adopted)` 事件；`effect_metrics.compute_self_update_acceptance` 读事件计算采纳率（adopted/proposals，有事件才出值，否则 None 诚实标注）。
+
+**Q5 连通矩阵登记 ✅**：技术全景 §10.21 登记 4 新 service 列（slo_metrics/usage_guard/material_quality/presentation_quality 均接线 ✅）+ 4 新端点行。
+
+**验证**：新增 10 测试全绿（`tests/test_round3_slo_usage_guard.py`）+ 回归 223 过（3 失败均为 test_v028_endpoints 既有顺序依赖 flake，隔离通过，与本轮无关）。
+
+**文档**：总需求 §4.7 状态 + 技术全景 §10.21 + 技术说明 C.18 + 维护手册 §18.57 + 任务清单 NEW-20 + 本 CHANGELOG
+
 ### v1.2.3 §3.79 质量标准落地：App Factory + 教学输出质量信号 + 物料结构检查（2026-08-20 ⭐）
 
 **本版定位**：按用户"先提质量标准、再优化代码架构与教学/物料能力"指示——**§3.6 六维质量标准**（Q1-Q8）定稿 + Q2/Q6/Q7 落地。

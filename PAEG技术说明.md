@@ -1766,3 +1766,22 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 **验证**：`tests/test_quality_round2.py` 13 测试全绿 + 本轮回归 155 全绿。
 
+### C.18 D1 SLO 分模式 + C5 每日限制/家长视图 + E1 采纳事件（v1.2.4 §3.79 ⭐）
+
+**D1 SLO 分模式指标**（`services/slo_metrics.py`）：
+- `record_request(mode, duration_ms, ok, tokens)` + `slo_summary()`（每模式 count/avg/P95/error_rate/tokens + 总体）+ `persist()`（data/slo.json）
+- server.py before/after_request 按 path 归 10 模式（teach/chat/lesson_prep/knowledge/affection/method/resources/other）自动埋点（防御式；耗时=首字节延迟，SSE 全量时长待下轮）
+- `/api/metrics` 增加 `slo` 字段（SLO 看板数据源）
+
+**C5 每日使用限制 + 家长视图**（教育特有合规 P0-9）：
+- `services/usage_guard.py`：每日会话次数额度（默认 20，`PAEG_DAILY_SESSION_LIMIT` 可调，跨天自动轮换）；teach_stream 入口超限拦截（薇依式温和提示）；`_save_teach_turn` 统一出口登记（覆盖 15 分支）
+- `GET /api/parent/conversations/<child_uid>`：家长/教师视图——每日使用摘要 + 会话列表 + `?full=1` 消息预览（合规最低要求；PII 字段级脱敏为下轮）
+
+**E1 采纳事件埋点**：
+- `self_evolution.distill_knowledge` 蒸馏入库 → `emit_event_typed("feedback/record", {kind: "adopted"})`
+- `effect_metrics.compute_self_update_acceptance` 读事件 → 采纳率 = adopted/proposals（有事件才出值；无则 None 诚实标注）
+
+**Q5 连通矩阵登记**：技术全景 §10.21 新增 4 service 列（slo_metrics/usage_guard/material_quality/presentation_quality ✅）+ 4 端点行（/api/metrics/effects、/api/preset/list、/api/preset/apply、/api/parent/conversations/&lt;uid&gt;）。
+
+**验证**：`tests/test_round3_slo_usage_guard.py` 10 测试全绿 + 回归 223 过（3 失败均为 test_v028_endpoints 既有顺序依赖 flake，隔离通过）。
+
