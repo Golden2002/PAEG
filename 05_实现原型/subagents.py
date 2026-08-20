@@ -1117,6 +1117,23 @@ class Presenter:
                 )
             else:
                 teaching_line = f"\n## 本节认知层级：{bloom}\n"
+            # §3.79 ⭐ 概念图谱接线（孤儿 concept_graph → 教学）：前驱/后继概念指令注入
+            # （与 prereq_graph 的 KB 提取互补：本处用内置种子图谱，零依赖兜底）
+            try:
+                from services.concept_graph import ConceptGraph
+                _cg = ConceptGraph()
+                _prereqs = _cg.prerequisites(concept) or []
+                _succs = _cg.successors(concept) or []
+                if _prereqs or _succs:
+                    _graph_line = "\n## 概念定位（知识图谱）\n"
+                    if _prereqs:
+                        _graph_line += (f"- 前置知识：{'、'.join(_prereqs[:4])}"
+                                        "（若学生明显陌生，先用一两句补基础再进入正题）\n")
+                    if _succs:
+                        _graph_line += f"- 掌握后可继续学习：{'、'.join(_succs[:4])}\n"
+                    teaching_line = teaching_line + _graph_line
+            except Exception:
+                pass
             system = build_presenter_system(
                 subject=subject or "default",
                 tone=tone,

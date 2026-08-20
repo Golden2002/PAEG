@@ -1,3 +1,17 @@
+### v1.2.7 §3.79 运维友好性（checkup 巡检）+ 概念图谱接线（孤儿 6→5）+ SRS 复习提醒（2026-08-20 ⭐）
+
+**本版定位**：面向运维工程师的**运维友好性** + 教学闭环继续深化（概念图谱前驱提示 + SRS 复习提醒注入）。
+
+**运维友好性 ✅**：新增 `ops/checkup.ps1` 一键运维巡检——进程/端口（netstat 反查 + 内存 CPU）→ `/api/health`（llm/db/mcp/skills）→ `/api/metrics`（SLO 汇总：reqs/P95/错误率/tokens/llm_calls）→ `/api/metrics/effects`（四指标）→ 日志尾部异常信号 → 磁盘/transcripts/users_data 规模；只读、无第三方依赖、降级友好；维护手册 §18.60 命令速查配套。
+
+**孤儿 concept_graph 接线 ✅（连通矩阵孤儿 6→5，教学对话增强）**：Presenter 教学 system 注入"**概念定位（知识图谱）**"——`ConceptGraph.prerequisites/successors` 内置种子（数学/物理前驱链）→ 生成"前置知识（若陌生先补基础）+ 掌握后可继续学"指令句（零依赖，与 prereq_graph 的 KB 提取互补）。
+
+**SRS 复习提醒注入对话 ✅（间隔重复教学闭环深化）**：`srs_service.build_reminder(uid, subject)`——到期卡优先同 subject，薇依式克制语气；teach_stream 入口诊断前注入 `step_type="srs_reminder"` 事件（无到期卡不发，不打断教学）。
+
+**验证**：新增 6 测试全绿（`tests/test_round6_ops_graph.py`）+ 六轮回归 217 全绿。
+
+**文档**：总需求 §4.7 + 技术全景 §10.21（孤儿 concept_graph 已接线）+ 技术说明 C.21 + 维护手册 §18.60 + 任务清单 NEW-23 + 本 CHANGELOG
+
 ### v1.2.6 §3.79 间隔重复接线（孤儿 srs_sm2 解决）+ PII 脱敏 + 严格队列坚持率（2026-08-20 ⭐）
 
 **本版定位**：教学效果提升（孤儿接线）+ 合规深化（PII 脱敏）+ 设计指标增强（严格队列）。
