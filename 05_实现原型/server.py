@@ -680,9 +680,64 @@ def parent_conversations(child_uid):
                 except Exception:
                     continue
             _out["message_preview"] = _msgs
+        # §3.79 C5 ⭐ PII 字段级脱敏（家长/教师视图合规：手机号/邮箱/身份证/长数字）
+        try:
+            from services.privacy import mask_pii
+            if isinstance(_out.get("conversations"), list):
+                for _c in _out["conversations"]:
+                    if isinstance(_c, dict) and _c.get("title"):
+                        _c["title"] = mask_pii(str(_c["title"]))
+            for _pv in (_out.get("message_preview") or []):
+                for _m in _pv.get("messages") or []:
+                    if _m.get("content"):
+                        _m["content"] = mask_pii(str(_m["content"]))
+        except Exception:
+            pass
         return jsonify(_out)
     except Exception as _e:
         return jsonify({"child_uid": child_uid, "error": str(_e)}), 500
+
+
+# §3.79 ⭐ 间隔重复复习计划（孤儿 srs_sm2 接线：教学评估达标入队 → 到期复习）
+@app.route("/api/srs/status", methods=["GET"])
+def srs_status():
+    """复习计划状态：到期卡 + 全部卡数（student 复习入口数据源）。"""
+    _uid = request.args.get("learner_id") or _anon_learner_id(request.args)
+    try:
+        from services.srs_service import all_cards, due_cards
+        return jsonify({
+            "learner_id": _uid,
+            "due": due_cards(str(_uid)),
+            "due_count": len(due_cards(str(_uid))),
+            "total": len(all_cards(str(_uid))),
+        })
+    except Exception as _e:
+        return jsonify({"error": f"SRS 状态失败: {_e}"}), 500
+
+
+@app.route("/api/srs/review", methods=["POST"])
+def srs_review():
+    """学生复习反馈（SM-2 更新）。
+
+    请求：{learner_id, concept, quality(0-5)}
+    """
+    data = request.get_json(force=True)
+    _uid = str(data.get("learner_id") or _anon_learner_id(data))
+    _concept = str(data.get("concept") or "").strip()
+    try:
+        _quality = int(data.get("quality") or 5)
+    except Exception:
+        _quality = 5
+    if not _concept:
+        return jsonify({"error": "concept 必填"}), 400
+    try:
+        from services.srs_service import review_card
+        _card = review_card(_uid, _concept, _quality)
+        if _card is None:
+            return jsonify({"error": f"卡不存在: {_concept}"}), 404
+        return jsonify({"ok": True, "card": _card})
+    except Exception as _e:
+        return jsonify({"error": f"SRS 复习失败: {_e}"}), 500
 
 @app.route("/api/subject-tree", methods=["GET"])
 def subject_tree():

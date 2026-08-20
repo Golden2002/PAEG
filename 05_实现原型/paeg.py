@@ -519,6 +519,17 @@ class PAEG:
                   f"{evaluation.get('presentation_quality', '?')} / 学生状态 "
                   f"{evaluation.get('learner_state', {}).get('student_state_score', '?')} / "
                   f"ready={evaluation['ready_to_advance']} / reason={evaluation.get('reason')}）")
+            # §3.79 ⭐ 间隔重复接线（孤儿 srs_sm2 → 教学闭环）：评估达标 → 概念入 SRS 复习队列
+            try:
+                if evaluation.get("ready_to_advance", True):
+                    from services.srs_service import add_card
+                    _uid_srs = str(getattr(learner, "id", "") or "")
+                    if _uid_srs:
+                        _q = 5 if float(evaluation.get("score") or 0) >= 0.8 else 4
+                        add_card(_uid_srs, question, subject, quality=_q)
+            except Exception as _srs_e:
+                print(f"[PAEG][paeg.py] SRS 入队忽略: {_srs_e}")
+                pass
             try:
                 if _tr: _tr("evaluation", step_id=i + 1,
                             score=evaluation.get("score", 0),
