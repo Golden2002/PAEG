@@ -634,6 +634,41 @@ def teach_stream():
                 print(f"[PAEG] 备课补充判定跳过: {_me}")
 
         if (_rfi_res.get("intent") == "lesson_prep" or _force_lesson_prep) and paeg.lesson_prep is not None:
+            # ── §3.75 ⭐ 多轮修改识别：上一轮已产出 lesson_plan，本轮是对它的修改指令 ──
+            _last_lp_key = f"lesson_prep_last_{learner_id}"
+            _last_lp = SESSIONS.get(_last_lp_key)
+            _MODIFY_RE = re.compile(r'(改|调整|修改|重写|突出|加重|把.{0,15}改成|重点讲|删除|删掉|不要|换一个|重新|再讲|换成)')
+            _is_modify = bool(_last_lp) and _MODIFY_RE.search(str(concept)[:200]) and not _mm(str(concept))
+            if _is_modify:
+                from subagents import LessonPlanInput
+                _lpi_m = LessonPlanInput(
+                    topic=_last_lp.get("topic", str(concept)[:80]),
+                    subject=_last_lp.get("subject") or str(subject or "通用"),
+                    grade=_last_lp.get("grade") or getattr(learner, "grade_level", "high_school"),
+                    duration_min=int(_last_lp.get("duration_min") or 45),
+                    objectives=_last_lp.get("objectives", []),
+                    learner_profile={},
+                    constraints={"modify_directive": str(concept)[:300],
+                                 "prior_lesson_plan": _last_lp.get("lesson_plan", "")},
+                    user_requested_assets=[], progressive=True,
+                )
+                _lp_res = paeg.lesson_prep.run(_lpi_m, learner=learner, progressive=True)
+                SESSIONS[_last_lp_key] = {
+                    "topic": _last_lp.get("topic", ""), "subject": _last_lp.get("subject", ""),
+                    "grade": _last_lp.get("grade", ""), "duration_min": _last_lp.get("duration_min", 45),
+                    "objectives": _last_lp.get("objectives", []), "lesson_plan": _lp_res.get("lesson_plan", {})}
+
+                def gen_lp_mod():
+                    _save_teach_turn("lesson_prep_modify", json.dumps(_lp_res, ensure_ascii=False)[:500])
+                    yield f"event: lesson_plan\ndata: {json.dumps(_lp_res.get('lesson_plan', {}), ensure_ascii=False)}\n\n"
+                    for k in ("handout", "script", "ppt_outline", "video_script", "mindmap", "quality_report"):
+                        payload = _lp_res.get(k)
+                        if payload:
+                            yield f"event: {k}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                    yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'lesson_prep_modify', 'token_used': _lp_res.get('token_used', 0)}, ensure_ascii=False)}\n\n"
+                return Response(gen_lp_mod(), mimetype="text/event-stream",
+                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
             # ── 合并提取：优先补充句，其次魔法词后缀 ──
             _merged = None
             if _force_lesson_prep:
@@ -642,23 +677,30 @@ def teach_stream():
                     SESSIONS.pop(_lp_pending_key, None)
             _extracted = _merged if _merged else _elt(str(concept)[:200])
 
-            # ── 引导分支：纯"我要备课"无主题 → 零 LLM 单轮追问 ──
+            # ── 引导分支：纯"我要备课"无主题 → 零 LLM 结构化缺失字段提示 ──
             if not _extracted or not _extracted.get("topic"):
-                _guide_msg = (
-                    "好的，咱们来备课\n\n"
-                    "为了备出贴合你班级的教案，请告诉我三件事：\n\n"
-                    "1. 学科 + 学段：例如「高中数学」「初二物理」\n"
-                    "2. 知识点 / 课题：例如「函数的单调性」「光合作用」\n"
-                    "3. 课时长度：例如「45 分钟」「一课时」\n\n"
-                    "也可以一次说全：`我要备课：高中数学，函数单调性，45分钟，重点讲图像变换`\n"
-                    "有特别要求（实验器材、跨学科融合、特定题型等）也可以一并告诉我"
-                )
+                # §3.75 ⭐ 按 pending 剔除已提取字段 → 只问真实缺失项（教师AI应用指引）
+                _LABELS = {"subject": "学科 + 学段", "topic": "知识点 / 课题",
+                           "duration": "课时长度", "grade": "学段（年级）"}
+                _EXAMPLES = {"subject": "高中数学 / 初二物理", "topic": "函数的单调性 / 光合作用",
+                             "duration": "45 分钟 / 一课时", "grade": "高中 / 初中 / 高一"}
+                _pending_fields = list(SESSIONS.get(f"current_intent_frame_{learner_id}", {}).get("pending", ["subject", "topic", "duration"]))
+                for _fk in ("subject", "topic", "duration", "grade"):
+                    if _extracted.get(_fk) and _fk in _pending_fields:
+                        _pending_fields.remove(_fk)
+                _guide_lines = ["好的，咱们来备课\n\n备出贴合你班级的教案，我还需要下列信息：\n"]
+                for _i, _key in enumerate(_pending_fields, 1):
+                    _guide_lines.append(f"{_i}. **{_LABELS.get(_key, _key)}** — 例：`{_EXAMPLES.get(_key, '')}`（缺失这一项我无法启动完整备课）")
+                _guide_lines.append("\n一次说全示例：`我要备课：高中数学，函数单调性，45 分钟，重点讲图像变换`")
+                _guide_lines.append("有特别要求（实验器材、跨学科融合、特定题型等）也可以一并告诉我")
+                _guide_msg = "\n".join(_guide_lines)
                 # 引导分支：写入 pending 标记 + 结构化 intent_frame（A+ 方案）
                 # ——引导后补充句用确定性短路识别（字段正则），无需 LLM followup 判定
                 SESSIONS[_lp_pending_key] = {"asked_at": time.time(), "source": str(concept)[:80]}
                 SESSIONS[f"current_intent_{learner_id}"] = "lesson_prep"
                 SESSIONS[f"current_intent_frame_{learner_id}"] = {
-                    "intent": "lesson_prep", "pending": ["subject", "topic", "duration"]}
+                    "intent": "lesson_prep", "pending": ["subject", "topic", "duration"],
+                    "optional": ["objectives", "extra_requirement"], "filled": dict(_extracted)}
 
                 def gen_guide():
                     _save_teach_turn("lesson_prep_guide", _guide_msg)
@@ -682,6 +724,14 @@ def teach_stream():
                 constraints=_constraints, user_requested_assets=[], progressive=True,
             )
             _lp_res = paeg.lesson_prep.run(_lpi, learner=learner, progressive=True)
+            # §3.75 ⭐ 记录最近产出（供多轮修改识别）
+            try:
+                SESSIONS[f"lesson_prep_last_{learner_id}"] = {
+                    "topic": _extracted.get("topic", ""), "subject": _extracted.get("subject", ""),
+                    "grade": _extracted.get("grade", ""), "duration_min": _extracted.get("duration_min", 45),
+                    "objectives": _objectives, "lesson_plan": _lp_res.get("lesson_plan", {})}
+            except Exception as _lpe:
+                print(f"[PAEG] 备课 last 状态写入失败: {_lpe}")
 
             def gen_lp():
                 _save_teach_turn("lesson_prep", json.dumps(_lp_res, ensure_ascii=False)[:500])

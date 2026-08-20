@@ -78,7 +78,7 @@ def test_lesson_planner_quality_criteria_shape():
     assert "slides" in LESSON_PLANNER_QUALITY_CRITERIA
     assert "video_script" in LESSON_PLANNER_QUALITY_CRITERIA
     assert "hard_checks" in LESSON_PLANNER_QUALITY_CRITERIA
-    assert len(LESSON_PLANNER_QUALITY_CRITERIA["hard_checks"]) == 12
+    assert len(LESSON_PLANNER_QUALITY_CRITERIA["hard_checks"]) == 15
 
 
 def test_lesson_planner_system_prompt():
