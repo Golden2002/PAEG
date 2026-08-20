@@ -3038,3 +3038,25 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 
 **commit**：9baaa79 + f891e58 + 3a03912
 
+
+
+## §3.76 备课产出类型分层（教案/PPT/视频按需生成）（2026-08-20）
+
+### 用户需求
+
+"假如一位老师想要制作教案，另一位老师想要制作PPT，第三位老师又想要生成视频，他们这种不同层次的要求能否在这一个 sub agent之下实现"
+
+### 现状验证
+
+- ✅ `LessonPrep.run` 后端已支持 `user_requested_assets=['ppt'|'handout'|'script'|'video_script'|'mindmap']` 选择性产出（验证：只请求 ppt → handout 跳过；教案无条件生成作基础）
+- ❌ **魔法词层未解析产出类型**——"我要备课：制作PPT，光合作用"时 server.py 未传 user_requested_assets，仍全量生成
+
+### 任务
+
+1. **Oracle 设计**（bg_2deee167）：产出类型识别（从输入提取 assets）+ 分层语义（教案始终生成/指定类型只出该类型/未指定全量）+ 引导选项 + 多轮修改携带 + 前端 SSE 过滤
+2. **实施**：产出类型识别 + server.py 传 assets + 测试
+3. **验证** + D4 同步
+
+### 实施记录
+
+（完成后更新）
