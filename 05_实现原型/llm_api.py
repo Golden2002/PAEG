@@ -231,6 +231,12 @@ class ReasonerModelAPI(OpenAICompatModelAPI):
                 data = json.loads(resp.read().decode("utf-8"))
             msg = data["choices"][0]["message"]
             usage = data.get("usage") or {}
+            # §3.79 D1 ⭐ token 埋点（SLO token 成本；防御式，不阻断主流程）
+            try:
+                from observability import record_metric
+                record_metric("paeg.llm.tokens", float(usage.get("total_tokens", 0) or 0))
+            except Exception:
+                pass
             return {
                 "thinking": msg.get("reasoning_content") or "",
                 "content": msg.get("content") or "",

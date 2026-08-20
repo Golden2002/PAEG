@@ -82,6 +82,16 @@ def slo_summary() -> Dict[str, Any]:
         "error_rate": round(_total["errors"] / max(1, _total["count"]), 4),
         "tokens": _total["tokens"],
     }
+    # §3.79 D1 ⭐ token 成本：LLM 适配器 record_metric("paeg.llm.tokens") 汇总
+    # （适配器无 mode 上下文，token 按总量计入 total；分模式 token 归因为下轮）
+    try:
+        from observability import _metrics as _obs_metrics
+        _tok_list = _obs_metrics.get("paeg.llm.tokens") or []
+        _tok_sum = int(sum(float(m.get("value") or 0) for m in _tok_list))
+        _out["total"]["tokens"] = _tok_sum
+        _out["total"]["llm_calls"] = len(_tok_list)
+    except Exception:
+        pass
     return _out
 
 

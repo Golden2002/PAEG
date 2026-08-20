@@ -1,3 +1,19 @@
+### v1.2.5 §3.79 增强与优化策略（§3.7）+ A3 subagent 声明化 + D1 token 埋点 + D2 灰度规范（2026-08-20 ⭐）
+
+**本版定位**：按用户"提出增强/优化各个部分的策略"指示——**§3.7 增强与优化策略表**定稿 + A3 声明化渐进 + D1 token 埋点 + D2 灰度回滚规范。
+
+**§3.7 增强与优化策略（写入总需求与执行标准）**：10 个部分（代码模块化/结构注释/Agent 架构插件/接线连通/教学对话/内容输出/物料/可观测/安全合规/商业化）——每部分含现状（Oracle 评分）、可执行策略、状态；依据 Oracle 49/100 缺口 + DSH 调研 + 前三轮落地复盘。
+
+**A3 subagent 声明化（渐进 ✅）**：`config/agents.yaml` 声明 10 subagent（id/name/role/keywords）+ `services/subagent_manifest.py`（get_manifest/agent_names/validate_against_registry）；声明层 ↔ 注册层（infra/subagent_registry）一致性校验（ratchet：只加描述层不改调度）；三层分工：声明（yaml）→ 注册（registry）→ 运行参数（agents.json）。
+
+**D1 token 埋点 ✅**：`llm_api.chat_with_reasoning` 成功响应时 `record_metric("paeg.llm.tokens", total_tokens)`（防御式）；`slo_summary` 汇总 token 成本与 LLM 调用数（`total.tokens` / `total.llm_calls`）——SLO 四指标 token 维度补齐（分模式归因为下轮）。
+
+**D2 灰度回滚规范（定稿 ✅）**：`deploy/灰度回滚规范.md`——Canary 阶梯（1-5%→20%→50%→100% + 闸门 + 72h 观察）+ Kill switch（module_registry 门控即主开关，热重载 60s 止损；PAEG_REASONING/PAEG_LESSON_NO_WEB 应急）+ Rollback（5min：git revert + 模型回退 + smoke 验证）+ SOP 速查；实施脚本（canary.ps1/admin 端点）为下轮。
+
+**验证**：新增 7 测试全绿（`tests/test_round4_manifest_token.py`）+ 回归 155 全绿。
+
+**文档**：总需求 §3.7 + §4.7 + 技术说明 C.19 + 维护手册 §18.58 + 任务清单 NEW-21 + 本 CHANGELOG
+
 ### v1.2.4 §3.79 D1 SLO 分模式 + C5 每日使用限制/家长视图 + E1 采纳事件（2026-08-20 ⭐）
 
 **本版定位**：总需求下轮计划继续——**D1 SLO 四指标深化**（分模式 P95/错误率）+ **C5 家长/教师可见性**（教育合规 P0-9）+ **E1 采纳事件埋点** + **Q5 连通矩阵登记**。
