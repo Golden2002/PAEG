@@ -24,6 +24,13 @@ from typing import Any, Dict, List, Optional
 
 from services.subprocess_service import RunResult, python_cmd, run_command
 
+# §3.79 Round 3 ⭐ 平台双轨命令模板（platform_dual_track 消费数据源）
+_PLATFORM_TEMPLATES = {
+    "ffmpeg": {"win32": "ffmpeg.exe", "posix": "ffmpeg"},
+    "python": {"win32": "python.exe", "posix": "python3"},
+    "mcp": {"win32": "npx.cmd", "posix": "npx"},
+}
+
 
 class Spawner:
     """单个进程类型的 spawner（build 构造命令 + run 执行）。
@@ -38,9 +45,23 @@ class Spawner:
         self.executable = executable
 
     def _resolve_exe(self) -> str:
-        """解析可执行文件路径（已配置 → 探测系统 PATH → 回退）。"""
+        """解析可执行文件路径（已配置 → 平台双轨 → 探测系统 PATH → 回退）。
+
+        §3.79 Round 3 ⭐ 孤儿接线：优先走 services.platform_dual_track 的
+        平台双轨模板（win32/posix 命令分支，如 ffmpeg.exe vs ffmpeg），
+        缺失再探测 PATH——与 #6 平台双轨机制联通（此前零消费方）。
+        """
         if self.executable:
             return self.executable
+        # 平台双轨模板（ffmpeg/python/mcp 的 win32/posix 分支）
+        try:
+            from services.platform_dual_track import get_command_template
+            _tpl = get_command_template(self.kind, _PLATFORM_TEMPLATES)
+            if _tpl:
+                _found = shutil.which(_tpl)
+                return _found or _tpl
+        except Exception:
+            pass
         _probe = {
             "ffmpeg": "ffmpeg",
             "python": sys.executable,

@@ -4953,7 +4953,7 @@ since:   <PAEG 版本号>
 
 ### 孤儿模块（已实现未接线）
 
-> **§3.79（2026-08-20）✅ 更新**：`srs_sm2.py`（间隔重复）已接线——`services/srs_service.py` 复用其 SM-2 纯函数，教学评估达标入队 + `/api/srs/status` + `/api/srs/review`。**`concept_graph.py`（概念图）已接线**——Presenter 教学 system 注入"概念定位（知识图谱）"（prerequisites/successors 前驱提示）。**Round 8：`agent_scope.py`（子代理作用域）已接线**——subagent_manifest.validate_scopes 消费（10 subagent 作用域一致性）；**`condition_eval.py`（条件启停）已接线**——hooks_hub 钩子 `when` 条件启停。孤儿剩 3 个（含 1 废弃候选）。
+> **§3.79（2026-08-20）✅ 更新**：`srs_sm2.py`（间隔重复）已接线——`services/srs_service.py` 复用其 SM-2 纯函数，教学评估达标入队 + `/api/srs/status` + `/api/srs/review`。**`concept_graph.py`（概念图）已接线**——Presenter 教学 system 注入"概念定位（知识图谱）"（prerequisites/successors 前驱提示）。**Round 8：`agent_scope.py`（子代理作用域）已接线**——subagent_manifest.validate_scopes 消费（10 subagent 作用域一致性）；**`condition_eval.py`（条件启停）已接线**——hooks_hub 钩子 `when` 条件启停。**v1.2.15（Round 3）：`agent_trirole.py` 已接线**（manifest.validate_contracts 契约校验）+ **`platform_dual_track.py` 已接线**（subprocess_spawn 平台分支）。孤儿剩 **1 个**（production_pipeline 废弃候选）。
 
 | 孤儿 | 类型 | 唯一引用 | §3.79 状态 |
 |---|---|---|---|
@@ -4962,10 +4962,12 @@ since:   <PAEG 版本号>
 | agent_scope.py（子代理作用域） | 列 | tests/test_agent_scope.py | ✅ 已接线（manifest 作用域校验消费） |
 | condition_eval.py（条件启停） | 列 | tests/test_condition_enable.py | ✅ 已接线（hooks_hub when 条件启停） |
 | production_pipeline.py（内容生产） | 列 | 零调用方（与 material_pipeline 重叠） | 🗑️ 废弃候选（与 material_pipeline 功能重叠，下轮代码清理） |
-| agent_trirole.py（子代理契约） | 列 | tests/test_agent_trirole.py | ⏳ 待接线（F6 Capability 三角色，下轮） |
-| platform_dual_track.py（平台双轨） | 列 | tests/test_platform_dual_track.py | ⏳ 待接线（平台化，下轮评估） |
+| agent_trirole.py（子代理契约） | 列 | tests/test_agent_trirole.py | ✅ 已接线（v1.2.15：manifest.validate_contracts 契约一致性校验） |
+| platform_dual_track.py（平台双轨） | 列 | tests/test_platform_dual_track.py | ✅ 已接线（v1.2.15：subprocess_spawn._resolve_exe 平台命令分支） |
 
 > **为何仍有孤儿（Round 8 结论）**：①历史包袱——早期设计（§3.54/#9/#4）超前于接线需求，功能模块先于消费点落地 ②重叠未决——production_pipeline 与 material_pipeline 职责重叠，未做合并决策 ③能力优先级——接线排在功能缺陷修复（如 Round 7 教学流 Bug）之后。处理策略：接线优先（能做即做）+ 废弃候选明确标注（production_pipeline）+ 下轮 F6 平台化一并处理（agent_trirole/platform_dual_track）。
+>
+> **§3.79（2026-08-21）✅ 更新（v1.2.15 · Round 3）**：**agent_trirole 已接线**——`subagent_manifest.validate_contracts` 消费（manifest 声明 vs 三角色契约一致性，补 resource_librarian/lesson_prep 契约）；**platform_dual_track 已接线**——`subprocess_spawn.Spawner._resolve_exe` 消费（ffmpeg/python/npx 平台双轨分支）。孤儿剩 **1 个**（production_pipeline 废弃候选）。
 
 ## §3.77.2 完整行列清单（39 行 × 55 列）
 
@@ -5007,6 +5009,6 @@ since:   <PAEG 版本号>
 
 - **五大核心 × 6 公共模块 = 30 格**：✅ 15 / ⚠️ 7 / ❌ 8 / — 4（N/A）
 - **断点 5 处**（B1-B5）：备课×3、查资料×1、倾诉×1
-- **孤儿 7 个**：srs_sm2、concept_graph、production_pipeline、condition_eval、agent_scope、agent_trirole、platform_dual_track
+- **孤儿 1 个（v1.2.15）**：production_pipeline（废弃候选；srs_sm2/concept_graph/condition_eval/agent_scope/agent_trirole/platform_dual_track 已全部接线）
 - **接线率**：五大核心已接线 15/26 适用格 ≈ **58%**（不含 N/A）
 

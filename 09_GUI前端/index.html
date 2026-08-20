@@ -2387,22 +2387,32 @@ async function api(path, options, method) {
   if (method) opts.method = method;
   if (opts.body && typeof opts.body !== 'string') opts.body = JSON.stringify(opts.body);
   const resp = await fetch(API_BASE + path, opts);
-  if (!resp.ok) {
-    // v0.26：优先解析 JSON error 字段（友好提示），否则才显示 HTTP 状态码
-    const errText = await resp.text();
-    let friendly = null;
-    try {
-      const parsed = JSON.parse(errText);
-      if (parsed && parsed.error) friendly = parsed.error;
-      else if (parsed && parsed.message) friendly = parsed.message;
-    } catch (e) { /* 非 JSON 错误体 */ }
-    const msg = friendly || `请求失败（HTTP ${resp.status}）`;
-    const err = new Error(msg);
-    err.status = resp.status;
-    err.friendly = friendly || '';
-    throw err;
-  }
+  if (!resp.ok) throw friendlyHttpError(resp);
   return resp.json();
+}
+
+// §3.79 Round 3 ⭐ 友好 HTTP 错误解析（429/500/其他）：
+// 优先 JSON error/message 字段；429 给限流说明；500 给可排查指引。
+// 供 api() 与流式接口（teach/stream、chat 等 fetch 直连）共用——修复"429/500 静默/生硬"UX。
+async function friendlyHttpError(resp) {
+  let friendlyMsg = null;
+  try {
+    const parsed = await resp.json();
+    if (parsed && parsed.error) friendlyMsg = parsed.error;
+    else if (parsed && parsed.message) friendlyMsg = parsed.message;
+  } catch (e) { /* 非 JSON 错误体 */ }
+  let msg;
+  if (resp.status === 429) {
+    msg = friendlyMsg || '请求过于频繁，请稍等片刻再试（每日额度限制）';
+  } else if (resp.status === 500) {
+    msg = friendlyMsg || '服务内部错误，请稍后重试（后端日志可查）';
+  } else {
+    msg = friendlyMsg || `请求失败（HTTP ${resp.status}）`;
+  }
+  const err = new Error(msg);
+  err.status = resp.status;
+  err.friendly = friendlyMsg || '';
+  return err;
 }
 
 // 转义 HTML（防止会话标题中的特殊字符破坏 DOM）
@@ -2811,7 +2821,7 @@ async function teach(question, subject, subtopic) {
       }),
       signal: controller.signal,
     });
-    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    if (!resp.ok) throw await friendlyHttpError(resp);
     const reader = resp.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
@@ -3112,7 +3122,7 @@ async function generalChat(text) {
       const dbtn = document.getElementById('cmd-trigger-deepthink');
       if (dbtn) dbtn.classList.remove('active');
     }
-    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    if (!resp.ok) throw await friendlyHttpError(resp);
     const reader = resp.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';

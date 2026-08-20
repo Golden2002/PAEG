@@ -1,3 +1,27 @@
+### v1.2.15 §3.79 物料真实产出抽查修复 + 孤儿接线(3→1) + 前端 429/500 UX（2026-08-21 ⭐）
+
+**本版定位**：Round 3——物料生产"真实联通+质量上乘"实证（用户重点）、孤儿模块接线收尾、遗留前端错误 UX 修复。
+
+**物料真实产出抽查 ✅（发现并修复 2 个真实断点）**：
+- `probe_material_outputs.py`：LessonPrep 真实运行（mock LLM 确定性路径）→ 6 类物料全产出
+- **断点1**：静态讲稿模板 `_static_script` 缺生活化例子（check_lecture_script.has_example=False）——补"生活例子→每要点配例子→类比收尾"（张宇扬课件特征：精确定义+例子落地）
+- **断点2**：`pptx_mcp_server._parse_outline` 只收 str，LessonPrep 静态兜底产出 list[dict] → `'list' object has no attribute 'splitlines'`（备课→PPT 链路断）——兼容 list 输入（title/points/notes 映射 + str points 拆行 + 空 list 兜底）
+- **验证**：真实 .pptx 落盘 6 页（python-pptx 可打开）+ 讲义/讲稿/导图/视频脚本 4/4 过检查器；新增 `test_round13_material_outputs.py` 6 测试守卫
+
+**孤儿接线 ✅（3 → 1）**：
+- `agent_trirole`（子代理三角色契约）→ `subagent_manifest.validate_contracts` 消费（契约覆盖 manifest 全声明；补 resource_librarian/lesson_prep 契约）
+- `platform_dual_track`（平台双轨）→ `subprocess_spawn.Spawner._resolve_exe` 消费（ffmpeg.exe/ffmpeg、python.exe/python3、npx.cmd/npx 平台分支）
+- `production_pipeline` 维持废弃候选（零调用方，与 material_pipeline 重叠）——孤儿剩 1（含废弃候选）
+
+**前端 429/500 静默错误 UX ✅（Round 7 遗留项）**：
+- 共享 `friendlyHttpError(resp)`：解析 JSON error/message → 429 限流说明 / 500 可排查指引 / 其他 HTTP 状态
+- teach_stream 与 generalChat 两处流式接口接入（原 `throw new Error('API '+status)` 生硬无提示）
+- node --check 全部 script 块语法通过；GUI 页面验证加载正常
+
+**验证**：本轮相关 64/64 + test_round13 6/6 + 全量回归绿。
+
+**文档**：CHANGELOG + 技术说明 C.27 + 任务清单 NEW-31 + 维护手册 §18.68 + 技术全景 §10.21
+
 ### v1.2.14 §3.79 物料工作流联通修复 + teach_stream 学段/深度守门接线（2026-08-21 ⭐）
 
 **本版定位**：R2 验证暴露两类真实断链——①`teach_materials` 工作流 outline 步 Planner 签名不匹配 + knowledge_map/keyword_doc 工具未注册；②学段特征守门只在 sync 路径 `paeg.teach` 接线，GUI 实际走的 `/api/teach/stream` 从不执行 gate → probe 0/4。

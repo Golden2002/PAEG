@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """生成 PPT MCP server（v0.60 ⭐ 升级：应用路演 PPT 手工经验）
 
 v0.60 升级内容（依据维护手册 §18.6-18.9 + memo/022 沉淀经验）：
@@ -59,8 +59,33 @@ def estimate_text_height(text, width_in, font_size):
     return lines * font_size * 0.018
 
 
-def _parse_outline(text: str) -> list:
-    """把 LLM/文本大纲解析为 [{title, points:[...], notes}]"""
+def _parse_outline(text) -> list:
+    """把 LLM/文本大纲解析为 [{title, points:[...], notes}]
+
+    §3.79 Round 3 ⭐ 兼容 list 输入：LessonPrep 静态兜底产出的 ppt_outline
+    是 list[dict{slide,title,points}]（_static_ppt_outline），此前直接 .splitlines()
+    抛 "'list' object has no attribute 'splitlines'" → 备课→PPT 链路断点。
+    修复：list 输入直接映射（保留 title/points），str 输入走原解析。
+    """
+    if isinstance(text, list):
+        slides = []
+        for it in text:
+            if not isinstance(it, dict):
+                continue
+            title = str(it.get("title") or it.get("slide") or "")
+            pts = it.get("points") or []
+            if isinstance(pts, str):
+                pts = [ln.strip() for ln in pts.splitlines() if ln.strip()]
+            if not title and not pts:
+                continue
+            slides.append({
+                "title": clean_md(str(title)),
+                "points": [clean_md(str(p)) for p in pts],
+                "notes": str(it.get("notes") or ""),
+            })
+        if slides:
+            return slides
+        return [{'title': '演示文稿', 'points': ['（空大纲，请补充内容）'], 'notes': ''}]
     slides = []
     lines = [l.strip() for l in (text or '').splitlines() if l.strip()]
     cur = None

@@ -1,4 +1,4 @@
-﻿# PAEG 教育智能体 — 简明技术说明（v1.1.9）
+# PAEG 教育智能体 — 简明技术说明（v1.1.9）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -1875,3 +1875,21 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 - 顺带修复 `on_session_end`：dialogue_summary 对 str 元素 `.get` → isinstance 保护
 
 **验证**：物料工作流 7 步全 ✓ 失败检测 False；probe 0/4 → **4/4**（重启 server 后复测，日志确认 `teach_stream ★ 学段特征补充：graduate_exam 缺失 ['真题示范']`）；test_round_workflow_fixes 4/4 + test_round12_teach_stream_gate 4/4 + 全回归绿。
+
+### C.27 物料真实产出抽查修复 + 孤儿接线(3→1) + 前端 429/500 UX（v1.2.15 §3.79 ⭐）
+
+**物料产出实证（Round 3 用户重点：PPT/讲义/讲稿/导图/视频"真实联通+质量上乘"）**：
+- `probe_material_outputs.py`：LessonPrep 真实运行（mock LLM 确定性路径）→ 讲义/讲稿/PPT 大纲/视频脚本/思维导图 6 类全产出
+- **断点1**：`_static_script` 静态讲稿缺生活化例子（Round 11 检查器加 `has_example` 但模板没跟上）→ 补"开场生活例子→每要点配例→类比收尾"
+- **断点2**：`pptx_mcp_server._parse_outline` 只收 str；LessonPrep 静态兜底产出 `list[dict{slide,title,points}]` → `'list' object has no attribute 'splitlines'`——备课→PPT 链路断。修复：list 输入直接映射（保留 title/points/notes、str points 拆行、空 list 兜底占位页）
+- 验证：真实 .pptx 落盘 6 页（python-pptx 打开）+ 文本物料 4/4 过检查器；`test_round13_material_outputs.py` 6 测守卫（含 `test_ppt_gen_from_list_outline`）
+
+**孤儿接线（3 → 1）**：
+- `agent_trirole`（DSH ctx.shell 三角色契约）→ `subagent_manifest.validate_contracts`：manifest 声明 vs 三角色契约一致性校验（补 resource_librarian/lesson_prep 契约）
+- `platform_dual_track`（平台双轨）→ `subprocess_spawn.Spawner._resolve_exe`：ffmpeg.exe/ffmpeg、python.exe/python3、npx.cmd/npx 平台分支（显式 executable 优先）
+- `production_pipeline`：维持废弃候选（零调用方，与 material_pipeline 重叠，下轮清理）
+
+**前端 429/500 静默错误 UX（Round 7 遗留）**：
+- `friendlyHttpError(resp)` 共享函数：解析 JSON error/message → 429"请求过于频繁（每日额度）" / 500"服务内部错误（后端日志可查）" / 其他 HTTP 状态
+- teach_stream（L2814）与 generalChat 两处 `throw new Error('API '+status)` → `throw await friendlyHttpError(resp)`
+- node --check 全部 script 块语法通过
