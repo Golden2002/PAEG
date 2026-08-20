@@ -1,4 +1,4 @@
-﻿﻿# PAEG 教育智能体 — 简明技术说明（v1.1.9）
+# PAEG 教育智能体 — 简明技术说明（v1.1.9）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -1602,34 +1602,34 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 | 核心功能 | 联网检索 | 知识库检索 | 用户资料库 | 语言质量门槛 | 引导提示词 | 脚本检查 |
 |---|---|---|---|---|---|---|
-| **备课**（LessonPrep） | ❌ 未接 | ⚠️ kb 注入 | ❌ 未接 | ✅ 4 处 | ✅ 有 | ❌ 未接 |
+| **备课**（LessonPrep） | ✅ §3.78 B1 | ⚠️ kb 注入 | ✅ §3.78 B2 | ✅ 4 处 | ✅ 有 | ✅ §3.78 B3 |
 | **教学**（teach_stream） | ✅ 11 处 | ✅ 1 处 | ✅ 1 处 | ✅ 11+22 | ✅ 有 | ✅ manim/video |
-| **倾诉**（Affection） | ⚠️ 仅提示词示例 | ⚠️ 仅提示词示例 | ❌ 未接 | ✅ server 收口 | ✅ 自建 | — |
-| **查资料**（file_operation） | ❌ 未接 | ✅ BM25 | ✅ 4 意图 | ✅ chat 收口 | ✅ handlers | — |
+| **倾诉**（Affection） | — | ✅ §3.78 B5 选择性 | ❌ 未接 | ✅ server 收口 | ✅ 自建 | — |
+| **查资料**（file_operation） | ✅ §3.78 B4 兜底 | ✅ BM25 | ✅ 4 意图 | ✅ chat 收口 | ✅ handlers | — |
 | **找答案**（AnswerSolver） | ⚠️ 工具暴露 | ✅ 强制检索 | ⚠️ 经工具 | ✅ v0.42.3 收口 | ✅ 自建 | — |
 
 ### 证据明细
 
 | 功能 | 模块 | 状态 | 证据 |
 |---|---|---|---|
-| 备课 | 联网检索 | ❌ | LessonPrep 类内 web_search 0 引用（subagents.py） |
+| 备课 | 联网检索 | ✅ | §3.78 B1：`_lesson_web_materials`（web_search_multi 多查询联想）+ 素材块注入 7 步 user 提示词；`PAEG_LESSON_NO_WEB=1` 闸门 |
 | 备课 | 知识库检索 | ⚠️ | self.kb = kb 构造注入（subagents.py LessonPrep）；无显式检索调用 |
-| 备课 | 用户资料库 | ❌ | usr_knowledge 0 / BM25 0 / material 0（LessonPrep 类内） |
+| 备课 | 用户资料库 | ✅ | §3.78 B2：`_lesson_user_materials`（BM25 检索 usr_knowledge/<uid>/ 命中片段） |
 | 备课 | 语言质量门槛 | ✅ | _lang_gate_safe ×4（subagents.py L2430 handout/L2444 script/L2481 video/L2495 mindmap） |
 | 备课 | 引导提示词 | ✅ | build_lesson_planner_system（prompts.py L1581，subagents.py 引用 L1607/1649-1652） |
-| 备课 | 脚本检查 | ❌ | visual_script 0 / manim 0 / script_service 0 / validator 0；产出视频脚本未过校验 |
+| 备课 | 脚本检查 | ✅ | §3.78 B3：`validate_lesson_script`（visual_script_validator）+ `quality_report.video_script_check` |
 | 教学 | 联网检索 | ✅ | web_search ×11 + web_search_tool ×2（server.py L1007/1011/1332/1361/1364） |
 | 教学 | 知识库检索 | ✅ | KnowledgeBase@L1342（gen_kb 分支） |
 | 教学 | 用户资料库 | ✅ | _try_file_operation@L753（teach_stream 入口） |
 | 教学 | 语言质量门槛 | ✅ | lang_gate ×11 + polish ×22（gen_lp/gen_grade_blocked/gen_kb/gen_composite/gen_pr/generate 全过） |
 | 教学 | 引导提示词 | ✅ | build_presenter_system（prompts.py L1775） |
 | 教学 | 脚本检查 | ✅ | manim×5/video×12/generate_teaching_video×2/generate_manim_video×2（server.py） |
-| 倾诉 | 联网检索 | ⚠️ | web_search 命中为提示词示例文本（"tool_adjustment": ...web_search...），非真实调用 |
-| 倾诉 | 知识库检索 | ⚠️ | KnowledgeBase 命中为提示词示例（knowledge_update 建议），非真实调用 |
+| 倾诉 | 联网检索 | — | 情绪场景不联网（v0.22.1 原则；§3.78 B5 知识库选择性接线） |
+| 倾诉 | 知识库检索 | ✅ | §3.78 B5：`_retrieve_affection_kb`（情绪+学习并存信号门 → KB 命中注入"可参考的准确资料"） |
 | 倾诉 | 用户资料库 | ❌ | 无引用 |
 | 倾诉 | 语言质量门槛 | ✅ | server.py L1258 _polish_text(_emo_result) + modes.py lang_gate×2 + teaching.py lang_gate×2 |
 | 倾诉 | 引导提示词 | ✅ | 自建 system（_build@L3240，system/prompt 引用 19+13 处） |
-| 查资料 | 联网检索 | ❌ | file_operation.py web_search 0 |
+| 查资料 | 联网检索 | ✅ | §3.78 B4：`_web_fallback_chunks`（BM25 分数全 0 = 无实质命中 → web_search 兜底）+ done 事件 `web_fallback` |
 | 查资料 | 知识库检索 | ✅ | BM25×2（file_operation.py L6/L29）+ services/retrieval/knowledge_retriever.py |
 | 查资料 | 用户资料库 | ✅ | 4 文件意图（file_qa/file_explain/file_quote/file_restructure，file_operation.py L60-62）+ intent_router@L33 |
 | 查资料 | 语言质量门槛 | ✅ | blueprints/chat.py lang_gate×3 + polish×7（出口统一收口） |
@@ -1642,13 +1642,15 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 ### 断点清单（需要接线但未接线）
 
-| # | 断点 | 位置 | 说明 | 建议 |
-|---|---|---|---|---|
-| B1 | 备课未接联网检索 | subagents.py LessonPrep | 备课素材全凭 LLM 内部知识，无 web_search 补充 | 备课引导时可选联网获取课程素材 |
-| B2 | 备课未接用户资料库 | subagents.py LessonPrep | 学生上传的讲义/资料未作为备课输入 | LessonPrep 检索 usr_knowledge/<uid>/ 作为材料源 |
-| B3 | 备课视频脚本未过脚本检查 | subagents.py L2481 | 产出 video_script 无 visual_script_validator 校验 | 接入 visual_script_validator.py |
-| B4 | 查资料未接联网检索 | services/file_operation.py | BM25 仅本地，无 web_search 兜底 | 本地无匹配 → web_search_tool 补充（与找答案一致） |
-| B5 | 倾诉未接真实联网/知识库 | subagents.py AffectionSupportor | 提示词示例提及但无实际调用 | 若需引用资料辅助疏导，接 KnowledgeBase |
+> **§3.78（2026-08-15）✅ 更新**：B1-B5 已全部修复接线，详见 C.15。
+
+| # | 断点 | 位置 | 说明 | 建议 | 状态（§3.78） |
+|---|---|---|---|---|---|
+| B1 | 备课未接联网检索 | subagents.py LessonPrep | 备课素材全凭 LLM 内部知识，无 web_search 补充 | 备课引导时可选联网获取课程素材 | ✅ `_lesson_web_materials` |
+| B2 | 备课未接用户资料库 | subagents.py LessonPrep | 学生上传的讲义/资料未作为备课输入 | LessonPrep 检索 usr_knowledge/<uid>/ 作为材料源 | ✅ `_lesson_user_materials` |
+| B3 | 备课视频脚本未过脚本检查 | subagents.py L2481 | 产出 video_script 无 visual_script_validator 校验 | 接入 visual_script_validator.py | ✅ `validate_lesson_script` + quality_report |
+| B4 | 查资料未接联网检索 | services/file_operation.py | BM25 仅本地，无 web_search 兜底 | 本地无匹配 → web_search_tool 补充（与找答案一致） | ✅ `_web_fallback_chunks` + web_fallback 标志 |
+| B5 | 倾诉未接真实联网/知识库 | subagents.py AffectionSupportor | 提示词示例提及但无实际调用 | 若需引用资料辅助疏导，接 KnowledgeBase | ✅ `_retrieve_affection_kb` 选择性接线 |
 
 ### 孤儿模块（已实现未接线）
 
@@ -1700,8 +1702,24 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 ### 接线状态统计
 
-- **五大核心 × 6 公共模块 = 30 格**：✅ 15 / ⚠️ 7 / ❌ 8 / — 4（N/A）
-- **断点 5 处**（B1-B5）：备课×3、查资料×1、倾诉×1
+- **五大核心 × 6 公共模块 = 30 格**：✅ 21 / ⚠️ 5 / ❌ 4 / — 4（N/A；§3.78 修复后）
+- **断点 5 处**（B1-B5）：备课×3、查资料×1、倾诉×1 —— **§3.78 全部修复 ✅**
 - **孤儿 7 个**：srs_sm2、concept_graph、production_pipeline、condition_eval、agent_scope、agent_trirole、platform_dual_track
-- **接线率**：五大核心已接线 15/26 适用格 ≈ **58%**（不含 N/A）
+- **接线率**：五大核心已接线 21/26 适用格 ≈ **81%**（§3.78 修复后；此前 58%）
+
+### C.15 连通性断点 B1-B5 修复 + /api/metrics（v1.2.1 §3.78 ⭐）
+
+**背景**：§3.77 连通性审计定位 5 处断点（备课×3、查资料×1、倾诉×1），§3.78 全部接线。
+
+| 断点 | 修复 | 实现 |
+|---|---|---|
+| B1 备课未接联网检索 | `subagents._lesson_web_materials` | web_search_multi 多查询词联想（n=3,per=3,max=6），素材块注入 syllabus→mindmap 全部 7 步 user 提示词；`PAEG_LESSON_NO_WEB=1` 测试/离线闸门（conftest 默认开启，单测确定性）；检索内容视为数据防注入 |
+| B2 备课未接用户资料库 | `subagents._lesson_user_materials` | BM25 检索 `Library/usr_knowledge/<uid>/`（read_corpus_full→chunk_documents→make_retriever），命中片段作为备课输入；run 输出 `materials.user_library` |
+| B3 备课视频脚本未过脚本检查 | `visual_script_validator.validate_lesson_script` | Markdown 版 5 检项（镜头≥2/画面旁白齐全/时长结构标识/旁白≤300字/无占位残留）；LessonPrep 步骤⑥接线，结果写入 `quality_report.video_script_check` 与返回契约 |
+| B4 查资料未接联网检索 | `services/file_operation._web_fallback_chunks` | BM25 **分数全 0 = 无实质命中**（语料非空时 BM25 总返回 top-k，须用分数判定）→ web_search_tool 兜底（与找答案 KB→web 一致）；done 事件 `web_fallback` 标志 |
+| B5 倾诉未接真实知识库 | `subagents._retrieve_affection_kb` | 情绪+学习并存信号门（考试/题目/概念等关键词）→ KnowledgeBase 检索命中注入"可参考的准确资料"块；**v0.22.1 默认不检索原则保留**（include_kb=False 不动） |
+
+**总需求落地**：`/api/metrics` 端点（uptime_seconds + observability 指标聚合 + events_count，SLO 看板数据源；P95/错误率/token 成本分模式埋点为下轮 D1 深化）。C2 存储安全三项（PBKDF2/原子写/登录限流）与 C3 CORS 白名单复核无缺口（v0.46/v0.51 已落地）。
+
+**验证**：新增 18 测试全过（`tests/test_connectivity_b1_b5.py`）+ 全量回归绿。接线率 58% → 81%。
 

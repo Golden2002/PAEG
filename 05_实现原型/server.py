@@ -441,6 +441,43 @@ def health():
         "timestamp": datetime.now().isoformat(),
     })
 
+# §3.78 ⭐ /api/metrics —— SLO 四指标基础端点（总需求 D1/B3 落地第一步）
+_METRICS_START_TS = time.time()
+
+
+@app.route("/api/metrics", methods=["GET"])
+def metrics():
+    """指标端点（v0.74+ §3.78）：观测性聚合——供 SLO 看板/运维消费。
+
+    返回：
+      - uptime_seconds / version / timestamp
+      - metrics: observability.all_metric_stats()（工具耗时/会话 token 等内存指标）
+      - events_count: events.jsonl 行数（可观测审计事件总量）
+      - note: P95 延迟/错误率/token 成本分模式埋点深化为下轮（总需求 D1）
+    """
+    try:
+        from observability import all_metric_stats, _EVENTS_FILE
+        _m = all_metric_stats()
+    except Exception:
+        _m = {}
+    _ev_count = 0
+    try:
+        from observability import _EVENTS_FILE as _evf
+        if os.path.isfile(_evf):
+            with open(_evf, 'r', encoding='utf-8', errors='ignore') as _fh:
+                _ev_count = sum(1 for _ in _fh)
+    except Exception:
+        _ev_count = 0
+    return jsonify({
+        "status": "ok",
+        "version": "0.74.0",
+        "uptime_seconds": round(time.time() - _METRICS_START_TS, 1),
+        "metrics": _m,
+        "events_count": _ev_count,
+        "note": "P95/错误率/token 成本分模式埋点深化为下轮（总需求与执行标准 D1）",
+        "timestamp": datetime.now().isoformat(),
+    })
+
 @app.route("/api/subject-tree", methods=["GET"])
 def subject_tree():
     """学科-学段-二级学科 层级树（v0.26 ⭐ 前端三级级联下拉数据源）。

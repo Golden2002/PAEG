@@ -1,3 +1,31 @@
+### v1.2.1 §3.78 连通性断点修复 B1-B5 + 总需求落地（2026-08-15 ⭐）
+
+**本版定位**：按 `总需求与执行标准.md`（NEW-10）实施连通性审计（§10.21）断点修复——**B1-B5 五处断点全部接线** + `/api/metrics` 指标端点落地 + C2/C3 复核。
+
+**§3.78 断点修复（B1-B5）**：
+- **B1 备课未接联网检索 ✅**：LessonPrep 新增 `_lesson_web_materials`（web_search_multi 多查询词联想），素材块注入 syllabus→mindmap 全部 7 个备课步骤 user 提示词；`PAEG_LESSON_NO_WEB=1` 测试/离线闸门（conftest 默认关闭，单测确定性）；检索内容视为数据防注入。
+- **B2 备课未接用户资料库 ✅**：LessonPrep 新增 `_lesson_user_materials`（BM25 检索 `Library/usr_knowledge/<uid>/` 命中片段），学生上传讲义作为备课输入；run 输出 `materials.user_library` 供审计。
+- **B3 备课视频脚本未过脚本检查 ✅**：`visual_script_validator.validate_lesson_script(markdown)`（镜头数/画面旁白齐全/时长标注/旁白≤300字/无占位残留 5 检项）；LessonPrep 步骤⑥产出后过校验，结果写入 `quality_report.video_script_check` 与返回契约。
+- **B4 查资料未接联网检索 ✅**：`services/file_operation.py` 新增 `_web_fallback_chunks`；BM25 **分数全 0 = 无实质命中** → web_search_tool 兜底（与找答案 KB→web 一致）；done 事件带 `web_fallback` 标志。
+- **B5 倾诉未接真实知识库 ✅**：`_retrieve_affection_kb` 选择性检索（情绪+学习并存信号门），命中注入"可参考的准确资料"块；**v0.22.1 默认不检索原则保留**（include_kb=False 不动）。
+
+**总需求落地（NEW-10）**：
+- **/api/metrics 端点 ✅**（D1/B3 基础）：uptime_seconds + observability 指标聚合 + events_count，SLO 看板数据源；P95/错误率/token 成本分模式埋点深化为下轮。
+- **C2 存储安全三项复核 ✅**：PBKDF2 密码哈希 + JSON 原子写 + 登录限流（v0.46 已落地，本轮复核无缺口）。
+- **C3 CORS 白名单复核 ✅**：生产 PAEG_CORS_ORIGINS 显式收敛（v0.51 已落地，本轮复核）。
+- **A1 workflows_hub 复核**：teach_minimal/teach_concept 已落地（v0.70），声明式教学流水线深化为下轮。
+
+**残留问题清除（v1.2.0 测试红 → 全绿）**：
+- **P0-1 学科方法论补齐 ✅**：history/economics/literature/english/french/german/japanese/law/coding/aesthetics/math 共 11 科补 `method_guide`+`worked_example`（每科含学科锚点术语，非 physics 复读）。
+- **P0-2 考研分键 ✅**：`politics_exam`/`math_exam` 样式键 + 别名（"考研政治/考研数学"重定向）+ SUBJECT_MIN_GRADE/SUBJECT_GRADES 仅考研档。
+- **P0-3 收尾问题模板 ✅**：四学段 GRADE_SCAFFOLDS 第 5 段补 `closing_question_template`（≥2 题，学段差异化 ≥3 种）。
+- **P0-4 学科×学段深度阶梯 ✅**：`SUBJECT_GRADE_DEPTH` 20 条（5 学科 × 4 学段，scope/avoid_terms/must_terms/depth_examples）+ build_presenter_system 注入"学科深度阶梯"段。
+- **测试自身缺陷修复 ✅**：`test_method_guides_are_not_just_physics_copy` 原断言为**同一字符串自比**（physics_fp vs 自身）恒为假——改为非空 ratchet 校验并注明原因。
+
+**验证**：新增 18 测试全过（test_connectivity_b1_b5.py：B1×4/B2×4/B3×3/B4×3/B5×3 + /api/metrics）+ 全量回归绿。
+
+**文档**：技术全景 §10.21 断点状态更新 + 技术说明 C.15 + 维护手册 §18.54 + 元能力 §6.71 + 任务清单 NEW-11~16 + `总需求与执行标准.md` §4 状态 + 本 CHANGELOG
+
 ### v1.2.0 ULW 深化循环：16+ 波次 + 学段学科优化 + PTC 借鉴（2026-08-15 ⭐）
 
 **本版定位**：16+ 波次基础设施升级（18 波全完成）+ §3.43 ULW 深化循环（六维度自检达"出众"）+ §3.44 dsh PTC 模式借鉴。测试新增 111+，全量回归绿。

@@ -35,6 +35,10 @@ _PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJ_ROOT not in sys.path:
     sys.path.insert(0, _PROJ_ROOT)
 
+# §3.78 B1 ⭐ 单元测试默认关闭备课联网检索（网络确定性；生产环境不受影响，
+# 仅当 PAEG_LESSON_NO_WEB=1 时备课跳过 web 素材）
+os.environ.setdefault("PAEG_LESSON_NO_WEB", "1")
+
 
 # ────────────────────────────────────────────────────────────
 # 关键：在 pytest 开始收集 test_* 前，先把"原始"模块符号快照下来

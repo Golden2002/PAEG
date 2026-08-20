@@ -5962,5 +5962,285 @@
   "ema_delta": -0.2,
   "reflection": "{}",
   "timestamp": "2026-08-09T21:16:01.185104"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "math",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-15T16:07:28.228055"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "physics",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-15T16:07:28.593845"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "math",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-15T16:07:28.841322"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "math",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-15T16:15:14.469635"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "physics",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-15T16:15:14.764353"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "math",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-15T16:15:14.930666"
+ },
+ {
+  "student_id": "t3",
+  "subject": "physics",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-15T17:14:11.797590"
+ },
+ {
+  "student_id": "t1",
+  "subject": "math",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-15T17:14:11.971801"
+ },
+ {
+  "student_id": "t2",
+  "subject": "math",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-15T17:14:12.143912"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "math",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-15T23:03:16.025734"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "physics",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-15T23:03:16.339082"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "math",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-15T23:03:16.517620"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "math",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-16T02:46:46.549852"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "physics",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-16T02:46:46.846739"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "math",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-16T02:46:47.060196"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "math",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-16T02:47:48.527955"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "physics",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-16T02:47:48.872001"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "math",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-16T02:47:49.054783"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "mock",
+  "timestamp": "2026-08-16T02:48:23.559513"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-16T02:49:34.963242"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-16T03:10:23.227673"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "math",
+  "ema_delta": -0.19299999999999995,
+  "reflection": "mock",
+  "timestamp": "2026-08-16T03:11:13.885069"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "physics",
+  "ema_delta": -0.288,
+  "reflection": "mock",
+  "timestamp": "2026-08-16T03:11:14.373239"
+ },
+ {
+  "student_id": "test_learner",
+  "subject": "math",
+  "ema_delta": -0.19299999999999995,
+  "reflection": "mock",
+  "timestamp": "2026-08-16T03:11:14.666360"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-16T03:13:09.473357"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-16T03:14:32.268187"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-16T03:15:17.809987"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-16T03:16:12.017925"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-16T03:17:02.076107"
+ },
+ {
+  "student_id": "u_test",
+  "subject": "math",
+  "ema_delta": -0.2,
+  "reflection": "{}",
+  "timestamp": "2026-08-16T03:20:11.422623"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-20T12:51:12.053421"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "我听见你说的了。如果你愿意，可以多跟我说一些具体的事情，我在这儿陪着你。",
+  "timestamp": "2026-08-20T12:56:56.479812"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-20T22:14:10.271451"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-20T22:16:59.974658"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-20T22:19:12.883417"
+ },
+ {
+  "student_id": "u001",
+  "subject": "physics",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-20T22:21:13.042950"
+ },
+ {
+  "student_id": "u001",
+  "subject": "math",
+  "ema_delta": -0.1429999999999999,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-20T22:23:03.533611"
+ },
+ {
+  "student_id": "u001",
+  "subject": "literature",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-20T22:25:25.375252"
+ },
+ {
+  "student_id": "u001",
+  "subject": "ethics",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-20T22:27:43.146406"
+ },
+ {
+  "student_id": "u001",
+  "subject": "phenomenology",
+  "ema_delta": -0.23799999999999993,
+  "reflection": "熵是热力学描述系统无序度的状态函数。",
+  "timestamp": "2026-08-20T22:29:59.832028"
  }
 ]

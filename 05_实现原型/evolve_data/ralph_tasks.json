@@ -15,5 +15,73 @@
     "high_risk": false,
     "status": "done",
     "verdict": "DONE"
+  },
+  "fresh-test": {
+    "source": "manual",
+    "goal": "测试",
+    "acceptance_criteria": [
+      {
+        "metric": "ok",
+        "threshold": 1.0,
+        "current": 1.0,
+        "source": ""
+      }
+    ],
+    "context": {},
+    "max_rounds": 3,
+    "high_risk": false,
+    "status": "done",
+    "verdict": "DONE"
+  },
+  "prog-test": {
+    "source": "manual",
+    "goal": "连续改进",
+    "acceptance_criteria": [
+      {
+        "metric": "progress",
+        "threshold": 99.0,
+        "current": 3.0,
+        "source": ""
+      }
+    ],
+    "context": {},
+    "max_rounds": 3,
+    "high_risk": false,
+    "status": "aborted",
+    "verdict": "ABORT"
+  },
+  "handoff-test": {
+    "source": "manual",
+    "goal": "交接",
+    "acceptance_criteria": [
+      {
+        "metric": "n",
+        "threshold": 99.0,
+        "current": 2.0,
+        "source": ""
+      }
+    ],
+    "context": {},
+    "max_rounds": 2,
+    "high_risk": false,
+    "status": "aborted",
+    "verdict": "ABORT"
+  },
+  "ralph-demo": {
+    "source": "manual",
+    "goal": "演示",
+    "acceptance_criteria": [
+      {
+        "metric": "ok",
+        "threshold": 1.0,
+        "current": 1.0,
+        "source": ""
+      }
+    ],
+    "context": {},
+    "max_rounds": 3,
+    "high_risk": false,
+    "status": "done",
+    "verdict": "DONE"
   }
 }

@@ -522,6 +522,14 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | NEW-7 | **安全工程补强**：工具级 Permission Preset（考试模式锁定写工具）| Oracle 检视 P0-4，教育场景硬卖点 |
 | NEW-8 | **教材同步**：将自我更新/记忆/上下文工程的新实现写入《用智能体开发智能体》| 教材是活文档 |
 | **NEW-9** | **⭐ 防幻觉底层约束（用户最高优先）✅ 已完成**：TRUTH_GROUNDING 常量（10 条底线：不编造/信源为绝对命令/先证据后结论/允许说不知道）+ 注入 build_presenter_system + build_general_chat_system + _safe_chat 兜底（幂等）| 对应 runoob 防幻觉五策略；用户"最底层不可放弃" |
+| **NEW-10** | **🚨 总需求与执行标准（下一轮更新最优先）**：`总需求与执行标准.md`（2026-08-15 新建，整合版主文档）——目标=成熟、商业化、实现设计指标的教育智能体；§5 列出最优先 10 项（E1 效果指标测量管道 / C1 考试模式 Permission Preset / A1 workflows_hub / B1 Session Event Log / D1 SLO 四指标 / C5 家长可见性 / D2 灰度回滚 / B3 OTel / C2 存储安全 / A3 subagent YAML 化）| 用户本轮指示：调研项目 + DeepSeek Harness 架构后提出优化需求，先记录入总需求与执行标准文档并提示为下一轮更新最优先 |
+| **NEW-11** | **B1 备课模式接入联网检索** ✅ 已完成：`_lesson_web_materials`（web_search_multi 多查询联想）+ 素材块注入 7 步备课 user 提示词；`PAEG_LESSON_NO_WEB=1` 测试/离线闸门 | 连通性审计断点 B1（§10.21）：素材全凭 LLM 内部知识 |
+| **NEW-12** | **B2 备课模式接入用户资料库** ✅ 已完成：`_lesson_user_materials`（BM25 检索 `Library/usr_knowledge/<uid>/` 命中片段）+ run 输出 `materials.user_library` | 连通性审计断点 B2：学生上传讲义未作备课输入 |
+| **NEW-13** | **B3 备课视频脚本接入脚本检查** ✅ 已完成：`visual_script_validator.validate_lesson_script`（5 检项）+ LessonPrep 步骤⑥接线 → `quality_report.video_script_check` | 连通性审计断点 B3：video_script 无 validator 校验 |
+| **NEW-14** | **B4 查资料 BM25 无匹配时联网兜底** ✅ 已完成：`services/file_operation._web_fallback_chunks`；BM25 分数全 0 = 无实质命中 → web_search 兜底；done 事件 `web_fallback` 标志 | 连通性审计断点 B4（与找答案 KB→web 兜底一致） |
+| **NEW-15** | **B5 倾诉模式接入真实知识库** ✅ 已完成：`_retrieve_affection_kb` 选择性检索（情绪+学习并存信号门）；v0.22.1 默认不检索原则保留 | 连通性审计断点 B5：提示词提及但无实际调用 |
+| **NEW-16** | **总需求落地选取项（本轮）** 🔄：①C2 存储安全三项复核 ✅（PBKDF2/原子写/登录限流 v0.46 已落地，本轮验证无缺口）②C3 CORS 白名单复核 ✅（v0.51 已落地）③`/api/metrics` 指标端点 ✅（uptime+metrics+events_count）④A1 workflows_hub 复核 ✅（teach_minimal/teach_concept 已落地）⑤E1 效果指标管道/D1 SLO 深化/C5 家长可见性等大项 ⏳ 未完成——如实标注并纳入目标模式后续轮次 | 总需求与执行标准.md §4/§5；B1-B5 验证：test_connectivity_b1_b5.py 18 测试全绿 |
+| **NEW-17** | **残留问题清除（v1.2.0 测试红 → 全绿）✅ 已完成**：①P0-1 补 11 科 method_guide/worked_example（含锚点词）②P0-2 考研分键 politics_exam/math_exam（样式+别名+学段档）③P0-3 四学段收尾问题模板 closing_question_template ④P0-4 SUBJECT_GRADE_DEPTH 20 条 + build_presenter_system 注入 ⑤修复 test_method_guides_are_not_just_physics_copy 自身缺陷（自比恒假）| 用户指示"全面清除残留问题"；test_grade_subject_optimization.py 62/62 全绿；对应 prompts.py + 测试文件改动 |
 
 ---
 
@@ -3097,3 +3105,31 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 - PAEG技术全景文档.md §10.21、PAEG技术说明.md 附录 C.14、元能力文档.md §6.70、维护手册.md §18.53
 
 **待办（后续需求）**：断点修复（B1-B5 按需实施）+ 找资料联网检索增强（此前 oracle 设计任务超时失败，可重试）
+
+## §3.78 断点修复 B1-B5（DeepSeek Harness 实施 · 2026-08-20）
+
+### 来源
+§3.77 连通性矩阵审计断点清单（B1-B5）+ 总需求与执行标准.md（DeepSeek Harness 主需求文档，登记于 2026-08-20 20:41）
+
+### 实施（DeepSeek Harness 完成 · 监控确认）
+
+| 断点 | 修复 | 文件 | 验证 |
+|---|---|---|---|
+| B1 备课未接联网 | `_lesson_web_materials`（web_search_multi 多查询词 + PAEG_LESSON_NO_WEB 闸门）| subagents.py | ✅ 测试绿 |
+| B2 备课未接用户资料库 | `_lesson_user_materials`（BM25 检索 usr_knowledge/<uid>/）+ materials 元数据 | subagents.py | ✅ 测试绿 |
+| B3 备课视频脚本未过脚本检查 | `validate_lesson_script`（镜头/画面/旁白/时长/占位 5 检）+ quality_report.video_script_check | visual_script_validator.py + subagents.py | ✅ 测试绿 |
+| B4 查资料未接联网 | `_web_fallback_chunks`（本地 BM25 无匹配→web_search 补充，防注入+降级空）+ web_fallback 标志 | services/file_operation.py | ✅ 测试绿 |
+| B5 倾诉未接知识库 | `_retrieve_affection_kb`（学习信号门 + KB 命中注入 system，保留默认不检索原则）| subagents.py | ✅ 测试绿 |
+| D1/B3 指标端点 | `/api/metrics`（uptime + metrics + events_count；P95 深化下轮）| server.py | ✅ 路由注册 |
+
+### 监控发现与处理
+
+1. **测试隔离缺陷（已修复）**：B1-B5 测试用 `MockLLM.last_user` 类属性断言，且 `_LESSON_PLAN_BUDGET_USED` 模块级预算（25000 上限）被 test_lesson_prep.py 多次 run 耗尽 → B1-B5 测试组合运行时 run 走静态兜底（MockLLM.chat 不被调用）。**修复**：`lesson_prep` fixture 中调用 `_reset_lesson_plan_budget()`。修复后组合测试 31/31 全绿。
+2. **audit_check 39/40**：唯一 P0 失败为既有昵称双源数据问题（u106/u3/u4/u5/u6），与 B1-B5 无关。
+3. **D4 同步**：总需求文档 §4.7 实施状态表 ✅ / 技术说明 C.15 断点状态全 ✅ / 接线率 58%→81%。
+4. **任务总清单补登记**（本记录）：DeepSeek 在总需求文档登记但未同步任务总清单——D1 纪律要求补登记。
+
+### 待办
+- 改动提交推送双远程（DeepSeek 或本轨道执行）
+- 技术说明 C.15 接线率 81% 计算口径确认（≈20/24 适用格）
+- 孤儿 7 个（srs_sm2 等）后续轮次处理

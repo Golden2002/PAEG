@@ -1,4 +1,4 @@
-﻿﻿# PAEG 教育者智能体 — 技术全景文档
+﻿# PAEG 教育者智能体 — 技术全景文档
 
 > **版本**：v0.73 关键节点（2026-08-16）：Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）+ 结构优化（TOC 自动生成/围栏修复/层级修正/§3.17 生产链路补强）；Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）；架构精细拆分（server.py 2601 行/31 路由/12 蓝图）+ RAG 检索增强（BM25Okapi/多路召回）+ 自我进化优化（Schema+CoT/失败案例/去重）+ dsh Harness 30 项落地 27/30（Seam/Registry/Provider/Persona 外置/Patch 系统/三角色契约层/Preset 体系/条件启停/Constitutional 补丁化/Self-Update via Patch）+ 前端 SVG 化+ 薇依人格大幅提升（文选 9 大哲学基石）
 > **适用对象**：项目维护者（你本人）
@@ -4938,13 +4938,15 @@ since:   <PAEG 版本号>
 
 ### 断点清单（需要接线但未接线）
 
-| # | 断点 | 位置 | 说明 | 建议 |
-|---|---|---|---|---|
-| B1 | 备课未接联网检索 | subagents.py LessonPrep | 备课素材全凭 LLM 内部知识，无 web_search 补充 | 备课引导时可选联网获取课程素材 |
-| B2 | 备课未接用户资料库 | subagents.py LessonPrep | 学生上传的讲义/资料未作为备课输入 | LessonPrep 检索 usr_knowledge/<uid>/ 作为材料源 |
-| B3 | 备课视频脚本未过脚本检查 | subagents.py L2481 | 产出 video_script 无 visual_script_validator 校验 | 接入 visual_script_validator.py |
-| B4 | 查资料未接联网检索 | services/file_operation.py | BM25 仅本地，无 web_search 兜底 | 本地无匹配 → web_search_tool 补充（与找答案一致） |
-| B5 | 倾诉未接真实联网/知识库 | subagents.py AffectionSupportor | 提示词示例提及但无实际调用 | 若需引用资料辅助疏导，接 KnowledgeBase |
+> **§3.78（2026-08-15）✅ 更新**：B1-B5 五处断点已全部修复接线，见下方状态列与 `技术说明 C.15`。
+
+| # | 断点 | 位置 | 说明 | 建议 | 状态（§3.78） |
+|---|---|---|---|---|---|
+| B1 | 备课未接联网检索 | subagents.py LessonPrep | 备课素材全凭 LLM 内部知识，无 web_search 补充 | 备课引导时可选联网获取课程素材 | ✅ `_lesson_web_materials`（web_search_multi 多查询联想）+ 素材块注入 7 步 user 提示词；`PAEG_LESSON_NO_WEB=1` 测试/离线闸门 |
+| B2 | 备课未接用户资料库 | subagents.py LessonPrep | 学生上传的讲义/资料未作为备课输入 | LessonPrep 检索 usr_knowledge/<uid>/ 作为材料源 | ✅ `_lesson_user_materials`（BM25 检索命中片段）；run 输出 `materials.user_library` |
+| B3 | 备课视频脚本未过脚本检查 | subagents.py L2481 | 产出 video_script 无 visual_script_validator 校验 | 接入 visual_script_validator.py | ✅ `validate_lesson_script(markdown)` 5 检项 + 结果写入 `quality_report.video_script_check` |
+| B4 | 查资料未接联网检索 | services/file_operation.py | BM25 仅本地，无 web_search 兜底 | 本地无匹配 → web_search_tool 补充（与找答案一致） | ✅ `_web_fallback_chunks`；BM25 分数全 0 = 无实质命中 → 联网兜底；done 事件 `web_fallback` 标志 |
+| B5 | 倾诉未接真实联网/知识库 | subagents.py AffectionSupportor | 提示词示例提及但无实际调用 | 若需引用资料辅助疏导，接 KnowledgeBase | ✅ `_retrieve_affection_kb` 选择性检索（情绪+学习并存信号门）；v0.22.1 默认不检索原则保留 |
 
 ### 孤儿模块（已实现未接线）
 
