@@ -252,8 +252,15 @@ class WorkflowsHub:
         except Exception:
             pass
         try:
-            _r = _sub.run(_llm, _input, learner=args.get("learner"),
-                          subject=args.get("subject") or "general")
+            # §3.79 Round 2 ⭐ 修复：planner 签名是 run(learner, diagnosis, subject, concept)——
+            # 通用 subagent 调用形状不匹配（Planner.run missing 2 required positional）
+            if _agent_name == "planner":
+                _r = _sub.run(
+                    learner=args.get("learner"), diagnosis={},
+                    subject=args.get("subject") or "general", concept=_input)
+            else:
+                _r = _sub.run(_llm, _input, learner=args.get("learner"),
+                              subject=args.get("subject") or "general")
             if isinstance(_r, dict):
                 return str(_r.get("content") or _r.get("presentation")
                            or json.dumps(_r, ensure_ascii=False)[:300])
@@ -276,10 +283,70 @@ class WorkflowsHub:
                 pass
 
     def _run_tool(self, st: WorkflowStep, args: dict, results: dict) -> str:
-        from tool_registry import execute_tool
         _tool = st.tool
         _targs = self._resolve_placeholders(dict(st.config or {}), results, args)
+        # §3.79 Round 2 ⭐ 修复：物料工作流引用了未注册工具 knowledge_map/keyword_doc
+        # ——在 workflow 层提供实现（避免侵入 tool_registry；LLM 生成 + 结构兜底）
+        if _tool == "knowledge_map":
+            return self._workflow_knowledge_map(_targs, args)
+        if _tool == "keyword_doc":
+            return self._workflow_keyword_doc(_targs, args)
+        from tool_registry import execute_tool
         return execute_tool(_tool, _targs)
+
+    def _workflow_knowledge_map(self, targs: dict, args: dict) -> str:
+        """知识导图生成（workflow 工具兜底）：优先复用 knowledge_map.handle_knowledge_map，
+        失败回退 LLM 生成 Markdown 缩进树。"""
+        _topic = str(targs.get("topic") or targs.get("concept") or args.get("topic") or "")
+        if not _topic:
+            return "knowledge_map 缺 topic"
+        try:
+            from knowledge_map import handle_knowledge_map
+            from infra.runtime import get_llm
+            _r = handle_knowledge_map(
+                _topic, str(targs.get("subject") or args.get("subject") or "general"),
+                args.get("learner"), get_llm())
+            if isinstance(_r, dict):
+                _c = _r.get("content") or _r.get("mindmap") or _r.get("result") or ""
+                if _c:
+                    return str(_c)[:2000]
+        except Exception:
+            pass
+        # LLM 兜底：Markdown 缩进树
+        try:
+            from subagents import _safe_chat
+            from infra.runtime import get_llm
+            _raw = _safe_chat(
+                get_llm(),
+                "你是知识导图生成器。只输出 Markdown 缩进树（根→一级分支→二级要点），不要解释。",
+                f"主题：{_topic}\n学段：{targs.get('stage', 'high')}\n请生成知识导图。",
+                max_tokens=1200)
+            return str(_raw or "")[:2000] or "(知识导图生成失败)"
+        except Exception as _e:
+            return f"knowledge_map 失败: {_e}"
+
+    def _workflow_keyword_doc(self, targs: dict, args: dict) -> str:
+        """讲义草稿生成（workflow 工具兜底）：基于大纲关键词生成结构化讲义。"""
+        _topic = str(targs.get("topic") or args.get("topic") or "")
+        _outline = str(targs.get("outline") or "")
+        if not _topic:
+            return "keyword_doc 缺 topic"
+        try:
+            from subagents import _safe_chat
+            from infra.runtime import get_llm
+            _raw = _safe_chat(
+                get_llm(),
+                "你是教学讲义撰写者。基于大纲生成结构化讲义（Markdown）："
+                "# 讲义：{主题} → ## 一、学习目标 → ## 二、核心内容（含定义/机制/例子/数据）→ "
+                "## 三、典型例题 → ## 四、巩固练习 → ## 五、小结。只输出讲义正文。",
+                f"主题：{_topic}\n学段：{targs.get('stage', 'high')}\n大纲：{_outline[:1500] or '（未提供，按主题自行拟定）'}",
+                max_tokens=2000)
+            _txt = str(_raw or "").strip()
+            if len(_txt) < 60:
+                return "(讲义生成过短)"
+            return _txt
+        except Exception as _e:
+            return f"keyword_doc 失败: {_e}"
 
     # v0.70+ §3.27：统一占位符替换——{step_id} 从 results 取，{param} 从 args 取
     def _resolve_placeholders(self, cfg: dict, results: dict, args: dict = None) -> dict:

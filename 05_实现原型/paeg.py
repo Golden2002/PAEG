@@ -4,6 +4,7 @@ PAEG (Pedagogical Agent with Evolving Growth) v0.5
 """
 
 import json
+import os  # §3.79 v1.2.14 ⭐ 守门开关 PAEG_GRADE_GATE 依赖（此前缺失导致 sync 路径守门静默失败）
 from datetime import datetime
 from typing import Optional
 from dataclasses import dataclass, field

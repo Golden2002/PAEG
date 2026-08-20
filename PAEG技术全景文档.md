@@ -4941,6 +4941,8 @@ since:   <PAEG 版本号>
 > **§3.78（2026-08-15）✅ 更新**：B1-B5 五处断点已全部修复接线，见下方状态列与 `技术说明 C.15`。
 > **§3.79（2026-08-20）新增登记（Q5）**：4 个新 service 列已接线 ✅——`services/slo_metrics.py`（D1 SLO 分模式，/api/metrics slo 字段）、`services/usage_guard.py`（C5 每日使用限制，teach_stream 入口+统一出口登记）、`services/material_quality.py`（Q7 物料结构检查，LessonPrep quality_report）、`services/presentation_quality.py`（Q6 教学输出质量信号，paeg.py quality_signal 事件）；新端点行：/api/metrics/effects、/api/preset/list、/api/preset/apply、/api/parent/conversations/&lt;uid&gt;。
 
+> **§3.79（2026-08-21）✅ 更新（v1.2.14）**：**物料工作流联通**——`teach_materials` 工作流 outline 步 Planner 签名适配（`run(learner, diagnosis, subject, concept)`，workflows_hub `_run_subagent` planner 分支）+ knowledge_map/keyword_doc workflow 工具兜底（优先 `knowledge_map.handle_knowledge_map`，失败回退 LLM）；真实运行 7 步全 ✓。**teach_stream 守门接线**——学段特征/内容深度守门此前只挂 sync 路径 `paeg.teach`，GUI 实际走的 `/api/teach/stream` 主循环从不执行 → probe 0/4；修复后主循环 presentation 生成后接入（同门控 `llm_generated`+`PAEG_GRADE_GATE`），复测 **probe 4/4 全特征通过**。修复 `on_session_end` 对 str 元素 `.get` 报错。
+
 | # | 断点 | 位置 | 说明 | 建议 | 状态（§3.78） |
 |---|---|---|---|---|---|
 | B1 | 备课未接联网检索 | subagents.py LessonPrep | 备课素材全凭 LLM 内部知识，无 web_search 补充 | 备课引导时可选联网获取课程素材 | ✅ `_lesson_web_materials`（web_search_multi 多查询联想）+ 素材块注入 7 步 user 提示词；`PAEG_LESSON_NO_WEB=1` 测试/离线闸门 |
