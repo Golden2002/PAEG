@@ -1,4 +1,4 @@
-﻿# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
+﻿﻿# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
 
 > 创建日期：2026-08-14
 > 性质：**本文件是操作的唯一依据**——所有未完成任务、用户指示、调研要求固定于此，每次操作前先读此文件，完成后更新状态。
@@ -3078,3 +3078,22 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 ### 实施记录
 
 （完成后更新）
+
+### 实施记录（2026-08-20 完成）
+
+**第一步：行列完整性确认** ✅
+- 修正基数：路由 32→58（server.py + blueprints 26）、意图 15→16 + 第二套 lib/ingest 4、services 45→53（+handlers 7 + retrieval 2）
+- 定稿矩阵：**39 行 × 55 列**（matrix_final.json）
+- 交叉验证：explore bg_42ea6e61（修正基数 + 发现 7 孤儿）
+
+**第二步：连通性逐格验证** ✅
+- 五大核心 × 6 公共模块 = 30 格：✅15 / ⚠️7 / ❌8 / N/A4（58% 已接线）
+- 证据：备课 lang_gate×4 / 教学 web_search×11+lang_gate×11+polish×22 / 查资料 BM25+4 意图 / 找答案 v0.42.3 polish 收口 / 倾诉 server polish 收口
+- 断点 5 处：B1 备课未接联网、B2 备课未接资料库、B3 备课视频脚本未过校验、B4 查资料未接联网、B5 倾诉未接知识库
+- 孤儿 7 个：srs_sm2 / concept_graph / production_pipeline / condition_eval / agent_scope / agent_trirole / platform_dual_track
+- 其余 34 功能项：6 handler 全过语言门槛，推荐/方法已接联网
+
+**D4 同步** ✅
+- PAEG技术全景文档.md §10.21、PAEG技术说明.md 附录 C.14、元能力文档.md §6.70、维护手册.md §18.53
+
+**待办（后续需求）**：断点修复（B1-B5 按需实施）+ 找资料联网检索增强（此前 oracle 设计任务超时失败，可重试）
