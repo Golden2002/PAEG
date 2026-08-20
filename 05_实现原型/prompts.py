@@ -1692,7 +1692,10 @@ def build_lesson_planner_system(topic: str, subject: str, grade: str,
       "teacher_activity": "...",
       "student_activity": "...",
       "design_intent":    "...",
-      "duration":         "5min"
+      "duration":         "5min",
+      "stage":            "pre",   // §3.75 ⭐ pre/during/post 三选一（课中 after 段必含 case_teaching 与 interaction）
+      "case_teaching": {{ "name": "...", "purpose": "设计目的", "steps": ["..."], "expected_outcome": "预期效果" }},   // 仅 stage=during 且课中必含 ≥1
+      "interaction": {{ "type": "小组讨论/提问/角色扮演/实验", "purpose": "设计目的", "steps": ["..."], "expected_outcome": "预期效果" }}   // 仅 stage=during 且课中必含 ≥1
     }}
   ],
   "blackboard": {{
