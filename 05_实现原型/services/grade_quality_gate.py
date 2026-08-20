@@ -52,6 +52,16 @@ _GRADE_FEATURES: Dict[str, Dict[str, str]] = {
 
 _GATE_DEFAULT = os.environ.get("PAEG_GRADE_GATE", "1") != "0"  # 默认开启
 
+# §3.79 Round 11 ⭐ 内容深度四要素（教学输出强化，借鉴张宇扬课件质量特征：
+# 精确概念定义 → 机制解释 → 具体例子 → 小结/衔接）
+_DEPTH_FEATURES: Dict[str, str] = {
+    "定义": r"定义|概念|是指|称为|指的是",
+    "机制": r"为什么|原理|机制|因为|本质|推导",
+    "例子": r"例子|例如|比如|实例|案例|例题|生活",
+    "小结": r"小结|总结|回顾|总之|因此|所以",
+}
+_DEPTH_MIN: int = 3  # 四要素命中 ≥3 视为达标（宽松防误伤）
+
 
 def _normalize_grade(grade: str) -> str:
     _g = str(grade or "high_school").strip()
@@ -94,6 +104,56 @@ def build_refine_prompt(content: Any, grade: str, missing: List[str],
         f"- 缺失：{'、'.join(missing)}\n"
         "输出：直接给补充段落文本，不要解释。"
     )
+
+
+# ─────────────────────────────────────
+# §3.79 Round 11 ⭐ 内容深度四要素守门（教学输出强化）
+# ─────────────────────────────────────
+def check_content_depth(content: Any, grade: str) -> Dict[str, Any]:
+    """内容深度四要素检查（定义/机制/例子/小结；≥3 达标）。
+
+    借鉴张宇扬课件质量特征：精确概念定义 → 机制解释 → 具体例子 → 小结衔接。
+    对高中/大学/考研学段启用（初中以生活化为主，由 grade 特征守门覆盖）。
+
+    Returns: {"missing": [...], "passed": bool, "matched": {...}, "grade": 归一学段}
+    """
+    text = str(content or "")
+    _g = _normalize_grade(grade)
+    _matched: Dict[str, bool] = {}
+    _missing: List[str] = []
+    for _fname, _pat in _DEPTH_FEATURES.items():
+        _hit = bool(re.search(_pat, text))
+        _matched[_fname] = _hit
+        if not _hit:
+            _missing.append(_fname)
+    return {
+        "missing": _missing,
+        "passed": (len(_matched) - len(_missing)) >= _DEPTH_MIN,
+        "matched": _matched,
+        "grade": _g,
+    }
+
+
+def refine_content_depth(llm, content: Any, missing: List[str],
+                         subject: str = "", concept: str = "") -> str:
+    """深度四要素缺失 → 补充（一次轻量调用，失败降级 ""）。"""
+    if not missing:
+        return ""
+    try:
+        from subagents import _safe_chat
+        _sys = ("你是 PAEG 的内容深度补充器。只输出补充段落，不解释、不重复，"
+                "用通俗语言把缺失要素补上（≤180 字）。")
+        _usr = (
+            f"学科：{subject or '未知'}；主题：{concept or '当前概念'}。\n"
+            f"现有讲解：{str(content)[:400]}\n"
+            f"请补充以下要素：{'、'.join(missing)}\n"
+            "输出：直接给补充段落文本。"
+        )
+        _raw = _safe_chat(llm, _sys, _usr, max_tokens=380)
+        _txt = str(_raw or "").strip()
+        return ("\n\n" + _txt) if len(_txt) >= 20 else ""
+    except Exception:
+        return ""
 
 
 def refine_for_grade(llm, content: Any, grade: str, missing: List[str],

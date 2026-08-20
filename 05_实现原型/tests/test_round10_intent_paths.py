@@ -124,3 +124,17 @@ def test_presenter_no_notes_unchanged():
     assert "detour 绕出" not in captured["system"]
     assert "revisit 绕回" not in captured["system"]
     assert "认知层级" in captured["system"]
+
+
+def test_detour_note_flexible_guidance_strategy():
+    """§3.79 Round 11 策略定稿：不强制拉回、但保留柔性引导（提醒主线+询问选择）。"""
+    _p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                      "server.py")
+    src = open(_p, encoding="utf-8").read()
+    # 柔性引导：提醒主线"随时告诉我" + 主动询问选择
+    assert "柔性引导" in src
+    assert "随时告诉我" in src
+    assert "继续学这个新话题" in src
+    # 不强制：明确"把选择权交给学生，不强迫"
+    assert "不强迫" in src
+    assert "不打断" in src

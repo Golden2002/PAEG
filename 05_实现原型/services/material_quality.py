@@ -24,7 +24,10 @@ def _base(passed: bool, errors: List[str], **extra) -> Dict[str, object]:
 def check_handout(markdown: str) -> Dict[str, object]:
     """讲义结构检查：应含学习目标/核心内容/典型例题/巩固练习/小结（命中 >=3 节）。
 
-    Returns: {"passed", "errors", "sections_found", "checked"}
+    §3.79 Round 11 ⭐ 增强（张宇扬课件特征：真实数据例题）：讲义还应含
+    具体例题（含数据/公式/数字）与练习/思考引导（宽松防误伤，仅作质量提示项）。
+
+    Returns: {"passed", "errors", "sections_found", "has_concrete_example", "has_practice", "checked"}
     """
     text = str(markdown or "")
     errors: List[str] = []
@@ -34,17 +37,30 @@ def check_handout(markdown: str) -> Dict[str, object]:
         errors.append(f"讲义结构不完整：仅命中 {len(_found)}/5 节（应含≥3：{_found or '无'}）")
     if len(text.strip()) < 60:
         errors.append("讲义过短（<60 字）")
+    # Round 11 ⭐ 真实数据例题（含数字/公式/具体数值）
+    _has_concrete = bool(re.search(r"\d|例题|例\s*[0-9一二三四五六七八九十]|例如|如：|=", text))
+    # 练习/思考引导
+    _has_practice = bool(re.search(r"练习|巩固|思考|试一试|你来", text))
+    if not _has_concrete:
+        errors.append("讲义缺具体例题（含数据/公式/数值的例证，张宇扬课件特征）")
+    if not _has_practice:
+        errors.append("讲义缺练习/思考引导（节末应有可操作练习或思考题）")
     if re.search(r"待补充|\(写|（写|占位|TODO", text):
         errors.append("存在占位残留（待补充/（写…/TODO 等）")
-    return _base(not errors, errors, sections_found=_found)
+    return _base(not errors, errors, sections_found=_found,
+                 has_concrete_example=_has_concrete, has_practice=_has_practice)
 
 
 def check_lecture_script(markdown: str) -> Dict[str, object]:
     """讲稿结构检查：开场/主体/小结 + 时长标注（秒/分钟）。
 
+    §3.79 Round 11 ⭐ 增强（张宇扬课件特征：口语化教学）：讲稿还应含
+    口语过渡句（好/那么/接下来/我们）与生活化例子（宽松防误伤）。
+
     注意与 visual_script_validator.validate_lesson_script（视频脚本）区分。
 
-    Returns: {"passed", "errors", "has_open,has_body,has_close,has_duration", "checked"}
+    Returns: {"passed", "errors", "has_open,has_body,has_close,has_duration",
+              "has_transition", "has_example", "checked"}
     """
     text = str(markdown or "")
     errors: List[str] = []
@@ -52,18 +68,26 @@ def check_lecture_script(markdown: str) -> Dict[str, object]:
     _has_body = bool(re.search(r"主体|环节|新授|讲解|展开", text))
     _has_close = bool(re.search(r"小结|总结|回顾|收尾|结束", text))
     _has_duration = bool(re.search(r"秒|分钟|min|minute", text))
+    # Round 11 ⭐ 口语过渡句 + 生活化例子
+    _has_transition = bool(re.search(r"好，|那么|接下来|我们|大家|你看|注意", text))
+    _has_example = bool(re.search(r"例子|例如|比如|类比|生活|就像", text))
     if not (_has_open and _has_body and _has_close):
         errors.append("讲稿缺少 开场/主体/小结 三段结构"
                       f"（open={_has_open} body={_has_body} close={_has_close}）")
     if not _has_duration:
         errors.append("讲稿缺少时长标注（秒/分钟）")
+    if not _has_transition:
+        errors.append("讲稿缺口语过渡句（好/那么/接下来/我们 等，讲稿是“说”出来的）")
+    if not _has_example:
+        errors.append("讲稿缺生活化例子（举例/类比让抽象概念落地）")
     if len(text.strip()) < 80:
         errors.append("讲稿过短（<80 字）")
     if re.search(r"待补充|\(写|（写|占位|TODO", text):
         errors.append("存在占位残留（待补充/（写…/TODO 等）")
     return _base(not errors, errors,
                  has_open=_has_open, has_body=_has_body,
-                 has_close=_has_close, has_duration=_has_duration)
+                 has_close=_has_close, has_duration=_has_duration,
+                 has_transition=_has_transition, has_example=_has_example)
 
 
 def check_mindmap(markdown: str) -> Dict[str, object]:

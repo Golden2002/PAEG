@@ -530,6 +530,28 @@ class PAEG:
                 print(f"[PAEG][paeg.py] 学段守门忽略: {_gg_e}")
                 pass
                 pass
+            # §3.79 Round 11 ⭐ 内容深度四要素守门（教学输出强化 R1：定义→机制→例子→小结）
+            # 仅对高中/大学/考研学段启用（初中由生活化守门覆盖）；一次轻量补充
+            try:
+                if presentation.get("llm_generated") and os.environ.get("PAEG_GRADE_GATE", "1") != "0":
+                    from services.grade_quality_gate import (
+                        check_content_depth, refine_content_depth)
+                    _dgrade = str(getattr(learner, "grade_level", "high_school") or "high_school")
+                    if _dgrade in ("high_school", "undergraduate", "graduate_exam"):
+                        _dchk = check_content_depth(presentation.get("content", ""), _dgrade)
+                        if not _dchk["passed"] and _dchk["missing"]:
+                            _dadd = refine_content_depth(
+                                self.model, presentation.get("content", ""),
+                                _dchk["missing"], subject=subject, concept=question)
+                            if _dadd:
+                                presentation["content"] = str(presentation.get("content") or "") + _dadd
+                                presentation["depth_refined"] = True
+                                presentation["depth_refined_missing"] = _dchk["missing"]
+                                self._log(f"   ★ 内容深度补充：缺失 {_dchk['missing']} → 已追加")
+            except Exception as _dd_e:
+                print(f"[PAEG][paeg.py] 深度守门忽略: {_dd_e}")
+                pass
+                pass
 
             # 4. 评估（每个呈现步骤后）—— v0.24 真正评估学生
             self._log(f"   -> 评估子代理：检查学生理解...")

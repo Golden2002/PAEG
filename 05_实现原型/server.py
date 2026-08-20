@@ -1228,6 +1228,11 @@ def _teach_stream_gen(data):
             elif _rel == "detour":
                 # 游离新话题：当前主题入栈 → 新话题作为 concept（subject 由 steering 处理）
                 # §3.79 Round 10 ⭐ 增强：入栈带 summary（供 revisit 接续）+ detour 约束注 LLM
+                # §3.79 Round 11 ⭐ 策略定稿（用户洞察）：**不强制拉回，但保留柔性引导**——
+                # ①完全尊重新话题（学生此刻的真实需求，不打断、不说教）
+                # ②结尾可柔性提醒教学主线（"如果想回到刚才的内容，随时告诉我"）
+                # ③也可主动询问选择（"你想继续学这个新话题，还是回去接着刚才的？"）
+                # ——把选择权交给学生；柔性引导 ≠ 强制拉回。
                 _hist = _stack_push(_hist, {"concept": str(_prev_concept),
                                             "subject": str(data.get("subject", "")),
                                             "intent": _prev_intent,
@@ -1238,9 +1243,11 @@ def _teach_stream_gen(data):
                 _llm_conf = 0.0
                 try:
                     setattr(learner, "_detour_note",
-                            f"学生从「{str(_prev_concept)[:30]}」暂时绕到当前话题："
-                            f"先完整回应新话题；若表达自然，结尾可轻提一句"
-                            f"『如果想继续之前的内容，我们可以随时回去』，不强迫。")
+                            f"学生此刻想学的是当前话题（他刚从「{str(_prev_concept)[:30]}」过来）。"
+                            f"请**完全专注当前话题**，按当前学科正常教学，不打断、不说教。"
+                            f"结尾做**柔性引导**（把选择权交给学生，不强迫）：可轻轻问一句——"
+                            f"『你想继续学这个新话题，还是想回到刚才的内容？随时告诉我都可以。』"
+                            f"若学生选择继续新话题，就自然往下讲；若他主动问起之前的内容，再无缝衔接。")
                 except Exception:
                     pass
             elif _rel == "revisit":
