@@ -411,7 +411,11 @@ def _pre_retrieve(question: str, subject: str = None, learner=None, llm=None,
         return ""
 
 
-
+# §3.79 Round 5 ⭐ 教学模式识别缓存（D1 延迟优化：同主题追问不重复 LLM 调用）
+import threading as _threading
+_MODE_CACHE: dict = {}
+_MODE_CACHE_TTL = 600  # 10 分钟
+_MODE_CACHE_LOCK = _threading.Lock()
 
 def _detect_teaching_mode(text: str, llm=None, fallback: str = "normal") -> str:
     """v0.26 ⭐ 教学模式识别（easy/normal/deep）——agent 引导 LLM 判断用户指令落入哪种模式。
@@ -421,10 +425,30 @@ def _detect_teaching_mode(text: str, llm=None, fallback: str = "normal") -> str:
     - normal 标准教学：默认深入讲解
     - deep  深度教学：学生要"讲透/深入研究/为什么/推导"
     LLM 失败/不可用时回退关键词兜底（_detect_teaching_mode_regex），再回退 fallback。
+
+    §3.79 Round 5 ⭐ 延迟优化（D1）：关键词规则优先 + LLM 结果缓存。
+    教学链路中本函数每次请求都调 LLM（增加限流消耗与延迟），但语义模式
+    大多由明确关键词决定（"深入/推导"→deep，"简单/入门"→easy）。
+    改：先跑规则（命中即返回，零 LLM）；未命中才走 LLM 语义判断；LLM
+    结果按 (text 归一) 缓存 10 分钟（同主题追问不重复消耗）。
     """
+    import time as _tm
     try:
-        if llm is None:
-            return _detect_teaching_mode_regex(text) or fallback
+        _rule = _detect_teaching_mode_regex(str(text or ""))
+        if _rule != "normal" or not llm:
+            # 规则命中（deep/easy）或 LLM 不可用 → 直接返回，省一次 LLM 调用
+            return _rule
+        # 规则未命中（normal）→ LLM 语义判断（带缓存）
+        _key = str(text or "").strip()[:80]
+        _now = _tm.time()
+        with _MODE_CACHE_LOCK:
+            _hit = _MODE_CACHE.get(_key)
+            if _hit and _now - _hit[1] < _MODE_CACHE_TTL:
+                return _hit[0]
+    except Exception:
+        return fallback
+    _mode = fallback
+    try:
         import json as _json
         _sys = (
             "你是教学模式识别器。判断学生这句话想用哪种教学深度：\n"
@@ -435,14 +459,22 @@ def _detect_teaching_mode(text: str, llm=None, fallback: str = "normal") -> str:
         )
         _r = _safe_chat(llm, _sys, str(text)[:200], max_tokens=10)
         if _r:
-            _mode = _r.strip().lower()
-            if _mode in ("easy", "normal", "deep"):
-                return _mode
+            _m = _r.strip().lower()
+            if _m in ("easy", "normal", "deep"):
+                _mode = _m
     except Exception as _e:
         print(f"[PAEG][subagents.py] _detect_teaching_mode 异常忽略: {_e}")
         pass
+    if _mode == "normal":
+        _mode = _detect_teaching_mode_regex(text) or fallback
+    try:
+        with _MODE_CACHE_LOCK:
+            _MODE_CACHE[_key] = (_mode, _tm.time())
+            if len(_MODE_CACHE) > 256:
+                _MODE_CACHE.clear()
+    except Exception:
         pass
-    return _detect_teaching_mode_regex(text) or fallback
+    return _mode
 
 
 def _detect_teaching_mode_regex(text: str) -> str:
@@ -898,7 +930,7 @@ class Diagnostor:
                 f"请用 JSON 输出：{{\"recommended_depth\": \"basic/moderate/advanced\", "
                 f"\"identified_gaps\": [\"...\"]}}\n只输出 JSON，不要任何解释文字。"
             )
-            text = _safe_reason_chat(self.model, "你是教学诊断助手，用一句话 JSON 给出教学深度建议，不要客套。", user, subject=subject, max_tokens=200, subagent="diagnostor")
+            text = _safe_reason_chat(self.model, "你是教学诊断助手，用一句话 JSON 给出教学深度建议，不要客套。", user, subject=subject, max_tokens=200, subagent="diagnostor", include_kb=False)
             if text:
                 import json as _json
                 try:
