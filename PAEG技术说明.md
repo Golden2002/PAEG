@@ -1914,3 +1914,21 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 - 现象：done 事件到达后发送按钮仍"■ 停止"（teach finally 要等流完全结束——done 后还有蒸馏/hooks 收尾 yield）→ 学生立即发下一条被拦截：`正在生成上一条回复，请先点击「■ 停止」再发送新内容`
 - 修复：done 事件处理里 `_hideStopBtn()` 即时恢复（teach + chat 两处），收尾后台进行
 - E2E 复跑 12 过 4：残余失败为 LLM 延迟/限流环境噪声（30 req/min 窗口；单 teach 内部 4-8 次 LLM 调用；429 来自 PUT profile 自动保存 + intent/infer）；手动验证 teach 流完整含 done 35s——产品行为正常，D1 延迟遗留
+
+### C.29 LLM 延迟优化（D1）+ 教学模式识别规则优先（v1.2.17 §3.79 ⭐）
+
+**延迟精确归因（probe_latency_fixed 流式实测，35s 分解）**：
+| 阶段 | 耗时 | 说明 |
+|---|---|---|
+| 路由/诊断 | 1.3s | route_intent/classify/steer/diagnostor 全链路（正常） |
+| 规划 plan | 5.6s | planner LLM 动态规划（4-7 步） |
+| 首步讲解 presentation | 19.6s | presenter LLM 长文本生成（500-1000 字）——**主因** |
+| 后续 + 收尾 | 8.6s | 余下步骤 + self_evolution |
+
+结论：延迟主因是 LLM 长文本生成（deepseek 端点基础设施级），非代码 bug；此前 E2E"6 连假超时"根因 = 前端按钮未即时恢复（Round 4 修）+ 限流排队。
+
+**优化实施（低风险）**：
+- `_detect_teaching_mode` 规则优先：deep/easy 关键词命中 → 零 LLM（教学请求高频，语义模式与关键词判定高度重合）；LLM 语义判断结果缓存 10 分钟（上限 256）
+- `Diagnostor.run` include_kb=False：诊断只输出 recommended_depth/identified_gaps JSON，知识库检索无价值（省 _pre_retrieve 检索 + 可能省 LLM 选库调用）
+
+**守护**：test_round15_llm_latency.py（规则命中零 LLM / 缓存命中零重复 / include_kb=False / 缓存上限）
