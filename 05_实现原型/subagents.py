@@ -1795,8 +1795,14 @@ def _parse_json_safely(text: str) -> Optional[dict]:
         return None
 
 
-def _score_lesson_plan(plan: dict, handout: str, video_script: str) -> dict:
-    """确定性六维质量打分（无 LLM，可测试可复现）。
+def _score_lesson_plan(
+    plan: dict,
+    handout: str,
+    video_script: str,
+    ppt_outline=None,
+    eval_mode: str = "auto",
+) -> dict:
+    """确定性五维质量打分（无 LLM，可测试可复现）。
 
     教案六维（每维 0-1，加权合成）：
       1. 三维目标可测动词（25%）：含'理解/能/体会'等可观察动词
@@ -1807,13 +1813,21 @@ def _score_lesson_plan(plan: dict, handout: str, video_script: str) -> dict:
       6. 反思（15%）：reflection 非空
 
     附加维度：讲义（handout）字数、视频脚本（理科）非空。
+    v0.74+ ⭐ 聚合 PPT 大纲 5 维 + 12 硬性检查 → 五维 overall_score：
+      lesson_plan (0.5) + handout (0.2) + ppt_outline (0.2) + hard_checks_ratio (0.1)
+      video_script 仅入 dim_scores 展示，不入 overall（文理分轨）。
 
     返回：{lesson_plan_score, handout_score, video_script_score,
-           violations: [{dim, msg}], overall: 'PASS'|'FAIL', overall_score}
-    PASS 阈值：overall_score >= 0.6 且 violations 不含致命违规。
+           ppt_outline_score, hard_checks, hard_checks_pass, hard_checks_total,
+           dim_scores: {lesson_plan, handout, video_script, ppt_outline, hard_checks},
+           violations: [{dim, msg}], overall: 'PASS'|'FAIL', overall_score,
+           eval_mode: str}
+    PASS 阈值：overall_score >= 0.6 且无致命违规（三维目标/教学环节/PPT大纲）。
     """
     violations = []
     plan = plan or {}
+    ppt_outline = ppt_outline or []
+    eval_mode = str(eval_mode or "auto")
 
     # 1. 三维目标可测动词
     obj = plan.get("objectives_3d") or {}
@@ -1904,19 +1918,376 @@ def _score_lesson_plan(plan: dict, handout: str, video_script: str) -> dict:
         video_script_score = 0.5
         violations.append({"dim": "视频脚本", "msg": f"视频脚本字数 {video_chars} 偏短"})
 
-    # 整体 PASS/FAIL
-    overall_score = lesson_plan_score * 0.7 + handout_score * 0.3
+    # ── v0.74+ ⭐ 聚合：PPT 大纲 5 维（_score_ppt_outline）+ 12 硬性检查 ──
+    ppt_score_pack = _score_ppt_outline(ppt_outline)
+    ppt_outline_score = round(float(ppt_score_pack.get("ppt_outline_score") or 0.0), 3)
+    # PPT 维度 violations 合并入主 violations（dim 已带 "PPT大纲" 前缀）
+    for _pv in (ppt_score_pack.get("violations") or []):
+        violations.append(_pv)
+
+    hard_pack = _score_12_hard_checks(plan, handout, ppt_outline)
+    hard_checks_list = hard_pack.get("hard_checks") or []
+    hard_checks_pass = int(hard_pack.get("hard_checks_pass") or 0)
+    hard_checks_total = int(hard_pack.get("hard_checks_total") or 12)
+    hard_checks_ratio = (
+        round(hard_checks_pass / hard_checks_total, 3)
+        if hard_checks_total > 0
+        else 0.0
+    )
+
+    # dim_scores：5 维（含 video_script，None 时按 0 处理展示）
+    dim_scores = {
+        "lesson_plan": lesson_plan_score,
+        "handout": round(handout_score, 3),
+        "video_script": (
+            round(video_script_score, 3)
+            if video_script_score is not None
+            else None
+        ),
+        "ppt_outline": ppt_outline_score,
+        "hard_checks": hard_checks_ratio,
+    }
+
+    # 整体 PASS/FAIL（5 维加权；video_script 不入 overall）
+    overall_score = (
+        lesson_plan_score * 0.5
+        + handout_score * 0.2
+        + ppt_outline_score * 0.2
+        + hard_checks_ratio * 0.1
+    )
     overall_score = round(overall_score, 3)
-    fatal = [v for v in violations if v["dim"] in ("三维目标", "教学环节")]
+    # 致命违规：三维目标 / 教学环节（教案核心）+ PPT大纲（v0.74+ 新增）
+    fatal = [
+        v for v in violations
+        if v["dim"] in ("三维目标", "教学环节", "PPT大纲", "页数", "6×6规则", "标题长度")
+    ]
     overall = "PASS" if (overall_score >= 0.6 and not fatal) else "FAIL"
 
     return {
         "lesson_plan_score": lesson_plan_score,
         "handout_score": round(handout_score, 3),
         "video_script_score": round(video_script_score, 3) if video_script_score is not None else None,
+        "ppt_outline_score": ppt_outline_score,
+        "hard_checks": hard_checks_list,
+        "hard_checks_pass": hard_checks_pass,
+        "hard_checks_total": hard_checks_total,
+        "dim_scores": dim_scores,
         "violations": violations,
         "overall": overall,
         "overall_score": overall_score,
+        "eval_mode": eval_mode,
+    }
+
+
+def _score_ppt_outline(ppt_outline):
+    """PPT 大纲五维确定性打分（无 LLM，可测试可复现）。
+
+    五维（每维 0-1，加权合成）：
+      1. 页数（10%）：4-7 页硬性合规（<4 或 >7 记 0）
+      2. 6×6 法则（30%）：每页 ≤6 条要点、每条 ≤60 字
+      3. 单一主题（20%）：页间关键词最高重叠率 ≥30%
+      4. 视觉焦点（20%）：≥30% 页含 [图]/[表]/[公式] 标记
+      5. 标题（20%）：所有页标题 ≤20 字（硬性，违规即 0）
+
+    返回：
+      {
+        "ppt_outline_score": float,
+        "ppt_dim_scores": {
+          "page_count", "six_six_rule", "single_topic",
+          "visual_focus", "title_length",
+        },
+        "violations": [{"dim": str, "msg": str}, ...],
+      }
+
+    PPT 大纲输入形态：list of dict（每页 {page/title/points[]/visual_focus/layout}）。
+    为兼容静态兜底模板 _static_ppt_outline（{slide, title, points}），函数同时接
+    受 "page" 或 "slide" 作为页号字段，"points" 或 "key_points" 作为要点字段。
+    """
+    violations = []
+    ppt_outline = ppt_outline or []
+
+    # ── 0. 空输入保护 ──
+    if not ppt_outline:
+        return {
+            "ppt_outline_score": 0.0,
+            "ppt_dim_scores": {
+                "page_count": 0.0,
+                "six_six_rule": 0.0,
+                "single_topic": 0.0,
+                "visual_focus": 0.0,
+                "title_length": 0.0,
+            },
+            "violations": [{"dim": "PPT大纲", "msg": "PPT大纲为空"}],
+        }
+
+    n = len(ppt_outline)
+
+    # ── 1. 页数（硬性 4-7）──
+    if 4 <= n <= 7:
+        score_pages = 1.0
+    else:
+        score_pages = 0.0
+        violations.append({"dim": "页数", "msg": f"页数 {n} 超出 4-7 范围"})
+
+    # ── 2. 6×6 法则（每页 ≤6 条要点，每条 ≤60 字）──
+    page_sixsix = []
+    for p in ppt_outline:
+        if not isinstance(p, dict):
+            page_sixsix.append(0.0)
+            continue
+        pts = p.get("points") or p.get("key_points") or []
+        if not pts:
+            page_sixsix.append(0.0)
+            continue
+        # 要点数合规率：>6 时按 6/len 折扣
+        count_ok = min(1.0, 6.0 / max(1, len(pts)))
+        # 字数合规率：所有要点 ≤60 时 1，否则按平均长度折扣
+        chars = [len(str(x)) for x in pts]
+        overlong = [c for c in chars if c > 60]
+        if not overlong:
+            chars_ok = 1.0
+        else:
+            avg_chars = sum(chars) / len(chars)
+            chars_ok = min(1.0, 60.0 / max(1, avg_chars))
+        page_sixsix.append(count_ok * chars_ok)
+    score_sixsix = sum(page_sixsix) / len(page_sixsix) if page_sixsix else 0.0
+    if score_sixsix < 1.0:
+        violations.append({
+            "dim": "6×6法则",
+            "msg": f"部分页未满足 6×6 法则（合规度 {score_sixsix:.2f}）",
+        })
+
+    # ── 3. 标题 ≤20 字（硬性，任一违规即 0）──
+    titles = [str(p.get("title") or "") if isinstance(p, dict) else "" for p in ppt_outline]
+    long_titles = [t for t in titles if len(t) > 20]
+    if not long_titles:
+        score_title = 1.0
+    else:
+        score_title = 0.0
+        violations.append({
+            "dim": "标题",
+            "msg": f"{len(long_titles)} 页标题 > 20 字",
+        })
+
+    # ── 4. 视觉焦点（≥30% 页含 [图]/[表]/[公式] 标记）──
+    _VISUAL_MARKERS = ("[图]", "[表]", "[公式]")
+
+    def _has_visual(p):
+        if not isinstance(p, dict):
+            return False
+        for field in ("visual_focus", "title"):
+            v = p.get(field) or ""
+            if any(m in str(v) for m in _VISUAL_MARKERS):
+                return True
+        for pt in (p.get("points") or p.get("key_points") or []):
+            if any(m in str(pt) for m in _VISUAL_MARKERS):
+                return True
+        return False
+
+    visual_count = sum(1 for p in ppt_outline if _has_visual(p))
+    ratio_visual = visual_count / n if n else 0.0
+    if ratio_visual >= 0.30:
+        score_visual = 1.0
+    else:
+        score_visual = ratio_visual / 0.30
+        violations.append({
+            "dim": "视觉焦点",
+            "msg": f"含视觉标记页占比 {ratio_visual:.1%}（要求 ≥30%）",
+        })
+
+    # ── 5. 单一主题（页间关键词最高重叠率 ≥30%）──
+    import re as _re_ppt
+
+    _PPT_STOPWORDS = frozenset({
+        "的", "是", "在", "和", "与", "或", "及", "第", "章", "节",
+        "一", "二", "三", "四", "五", "六", "七", "八", "九", "十",
+        "之", "了", "为", "中", "上", "下", "不", "有", "从", "到",
+        "由", "向", "把", "让", "使", "用", "于", "以", "对", "也",
+        "可", "这", "那", "并", "且", "但", "如", "何",
+    })
+
+    def _keywords(title):
+        return _re_ppt.findall(r"[一-鿿]{2,}", str(title or ""))
+
+    word_counts = {}
+    for t in titles:
+        for w in set(_keywords(t)):
+            if w in _PPT_STOPWORDS:
+                continue
+            word_counts[w] = word_counts.get(w, 0) + 1
+    if word_counts:
+        max_count = max(word_counts.values())
+        max_overlap = max_count / n
+    else:
+        max_overlap = 0.0
+    if max_overlap >= 0.30:
+        score_topic = 1.0
+    else:
+        score_topic = max_overlap / 0.30
+        violations.append({
+            "dim": "单一主题",
+            "msg": f"关键词最高重叠率 {max_overlap:.1%}（要求 ≥30%）",
+        })
+
+    # ── 6. 加权总分 ──
+    ppt_outline_score = (
+        score_pages * 0.10
+        + score_sixsix * 0.30
+        + score_topic * 0.20
+        + score_visual * 0.20
+        + score_title * 0.20
+    )
+    ppt_outline_score = round(ppt_outline_score, 3)
+
+    return {
+        "ppt_outline_score": ppt_outline_score,
+        "ppt_dim_scores": {
+            "page_count": score_pages,
+            "six_six_rule": round(score_sixsix, 3),
+            "single_topic": round(score_topic, 3),
+            "visual_focus": round(score_visual, 3),
+            "title_length": score_title,
+        },
+        "violations": violations,
+    }
+
+
+# v0.72 ⭐：12 条硬性检查确定性判定（来源 LESSON_PLANNER_QUALITY_CRITERIA['hard_checks']）
+# 7 条 auto（正则/结构）+ 5 条 LLM 评审标记 "unverified"
+_HARD_CHECKS_12 = (
+    # ── 7 条自动判定 ──
+    "三级层次结构（总章/节/小节）清晰",
+    "元学习指引（前置知识/学习目标/难度评级）",
+    "节末有3-5行总结",
+    "核心/拓展内容显式分流（*号或标注）",
+    "易混概念配对比表",
+    "每节≥1个启发式思考题",
+    "公式出现前先给直觉解释",
+    # ── 5 条 LLM 评审（恒标记 unverified，由上层 LLM 异步补判）──
+    "每核心概念绑定≥1位历史人物",
+    "≥1处第一手文献引用",
+    "≥1处跨学科连接",
+    "例题用真实数据场景（非虚构数字）",
+    "抽象概念配类比/隐喻",
+)
+
+
+def _score_12_hard_checks(plan: dict, handout: str, ppt: list) -> dict:
+    """12 条硬性检查确定性判定（7 条自动 + 5 条 LLM 标记 unverified）。
+
+    来源：LESSON_PLANNER_QUALITY_CRITERIA['hard_checks'] 12 条原文。
+
+    7 条确定性（正则/结构判定，纯函数无 LLM 调用）：
+      1. 三级层次结构（总章/节/小节）清晰 —— plan['sections'] 非空
+      2. 元学习指引（前置知识/学习目标/难度评级） —— student_analysis 与
+         objectives_3d 均非空
+      3. 节末有3-5行总结 —— sections 任一含 '小结' 或 handout 含 '小结'
+      4. 核心/拓展内容显式分流（*号或标注） —— sections 任一含 '拓展' 或
+         ppt 任一项文本含 '*'
+      5. 易混概念配对比表 —— handout 含 '对比' 或 '区别'
+      6. 每节≥1个启发式思考题 —— handout 含 '思考题' 或 '探究'
+      7. 公式出现前先给直觉解释 —— sections+handout+ppt 合并文本含
+         '直观'/'直觉'/'类比'
+
+    5 条 LLM 评审（恒标记 "unverified"，由 LessonPrep 异步 LLM 评审补判）：
+      - 人物绑定 / 第一手文献 / 跨学科连接 / 真实数据场景 / 类比隐喻
+
+    返回：
+      {
+        "hard_checks": [{"name": str, "status": "pass"|"unverified"|"fail"} ... 12],
+        "hard_checks_pass": int,    # status == "pass" 的条目数
+        "hard_checks_total": 12,    # 恒为 12
+      }
+    """
+    plan = plan or {}
+    handout = str(handout or "")
+    ppt = ppt or []
+
+    # ── 提取文本源（仅做存在性/包含判定，不做语义解析）──
+    sections = plan.get("sections") if isinstance(plan.get("sections"), list) else []
+    section_text = "".join(
+        str(s.get("name", "")) if isinstance(s, dict) else str(s) for s in sections
+    )
+    student_analysis = str(plan.get("student_analysis") or "").strip()
+    objectives_3d = plan.get("objectives_3d")
+    has_objectives = bool(objectives_3d) and (
+        not isinstance(objectives_3d, (list, dict)) or len(objectives_3d) > 0
+    )
+
+    def _ppt_text() -> str:
+        """合并 ppt 全部文本字段（title/points/layout/visual_focus）。"""
+        chunks = []
+        for p in ppt:
+            if not isinstance(p, dict):
+                chunks.append(str(p))
+                continue
+            for k in ("title", "layout", "visual_focus"):
+                v = p.get(k)
+                if v:
+                    chunks.append(str(v))
+            for pt in (p.get("points") or p.get("key_points") or []):
+                chunks.append(str(pt))
+        return "".join(chunks)
+
+    ppt_text = _ppt_text()
+    combined_text = section_text + handout + ppt_text
+
+    # ── 7 条自动判定 ──
+    def _three_level() -> bool:
+        return bool(sections)
+
+    def _meta_guidance() -> bool:
+        return bool(student_analysis) and has_objectives
+
+    def _section_summary() -> bool:
+        return ("小结" in section_text) or ("小结" in handout)
+
+    def _branching() -> bool:
+        return ("拓展" in section_text) or ("*" in ppt_text) or ("*" in handout)
+
+    def _compare_table() -> bool:
+        return ("对比" in handout) or ("区别" in handout)
+
+    def _think_question() -> bool:
+        return ("思考题" in handout) or ("探究" in handout)
+
+    def _formula_intuition() -> bool:
+        return any(kw in combined_text for kw in ("直观", "直觉", "类比"))
+
+    auto_checks = (
+        ("三级层次结构（总章/节/小节）清晰", _three_level),
+        ("元学习指引（前置知识/学习目标/难度评级）", _meta_guidance),
+        ("节末有3-5行总结", _section_summary),
+        ("核心/拓展内容显式分流（*号或标注）", _branching),
+        ("易混概念配对比表", _compare_table),
+        ("每节≥1个启发式思考题", _think_question),
+        ("公式出现前先给直觉解释", _formula_intuition),
+    )
+
+    hard_checks = []
+    pass_count = 0
+    for name, predicate in auto_checks:
+        ok = bool(predicate())
+        status = "pass" if ok else "fail"
+        if ok:
+            pass_count += 1
+        hard_checks.append({"name": name, "status": status})
+
+    # ── 5 条 LLM 评审恒标记 "unverified"（上层 LLM 异步补判）──
+    llm_names = (
+        "每核心概念绑定≥1位历史人物",
+        "≥1处第一手文献引用",
+        "≥1处跨学科连接",
+        "例题用真实数据场景（非虚构数字）",
+        "抽象概念配类比/隐喻",
+    )
+    for name in llm_names:
+        hard_checks.append({"name": name, "status": "unverified"})
+
+    return {
+        "hard_checks": hard_checks,
+        "hard_checks_pass": pass_count,
+        "hard_checks_total": 12,
     }
 
 
@@ -2095,7 +2466,12 @@ class LessonPrep:
             mindmap = ""
 
         # ── 步骤 ⑧：质量检查 quality_report（确定性，无 LLM） ──
-        quality_report = _score_lesson_plan(lesson_plan, handout, video_script)
+        # v0.74+ ⭐ 传入 ppt_outline 以聚合 5 维（PPT 大纲 5 维 + 12 硬性检查）；
+        # eval_mode 默认 "auto"（LLM 评审异步补判后切换 "human"）
+        quality_report = _score_lesson_plan(
+            lesson_plan, handout, video_script,
+            ppt_outline=ppt_outline,
+        )
 
         # 累计 token 实际消耗：按 max_tokens 计（估算；真实 token 在 _safe_reason_chat 内计）
         token_used = _LESSON_PLAN_BUDGET_USED  # 累计已扣（测试与审计用）
