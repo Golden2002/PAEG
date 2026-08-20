@@ -212,6 +212,20 @@ def _extract_material_text(uid: str, max_files: int = 3, max_chars: int = 8000) 
         return ""
 
 
+def _add_slide_image(slide, image_path, prs):
+    """为单页幻灯片添加配图（右侧区域 7.7→12.9 宽 × 1.5→5.5 高）——静默失败"""
+    try:
+        if not image_path:
+            return
+        slide.shapes.add_picture(
+            image_path,
+            Inches(7.7), Inches(1.5),
+            width=Inches(5.2), height=Inches(4.0),
+        )
+    except Exception:
+        pass
+
+
 def list_templates() -> dict:
     """列出可用模板与脚本资产（v0.60 ⭐ 模板/脚本资产化）"""
     templates = {}
@@ -227,7 +241,8 @@ def list_templates() -> dict:
 
 
 def generate_ppt(topic: str, outline: str = "", sources: str = "",
-                 out_name: str = "", uid: str = "", style: str = "paeg_standard") -> dict:
+                 out_name: str = "", uid: str = "", style: str = "paeg_standard",
+                 enable_images: bool = True) -> dict:
     """生成演示文稿 .pptx（v0.60 ⭐ 升级：Logo/自适应/markdown 清理）
 
     Args:
@@ -238,6 +253,7 @@ def generate_ppt(topic: str, outline: str = "", sources: str = "",
         uid: 用户 id（提取上传物料）
         style: 风格模板——'paeg_standard'（深蓝+金，默认）/
                'presentation_zen'（极简留白）/'dark_premium'（深色高级）
+        enable_images: 是否启用右侧配图（v0.61 ⭐ 资料库/公共库/联网检索，失败静默降级）
 
     Returns:
         {"ok": bool, "path": str, "slides": int, "error": str, "templates": dict}
@@ -294,7 +310,16 @@ def generate_ppt(topic: str, outline: str = "", sources: str = "",
             s = prs.slides.add_slide(blank)
             _add_header(s, sd['title'], i + 2, prs)
             pts = sd['points'] or ['（本页要点）']
-            _add_bullets_adaptive(s, pts, 0.8, 1.4, 11.7, 5.4, prs)
+            _add_bullets_adaptive(s, pts, 0.8, 1.4, 6.7, 5.4, prs)  # 宽度 11.7→6.7 让出右侧配图区
+            # §3.71 ⭐ PPT 配图增强：资料库/公共库/联网检索（失败静默）
+            if enable_images:
+                try:
+                    from pptx_image_supplier import find_images_for_slide
+                    _imgs = find_images_for_slide(sd.get("title", ""), pts, uid, max_results=1)
+                    if _imgs:
+                        _add_slide_image(s, _imgs[0], prs)
+                except Exception:
+                    pass
             if sd.get('notes'):
                 s.notes_slide.notes_text_frame.text = sd['notes']
 
@@ -316,14 +341,16 @@ try:
     @mcp.tool()
     def generate_presentation(topic: str, outline: str = "", sources: str = "",
                               out_name: str = "", uid: str = "",
-                              style: str = "paeg_standard") -> dict:
+                              style: str = "paeg_standard",
+                              enable_images: bool = True) -> dict:
         """根据主题+大纲+来源生成演示文稿 PPT（v0.60 升级：品牌 Logo + 长文本自适应 + markdown 清理）。
 
         大纲格式：每页以 '## 标题' 或 '1. 标题' 开头，要点以 '- ' 开头。
         uid（可选）：用户 id——提供时自动提取该用户上传物料补充内容。
         style：'paeg_standard'（深蓝+金，默认）/'presentation_zen'/'dark_premium'。
+        enable_images（v0.61 ⭐）：是否启用右侧配图（资料库/公共库/联网检索），默认 True。
         模板与脚本资产：Library/ppt_templates/ + assets/ppt_scripts/（方法论见维护手册 §18.6-18.9）。"""
-        return generate_ppt(topic, outline, sources, out_name, uid, style=style)
+        return generate_ppt(topic, outline, sources, out_name, uid, style=style, enable_images=enable_images)
 
     @mcp.tool()
     def list_ppt_templates() -> dict:
