@@ -2959,5 +2959,23 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 
 ### 实施记录
 
-（完成后更新）
+**全部完成（2026-08-20）**
+
+1. **Oracle 架构方案对比**（bg_19de5380）：A（融合 followup）vs B（独立状态机）→ 结论**选 A+**——保留 followup 架构，用结构化 `intent_frame {intent, pending}` 替代"备课需求："字符串拼接，加确定性短路（字段正则）跳过 LLM
+2. **独立激活词**（用户要求）："我要备课"作为唯一激活词（ULW 风格），不做变体匹配（"帮我备课/备一下"等不再触发）
+3. **代码落地**：
+   - `magic_intent.py`：`^我要备课$`（纯词→引导）+ `^我要备课[:：\s、,，]*(.{1,60}?)$`（带需求→直接生成）
+   - `meta_router._extract_lesson_topic()`：零 LLM 提取 {topic/subject/grade/duration_min/extra_requirement}；先剥离"我要备课"前缀 → extra（重点讲X）→ 学科/学段 → 时长
+   - `server.py` 三分类 fast-path：topic 完整→直接生成；topic 空→引导分支（零 LLM SSE + intent_frame 写入）；pending 标记 + 确定性短路→引导后补充合并
+   - `server.py` 引导分支写结构化 `current_intent_frame_{learner_id}`（A+，非字符串拼接）
+4. **端到端验证**（S1-S4 全过，真实 LLM + 真实后端）：
+   - S1 纯词"我要备课"→ 引导（秒回零 LLM）✅
+   - S2 "我要备课：高中数学，函数单调性，45分钟"→ 直接生成 8 事件（24s，教案质量 1.0）✅
+   - S3 引导后补"高中数学，函数单调性，45分钟"→ 确定性短路合并生成 ✅
+   - S4 "什么是导数"→ 不进备课（chat）✅
+5. **纪律 26 执行**（用户指出卡住根因）：服务启动**禁止** `-RedirectStandardOutput` + 内联 env 赋值——改按 SOP（端口反查→杀→清 pyc→启动（无重定向）→18s 后 health）；API key 用 `secret/auth.json`（§3.70 已配置，探测链自动读，无需显式声明）
+6. **D4 分层同步**：README（§备课模式 ULW 两种方式）+ 技术说明（§7.10）+ 技术全景（§3.2 备课子代理）+ 需求文档（本 §）
+
+**commit**：5cc333d（A+ 落地）+ 82ad1aa（激活词 + D4 同步）
+
 
