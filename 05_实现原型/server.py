@@ -2886,6 +2886,31 @@ def submit_lesson_prep_feedback():
         return jsonify({"ok": False, "error": str(_lpfb_e)}), 500
 
 
+@app.route("/api/lesson_prep/feedback/summary", methods=["GET"])
+def lesson_prep_feedback_summary():
+    """§3.81 P1-② ⭐ 备课反馈聚合面板（质量盲区③：反馈 jsonl 消费闭环）。
+
+    聚合 memory/lesson_prep_feedback.jsonl（人工评分）+ evolve_data/material_judge.jsonl（LLM 评审）
+    → 维度均分 / 低分主题 / 关键词 / 趋势 + LLM 评审聚合。
+
+    响应：{ok, feedback: {...}, material_judge: {...}}
+    """
+    try:
+        from services.feedback_aggregator import aggregate_feedback, feedback_to_prompt_patch
+        from services.material_judge import aggregate_judges
+        _fb = aggregate_feedback()
+        _mj = aggregate_judges()
+        _patches = feedback_to_prompt_patch()
+        return jsonify({
+            "ok": True,
+            "feedback": _fb,
+            "material_judge": _mj,
+            "patches": _patches,
+        })
+    except Exception as _fbs_e:
+        return jsonify({"ok": False, "error": f"反馈聚合失败: {_fbs_e}"}), 500
+
+
 # §3.45 ⭐ uploads 2 路由（upload/avatar）已迁至 blueprints/uploads.py（行为字节级不变）
 
 # §3.45 ⭐ voice 2 路由（tts/stt）已迁至 blueprints/voice.py（行为字节级不变）
