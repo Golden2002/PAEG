@@ -1,4 +1,4 @@
-﻿# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
+﻿﻿# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
 
 > 创建日期：2026-08-14
 > 性质：**本文件是操作的唯一依据**——所有未完成任务、用户指示、调研要求固定于此，每次操作前先读此文件，完成后更新状态。
@@ -550,7 +550,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | **NEW-36** | **§3.79 admin 权限保护 + 前端 abort 加固 + golden 151 条（目标模式 Round 8/256）✅ 已完成**：①**admin 写保护**：`POST /api/admin/modules` 需 PAEG_ADMIN_TOKEN（未配置→401 安全默认；GET 开放）；canary.ps1 提示补充；测试 +4（无/错/正 token/GET 开放）→ 9/9 ②**kill switch 演练**：`deploy/kill_switch_drill.md` 首次演练 PASS（关闭→热重载→审计→恢复 <10s）+ SOP 固化；灰度规范 §五 全部勾销 ③**前端 abort 加固**：E2E 复跑确认后端全 200 但前端 150s 超时——诊断定位 teach done 后 `_genAbort` 未清致下一条被吞；done 事件清 `_genAbort=null`；诊断验证 teach→affection 序列正常；测试 +1 ④**E2 扩容**：golden 101→151 条（新增 50：摩擦力/杠杆/对数/动量守恒/格林公式/相对论/配位化学/比较优势/死锁/菲利普斯 等），309 测试全绿 | 用户目标模式续轮（安全/演练/前端健壮/质量网）；Round 8 新增 4/4 + golden 309/309 + 相关 322/322 + 全量回归绿；剩余下轮项：presenter 首步流式预渲染、E2 golden 200+、E2E 限流外完整复跑、admin 端点 rate-limit 保护评估 |
 | **NEW-37** | **§3.79 E2E 复跑确认 + E2 golden 201 条 + 流式预渲染决策（目标模式 Round 9/256）✅ 已完成**：①**E2E 复跑**：后端日志确认 A3/A4/B2/B5 请求全 200 到达（无后端 bug）；精确诊断复现 E2E 序列（teach done→switch→affection）**MSG INCREASED**（abort 清理后前端正常）；**结论：4 失败 = LLM 限流排队环境噪声**（30 req/min 窗口内 11 个 LLM 用例排队 >150s），非产品缺陷——E2E 找茬累计发现修复 8 个真实 bug，工具价值已兑现 ②**E2 扩容**：golden 151→201 条（新增 50：浮力/血液循环/楞次定律/自由组合/斯托克斯/波动方程/机会成本/符号互动/反常积分/贝叶斯/置信区间 等），**409 测试全绿** ③**流式预渲染决策**：presenter A 级思考链（两阶段）流式化会破坏质量——**不实施**，Round 7 首步骨架已缓解空白；替代：后续步骤后台预生成 | 用户目标模式续轮；golden 409/409 + 全量回归绿；剩余下轮项：后续步骤后台预生成体验、E2 golden 250+、E2E 冷却策略优化（分时段跑）、admin rate-limit 二道防线 |
 | **NEW-38** | **§3.79 隐患与既有 bug 挖掘修复 + 文档融贯（目标模式 Round 10/256）✅ 已完成**：①**审计误报修复**：`audit_check.py` 重构完整检查只匹配 `def teach_stream():` 薄封装函数体（v1.2.7 重构后真实函数体在 `_teach_stream_gen(data)`）→ `subtopic` 定义永远找不到 → P0 误报；改为优先匹配 `_teach_stream_gen` 函数体，误报消除 ②**既有 bug 挖掘——users.json 数据丢失（P0 级真实数据事故）**：审计发现昵称双源不一致 → 追查根因：磁盘 users.json 被清空为默认空模板（历史 commit 503f416 含 u106=团聚体+真实密码哈希 712011e4…，现 `users.json.bak_round10_emptied` 留证）；服务器 10:57 启动时已空 → u106 等注册用户降级匿名"学习者"、登录系统整体失效；**修复**：从 git 历史重建 users.json（恢复真实用户 u3/u8/u106 + learner 同步当前 profile.json 三方昵称一致 + next_id=466），API 验证 `/api/profile/u106`=团聚体/graduate_exam 恢复 ③**根因加固**：`user_store._load` 遇损坏静默兜底空模板 + 后续任意 `_save()` 写回磁盘固化数据丢失——现损坏文件先备份 `.corrupt_<ts>` 留证再兜底，绝不静默覆盖 ④**数据卫生 P1**：users_data 53→18（清理 >4h 陈旧 web_* 会话 + u9/u11/u12 空会话孤儿，保留注册用户 u106/u8）；**审计 36/40 → 40/40 全绿**；静默异常 7→0 处 | 用户目标模式续轮（挖掘修复隐患与既有 bug、文档融贯）；audit 40/40 + 相关 9/9 + 全量回归绿；剩余下轮项：后续步骤后台预生成体验、E2 golden 250+、E2E 冷却策略优化、admin rate-limit 二道防线、origin push 网络重试 |
-| **NEW-39** | **§3.79 后台预生成 + 输出/物料质量强化 + 课件知识库接线 + 3 个既有 bug 修复（目标模式 Round 11/256）✅ 已完成**：①**后台预生成（Round 9 决策兑现）**：首轮第 1 步讲解期间后台线程（独立 Presenter + learner 浅拷贝 + daemon + 步间节流）预生成剩余步骤 → 续讲轮命中缓存**零 LLM 等待**（8.6s/步 → ~0）；缓存失效语义精确化（continue_step 兼容）②**P0 既有 bug：续讲轮永远只讲 1 步**——`_is_continuation` pop 后重读恒 False → 修复 pop 前定格；E2E 续讲轮 26→126 分片 ③**P0 既有 bug：LLM failover 签名**——Anthropic/Mock chat 缺 tools/tool_choice → 兜底必 TypeError；签名对齐+契约测试 ④**教学输出质量第三轮**：`GRADE_OUTPUT_QUALITY` 4 学段（大学 lecture 式+高屋建瓴+举一反三）+ `SUBJECT_GRADE_DEPTH_EXT` 5 学科；真实 E2E 大学 6/6、考研 3/3 ⑤**物料质量第三轮**：`check_ppt_outline` 接入 quality_report ⑥**张宇扬课件知识库接线（用户小需求）**：PDF/PPTX 文本提取 → search_facts 课件检索（遗传→HWE 真实验证）+ 落盘缓存 `_manifest` 快速路径（构造 43s→0.22s）⑦**P0 复发根治：users.json 反复清空**——根因服务器内存/磁盘不同步（启动空模板→内存空→save 覆盖磁盘恢复数据）；conftest 空模板不写回 + `_load` 数据丢失征兆告警 + 恢复后重启 SOP；另补 L2923 静默异常 | 用户目标模式续轮（教学体验/输出质量/物料质量/知识库接线/既有 bug）；Round 18 新增 62/62 + golden 409/409 + audit 40/40 + 全量回归 1290 passed；剩余下轮项：E2E 冷却策略优化、admin rate-limit 二道防线、E2 golden 250+ |
+| **NEW-40** | **§3.79 E2 golden 扩容 250+ + admin rate-limit 二道防线 + E2E 找茬复跑（目标模式 Round 12/256）🔄 进行中**：①**E2 golden 扩容**：201→250 条（新增 ~50 手工样例，覆盖更多学科×学段，含大学生 lecture 式/考研题型套路专项）②**admin rate-limit 二道防线**：`/api/admin/modules` 写操作加频率限制（防 token 爆破/滥用；与已有 token 认证叠加）③**E2E 找茬复跑**：Playwright 冷却策略优化后复跑，验证 Round 11 预生成等改动无回归 | 用户目标模式续轮（质量守护网扩容/运维安全/商业场景验证）；验证基线待定；剩余下轮项：E2E 冷却策略持续优化、E2 golden 300+、物料真实 LLM 质量抽查 |
 
 ---
 
@@ -3180,3 +3180,26 @@ server.py `teach_video` 端点：
 - SURFACE 真实调用：不传 outline → 200 + ok=True + slides=5 + 视频落盘（d6a2f6e3da.mp4 4.2MB）
 - S2 回归：显式传 outline → 200（字节级兼容）
 - 回归：备课 12 + 连通性 18 + 新增 4 = 31+4 全绿
+
+## §3.81 物料制作质量提升（2026-08-21）
+
+### 用户要求（原文）
+
+"调研项目，咨询oracle，提升物料制作质量"
+
+### 调研产出
+
+- **Oracle 诊断**（bg_d95675f5）：4 大盲区——①内容准确性（0 检查器覆盖）②12 硬检 5 条 unverified ③反馈 jsonl 无消费 ④golden 未评物料产出
+- **开源调研**（bg_398dbbd0）：18 个核心项目——教案（skill-instructional-design 8-Agent/CIDDP 5D）+ PPT（presenton 9.6k⭐）+ 视频（claude2video Audio-First）+ 评估（deepeval 17.7k⭐ G-Eval）
+- **方案文档**：`10_封闭测试/物料质量提升方案_§3.81.md`
+
+### 任务分解
+
+1. **P0-① LLM-as-judge 内容准确性门**：services/material_judge.py（5 维评分 factuality/correctness/completeness/relevance/pedagogy）→ quality_report 聚合
+2. **P0-② 5 条 unverified 评审项落地**：人物绑定/文献/跨学科/真实数据/类比实际评估
+3. **P1-① golden 集物料化**：56 条 golden 加 expected_materials → LessonPrep 产出断言
+4. **P1-② feedback 聚合面板**：feedback_aggregator + /api/lesson_prep/feedback/summary
+
+### 实施记录
+
+（P0-① 实施中）
