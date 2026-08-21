@@ -5,9 +5,25 @@
 """
 from __future__ import annotations
 
+import os
+
 from flask import Blueprint, jsonify, request
 
 bp = Blueprint("admin", __name__)
+
+
+def _admin_authorized() -> bool:
+    """§3.79 Round 8 ⭐ admin 权限保护：写操作需 PAEG_ADMIN_TOKEN。
+
+    安全默认：未配置 PAEG_ADMIN_TOKEN → 拒绝写操作（防任意访客 kill switch）。
+    配置后：请求需带 `X-Admin-Token` 头（或 ?token= 查询参数）且匹配。
+    读操作（GET 状态）保持开放（无害审计视图，运维排查可用）。
+    """
+    _token = os.environ.get("PAEG_ADMIN_TOKEN", "").strip()
+    if not _token:
+        return False  # 未配置 → 写操作禁用（安全默认）
+    _provided = request.headers.get("X-Admin-Token") or request.args.get("token") or ""
+    return _provided == _token
 
 
 @bp.route("/api/admin/reload", methods=["POST"])
@@ -74,6 +90,9 @@ def admin_modules_set():
     审计：切换写入 observability 事件（module/toggle，含操作者/前后状态）——
     §灰度回滚规范 二 kill switch 落地。
     """
+    if not _admin_authorized():
+        return jsonify({"ok": False,
+                        "error": "需要 PAEG_ADMIN_TOKEN（请求头 X-Admin-Token 或 ?token=）"}), 401
     data = request.get_json(force=True) or {}
     _module = str(data.get("module") or "").strip()
     _toggle = data.get("modules")

@@ -16,6 +16,7 @@ v0.5：接入真实 LLM（ModelAPI.chat）：
 from __future__ import annotations  # 延迟求值注解，避免与 paeg.py 的循环导入
 
 import os  # v0.42 ⭐ P0 修复：_pre_retrieve 的 Library 分支使用 os.path，此前顶层缺 import 导致每次调用抛 NameError，三线检索只剩 KB 一线
+import sys  # §3.79 Round 8 ⭐ 修复：Planner 异常路径 print(file=sys.stderr) 此前缺 import → 动态规划失败时 NameError 中断教学流（test_teach_stream_always_completes 暴露）
 
 from typing import Optional
 from dataclasses import dataclass, field  # v0.48 ⭐ 判读层 AffectionTurnAnalysis 用；v0.71 备课 LessonPlanInput 默认值用

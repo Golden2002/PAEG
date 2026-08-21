@@ -44,3 +44,27 @@ def test_step_topic_truncated():
     """topic 截断 40 字（防超长骨架撑爆事件）。"""
     src = open(SERVER, encoding="utf-8").read()
     assert "[:40]" in src, "topic 应截断 40 字"
+
+
+def test_frontend_done_clears_abort():
+    """§3.79 Round 8 ⭐ 前端 done 事件清 _genAbort（防下一条被吞——E2E 找茬发现）。"""
+    html = open(GUI, encoding="utf-8").read()
+    assert "_genAbort = null" in html, "前端缺 _genAbort 清理"
+    # done 事件处理内清 _genAbort：找第一个 done 事件块内是否含 abort 清理
+    idx_done = html.index("event === 'done'")
+    # 从 done 事件块到下一个 '} else if' 之间应含 _genAbort 清理（或 __e2eDone 钩子）
+    _seg = html[idx_done:idx_done + 1200]
+    assert "_genAbort = null" in _seg or "__e2eDone" in _seg, \
+        "done 事件块缺 abort 清理/观测钩子"
+
+
+def test_subagents_imports_sys():
+    """§3.79 Round 8 ⭐ subagents.py 顶层 import sys（Planner 异常路径 file=sys.stderr）。
+
+    此前缺 import → LLM 动态规划 JSON 解析失败时，降级 print 抛 NameError
+    中断教学流（test_teach_stream_always_completes 暴露，运维友好性 bug）。
+    """
+    src = open(os.path.join(PROJ, "subagents.py"), encoding="utf-8").read()
+    assert re.search(r"^import sys\b", src, re.M), "subagents.py 缺顶层 import sys"
+    # file=sys.stderr 用法必须能被 sys import 支撑
+    assert "file=sys.stderr" in src
