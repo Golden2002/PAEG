@@ -3220,3 +3220,26 @@ server.py `teach_video` 端点：
 - 测试 46/46 全绿（12+12+12+8+坏样例+规模）
 
 **全量验证**：P0+P1 共 78/78 全绿（material_judge 7 + feedback 7 + golden 46 + 连通性 18）
+
+### P2（已完成 · 2026-08-21 · 用户指示"进行 P2 及需求文档其他未完成项"）
+
+**P2-① PPT/视频多模板视觉美化（已完成）** ✅
+- `video_service._render_frame` 支持 template 参数（default/comparison/example/formula 四种版式）
+- `_pick_template` 确定性启发式自动选模板（对比/例题/公式章节关键词触发；零 LLM）
+- 模板差异：标题条颜色（例题绿/公式紫）+ 版式标记（右上角 [概念]/[对比]/[例题]/[公式]）+ 对比页双色要点 + 例题页强调框 + 页脚模板标签
+- 测试 8/8 全绿（tests/test_video_templates.py）
+
+**P2-② Manim 教学叙事复核（已完成）** ✅
+- `services/manim_judge.py`：4 维评分（clarity/pedagogy/correctness/focus）+ verdict（pass/review/fail）
+- `manim_service.generate_manim_video` 单段路径接入（PAEG_NO_MANIM_JUDGE 测试闸门）
+- 测试 6/6 全绿 + SURFACE 真实评审（抛物线动画 overall 3.25 verdict=review——识别"教学引导不足"）
+- 落盘 evolve_data/manim_judge.jsonl（可观测）
+
+**P2 验证**：14/14 全绿（manim_judge 6 + video_templates 8）+ P0/P1 回归 28/28
+
+**其他未完成项盘点**（需求文档，DeepSeek/后续轮次）：
+- E2E 冷却策略优化 / admin rate-limit 二道防线（DeepSeek Round 12 进行中）
+- E2 golden 300+ 扩容（当前 201 条）
+- E1 埋点增强（采纳/自我评估事件）
+- C5 家长实时看板深化
+- B3 OTel 导出完善

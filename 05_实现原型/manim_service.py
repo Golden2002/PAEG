@@ -274,8 +274,18 @@ def generate_manim_video(topic: str, subject: str = 'math',
         _url = f"/api/download/manim/{_rel}"
     except Exception:
         _url = f"/api/download/manim/{os.path.basename(path)}"
+
+    # §3.81 P2-② ⭐ Manim 教学叙事复核（LLM 评审动画是否表达概念；降级不阻塞）
+    _narr = {"checked": False}
+    try:
+        if os.environ.get("PAEG_NO_MANIM_JUDGE") != "1":
+            from services.manim_judge import judge_manim_narrative
+            _narr = judge_manim_narrative(topic, subject, code, path)
+    except Exception as _nj_e:
+        print(f"[manim_service] 动画叙事复核跳过: {_nj_e}")
+
     return {"ok": True, "path": path, "url": _url,
-            "error": ""}
+            "error": "", "narrative_judge": _narr}
 
 
 if __name__ == '__main__':

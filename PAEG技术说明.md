@@ -2066,6 +2066,23 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 **验证**：P1 测试 53/53（feedback 7 + golden 46）+ P0 回归 25/25 = **全量 78/78 全绿**；SURFACE 实测 summary 端点 200（feedback.total=1 + material_judge.total=1 + patches=1）。
 
 
+
+### C.36 视频多模板 + Manim 叙事复核（§3.81 P2 · v1.2.24 ⭐）
+
+> 承接 C.34/C.35 物料质量——P2 完成视觉美观度与动画教学有效性（Oracle 方案 P2-①/②）。
+
+**视频多模板视觉（P2-①）**：
+- `video_service._render_frame` 支持 template 参数：default/comparison/example/formula
+- `_pick_template` 确定性启发式自动选模板（标题/要点含"对比/例题/公式"关键词触发；零 LLM 零延迟）
+- 模板差异：标题条颜色（例题绿 #106046 / 公式紫 #5a2878）+ 右上角版式标记 + 对比页双色要点 + 例题页强调框 + 页脚模板标签
+
+**Manim 教学叙事复核（P2-②）**：
+- `services/manim_judge.py`：4 维评分（clarity 清晰/pedagogy 教学价值/correctness 正确/focus 聚焦）+ verdict（pass/review/fail）
+- `manim_service.generate_manim_video` 单段路径接入（PAEG_NO_MANIM_JUDGE 测试闸门）
+- 落盘 evolve_data/manim_judge.jsonl（可观测）
+
+**验证**：P2 测试 14/14（templates 8 + manim_judge 6）+ P0/P1 回归 28/28；SURFACE 真实 LLM 评审抛物线动画 → overall 3.25 verdict=review（识别"教学引导不足"——评审真实有效非形式化）。
+
 ### C.34 隐患与既有 bug 挖掘修复 + 文档融贯（v1.2.22 §3.79 ⭐）
 
 > 融贯整合见正文 **§7.11 主线五**（数据安全与既有 bug 挖掘）；此条仅保留版本追溯要点。
