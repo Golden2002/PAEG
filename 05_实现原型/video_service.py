@@ -87,15 +87,70 @@ def _wrap_text(text: str, draw, font, max_width: int) -> List[str]:
     return lines
 
 
+# §3.81 P2-① ⭐ 多模板版式（default/comparison/example/formula）——视觉美观度提升
+# 每模板：品牌色 / 饰线色 / 版式标记（对比页双栏、例题页强调框、公式页居中展示）
+_TEMPLATES = {
+    "default": {"bar": (26, 58, 107), "accent": (230, 165, 40),
+                "label": "概念", "layout": "list"},
+    "comparison": {"bar": (26, 58, 107), "accent": (230, 165, 40),
+                   "label": "对比", "layout": "list"},
+    "example": {"bar": (16, 96, 70), "accent": (230, 165, 40),
+                "label": "例题", "layout": "list"},
+    "formula": {"bar": (90, 40, 120), "accent": (230, 165, 40),
+                "label": "公式", "layout": "list"},
+}
+# 对比页/例题页的版式差异：comparison 用双色要点（A/B 对比）、example 用强调框
+_TEMPLATE_LAYOUT_HINT = {
+    "comparison": "对比",
+    "example": "例题",
+    "formula": "公式",
+}
+
+
+def _pick_template(title: str, points: List[str], outline: str = "") -> str:
+    """§3.81 P2-① ⭐ 按章节标题/要点内容选模板（确定性启发式，零 LLM）。
+
+    - 标题含"对比/比较/区别/异同" → comparison
+    - 标题含"例题/示例/案例/应用" → example
+    - 标题含"公式/定义/定理/推导" 或要点含"=" → formula
+    - 否则 → default
+    """
+    _t = str(title or "")
+    _pts = " ".join(str(p) for p in (points or []))
+    _outline = str(outline or "")
+    _all = _t + " " + _pts + " " + _outline
+    if any(k in _all for k in ("对比", "比较", "区别", "异同", "vs", "对照")):
+        return "comparison"
+    if any(k in _all for k in ("例题", "示例", "案例", "应用", "举例", "实战")):
+        return "example"
+    if any(k in _all for k in ("公式", "定义", "定理", "推导", "方程", "表达式")) or "=" in _all:
+        return "formula"
+    return "default"
+
+
 def _render_frame(title: str, points: List[str], page_no: int, total: int,
-                  width: int = 1280, height: int = 720) -> Image.Image:
-    """绘制单页教学视频帧：品牌色标题条 + 要点列表 + 页脚。"""
+                  width: int = 1280, height: int = 720, template: str = "default",
+                  outline: str = "") -> Image.Image:
+    """绘制单页教学视频帧：品牌色标题条 + 要点列表 + 页脚（多模板版式）。
+
+    §3.81 P2-① ⭐ template 参数：default/comparison/example/formula
+    - 模板影响：标题条颜色（例题绿/公式紫）、版式标记、页脚课程标签
+    - template 未指定时按章节内容自动选（_pick_template）
+    """
+    if template not in _TEMPLATES:
+        template = "default"
+    if template == "default":
+        template = _pick_template(title, points, outline)
+    _tpl = _TEMPLATES.get(template, _TEMPLATES["default"])
+    _bar = _tpl["bar"]
+    _accent = _tpl["accent"]
+    _label = _tpl.get("label", "概念")
     img = Image.new("RGB", (width, height), (250, 250, 250))
     d = ImageDraw.Draw(img)
-    # 品牌色标题条（深蓝 #1a3a6b）
+    # 品牌色标题条（按模板色）
     bar_h = 110
-    d.rectangle([0, 0, width, bar_h], fill=(26, 58, 107))
-    d.rectangle([0, bar_h, width, bar_h + 6], fill=(230, 165, 40))  # 金色饰线
+    d.rectangle([0, 0, width, bar_h], fill=_bar)
+    d.rectangle([0, bar_h, width, bar_h + 6], fill=_accent)  # 饰线
     # 标题（自动换行，最多两行）
     f_title = _font(44)
     t_lines = _wrap_text(title, d, f_title, width - 160)
@@ -103,21 +158,30 @@ def _render_frame(title: str, points: List[str], page_no: int, total: int,
     for ln in t_lines[:2]:
         d.text((80, ty), ln, font=f_title, fill=(255, 255, 255))
         ty += 54
+    # 版式标记（右上角：概念/对比/例题/公式）
+    f_label = _font(22)
+    d.text((width - 160, 30), f"[{_label}]", font=f_label, fill=(255, 255, 255))
     # 要点区
     f_point = _font(30)
     f_sub = _font(24)
     y = bar_h + 50
+    # 例题模板：要点前加强调框（浅绿背景）
+    if template == "example":
+        d.rectangle([70, bar_h + 40, width - 70, bar_h + 52], fill=(230, 245, 235))
     for pt in points[:6]:
-        # 要点符号
-        d.ellipse([90, y + 12, 106, y + 28], fill=(26, 58, 107))
+        # 要点符号（对比模板用双色 A/B）
+        if template == "comparison":
+            d.rectangle([90, y + 12, 106, y + 28], fill=_accent)
+        else:
+            d.ellipse([90, y + 12, 106, y + 28], fill=_bar)
         # 要点文本（换行，最多 3 行/条）
         for ln in _wrap_text(pt, d, f_point, width - 180)[:3]:
             d.text((130, y), ln, font=f_point, fill=(40, 40, 40))
             y += 44
         y += 14
-    # 页脚（页码 + 课程标记）
+    # 页脚（页码 + 模板标记）
     f_foot = _font(20)
-    d.text((80, height - 45), f"PAEG 课堂 · 第 {page_no} 页 / 共 {total} 页",
+    d.text((80, height - 45), f"PAEG 课堂 · {_label} · 第 {page_no} 页 / 共 {total} 页",
            font=f_foot, fill=(120, 120, 120))
     return img
 
@@ -268,7 +332,8 @@ def generate_teaching_video(topic: str, outline: str,
         for i, sl in enumerate(slides):
             title = sl.get("title") or "未命名页"
             points = sl.get("points") or []
-            frame = _render_frame(title, points, i + 1, len(slides))
+            frame = _render_frame(title, points, i + 1, len(slides),
+                                  outline=f"{title} {' '.join(points[:4])}")
             fp = tmp / f"frame_{i:03d}.png"
             frame.save(fp)
             frame_files.append(str(fp))
