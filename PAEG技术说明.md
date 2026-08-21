@@ -20,10 +20,10 @@
 - 第 5A 章 可扩展模块（框架化 · v0.70 ⭐）
 - 第 5B 章 DeepSeek Harness 借鉴蓝图（2026-08-14 调研 · 30 项中 27 项已落地）
 - 第 6 章 未来规划（Roadmap · Oracle 咨询 2026-08-14）
-- 第 7 章 能力全景与引用来源（v1.1.9）
+- 第 7 章 能力全景与引用来源（v1.1.9 · 含 §7.11 工程化就绪融贯）
 - 附录 A 术语表
 - 附录 B 核心文件索引
-- 附录 C 技术创新亮点（v0.70 ⭐ · C.1-C.13）
+- 附录 C 技术创新亮点（v0.70 ⭐ · C.1-C.34）
 - 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
 
 ---
@@ -1437,6 +1437,37 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 
 **质量守门（§3.71/§3.75）**：每份产出过四类评分（教案 6 维 / 讲义 / PPT 大纲 5 维 / 视频脚本）+ **15 条硬性检查**（7 自动 + 5 LLM 评审 + 3 条 §3.75：三维结构/案例教学/互动环节），产出 `dim_scores` 与 `eval_mode`；`/api/lesson_prep/feedback` 收集教师反馈（L3 人工评估）。**PPT 自动配图**：三级来源（用户资料库 → 公共文件夹 → 联网 Bing 免 key）+ 缓存，缺图不阻塞。
 
+### 7.11 工程化就绪：Round 4-10 优化融贯（§3.79 · v1.2.14-v1.2.22 ⭐）
+
+> 本小节把 Round 4-10 逐轮改进按主题融贯成五条主线（版本追溯见附录 C.26-C.34）——不再按版本流水账罗列，而是呈现"从功能可用到商业就绪"的完整链路。
+
+**主线一：物料生产真实联通（PPT/讲义/讲稿/思维导图/视频）**：
+- `teach_materials` 工作流 7 步真实运行暴露并修复 2 断链：outline 步 Planner 签名不匹配（`run()` 缺参）→ `_run_subagent` planner 分支适配；knowledge_map/keyword_doc 工具未注册 → `_run_tool` 兜底（优先复用 handler，失败回退 LLM 生成）
+- 静态讲稿缺生活化例子（`_static_script` 补例子/类比收尾）、`_parse_outline` 只收 str 而 LessonPrep 产 list（备课→PPT 断链）→ 兼容 list；真实 .pptx 落盘 6 页 + 文本物料 4/4 过检查器
+- **manim 数学视频真实出片**：AST 安全校验 → 真实渲染 → mp4 落盘；修复 `render_manim` 未指定 encoding 导致 Windows GBK 解码崩溃 + 质量档输出目录 5 档（480p15…2160p60）
+- 学习计划 format bug：`unsupported format string passed to dict.__format__`（mastery 值 float/dict 混用）→ `_fmt_mastery` 鲁棒格式化
+
+**主线二：质量守护网（学段×深度双层守门 + golden set）**：
+- **teach_stream 守门接线**：学段特征/内容深度守门此前只挂 sync 路径 `paeg.teach`，GUI 实际走的 `/api/teach/stream` 从不执行 → 主循环接入（同门控 llm_generated+PAEG_GRADE_GATE）→ probe 4/4 全特征通过
+- **golden set 质检集**：51 → 101 → 151 → **201 条** × 3 断言 = **409 测试全绿**——学段特征必过（per-grade MUST_HAVE 质量红线）+ 呈现长度（≥80 字防碎片）+ 坏样例漏检守护；覆盖 20+ 学科 × 4 学段
+
+**主线三：运维可治理（灰度/回滚/kill switch/观测）**：
+- `deploy/canary.ps1` 灰度发布可执行化：Canary 阶梯（C1 5%→C4 100%）+ 闸门检查（错误率≤0.5%/P95≤120s/health）+ rollback（git revert+smoke）；修复 .ps1 中文 UTF-8 BOM（PS 5.1 无 BOM 按 ANSI 解析乱码）
+- **kill switch**：`paeg_modules.json` 热重载 60s 止损 + `GET/POST /api/admin/modules` 远程切换（PAEG_ADMIN_TOKEN 写保护，未配置→401 安全默认）+ `module/toggle` 事件注册；首次演练 PASS（关闭→热重载→审计→恢复 <10s）
+- 观测：`/api/metrics` + 效果指标管道 + SLO 分模式（D1 延迟归因：teach 35s = 路由/诊断 1.3s + 规划 5.6s + 首步讲解 19.6s 主导 + 其余 8.6s，presenter 长输出为基础设施级主因）
+
+**主线四：教学对话体验（模式识别/首步先行/前端健壮）**：
+- `_detect_teaching_mode` 规则优先（deep/easy 关键词命中零 LLM）+ LLM 结果缓存 10 分钟（上限 256）；Diagnostor include_kb=False
+- **首步先行**：presenter 19.6s 延迟 UX 缓解——`step` 事件携带 topic 骨架（截 40 字），前端显示"正在讲解第 N 步：xxx"（骨架先行于内容：step@16.9s vs presentation@38s 真实验证）；流式预渲染决策：presenter A 级思考链流式化破坏质量 → 不实施，替代为后续步骤后台预生成
+- 前端健壮：`friendlyHttpError`（429/500 UX）、done 后按钮恢复 + `_genAbort` 清理（E2E 找茬发现"正在生成上一条回复"吞消息 bug）
+
+**主线五：数据安全与既有 bug 挖掘（Round 10 ⭐）**：
+- **users.json 数据丢失事故**：审计发现磁盘 users.json 被清空为默认空模板（历史 commit 503f416 含 u106=团聚体+真实密码哈希）→ 注册用户降级匿名"学习者"、登录系统失效；从 git 历史重建（真实用户 u3/u8/u106 + learner 同步当前 profile.json 三方一致 + next_id=466），API 验证恢复
+- **根因加固**：`user_store._load` 遇损坏静默兜底空模板 + 后续 `_save()` 写回磁盘固化丢失 → 损坏先备份 `.corrupt_<ts>` 留证再兜底
+- **审计基建**：audit_check.py 40/40 全绿——重构完整检查适配 wrapper 重构（`_teach_stream_gen` 函数体）；静默异常 except:pass 7→0 处；数据卫生 users_data 53→18
+
+**验证基线**：golden 409/409 + 全量回归绿 + audit 40/40 + E2E 找茬累计发现修复 8 个真实 bug。
+
 ## 附录 A 术语表
 
 | 术语 | 含义 |
@@ -1992,3 +2023,13 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 - Round 7 首步骨架已缓解 20s 空白；替代路径：后续步骤后台预生成
 
 **E2 golden 201 条**：新增 50（浮力/血液循环/楞次定律/自由组合/斯托克斯/波动方程/机会成本/符号互动/反常积分/贝叶斯/置信区间）——409 测试全绿
+
+### C.34 隐患与既有 bug 挖掘修复 + 文档融贯（v1.2.22 §3.79 ⭐）
+
+> 融贯整合见正文 **§7.11 主线五**（数据安全与既有 bug 挖掘）；此条仅保留版本追溯要点。
+
+- **审计误报修复**：`audit_check.py` 重构完整检查只匹配 `def teach_stream():` 薄封装（v1.2.7 重构后真实函数体在 `_teach_stream_gen(data)`）→ subtopic 定义永远找不到 → P0 误报；改为优先匹配 `_teach_stream_gen` 函数体
+- **users.json 数据丢失（P0 数据事故）**：磁盘 users.json 被清空为默认空模板（历史 503f416 含 u106=团聚体+真实哈希 712011e4…）→ 注册用户降级匿名；从 git 历史重建（u3/u8/u106 + learner 同步 profile.json 三方一致 + next_id=466），`/api/profile/u106`=团聚体恢复
+- **根因加固**：`user_store._load` 损坏静默兜底 + `_save()` 写回固化丢失 → 损坏先备份 `.corrupt_<ts>` 留证
+- **数据卫生**：users_data 53→18（清理 >4h 陈旧 web_* 会话 + 空会话孤儿目录）
+- **静默异常清零**：except:pass 7→0 处；**audit 36/40 → 40/40 全绿**

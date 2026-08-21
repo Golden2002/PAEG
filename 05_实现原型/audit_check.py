@@ -448,7 +448,12 @@ def audit_refactor_integrity():
     """
     srv = SRV.read_text(encoding="utf-8")
     # 1) 保留原有 regex 防线（teach_stream 的 subtopic 定义存在性）
-    m = re.search(r'def teach_stream\(\):(.*?)(?=\n@|\ndef )', srv, re.S)
+    # v1.2.7 ⭐ 修复（找茬 E2E）：teach_stream 重构为薄封装，函数体移入
+    # `_teach_stream_gen(data)`（避免流式期间访问 request 上下文 → 500）。
+    # 旧 regex 只匹配 `def teach_stream\(\):` → 函数体止于下一个 def →
+    # subtopic 永远找不到 → P0 误报。现优先匹配真实函数体所在的位置。
+    m = (re.search(r'def _teach_stream_gen\(data\):(.*?)(?=\n@|\ndef )', srv, re.S)
+         or re.search(r'def teach_stream\(\):(.*?)(?=\n@|\ndef )', srv, re.S))
     ok_subtopic = True
     if m:
         body = m.group(1)
