@@ -2048,6 +2048,24 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 **复用**：参照 quality_gate._llm_score 模式；`aggregate_judges()` 聚合面板（P1-② 反馈闭环数据源）。
 
 
+
+### C.35 反馈聚合面板 + golden 物料化（§3.81 P1 · v1.2.23 ⭐）
+
+> 承接 C.34 物料评审门——P1 完成反馈闭环与物料评估集（Oracle 盲区③④）。
+
+**反馈聚合面板**（盲区③：feedback jsonl 从"垃圾桶"变"仪表盘"）：
+- `services/feedback_aggregator.py`：aggregate_feedback()（维度均分/低分主题/关键词/趋势）+ feedback_to_prompt_patch()（反哺 self_evolution）
+- 端点 `GET /api/lesson_prep/feedback/summary`（feedback + material_judge 双聚合 + patches）
+- **设计修正**：低分主题判定从"整体均分 <3"改为"任一维度 <3"（防高分稀释——video_script=2 不被 lesson_plan=5 掩盖）
+
+**golden 物料化**（盲区④：物料产出无评估集）：
+- `tests/test_round17_material_golden.py`：60 条 golden（初中12/高中12/大学19/考研17）→ 优质内容→物料结构映射断言
+- 覆盖：讲义 5 节结构（学习目标/核心内容/典型例题/巩固练习/小结）→ 讲稿三段（开场/主体/小结+时长）→ PPT 分页要点 → 视频脚本镜头（画面+旁白+时长）
+- 坏样例检出（残缺讲义必须被检出，防漏检退化）
+
+**验证**：P1 测试 53/53（feedback 7 + golden 46）+ P0 回归 25/25 = **全量 78/78 全绿**；SURFACE 实测 summary 端点 200（feedback.total=1 + material_judge.total=1 + patches=1）。
+
+
 ### C.34 隐患与既有 bug 挖掘修复 + 文档融贯（v1.2.22 §3.79 ⭐）
 
 > 融贯整合见正文 **§7.11 主线五**（数据安全与既有 bug 挖掘）；此条仅保留版本追溯要点。
