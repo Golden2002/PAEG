@@ -1,4 +1,4 @@
-# ops/checkup.ps1 —— PAEG 一键运维巡检（§3.79 运维友好性）
+﻿# ops/checkup.ps1 —— PAEG 一键运维巡检（§3.79 运维友好性）
 # 用途：运维工程师 1 分钟摸清系统状态（进程/端口/健康/指标/效果/复习队列/日志/磁盘）。
 # 用法：pwsh ops/checkup.ps1 [-BaseUrl http://127.0.0.1:5000] [-Tail 20]
 # 依赖：仅 PowerShell 5.1+（无第三方模块）。

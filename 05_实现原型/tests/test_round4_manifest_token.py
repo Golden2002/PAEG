@@ -54,6 +54,24 @@ def test_manifest_missing_file_degrades(tmp_path, monkeypatch):
     assert _r["agents"] == []
 
 
+def test_validate_declaration_fields_ok():
+    """A3 声明字段完整性校验：真实 manifest 全部通过（id/name/role/keywords）。"""
+    bad = sm.validate_declaration_fields()
+    assert bad == [], f"声明字段不完整: {bad}"
+
+
+def test_validate_declaration_fields_detects_missing():
+    """A3 校验能检出缺字段的声明（防声明退化）。"""
+    fake = {"agents": [
+        {"id": "ok", "name": "n", "role": "r", "keywords": ["k"]},
+        {"id": "bad", "name": "n"},  # 缺 role/keywords
+        {"id": "empty"},             # 仅 id
+    ]}
+    bad = sm.validate_declaration_fields(fake)
+    assert any("bad" in b for b in bad), f"应检出 bad: {bad}"
+    assert any("empty" in b for b in bad), f"应检出 empty: {bad}"
+
+
 # ────────────────────────────────────────────
 # D1 token 埋点 → SLO
 # ────────────────────────────────────────────

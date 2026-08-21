@@ -1932,3 +1932,17 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 - `Diagnostor.run` include_kb=False：诊断只输出 recommended_depth/identified_gaps JSON，知识库检索无价值（省 _pre_retrieve 检索 + 可能省 LLM 选库调用）
 
 **守护**：test_round15_llm_latency.py（规则命中零 LLM / 缓存命中零重复 / include_kb=False / 缓存上限）
+
+### C.30 D2 灰度脚本 + E2 golden set + A3 声明化（v1.2.18 §3.79 ⭐）
+
+**D2 灰度发布可执行化（deploy/canary.ps1）**：
+- 阶梯：C1 5% → C2 20% → C3 50% → C4 100%（每档闸门：错误率 ≤0.5% + P95 ≤120s + health ok）
+- Kill switch：`paeg_modules.json` 模块门控（热重载，60s 止损）；Rollback：`git revert` + smoke 验证
+- 运维要点：PowerShell 5.1 解析 .ps1 用系统 ANSI——**中文 ps1 必须 UTF-8 BOM**（无 BOM 中文乱码破坏语法；checkup.ps1 同步修复）
+
+**E2 golden set（tests/test_round16_golden_set.py，109 测试）**：
+- 51 条手工高质量教学输出（4 学段 × 多学科）+ MUST_HAVE 学段必过特征（质量红线）+ 呈现长度 ≥80 字 + 5 坏样例漏检守护
+- 设计洞察：`check_grade_features`（学段特征）与 `check_content_depth`（五要素）是正交维度——golden 守护学段特征，深度由 gate 运行时补齐（考研"考点/题型/真题/易错"与"定义/机制/例子"不同语义层）
+
+**A3 声明化深化**：
+- `validate_declaration_fields`：声明字段完整性（id/name/role/keywords）——与 registry 一致 + scopes + contracts 组成四层校验链

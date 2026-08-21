@@ -125,5 +125,26 @@ def validate_contracts(manifest: Optional[Dict[str, Any]] = None) -> List[str]:
     return _missing
 
 
+def validate_declaration_fields(manifest: Optional[Dict[str, Any]] = None) -> List[str]:
+    """A3 ⭐ 声明字段完整性校验（§3.79 Round 6 深化）：每个声明须含
+    id/name/role/keywords 四字段（声明驱动的基础——字段缺失=声明退化）。
+
+    Returns:
+        声明不完整的 subagent 描述列表；空列表 = 全部完整。
+    """
+    _m = manifest or get_manifest()
+    _req = ("id", "name", "role", "keywords")
+    _bad = []
+    for _a in _m.get("agents", []):
+        if not isinstance(_a, dict):
+            _bad.append(f"声明项非 dict: {str(_a)[:40]}")
+            continue
+        _missing_f = [f for f in _req if not _a.get(f)]
+        if _missing_f:
+            _bad.append(f"{_a.get('id', '?')}: 缺字段 {_missing_f}")
+    return _bad
+
+
 __all__ = ["get_manifest", "agent_names", "validate_against_registry",
-           "validate_scopes", "validate_contracts", "_MANIFEST_PATH"]
+           "validate_scopes", "validate_contracts", "validate_declaration_fields",
+           "_MANIFEST_PATH"]
