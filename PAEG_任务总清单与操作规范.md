@@ -3202,4 +3202,21 @@ server.py `teach_video` 端点：
 
 ### 实施记录
 
-（P0-① 实施中）
+**P0-① + P0-②（已完成 · 提交 59222ca + 7644c33）** ✅
+- `services/material_judge.py`：LLM-as-judge 5 维评分（factuality/correctness/completeness/relevance/pedagogy）+ 5 深检（person_binding/literature/cross_subject/real_data/analogy）
+- LessonPrep quality_report.material_judge 接线（PAEG_NO_MATERIAL_JUDGE=1 测试闸门）
+- 测试 7/7 全绿 + SURFACE 真实评审（导数教案 overall 4.4，识别牛顿/莱布尼茨人物绑定✅、速度类比✅、无文献❌如实标注）
+- 回归 25/25 全绿 + D4（技术说明 C.34 融贯插入）+ 双远程推送
+
+**P1-② feedback 聚合面板（已完成）** ✅
+- `services/feedback_aggregator.py`：aggregate_feedback()（维度均分/低分主题[任一维度<3 即标记]/关键词/趋势）+ feedback_to_prompt_patch()（反哺 self_evolution）
+- server.py `GET /api/lesson_prep/feedback/summary`（feedback + material_judge 双聚合 + patches）
+- 调试记录：低分判断从"整体均分"改为"任一维度 <3"（防高分稀释）
+- 测试 7/7 全绿 + SURFACE 实测（feedback.total=1 overall=4.0 + material_judge.total=1 + patches=1[ppt_outline 低分建议]）
+
+**P1-① golden 物料化（已完成）** ✅
+- `tests/test_round17_material_golden.py`：60 条 golden（初中12/高中12/大学19/考研17）→ 优质内容→物料结构映射断言
+- 覆盖盲区④（物料产出无评估集）：讲义 5 节/讲稿三段/PPT 分页/视频脚本镜头全断言 + 坏样例检出
+- 测试 46/46 全绿（12+12+12+8+坏样例+规模）
+
+**全量验证**：P0+P1 共 78/78 全绿（material_judge 7 + feedback 7 + golden 46 + 连通性 18）
