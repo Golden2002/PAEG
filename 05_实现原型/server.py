@@ -1717,7 +1717,7 @@ def _teach_stream_gen(data):
                 _facts_ctx = ""
                 try:
                     from library_loader import KnowledgeLibrary
-                    _kl = KnowledgeLibrary()
+                    _kl = KnowledgeLibrary._get_instance()
                     _facts_hits = _kl.search_facts(concept, top_k=2)
                     if _facts_hits:
                         _facts_ctx = "\n\n".join(
@@ -1790,6 +1790,11 @@ def _teach_stream_gen(data):
         # v0.46.1 ⭐ 单步教学续讲：若上一轮有剩余 steps（学生回答了上一步的提问），
         # 直接继续讲下一步（不再重新诊断/计划——保持教学连续性）
         _pending_steps = SESSIONS.get(f"teach_plan_{learner_id}") or []
+        # v1.2.23 ⭐ P0 修复（Round 11 后台预生成联动发现）：续讲轮判定必须在 pop 之前
+        # 定格——此前 L1969 重新读 SESSIONS.get("teach_plan_done_")，但 L1795-1796 已
+        # pop 该标志 → 续讲轮恒被判为新 plan（只讲 1 步、剩余又存回）→ 多步永远讲不完，
+        # 学生只能反复追问才能推进。本变量在 pop 前定格，供步骤循环复用。
+        _is_continuation = bool(_pending_steps)
         if _pending_steps:
             plan = {"steps": _pending_steps}
             SESSIONS.pop(f"teach_plan_{learner_id}", None)  # 取走即清（本轮再存新的）
@@ -1966,7 +1971,8 @@ def _teach_stream_gen(data):
         # 续讲轮（_pending_steps 取出）则全部讲完（学生已回到对话，连续推进剩余步骤）。
         _steps_all = plan.get("steps") or []
         _steps_total = len(_steps_all)
-        _is_continuation = bool(SESSIONS.get(f"teach_plan_done_{learner_id}"))
+        # v1.2.23 ⭐ P0 修复：续讲轮判定复用 pop 前定格的值（_pending_steps 非空=续讲轮），
+        # 不再重新读 teach_plan_done_（已被 pop → 恒 False → 续讲轮被误判新 plan 只讲 1 步）
         if _steps_total > 1 and not _is_continuation:
             # 新 plan 多步：首轮只推进第 1 步，剩余存会话供后续轮
             SESSIONS[f"teach_plan_{learner_id}"] = _steps_all[1:]
@@ -1976,6 +1982,96 @@ def _teach_stream_gen(data):
             SESSIONS.pop(f"teach_plan_{learner_id}", None)
             SESSIONS.pop(f"teach_plan_done_{learner_id}", None)
             _steps_this_round = _steps_all
+        # §3.79 Round 11 ⭐ 后续步骤后台预生成启动（v1.2.23 优化：plan 生成后立即启动，
+        # 与首步 presenter **并行**——此前在首步完成后才启动，串行浪费 30s+，学生回复时
+        # 缓存常未就绪）。剩余步骤在后台线程用独立 Presenter + learner 浅拷贝预生成，
+        # 存入 teach_pregen_ 缓存；学生阅读首步/回复期间缓存就绪 → 续讲轮零 LLM 等待。
+        # 守护线程 + 全异常捕获：预生成失败只损失加速，不影响本次流。
+        if (not _is_continuation and _steps_total > 1
+                and _steps_this_round and SESSIONS.get(f"teach_plan_{learner_id}")):
+            try:
+                _rest_steps = SESSIONS.get(f"teach_plan_{learner_id}") or []
+                if _rest_steps:
+                    import copy as _copy_mod
+                    _lk_copy = _copy_mod.copy(learner)  # 浅拷贝：预生成消费一次性槽不污染主 learner
+                    _prev_snapshot = list(_prev_presentations)
+
+                    def _pregen_worker():
+                        try:
+                            # v1.2.23 ⭐ 限流节流：预生成与主请求并行会翻倍同窗口 LLM 请求
+                            # （30 req/min 环境限流）→ 首步 presenter 期间已占用窗口，后台
+                            # 线程延迟 2s 起步 + 步间 1.5s 间隔，错峰发起，避免瞬时并发超限。
+                            import time as _pg_time
+                            _pg_time.sleep(2.0)
+                            from subagents import Presenter as _PgPresenter
+                            from infra.runtime import get_llm as _get_llm, get_kb as _get_kb
+                            _pg_model = _get_llm()
+                            _pg_kb = _get_kb()
+                            _pg_presenter = _PgPresenter(_pg_model, _pg_kb)
+                            _pg_out = []
+                            _pg_prev = _prev_snapshot
+                            for _rst in _rest_steps:
+                                try:
+                                    _pp = _pg_presenter.run(
+                                        step=_rst, learner=_lk_copy,
+                                        previous=_pg_prev, tone_info=tone_info,
+                                        concept=concept, subject=subject)
+                                    if _pp and _pp.get("content"):
+                                        _pg_out.append(_pp)
+                                    else:
+                                        _pg_out.append(None)
+                                    _pg_prev = _pg_prev + [_pp] if _pp else _pg_prev
+                                except Exception as _pe:
+                                    print(f"[PAEG][server.py] 预生成单步失败忽略: {_pe}")
+                                    _pg_out.append(None)
+                                _pg_time.sleep(1.5)  # 步间节流（30 req/min 环境）
+                            SESSIONS[f"teach_pregen_{learner_id}"] = _pg_out
+                            print(f"[PAEG] ★ 后续步骤后台预生成完成: {len(_pg_out)} 步缓存"
+                                  f"（{learner_id} · {concept[:20]}）")
+                        except Exception as _pw:
+                            print(f"[PAEG][server.py] 后台预生成线程失败忽略: {_pw}")
+
+                    _lt_mod.Thread(target=_pregen_worker, daemon=True).start()
+                    print(f"[PAEG] ★ 后续步骤后台预生成已启动: {len(_rest_steps)} 步"
+                          f"（{learner_id} · {concept[:20]}）")
+            except Exception as _pg2_e:
+                print(f"[PAEG][server.py] 预生成启动忽略: {_pg2_e}")
+
+        # §3.79 Round 11 ⭐ 后续步骤后台预生成（体验优化，承接 Round 9 决策）：
+        # 首轮第 1 步 presenter 19.6s 期间，后台线程预生成剩余步骤（独立 Presenter 实例 +
+        # learner 浅拷贝，避免一次性指令槽/意图指令竞争），结果存 teach_pregen_ 缓存；
+        # 续讲轮命中缓存 → 零 LLM 等待直接消费。失效条件：
+        #   ① 本轮有"改变讲解方式"的新指令（re_explain/give_example/switch_angle/
+        #      request_full_content）——预生成内容无法反映新要求
+        #   ② detour/revisit 话题切换（_detour_note/_revisit_note 非空）
+        #   ③ 续讲轮触发了困惑 remediation（steps 被 _build_remediation 替换）
+        #   ④ 预生成未完成（缓存缺项）
+        # 注：continue_step（"用户要继续"）与缓存**兼容**（缓存正是后续步骤内容），
+        # 不失效——v1.2.23 修复（此前所有 follow 指令一律失效 → 续讲轮永远现场生成）。
+        _pregen_cache = None
+        if _is_continuation:
+            try:
+                _fresh_inst = getattr(learner, "_follow_instruction", "") or ""
+                _inst_changes_way = bool(
+                    _fresh_inst and "用户要继续" not in _fresh_inst)
+                _has_fresh_inst = bool(
+                    _inst_changes_way or
+                    getattr(learner, "_detour_note", "") or
+                    getattr(learner, "_revisit_note", "") or
+                    plan.get("_student_signal") == "confused")
+                if not _has_fresh_inst:
+                    _pc = SESSIONS.get(f"teach_pregen_{learner_id}")
+                    if isinstance(_pc, list) and len(_pc) == len(_steps_this_round):
+                        _pregen_cache = _pc
+                        print(f"[PAEG] ★ 续讲轮命中预生成缓存: {len(_pc)} 步（{learner_id}）")
+                    else:
+                        SESSIONS.pop(f"teach_pregen_{learner_id}", None)
+                        print(f"[PAEG] ★ 预生成缓存未就绪: len={len(_pc) if isinstance(_pc, list) else 'N/A'} "
+                              f"steps={len(_steps_this_round)}（{learner_id}）")
+                else:
+                    SESSIONS.pop(f"teach_pregen_{learner_id}", None)
+            except Exception as _pg_e:
+                print(f"[PAEG][server.py] 预生成缓存读取忽略: {_pg_e}")
         for i, step in enumerate(_steps_this_round):
             # §3.79 Round 7 ⭐ 首步先行体验优化：step 事件携带 topic 骨架，
             # 前端立即显示"正在讲解：{topic}"（presenter LLM 19.6s 期间有感知进度，
@@ -1991,14 +2087,19 @@ def _teach_stream_gen(data):
             except Exception:
                 logger.warning(f"[server] generate 静默异常已记录 (L1963)")
                 pass
-            presentation = paeg.presenter.run(
-                step=step,
-                learner=learner,
-                previous=_prev_presentations,
-                tone_info=tone_info,
-                concept=concept,
-                subject=subject,
-            )
+            if _pregen_cache is not None and i < len(_pregen_cache) and _pregen_cache[i]:
+                # §3.79 Round 11 ⭐ 命中后台预生成缓存 → 零 LLM 等待
+                presentation = _pregen_cache[i]
+                presentation = dict(presentation)  # 防主流程原地修改污染缓存
+            else:
+                presentation = paeg.presenter.run(
+                    step=step,
+                    learner=learner,
+                    previous=_prev_presentations,
+                    tone_info=tone_info,
+                    concept=concept,
+                    subject=subject,
+                )
             # v0.20：teach_stream 补 LanguageRefiner（原漏洞——手动教学循环跳过了 paeg.teach 的 refiner 钩子）
             if paeg.refiner and presentation.get("llm_generated"):
                 try:
@@ -2789,15 +2890,55 @@ def submit_lesson_prep_feedback():
 
 # §3.45 ⭐ voice 2 路由（tts/stt）已迁至 blueprints/voice.py（行为字节级不变）
 
+# §3.80 ⭐ 授课视频 outline 自动生成（前端 v0.66+ 契约：不传 outline 由后端生成）
+def _safe_chat_for_outline(llm, system, user, max_tokens=800):
+    """轻量封装：LLM 生成教学大纲（异常静默降级 None）。"""
+    try:
+        from subagents import _safe_chat
+        return _safe_chat(llm, system, user, max_tokens=max_tokens)
+    except Exception:
+        return None
+
+
+def _auto_build_video_outline(topic: str, llm=None) -> str:
+    """outline 缺失时自动生成教学大纲（"## 章节 + - 要点" 格式，对齐 _parse_outline）。
+
+    优先 LLM 生成（结构化教学大纲）；LLM 缺失/失败 → 结构化占位大纲（不阻塞视频流程）。
+    与 video_service._parse_outline 契约一致：## 章节标题 + - 要点。
+    """
+    _t = (topic or "").strip() or "授课内容"
+    if llm is not None:
+        _sys = (
+            "你是教学大纲生成器。为给定主题生成授课视频的教学大纲。"
+            "严格使用以下格式：\n"
+            "## 章节标题1\n- 要点1\n- 要点2\n"
+            "## 章节标题2\n- 要点1\n\n"
+            "要求：3-5 个章节，每章 2-4 个要点；内容准确、由浅入深；只输出大纲，不要其他文字。"
+        )
+        _usr = f"主题：{_t}"
+        try:
+            _out = _safe_chat_for_outline(llm, _sys, _usr)
+            if _out and "## " in _out:
+                return _out.strip()
+        except Exception as _vo_e:
+            print(f"[PAEG][server.py] _auto_build_video_outline 异常忽略(降级占位大纲): {_vo_e}")
+            pass
+    # 降级：结构化占位大纲（3 章，保证视频流程不中断）
+    return (
+        f"## {_t}引入\n- 从生活实例引入 {_t}\n- 明确本节学习目标\n"
+        f"## {_t}核心概念\n- 定义与关键术语\n- 核心原理讲解\n- 典型示例\n"
+        f"## {_t}总结\n- 要点回顾\n- 常见误区提醒\n- 课后思考"
+    )
+
+
 @app.route("/api/teach/video", methods=["POST"])
 @require_module("voice")
 def teach_video():
     """v0.45 ⭐ 授课视频生成：PPT 大纲 → 教学视频（画面 + 语音讲解）。
 
     请求：{topic, outline, learner_id} —— outline 为 "## 章节 + - 要点" 结构
-
-    请求：{topic, outline, learner_id} —— outline 为 "## 章节 + - 要点" 结构
     （可与 /api/resources 的 ppt_outline 或 LLM 生成的大纲直接复用）。
+    §3.80 ⭐ outline 可选：缺失时后端自动生成教学大纲（前端 v0.66+ 契约）。
     响应：{ok, url, slides, duration} —— url 可下载播放 mp4。
     """
     data = request.get_json(force=True) or {}
@@ -2805,7 +2946,13 @@ def teach_video():
     outline = (data.get("outline") or "").strip()
     learner_id = data.get("learner_id") or "anon"
     if not outline:
-        return jsonify({"ok": False, "error": "outline is required"}), 400
+        # §3.80 ⭐ 前端 v0.66+ 契约：不传 outline → 后端自动生成（LLM 教学大纲 → 降级占位）
+        try:
+            from infra.runtime import get_llm
+            _vllm = get_llm()
+        except Exception:
+            _vllm = None
+        outline = _auto_build_video_outline(topic, _vllm)
     try:
         from video_service import generate_teaching_video
         result = generate_teaching_video(topic, outline, learner_id)

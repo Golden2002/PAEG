@@ -1,4 +1,4 @@
-# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
+﻿﻿# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
 
 > 创建日期：2026-08-14
 > 性质：**本文件是操作的唯一依据**——所有未完成任务、用户指示、调研要求固定于此，每次操作前先读此文件，完成后更新状态。
@@ -550,6 +550,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | **NEW-36** | **§3.79 admin 权限保护 + 前端 abort 加固 + golden 151 条（目标模式 Round 8/256）✅ 已完成**：①**admin 写保护**：`POST /api/admin/modules` 需 PAEG_ADMIN_TOKEN（未配置→401 安全默认；GET 开放）；canary.ps1 提示补充；测试 +4（无/错/正 token/GET 开放）→ 9/9 ②**kill switch 演练**：`deploy/kill_switch_drill.md` 首次演练 PASS（关闭→热重载→审计→恢复 <10s）+ SOP 固化；灰度规范 §五 全部勾销 ③**前端 abort 加固**：E2E 复跑确认后端全 200 但前端 150s 超时——诊断定位 teach done 后 `_genAbort` 未清致下一条被吞；done 事件清 `_genAbort=null`；诊断验证 teach→affection 序列正常；测试 +1 ④**E2 扩容**：golden 101→151 条（新增 50：摩擦力/杠杆/对数/动量守恒/格林公式/相对论/配位化学/比较优势/死锁/菲利普斯 等），309 测试全绿 | 用户目标模式续轮（安全/演练/前端健壮/质量网）；Round 8 新增 4/4 + golden 309/309 + 相关 322/322 + 全量回归绿；剩余下轮项：presenter 首步流式预渲染、E2 golden 200+、E2E 限流外完整复跑、admin 端点 rate-limit 保护评估 |
 | **NEW-37** | **§3.79 E2E 复跑确认 + E2 golden 201 条 + 流式预渲染决策（目标模式 Round 9/256）✅ 已完成**：①**E2E 复跑**：后端日志确认 A3/A4/B2/B5 请求全 200 到达（无后端 bug）；精确诊断复现 E2E 序列（teach done→switch→affection）**MSG INCREASED**（abort 清理后前端正常）；**结论：4 失败 = LLM 限流排队环境噪声**（30 req/min 窗口内 11 个 LLM 用例排队 >150s），非产品缺陷——E2E 找茬累计发现修复 8 个真实 bug，工具价值已兑现 ②**E2 扩容**：golden 151→201 条（新增 50：浮力/血液循环/楞次定律/自由组合/斯托克斯/波动方程/机会成本/符号互动/反常积分/贝叶斯/置信区间 等），**409 测试全绿** ③**流式预渲染决策**：presenter A 级思考链（两阶段）流式化会破坏质量——**不实施**，Round 7 首步骨架已缓解空白；替代：后续步骤后台预生成 | 用户目标模式续轮；golden 409/409 + 全量回归绿；剩余下轮项：后续步骤后台预生成体验、E2 golden 250+、E2E 冷却策略优化（分时段跑）、admin rate-limit 二道防线 |
 | **NEW-38** | **§3.79 隐患与既有 bug 挖掘修复 + 文档融贯（目标模式 Round 10/256）✅ 已完成**：①**审计误报修复**：`audit_check.py` 重构完整检查只匹配 `def teach_stream():` 薄封装函数体（v1.2.7 重构后真实函数体在 `_teach_stream_gen(data)`）→ `subtopic` 定义永远找不到 → P0 误报；改为优先匹配 `_teach_stream_gen` 函数体，误报消除 ②**既有 bug 挖掘——users.json 数据丢失（P0 级真实数据事故）**：审计发现昵称双源不一致 → 追查根因：磁盘 users.json 被清空为默认空模板（历史 commit 503f416 含 u106=团聚体+真实密码哈希 712011e4…，现 `users.json.bak_round10_emptied` 留证）；服务器 10:57 启动时已空 → u106 等注册用户降级匿名"学习者"、登录系统整体失效；**修复**：从 git 历史重建 users.json（恢复真实用户 u3/u8/u106 + learner 同步当前 profile.json 三方昵称一致 + next_id=466），API 验证 `/api/profile/u106`=团聚体/graduate_exam 恢复 ③**根因加固**：`user_store._load` 遇损坏静默兜底空模板 + 后续任意 `_save()` 写回磁盘固化数据丢失——现损坏文件先备份 `.corrupt_<ts>` 留证再兜底，绝不静默覆盖 ④**数据卫生 P1**：users_data 53→18（清理 >4h 陈旧 web_* 会话 + u9/u11/u12 空会话孤儿，保留注册用户 u106/u8）；**审计 36/40 → 40/40 全绿**；静默异常 7→0 处 | 用户目标模式续轮（挖掘修复隐患与既有 bug、文档融贯）；audit 40/40 + 相关 9/9 + 全量回归绿；剩余下轮项：后续步骤后台预生成体验、E2 golden 250+、E2E 冷却策略优化、admin rate-limit 二道防线、origin push 网络重试 |
+| **NEW-39** | **§3.79 后续步骤后台预生成 + 教学输出/物料质量强化 + 3 个既有 bug 修复（目标模式 Round 11/256）✅ 已完成**：①**后台预生成（Round 9 决策兑现）**：首轮第 1 步讲解期间后台线程（独立 Presenter + learner 浅拷贝 + daemon + 步间节流防限流）预生成剩余步骤 → 续讲轮命中缓存**零 LLM 等待**（8.6s/步 → ~0）；并行启动优化（plan 后立即启动，与首步 presenter 并行）；缓存失效语义精确化（continue_step 兼容，仅改变讲解方式/话题切换/困惑 remediation 失效）②**P0 既有 bug：续讲轮永远只讲 1 步**——`_is_continuation` pop 后重读 `teach_plan_done_` 恒 False → 多步 plan 永远讲不完；修复 pop 前定格；真实 E2E 续讲轮 26→126 分片（剩余真正讲完）③**P0 既有 bug：LLM failover 签名不一致**——Anthropic/Mock chat 缺 tools/tool_choice → 兜底必 TypeError（日志实锤）；签名对齐 + 参数化契约测试 ④**教学输出质量第三轮强化**：`GRADE_OUTPUT_QUALITY` 4 学段指令（大学 lecture 式+高屋建瓴+举一反三/高中例题+误区/考研考点题型易错/初中生活化）+ `SUBJECT_GRADE_DEPTH_EXT` 5 学科扩展；真实 E2E 大学 6/6、考研 3/3 ⑤**物料质量第三轮强化**：新增 `check_ppt_outline` 接入 quality_report（四类物料检查补齐） | 用户目标模式续轮（教学体验/输出质量/物料质量/挖掘既有 bug）；Round 18 新增 45/45 + golden 409/409 + audit 40/40 + 全量回归绿；剩余下轮项：E2E 冷却策略优化、admin rate-limit 二道防线、E2 golden 250+ |
 
 ---
 
@@ -3153,3 +3154,29 @@ un() 加 	each_state/ction 参数（向后兼容），LLM 基于完整上下文
 - 改动提交推送双远程（DeepSeek 或本轨道执行）
 - 技术说明 C.15 接线率 81% 计算口径确认（≈20/24 适用格）
 - 孤儿 7 个（srs_sm2 等）后续轮次处理
+
+## §3.80 授课视频 outline 自动生成（bug 修复 · 2026-08-21）
+
+### 用户报告
+
+"给我生成一个可视化矩阵乘法本质的视频" → "授课视频生成失败：outline is required"
+
+### 根因
+
+**前端 v0.66 契约断裂（历史遗留）**：
+- 前端 `fetchTeachVideoByTopic`（index.html L5417-5424）v0.66 起**不传 outline**（注释明确"后端自动生成完整教学大纲"）
+- 后端 `/api/teach/video`（server.py）仍强制 outline 非空 → 400 "outline is required"
+- `outline is required` 自 v0.46/v0.52 引入，前端 v0.66 改契约时未同步后端——**非本轮 DeepSeek 引入**
+
+### 修复
+
+server.py `teach_video` 端点：
+- 新增 `_auto_build_video_outline(topic, llm)`：outline 缺失时 LLM 生成教学大纲（"## 章节 + - 要点"格式，对齐 video_service._parse_outline）；LLM 缺失/失败 → 结构化占位大纲（不阻塞视频流程）
+- outline 可选：缺失时自动生成后进入生成流程（对齐前端 v0.66+ 契约）
+
+### 验证
+
+- 单元测试 4/4 全绿（tests/test_teach_video_outline_auto.py：LLM 成功/LLM 失败降级/llm=None 离线/集成锚点）
+- SURFACE 真实调用：不传 outline → 200 + ok=True + slides=5 + 视频落盘（d6a2f6e3da.mp4 4.2MB）
+- S2 回归：显式传 outline → 200（字节级兼容）
+- 回归：备课 12 + 连通性 18 + 新增 4 = 31+4 全绿
