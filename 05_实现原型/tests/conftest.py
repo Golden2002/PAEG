@@ -39,6 +39,10 @@ if _PROJ_ROOT not in sys.path:
 # 仅当 PAEG_LESSON_NO_WEB=1 时备课跳过 web 素材）
 os.environ.setdefault("PAEG_LESSON_NO_WEB", "1")
 
+# §3.81 ⭐ 单元测试默认关闭物料 LLM 评审（避免 mock LLM 覆盖 last_user 断言；
+# 评审门逻辑由 tests/test_material_judge.py 独立覆盖）
+os.environ.setdefault("PAEG_NO_MATERIAL_JUDGE", "1")
+
 
 # ────────────────────────────────────────────────────────────
 # 关键：在 pytest 开始收集 test_* 前，先把"原始"模块符号快照下来

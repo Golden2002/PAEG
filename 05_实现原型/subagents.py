@@ -2674,6 +2674,25 @@ class LessonPrep:
         )
         # §3.78 B3 ⭐ 视频脚本检查结果并入质量报告（结构化、可审计）
         quality_report["video_script_check"] = _video_check
+        # §3.81 P0-① ⭐ 物料内容准确性评审门（LLM-as-judge：5 维 + 5 深检）
+        # 覆盖质量盲区①（无内容准确性检查）——LLM 失败降级不阻塞主流程
+        # 测试/离线闸门：PAEG_NO_MATERIAL_JUDGE=1 时跳过（评审门独立测试覆盖）
+        if os.environ.get("PAEG_NO_MATERIAL_JUDGE") != "1":
+            try:
+                from services.material_judge import judge_material, log_judge
+                _judge_content = "\n".join(filter(None, [
+                    (lesson_plan or {}).get("key_points") and str(lesson_plan.get("key_points")),
+                    handout or "",
+                    script or "",
+                ]))[:1500]
+                if _judge_content:
+                    _judge_result = judge_material(
+                        _judge_content, subject, grade, "lesson_plan", self.llm)
+                    quality_report["material_judge"] = _judge_result
+                    if _judge_result.get("checked"):
+                        log_judge(f"lp_{topic}_{int(time.time())}", topic, _judge_result)
+            except Exception as _mj_e:
+                print(f"[PAEG][subagents.py] 物料评审跳过: {_mj_e}")
         # §3.79 Q7 ⭐ 讲义/讲稿/思维导图结构检查（services/material_quality 对称补齐）
         # §3.79 Round 11 ⭐ PPT 大纲结构检查（check_ppt_outline 新增，PPT 质量上乘守护）
         try:
