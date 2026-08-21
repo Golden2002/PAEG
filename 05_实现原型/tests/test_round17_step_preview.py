@@ -27,10 +27,13 @@ def test_step_event_carries_topic():
     src = open(SERVER, encoding="utf-8").read()
     # step 事件 yield 含 'topic'
     assert "'topic': str(step.get('topic')" in src, "step 事件缺 topic 字段"
-    # 必须位于 presenter.run 之前（骨架先行于 19.6s 生成）
+    # 必须位于主循环 presenter.run 之前（骨架先行于 19.6s 生成）
+    # §3.79 Round 11 ⭐ 精确匹配主循环调用（paeg.presenter.run）——后台预生成 worker
+    # 的 `_pg_presenter.run(` 也含 ".run("，旧断言 src.index("presenter.run") 会
+    # 误命中 worker 调用（worker 在 step 事件之前定义）→ 假失败
     idx_step = src.index("event: step")
-    idx_presenter = src.index("presenter.run")
-    assert idx_step < idx_presenter, "step 骨架应在 presenter.run 之前"
+    idx_presenter = src.index("paeg.presenter.run(")
+    assert idx_step < idx_presenter, "step 骨架应在主循环 presenter.run 之前"
 
 
 def test_frontend_shows_step_topic():

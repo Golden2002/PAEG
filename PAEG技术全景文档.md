@@ -1,4 +1,4 @@
-﻿# PAEG 教育者智能体 — 技术全景文档
+# PAEG 教育者智能体 — 技术全景文档
 
 > **版本**：v0.73 关键节点（2026-08-16）：Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）+ 结构优化（TOC 自动生成/围栏修复/层级修正/§3.17 生产链路补强）；Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）；架构精细拆分（server.py 2601 行/31 路由/12 蓝图）+ RAG 检索增强（BM25Okapi/多路召回）+ 自我进化优化（Schema+CoT/失败案例/去重）+ dsh Harness 30 项落地 27/30（Seam/Registry/Provider/Persona 外置/Patch 系统/三角色契约层/Preset 体系/条件启停/Constitutional 补丁化/Self-Update via Patch）+ 前端 SVG 化+ 薇依人格大幅提升（文选 9 大哲学基石）
 > **适用对象**：项目维护者（你本人）
@@ -5102,4 +5102,45 @@ since:   <PAEG 版本号>
 | 版本 | 审计 | 全量回归 | golden set | 孤儿 |
 |---|---|---|---|---|
 | v1.2.21（Round 9） | 36/40（3 P0 + 1 P1） | 1245 无失败 | 201 条（409 全绿） | 0 |
-| **v1.2.22（Round 10）** | **40/40 全绿** | 全量回归绿 | 201 条（409 全绿） | 0 |
+| v1.2.22（Round 10） | **40/40 全绿** | 全量回归绿 | 201 条（409 全绿） | 0 |
+| **v1.2.23（Round 11）** | **40/40 全绿** | 全量回归绿 | 201 条（409 全绿） | 0 |
+
+
+## 10.24 ⭐ §3.79 后台预生成 + 输出/物料质量强化（Round 11/256 · v1.2.23 · 2026-08-21）
+
+> 承接 §10.23——本轮兑现 Round 9"后续步骤后台预生成"决策，完成教学输出与物料生产
+> 质量第三轮专门强化，并挖掘修复 2 个 P0 既有 bug（续讲轮判定 / LLM failover 签名）。
+
+### 10.24.1 后续步骤后台预生成（教学体验）
+
+| 项 | 说明 |
+|---|---|
+| 并行预生成 | plan 生成后立即启动后台线程（独立 Presenter + learner 浅拷贝 + daemon），与首步 presenter 并行 |
+| 缓存消费 | 续讲轮命中 `teach_pregen_` 缓存 → presenter 零 LLM 等待（8.6s/步 → ~0） |
+| 失效语义 | continue_step 兼容（缓存正是后续内容）；改变讲解方式指令/detour/revisit/困惑 remediation 失效 |
+| 限流防护 | 首步延迟 2s + 步间 1.5s 节流（30 req/min 环境） |
+
+### 10.24.2 既有 bug 修复（P0 × 2）
+
+- **续讲轮判定**：`_is_continuation` 在 pop 后重读 `teach_plan_done_` → 恒 False → 多步
+  plan 永远只讲 1 步（学生需反复追问推进）；修复为 pop 前定格 `bool(_pending_steps)`
+- **LLM failover 签名**：failover 统一传 tools/tool_choice，Anthropic/Mock chat 签名缺参
+  → 兜底必 TypeError（日志实锤 "got an unexpected keyword argument 'tools'"）；签名对齐 + 参数化契约测试
+
+### 10.24.3 教学输出质量（第三轮专门强化）
+
+- `GRADE_OUTPUT_QUALITY` 4 学段输出指令：大学 lecture 式（严格定义→定理→推导→应用
+  + 高屋建瓴 + 举一反三变式）、高中例题+误区、考研考点/题型/易错、初中生活化
+- `SUBJECT_GRADE_DEPTH_EXT`：英语/计算机/经济/法学/哲学 × 大学/考研 深度阶梯补全
+- 真实 E2E：大学"线性变换" 6/6 特征全过（几何直觉 + 完整推导 + 学科视野）；考研 3/3
+
+### 10.24.4 物料生产质量（第三轮专门强化）
+
+- 新增 `check_ppt_outline`（分页/每页要点/无空页/无占位），接入 LessonPrep `quality_report.ppt_check`
+- 物料确定性检查补齐四类：handout / lecture_script / mindmap / ppt_outline
+
+### 10.24.5 质量基线（更新）
+
+| 版本 | Round 18 新增测试 | 全量回归 | golden | audit |
+|---|---|---|---|---|
+| **v1.2.23（Round 11）** | **45/45** | 全量回归绿 | 409/409 | 40/40 |

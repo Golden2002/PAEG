@@ -63,7 +63,10 @@ class MockModelAPI(ModelAPI):
         self._echo = echo
 
     def chat(self, system: str, messages: list, max_tokens: int = 8000,
-             temperature: float = 0.7) -> str:
+             temperature: float = 0.7, tools: Optional[list] = None,
+             tool_choice: Optional[str] = None) -> str:
+        # v1.2.23 ⭐ 签名对齐（Round 11 挖掘）：MockModelAPI 也需接受 tools/tool_choice，
+        # 否则 failover 候选含 mock 时同样 TypeError（Anthropic 同类隐患一并修复）。
         return self._echo
 
     def available(self) -> bool:
@@ -268,7 +271,14 @@ class AnthropicModelAPI(ModelAPI):
         self._timeout = timeout
 
     def chat(self, system: str, messages: list, max_tokens: int = 8000,
-             temperature: float = 0.7) -> str:
+             temperature: float = 0.7, tools: Optional[list] = None,
+             tool_choice: Optional[str] = None) -> str:
+        # v1.2.23 ⭐ P0 修复（Round 11 挖掘）：llm_adapter failover 对全部候选统一传
+        # tools/tool_choice——AnthropicModelAPI.chat 原签名缺这两个参数 → TypeError →
+        # 被 failover 循环吞掉 → 若主候选失败，anthropic 兜底必然失败（"got an unexpected
+        # keyword argument 'tools'"）。现签名对齐 OpenAICompatModelAPI，支持 tools 透传
+        # （Anthropic Messages API 原生支持 tools 字段），tool_choice 仅支持显式字符串
+        # （"auto"/"any"/"tool"），不支持 dict 时忽略（降级普通生成，不抛错）。
         payload = {
             "model": self._model,
             "system": system,
@@ -276,6 +286,11 @@ class AnthropicModelAPI(ModelAPI):
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
+        if tools:
+            payload["tools"] = tools
+        _tc = self._tool_choice_payload(tool_choice)
+        if _tc:
+            payload["tool_choice"] = _tc
         body = json.dumps(payload).encode("utf-8")
         req = request.Request(
             self._base_url + "/v1/messages",
@@ -301,6 +316,17 @@ class AnthropicModelAPI(ModelAPI):
 
     def available(self) -> bool:
         return bool(self._api_key)
+
+    @staticmethod
+    def _tool_choice_payload(tool_choice):
+        """Anthropic tool_choice 归一化：str → {"type": str}；dict → 原样；其他 → None。"""
+        if not tool_choice:
+            return None
+        if isinstance(tool_choice, str):
+            return {"type": tool_choice}
+        if isinstance(tool_choice, dict):
+            return tool_choice
+        return None  # 其他类型：忽略（Anthropic 不支持的复杂 tool_choice 降级）
 
 
 # ---------------------------------------------------------------------------

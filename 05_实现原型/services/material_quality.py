@@ -111,4 +111,52 @@ def check_mindmap(markdown: str) -> Dict[str, object]:
     return _base(not errors, errors, list_items=len(_items), levels=sorted(_levels))
 
 
-__all__ = ["check_handout", "check_lecture_script", "check_mindmap"]
+def check_ppt_outline(markdown: str) -> Dict[str, object]:
+    """PPT 大纲检查（§3.79 Round 11 ⭐ 新增——物料检查对称补齐 PPT）：
+
+    真实 PPT 大纲应满足：
+      - 分页结构（## 第N页 / --- / 页标题行）
+      - 每页有要点（列表项 ≥1）
+      - 覆盖 5 页左右（封面/引入/定义/例子/小结）
+      - 无占位残留
+
+    Returns: {"passed", "errors", "pages", "items_per_page", "checked"}
+    """
+    text = str(markdown or "")
+    errors: List[str] = []
+    # 分页识别：## 页 / --- 分隔 / 行尾冒号标题
+    _lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    _pages = []
+    _cur: List[str] = []
+    for _ln in _lines:
+        if re.match(r"^(#{2,4} |---|幻灯片|第\s*[0-9一二三四五六七八九十]+\s*页)", _ln):
+            if _cur:
+                _pages.append(_cur)
+            _cur = [_ln]
+        else:
+            _cur.append(_ln)
+    if _cur:
+        _pages.append(_cur)
+    _n_pages = len(_pages)
+    if _n_pages < 3:
+        errors.append(f"PPT 大纲分页过少（{_n_pages} < 3 页：封面/主体/小结）")
+    _items_total = 0
+    _items_per_page: List[int] = []
+    for _pg in _pages:
+        _n = sum(1 for _l in _pg if re.match(r"^\s*[-*+]\s+\S", _l))
+        _items_per_page.append(_n)
+        _items_total += _n
+    if _items_total < 6:
+        errors.append(f"PPT 大纲要点过少（共 {_items_total} < 6 条要点）")
+    if _n_pages >= 3 and any(_n == 0 for _n in _items_per_page[:3]):
+        errors.append("PPT 大纲存在空页（无任何要点）")
+    if re.search(r"待补充|\(写|（写|占位|TODO|此处插入|图片\s*[（(]?\s*$", text):
+        errors.append("存在占位残留（待补充/（写…/TODO/空图片占位 等）")
+    if len(text.strip()) < 60:
+        errors.append("PPT 大纲过短（<60 字）")
+    return _base(not errors, errors, pages=_n_pages,
+                 items_per_page=_items_per_page)
+
+
+__all__ = ["check_handout", "check_lecture_script", "check_mindmap",
+           "check_ppt_outline"]

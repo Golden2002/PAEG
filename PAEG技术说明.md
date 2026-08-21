@@ -1437,18 +1437,20 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 
 **质量守门（§3.71/§3.75）**：每份产出过四类评分（教案 6 维 / 讲义 / PPT 大纲 5 维 / 视频脚本）+ **15 条硬性检查**（7 自动 + 5 LLM 评审 + 3 条 §3.75：三维结构/案例教学/互动环节），产出 `dim_scores` 与 `eval_mode`；`/api/lesson_prep/feedback` 收集教师反馈（L3 人工评估）。**PPT 自动配图**：三级来源（用户资料库 → 公共文件夹 → 联网 Bing 免 key）+ 缓存，缺图不阻塞。
 
-### 7.11 工程化就绪：Round 4-10 优化融贯（§3.79 · v1.2.14-v1.2.22 ⭐）
+### 7.11 工程化就绪：Round 4-11 优化融贯（§3.79 · v1.2.14-v1.2.23 ⭐）
 
-> 本小节把 Round 4-10 逐轮改进按主题融贯成五条主线（版本追溯见附录 C.26-C.34）——不再按版本流水账罗列，而是呈现"从功能可用到商业就绪"的完整链路。
+> 本小节把 Round 4-11 逐轮改进按主题融贯成五条主线（版本追溯见附录 C.26-C.35）——不再按版本流水账罗列，而是呈现"从功能可用到商业就绪"的完整链路。
 
 **主线一：物料生产真实联通（PPT/讲义/讲稿/思维导图/视频）**：
 - `teach_materials` 工作流 7 步真实运行暴露并修复 2 断链：outline 步 Planner 签名不匹配（`run()` 缺参）→ `_run_subagent` planner 分支适配；knowledge_map/keyword_doc 工具未注册 → `_run_tool` 兜底（优先复用 handler，失败回退 LLM 生成）
 - 静态讲稿缺生活化例子（`_static_script` 补例子/类比收尾）、`_parse_outline` 只收 str 而 LessonPrep 产 list（备课→PPT 断链）→ 兼容 list；真实 .pptx 落盘 6 页 + 文本物料 4/4 过检查器
 - **manim 数学视频真实出片**：AST 安全校验 → 真实渲染 → mp4 落盘；修复 `render_manim` 未指定 encoding 导致 Windows GBK 解码崩溃 + 质量档输出目录 5 档（480p15…2160p60）
 - 学习计划 format bug：`unsupported format string passed to dict.__format__`（mastery 值 float/dict 混用）→ `_fmt_mastery` 鲁棒格式化
+- **PPT 大纲结构检查（Round 11 ⭐）**：`check_ppt_outline`（分页/每页要点/无空页/无占位）接入 LessonPrep `quality_report.ppt_check`——物料检查补齐 handout/script/mindmap/ppt 四类覆盖
 
-**主线二：质量守护网（学段×深度双层守门 + golden set）**：
+**主线二：质量守护网（学段×深度双层守门 + 输出质量注入 + golden set）**：
 - **teach_stream 守门接线**：学段特征/内容深度守门此前只挂 sync 路径 `paeg.teach`，GUI 实际走的 `/api/teach/stream` 从不执行 → 主循环接入（同门控 llm_generated+PAEG_GRADE_GATE）→ probe 4/4 全特征通过
+- **输出质量注入（Round 11 ⭐ 第三轮专门强化）**：`GRADE_OUTPUT_QUALITY` 4 学段输出指令（大学 lecture 式：严格定义→定理→推导→应用 + 高屋建瓴（先点透本质）+ 举一反三变式；高中例题+误区；考研考点/题型/易错；初中生活化）+ `SUBJECT_GRADE_DEPTH_EXT` 扩展 5 学科 × 2 学段深度阶梯（英语/计算机/经济/法学/哲学）——真实 E2E：大学"线性变换" 6/6 特征全过（含几何直觉、完整推导、学科视野）
 - **golden set 质检集**：51 → 101 → 151 → **201 条** × 3 断言 = **409 测试全绿**——学段特征必过（per-grade MUST_HAVE 质量红线）+ 呈现长度（≥80 字防碎片）+ 坏样例漏检守护；覆盖 20+ 学科 × 4 学段
 
 **主线三：运维可治理（灰度/回滚/kill switch/观测）**：
@@ -1456,14 +1458,17 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 - **kill switch**：`paeg_modules.json` 热重载 60s 止损 + `GET/POST /api/admin/modules` 远程切换（PAEG_ADMIN_TOKEN 写保护，未配置→401 安全默认）+ `module/toggle` 事件注册；首次演练 PASS（关闭→热重载→审计→恢复 <10s）
 - 观测：`/api/metrics` + 效果指标管道 + SLO 分模式（D1 延迟归因：teach 35s = 路由/诊断 1.3s + 规划 5.6s + 首步讲解 19.6s 主导 + 其余 8.6s，presenter 长输出为基础设施级主因）
 
-**主线四：教学对话体验（模式识别/首步先行/前端健壮）**：
+**主线四：教学对话体验（模式识别/首步先行/后台预生成/前端健壮）**：
 - `_detect_teaching_mode` 规则优先（deep/easy 关键词命中零 LLM）+ LLM 结果缓存 10 分钟（上限 256）；Diagnostor include_kb=False
 - **首步先行**：presenter 19.6s 延迟 UX 缓解——`step` 事件携带 topic 骨架（截 40 字），前端显示"正在讲解第 N 步：xxx"（骨架先行于内容：step@16.9s vs presentation@38s 真实验证）；流式预渲染决策：presenter A 级思考链流式化破坏质量 → 不实施，替代为后续步骤后台预生成
+- **后续步骤后台预生成（Round 11 ⭐ 兑现）**：首轮第 1 步讲解期间，后台线程（独立 Presenter + learner 浅拷贝 + daemon + 步间节流防限流）预生成剩余步骤 → 续讲轮命中缓存**零 LLM 等待**（8.6s/步 → ~0）；缓存失效语义精确化（continue_step 兼容，仅改变讲解方式指令/话题切换/困惑 remediation 失效）
 - 前端健壮：`friendlyHttpError`（429/500 UX）、done 后按钮恢复 + `_genAbort` 清理（E2E 找茬发现"正在生成上一条回复"吞消息 bug）
 
-**主线五：数据安全与既有 bug 挖掘（Round 10 ⭐）**：
+**主线五：数据安全与既有 bug 挖掘（Round 10-11 ⭐）**：
 - **users.json 数据丢失事故**：审计发现磁盘 users.json 被清空为默认空模板（历史 commit 503f416 含 u106=团聚体+真实密码哈希）→ 注册用户降级匿名"学习者"、登录系统失效；从 git 历史重建（真实用户 u3/u8/u106 + learner 同步当前 profile.json 三方一致 + next_id=466），API 验证恢复
 - **根因加固**：`user_store._load` 遇损坏静默兜底空模板 + 后续 `_save()` 写回磁盘固化丢失 → 损坏先备份 `.corrupt_<ts>` 留证再兜底
+- **续讲轮判定 P0（Round 11）**：`_is_continuation` 在 pop 后重读 `teach_plan_done_` → 恒 False → 续讲轮被误判新 plan 只讲 1 步 → 多步永远讲不完；修复为 pop 前定格 `bool(_pending_steps)`
+- **LLM failover 签名 P0（Round 11）**：failover 统一传 tools/tool_choice，但 Anthropic/Mock chat 签名缺参 → 兜底必 TypeError（"got an unexpected keyword argument 'tools'"）；签名对齐 + 参数化契约测试
 - **审计基建**：audit_check.py 40/40 全绿——重构完整检查适配 wrapper 重构（`_teach_stream_gen` 函数体）；静默异常 except:pass 7→0 处；数据卫生 users_data 53→18
 
 **验证基线**：golden 409/409 + 全量回归绿 + audit 40/40 + E2E 找茬累计发现修复 8 个真实 bug。
@@ -2033,3 +2038,16 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 - **根因加固**：`user_store._load` 损坏静默兜底 + `_save()` 写回固化丢失 → 损坏先备份 `.corrupt_<ts>` 留证
 - **数据卫生**：users_data 53→18（清理 >4h 陈旧 web_* 会话 + 空会话孤儿目录）
 - **静默异常清零**：except:pass 7→0 处；**audit 36/40 → 40/40 全绿**
+
+### C.35 后台预生成 + 教学输出/物料质量强化 + LLM failover 修复（v1.2.23 §3.79 ⭐）
+
+> 融贯整合见正文 **§7.11**（主线一物料/主线二质量/主线四体验/主线五 bug）；此条保留版本追溯要点。
+
+- **后续步骤后台预生成**：首轮第 1 步讲解期间后台线程预生成剩余步骤（独立 Presenter + learner 浅拷贝 + daemon + 步间节流）→ 续讲轮命中缓存零 LLM 等待；缓存失效语义精确化（continue_step 兼容）
+- **续讲轮判定 P0 修复**：`_is_continuation` pop 后重读恒 False → 多步 plan 永远只讲 1 步；改 pop 前定格
+- **教学输出质量**：`GRADE_OUTPUT_QUALITY` 4 学段指令（大学 lecture 式 + 高屋建瓴 + 举一反三）+ `SUBJECT_GRADE_DEPTH_EXT` 5 学科扩展；真实 E2E 大学 6/6、考研 3/3
+- **LLM failover 签名 P0 修复**：Anthropic/Mock chat 缺 tools/tool_choice → 兜底必 TypeError；签名对齐 + 契约测试
+- **物料质量**：`check_ppt_outline` 新增并接入 LessonPrep `quality_report.ppt_check`
+- **张宇扬课件知识库接线**：PDF/PPTX 文本提取 → `search_facts` 课件检索（遗传→HWE/生态→物种形成 真实验证）；落盘缓存 + `_manifest` 快速路径（构造 43s→0.22s）
+- **users.json 复发根治**：服务器内存/磁盘不同步导致恢复数据被覆盖——conftest 空模板不写回 + `_load` 数据丢失征兆告警 + 恢复后重启 SOP
+- **验证**：Round 18 新增 62/62 + golden 409/409 + audit 40/40 + 全量回归 1290 passed
