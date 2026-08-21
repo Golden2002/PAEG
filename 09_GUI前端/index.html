@@ -2855,7 +2855,10 @@ async function teach(question, subject, subtopic) {
           updateTeachingStage('规划教学路径');
         } else if (event === 'step') {
           const sid = obj.step_id || 1;
-          updateTeachingStage(`第 ${sid} 步讲解`);
+          // §3.79 Round 7 ⭐ 首步先行：step 事件携带 topic 骨架 → 显示"正在讲解：xxx"
+          // （presenter LLM 生成 20s 期间有感知进度，而非空白等待）
+          const stepTopic = obj.topic ? `：${obj.topic}` : '';
+          updateTeachingStage(`正在讲解第 ${sid} 步${stepTopic}…`);
         } else if (event === 'presentation') {
           // 追加到同一气泡（步骤间加空行分隔，不拆气泡）
           const content = obj.content || obj.text || '';

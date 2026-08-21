@@ -1972,7 +1972,10 @@ def _teach_stream_gen(data):
             SESSIONS.pop(f"teach_plan_done_{learner_id}", None)
             _steps_this_round = _steps_all
         for i, step in enumerate(_steps_this_round):
-            yield f"event: step\ndata: {json.dumps({'step_id': i + 1, 'status': 'presenting'})}\n\n"
+            # §3.79 Round 7 ⭐ 首步先行体验优化：step 事件携带 topic 骨架，
+            # 前端立即显示"正在讲解：{topic}"（presenter LLM 19.6s 期间有感知进度，
+            # 而非 20s 空白）。此前 step 事件无 topic，前端只能显示"第 N 步讲解"。
+            yield f"event: step\ndata: {json.dumps({'step_id': i + 1, 'status': 'presenting', 'topic': str(step.get('topic') or '')[:40]})}\n\n"
             # v0.66 ⭐ 统一资源门面：教学每步注入 KB+facts+用户物料+联网 完整资源块
             try:
                 from services.library import collect_all_resources
