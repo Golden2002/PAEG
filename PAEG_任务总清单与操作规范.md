@@ -3243,3 +3243,44 @@ server.py `teach_video` 端点：
 - E1 埋点增强（采纳/自我评估事件）
 - C5 家长实时看板深化
 - B3 OTel 导出完善
+
+## §3.82 E1 埋点 + C5 家长看板 + B3 OTel（2026-08-21）
+
+### 用户要求（原文）
+
+"完成E1埋点，C5家长看板，B3OTEL"
+
+### 现状盘点
+
+| 项 | 现状 | 缺口 |
+|---|---|---|
+| E1 埋点 | effect_metrics 已建管道；compute_self_update_acceptance 注释明确"无采纳/拒绝事件埋点 → 采纳率不可精确计算（诚实标注），下轮补 feedback/record 事件" | **self_update 采纳处补 record_adoption 事件** → 精确计算 |
+| C5 家长看板 | parent_conversations 已建（会话列表+每日摘要+PII 脱敏） | **缺学情聚合看板端点**（统计/趋势/干预建议） |
+| B3 OTel | trace_id 已建（server.py L814）；/api/metrics 已有（uptime+events_count） | **缺 OTel 导出**（trace_id 全链路 + 失败分类统计） |
+
+### 任务分解
+
+1. **E1 埋点**：self_update 采纳/拒绝处补 `record_adoption(suggestion_id, adopted)` 事件（落盘 evolve_data/adoption_events.jsonl）+ compute_self_update_acceptance 精确计算（去掉"不可精确计算"标注）
+2. **C5 看板**：`GET /api/parent/dashboard/<child_uid>`（学情统计：会话数/学科分布/每日趋势/掌握度 + 干预建议）
+3. **B3 OTel**：`/api/metrics` 扩展 OTel 导出（trace_id 全链路收集 + 按类型失败分类统计 + otel 导出端点）
+
+### 实施记录（2026-08-21 完成）
+
+**E1 埋点（已完成）** ✅
+- `services/adoption_tracker.py`：record_adoption()（append-only 落盘 evolve_data/adoption_events.jsonl）+ compute_acceptance()（精确采纳率）
+- `quality_gate.promote_to_insights` 接入：每条沙盒转正（=采纳）记录 adoption 事件
+- `effect_metrics.compute_self_update_acceptance` 优先读精确事件（"不可精确计算"标注消除）
+- 测试 5/5 + SURFACE（3 事件 → 精确采纳率 0.67，status=adopted_events）
+
+**C5 家长看板（已完成）** ✅
+- `services/parent_dashboard.py`：build_dashboard()（会话数/学科分布/近 7 日趋势/掌握度/反思数 + 干预建议）
+- server.py `GET /api/parent/dashboard/<child_uid>`（PII 脱敏沿用 mask_pii）
+- 干预建议规则：近 7 日无活动 / 学科集中 >60% / 掌握度 <0.4
+- 测试 6/6 + SURFACE（convs=0 + suggestions=1["近 7 日无学习活动"]）
+
+**B3 OTel 导出（已完成）** ✅
+- `services/otel_export.py`：export_telemetry()（trace 全链路归组）+ failure_classification()（协议/业务/环境三类）+ otlp_json_export()（OTLP 兼容 JSON）
+- `/api/metrics` 接入 otel 摘要（traces + event_types + failure 分类）
+- 测试 4/4 + SURFACE（events=505 已收集，trace 归组正常）
+
+**全量验证**：29/29 全绿（adoption 5 + dashboard 6 + otel 4 + material_judge 7 + feedback 7）

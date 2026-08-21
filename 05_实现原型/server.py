@@ -533,6 +533,17 @@ def metrics():
         _slo = slo_summary()
     except Exception:
         _slo = {}
+    # §3.82 B3 ⭐ OTel 导出（trace 全链路 + 失败分类）
+    _otel = {}
+    try:
+        from services.otel_export import export_telemetry, failure_classification
+        _otel = {
+            "traces": export_telemetry().get("traces", 0),
+            "event_types": export_telemetry().get("event_types", {}),
+            "failure": failure_classification(),
+        }
+    except Exception:
+        _otel = {}
     return jsonify({
         "status": "ok",
         "version": "0.74.0",
@@ -540,6 +551,7 @@ def metrics():
         "metrics": _m,
         "events_count": _ev_count,
         "slo": _slo,
+        "otel": _otel,
         "note": "P95/错误率/token 成本分模式埋点深化为下轮（总需求与执行标准 D1）",
         "timestamp": datetime.now().isoformat(),
     })
@@ -698,6 +710,55 @@ def parent_conversations(child_uid):
         return jsonify(_out)
     except Exception as _e:
         return jsonify({"child_uid": child_uid, "error": str(_e)}), 500
+
+
+# §3.82 C5 ⭐ 家长学情看板：学情统计 + 近 7 日趋势 + 干预建议（教育合规友好）
+@app.route("/api/parent/dashboard/<child_uid>", methods=["GET"])
+def parent_dashboard(child_uid):
+    """家长/教师学情看板（§3.82 C5 深化）。
+
+    聚合：会话数 / 学科分布 / 近 7 日趋势 / 掌握度 / 反思数 + 干预建议。
+    PII 脱敏沿用 parent_conversations 的 mask_pii（标题字段）。
+    """
+    try:
+        from services.parent_dashboard import build_dashboard
+        # 会话存储
+        _cs = None
+        try:
+            _cs = get_conv_store()
+        except Exception:
+            _cs = None
+        # 画像（掌握度）
+        _profile = None
+        try:
+            from services.profile_bundle import load_profile_summary
+            _profile = load_profile_summary(str(child_uid)) or {}
+        except Exception:
+            try:
+                _profile = STUDENT_TRAITS.get(str(child_uid)) or {}
+            except Exception:
+                _profile = None
+        # 反思（可空）
+        _ref = None
+        try:
+            from reflection_store import list_reflections
+            _ref = list_reflections(str(child_uid)) or []
+        except Exception:
+            _ref = None
+        _out = build_dashboard(str(child_uid), conv_store=_cs,
+                               profile=_profile, reflections=_ref)
+        # PII 脱敏（标题/学科名）
+        try:
+            from services.privacy import mask_pii
+            _subj = dict(_out.get("subject_distribution") or {})
+            _out["subject_distribution"] = {
+                mask_pii(str(k)) if len(str(k)) > 4 else k: v for k, v in _subj.items()
+            }
+        except Exception:
+            pass
+        return jsonify(_out)
+    except Exception as _pd_e:
+        return jsonify({"child_uid": child_uid, "error": str(_pd_e)}), 500
 
 
 # §3.79 ⭐ 间隔重复复习计划（孤儿 srs_sm2 接线：教学评估达标入队 → 到期复习）

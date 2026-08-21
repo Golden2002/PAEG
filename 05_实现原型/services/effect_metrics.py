@@ -343,6 +343,17 @@ def compute_self_update_acceptance() -> Dict[str, Any]:
                         _adopted += 1
         except Exception:
             _adopted = 0
+    # §3.82 E1 ⭐ 精确埋点优先：adoption_events.jsonl（quality_gate.promote 发射）
+    # 存在精确事件 → 用精确计数；否则回退上述 events.jsonl 代理计数
+    _precise = None
+    try:
+        from services.adoption_tracker import compute_acceptance
+        _precise = compute_acceptance()
+    except Exception:
+        _precise = None
+    if _precise and _precise.get("total", 0) > 0:
+        _adopted = int(_precise.get("adopted", 0))
+        _proposals = max(_proposals, int(_precise.get("total", 0)))
     # 采纳率 = 采纳事件 / 提议建议数（采纳事件存在才计算；否则 None 诚实标注）
     _rate = None
     if _proposals > 0 and _adopted > 0:
@@ -351,12 +362,14 @@ def compute_self_update_acceptance() -> Dict[str, Any]:
         "value": _rate,
         "status": "adopted_events" if _rate is not None else "needs_adoption_event",
         "target": 0.5,
-        "note": ("采纳率 = feedback/record(adopted) 事件数 / 提议建议数" if _rate is not None
-                 else "暂无采纳事件（self_evolution 蒸馏入库后才发射），建议数 "
-                      f"{_proposals}、采纳痕迹 {_traces}；数据积累后自动出值"),
+        "note": ("采纳率 = adoption_events.jsonl 精确事件 / 提议建议数（§3.82 E1 埋点）"
+                 if _precise and _precise.get("total", 0) > 0 else
+                 "暂无采纳事件（self_evolution 蒸馏入库后才发射），建议数 "
+                 f"{_proposals}、采纳痕迹 {_traces}；数据积累后自动出现"),
         "proposals": _proposals,
         "adopted_events": _adopted,
         "adopted_traces": _traces,
+        "precise_events": _precise,
     }
 
 
