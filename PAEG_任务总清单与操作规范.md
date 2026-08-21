@@ -550,7 +550,7 @@ DeepSeek Harness（dsh）核心架构 = **一切皆插件**（Everything is a Pl
 | **NEW-36** | **§3.79 admin 权限保护 + 前端 abort 加固 + golden 151 条（目标模式 Round 8/256）✅ 已完成**：①**admin 写保护**：`POST /api/admin/modules` 需 PAEG_ADMIN_TOKEN（未配置→401 安全默认；GET 开放）；canary.ps1 提示补充；测试 +4（无/错/正 token/GET 开放）→ 9/9 ②**kill switch 演练**：`deploy/kill_switch_drill.md` 首次演练 PASS（关闭→热重载→审计→恢复 <10s）+ SOP 固化；灰度规范 §五 全部勾销 ③**前端 abort 加固**：E2E 复跑确认后端全 200 但前端 150s 超时——诊断定位 teach done 后 `_genAbort` 未清致下一条被吞；done 事件清 `_genAbort=null`；诊断验证 teach→affection 序列正常；测试 +1 ④**E2 扩容**：golden 101→151 条（新增 50：摩擦力/杠杆/对数/动量守恒/格林公式/相对论/配位化学/比较优势/死锁/菲利普斯 等），309 测试全绿 | 用户目标模式续轮（安全/演练/前端健壮/质量网）；Round 8 新增 4/4 + golden 309/309 + 相关 322/322 + 全量回归绿；剩余下轮项：presenter 首步流式预渲染、E2 golden 200+、E2E 限流外完整复跑、admin 端点 rate-limit 保护评估 |
 | **NEW-37** | **§3.79 E2E 复跑确认 + E2 golden 201 条 + 流式预渲染决策（目标模式 Round 9/256）✅ 已完成**：①**E2E 复跑**：后端日志确认 A3/A4/B2/B5 请求全 200 到达（无后端 bug）；精确诊断复现 E2E 序列（teach done→switch→affection）**MSG INCREASED**（abort 清理后前端正常）；**结论：4 失败 = LLM 限流排队环境噪声**（30 req/min 窗口内 11 个 LLM 用例排队 >150s），非产品缺陷——E2E 找茬累计发现修复 8 个真实 bug，工具价值已兑现 ②**E2 扩容**：golden 151→201 条（新增 50：浮力/血液循环/楞次定律/自由组合/斯托克斯/波动方程/机会成本/符号互动/反常积分/贝叶斯/置信区间 等），**409 测试全绿** ③**流式预渲染决策**：presenter A 级思考链（两阶段）流式化会破坏质量——**不实施**，Round 7 首步骨架已缓解空白；替代：后续步骤后台预生成 | 用户目标模式续轮；golden 409/409 + 全量回归绿；剩余下轮项：后续步骤后台预生成体验、E2 golden 250+、E2E 冷却策略优化（分时段跑）、admin rate-limit 二道防线 |
 | **NEW-38** | **§3.79 隐患与既有 bug 挖掘修复 + 文档融贯（目标模式 Round 10/256）✅ 已完成**：①**审计误报修复**：`audit_check.py` 重构完整检查只匹配 `def teach_stream():` 薄封装函数体（v1.2.7 重构后真实函数体在 `_teach_stream_gen(data)`）→ `subtopic` 定义永远找不到 → P0 误报；改为优先匹配 `_teach_stream_gen` 函数体，误报消除 ②**既有 bug 挖掘——users.json 数据丢失（P0 级真实数据事故）**：审计发现昵称双源不一致 → 追查根因：磁盘 users.json 被清空为默认空模板（历史 commit 503f416 含 u106=团聚体+真实密码哈希 712011e4…，现 `users.json.bak_round10_emptied` 留证）；服务器 10:57 启动时已空 → u106 等注册用户降级匿名"学习者"、登录系统整体失效；**修复**：从 git 历史重建 users.json（恢复真实用户 u3/u8/u106 + learner 同步当前 profile.json 三方昵称一致 + next_id=466），API 验证 `/api/profile/u106`=团聚体/graduate_exam 恢复 ③**根因加固**：`user_store._load` 遇损坏静默兜底空模板 + 后续任意 `_save()` 写回磁盘固化数据丢失——现损坏文件先备份 `.corrupt_<ts>` 留证再兜底，绝不静默覆盖 ④**数据卫生 P1**：users_data 53→18（清理 >4h 陈旧 web_* 会话 + u9/u11/u12 空会话孤儿，保留注册用户 u106/u8）；**审计 36/40 → 40/40 全绿**；静默异常 7→0 处 | 用户目标模式续轮（挖掘修复隐患与既有 bug、文档融贯）；audit 40/40 + 相关 9/9 + 全量回归绿；剩余下轮项：后续步骤后台预生成体验、E2 golden 250+、E2E 冷却策略优化、admin rate-limit 二道防线、origin push 网络重试 |
-| **NEW-40** | **§3.79 E2 golden 扩容 250+ + admin rate-limit 二道防线 + E2E 找茬复跑（目标模式 Round 12/256）🔄 进行中**：①**E2 golden 扩容**：201→250 条（新增 ~50 手工样例，覆盖更多学科×学段，含大学生 lecture 式/考研题型套路专项）②**admin rate-limit 二道防线**：`/api/admin/modules` 写操作加频率限制（防 token 爆破/滥用；与已有 token 认证叠加）③**E2E 找茬复跑**：Playwright 冷却策略优化后复跑，验证 Round 11 预生成等改动无回归 | 用户目标模式续轮（质量守护网扩容/运维安全/商业场景验证）；验证基线待定；剩余下轮项：E2E 冷却策略持续优化、E2 golden 300+、物料真实 LLM 质量抽查 |
+| **NEW-40** | **§3.79 E2 golden 扩容 252 + admin rate-limit + 量子力学 bug 根治 + 终极版 E2E 高压测试（目标模式 Round 12/256）✅ 已完成**：①**E2 golden 扩容**：201→**252 条**（新增 51：薄弱学科 art/CS/politics/sociology 等 + 大学生 lecture 式/考研题型专项），**511 测试全绿** ②**admin rate-limit 二道防线**：`/api/admin/modules` 写操作滑动窗口限频（默认 10 次/60s，PAEG_ADMIN_RATE_LIMIT 可配）——与 token 认证叠加防爆破；测试 +4、真实 POST 11 连发第 11 次 429 验证 ③**E2E 找茬复跑**：自适应冷却（LLM 用例慢→35s 慢速档）13 过 3 环境噪声 ④**用户报告 bug 根治：量子力学被拒**（"未列入学科清单"）——根因：LLM prompt 把量子力学当 unknown 示例 + 规则层无子学科映射；按**元能力 L918 铁律（LLM 先判断、规则兜底）**修复：prompt 注入子学科归属知识（量子力学/微积分/遗传学→父学科，LLM 语义分类），规则仅 llm=None 时兜底 + unknown 名二次映射；真实 LLM 验证 10/10、量子力学教学端到端 8/8 正常输出 ⑤**终极版 E2E 高压测试**（用户本轮规格）：维度 A 对抗对话（A-4 0/0 陷阱/A-5 跨时空跳跃+拉回/A-6 拒作弊安抚）+ 维度 B 全物料（B-5 Manim 代码硬指标/B-6 视频分镜/B-7 讲义+Mermaid/B-8 PPT≥12 页+备注）+ Q 质量硬指标（防幻觉学科错配拒绝/LaTeX 闭合） | 用户目标模式续轮（质量网扩容/运维安全/既有 bug 根治/商业场景高压验证）；golden 511/511 + 相关 527/527 + audit 40/40；剩余下轮项：终极版 E2E 问题整改、E2 golden 300+、物料真实 LLM 质量抽查 |
 
 ---
 
@@ -3284,3 +3284,52 @@ server.py `teach_video` 端点：
 - 测试 4/4 + SURFACE（events=505 已收集，trace 归组正常）
 
 **全量验证**：29/29 全绿（adoption 5 + dashboard 6 + otel 4 + material_judge 7 + feedback 7）
+
+## §3.84 体验问题解决策略（2026-08-21 · E2E 发现 + Oracle 设计）
+
+### 来源
+
+§3.83 E2E 测试发现的体验问题 + 用户指示"咨询 Oracle，把体验问题和同类问题的解决策略写入需求文档"
+
+### E2E 发现的体验问题
+
+| # | 问题 | 现象（§3.83 实测） | 影响 |
+|---|---|---|---|
+| U1 | 学科覆盖缺口 | 问"量子纠缠"→"量子力学未列入学科清单，已记录需求" | 用户得不到教学（合理降级但覆盖不足） |
+| U2 | 多轮上下文漂移 | 第 1 轮量子纠缠，第 2 轮"再详细讲讲"实际讲算法复杂度 | 主题漂移，教学不连贯 |
+| U3 | 并发生成冲突 | 快速发送被"正在生成上一条回复，请先点击停止"拦截 | 无法连续提问 |
+| U4 | PPT 大纲质量低 | 备课产物 PPT 大纲得分 0.2（教案/讲义满分 1.0） | 物料质量不均衡 |
+| U5 | Manim 下载 404 | 视频真实产出但下载端点路径不一致 | 已修复（§3.83） |
+
+### Oracle 策略设计（bg_06e3a2fa · 已完成）✅
+
+**U1 学科覆盖缺口 → 兜底教学（P0）**
+- 根因：subject_detector LLM 非确定性偶发返回 unknown → steering.py:103-118 直接拒答；lookup_alias 仅匹配 unknown_name 字面值
+- 方案：steering 在 unknown 时走 `_fallback_teach`（通用学科直接教 + subject_confidence:"low" + "我没专门学过"提示语）；subject_detector 加 `_alias_detect`（对用户原话二次别名匹配）
+- 测试：test_round19_llm_unknown_alias_fallback（mock LLM 返回残缺 unknown_name）
+
+**U2 多轮上下文漂移 → 主题锚定+学科分桶（P0）**
+- 根因：concept_history_{learner_id} 仅按 learner 索引不按学科分桶 → 跨学科残留污染
+- 方案：concept_history 按学科并行子栈（concept_history_{learner_id}:{subject}）；topic_stack.push_subject 分桶 + recover 跨学科拒绝拉回；prompt 注入"当前教学主题(学科=X):Y"
+- 测试：E2E 跨学科切换（math→physics"再详细讲讲"不继承 math 历史）
+
+**U3 并发生成冲突 → 自动 abort 重发（P1）**
+- 根因：index.html:1803 Enter 生成中直接提示拦截，_genAbort 控制器未自动串联
+- 方案：生成中 Enter → 自动 abort 旧请求 + 立即发新（删拦截提示）；done 后若有未发送内容自动续发；abort 时按钮闪红反馈
+
+**U4 PPT 大纲质量 0.2 → 格式 retry + 学科化静态模板（P1）**
+- 根因：subagents.py:2615 PPT LLM 输出非 JSON → 降级 _lines 纯文本行（劣质）→ _static_ppt_outline（通用低质）
+- 方案：_step_chat_with_format_retry（JSON 失败重试 + "只输出 JSON"提示）；删 _lines 劣质降级；静态模板加学科分支（physics/literature 不同结构）；material_judge 加 PPT 结构分维度
+
+**体验问题通用解决框架（5 步）**：
+1. 识别静默降级点（搜 except.*pass / or _static_* / or _fallback）
+2. 失败仍给价值（降级必须返回有用结果，不空洞拒绝/随机拼接）
+3. 边界加 E2E（每个降级点有 mock LLM 残缺输入的反向测试）
+4. 状态空间隔离（主题/学科/会话按维度分桶，跨维度显式语义）
+5. UX 反馈即时（abort 闪红/降级提示语/漂移柔性引导）
+
+**优先级**：P0=U1+U2（教学正确性+信任）；P1=U3+U4（并发体验+备课质量）；P2=全局静默降级审计
+
+### 实施记录
+
+（按优先级实施中——P0 优先）
