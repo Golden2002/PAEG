@@ -1978,3 +1978,17 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 **kill switch 演练（灰度规范 §五 收尾）**：deploy/kill_switch_drill.md——关闭→热重载→审计→恢复 <10s PASS；SOP 固化（季度 red team）
 
 **E2 golden 151 条**：新增 50 条（摩擦力/杠杆/对数/动量守恒/格林公式/相对论/配位化学/比较优势/死锁/菲利普斯曲线 等）——309 测试全绿
+
+### C.33 E2E 复跑确认 + golden 201 + 流式预渲染决策（v1.2.21 §3.79 ⭐）
+
+**E2E 复跑结论（12/16 通过，4 失败为环境噪声）**：
+- 后端日志逐条确认：A3/A4/B2/B5 请求全部 200 到达——**后端无 bug**
+- 精确诊断复现 E2E 完整序列（teach done → switch_mode → affection 发送）：`AFFECTION MSG INCREASED`——Round 8 abort 清理后前端状态机正常
+- 失败归因：LLM 限流排队（30 req/min 窗口内 11 个 LLM 用例，每个 teach 内部 4-8 次 LLM 调用 → 后续请求排队 >150s 超时）——**D1 遗留，非本轮可解**
+- E2E 找茬累计价值：8 个真实 bug（teach_stream 500/18 死分支/主循环不可达/学段守门缺失/讲稿缺例子/PPT 断链/manim 编码/study_plan format/前端按钮+abort）
+
+**presenter 流式预渲染决策**：
+- 不实施（A 级深度思考链两阶段：reasoning + chat 落地——流式化破坏质量）
+- Round 7 首步骨架已缓解 20s 空白；替代路径：后续步骤后台预生成
+
+**E2 golden 201 条**：新增 50（浮力/血液循环/楞次定律/自由组合/斯托克斯/波动方程/机会成本/符号互动/反常积分/贝叶斯/置信区间）——409 测试全绿
