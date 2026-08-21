@@ -423,6 +423,19 @@ class QualityGate:
                     with open(insights_path, "w", encoding="utf-8") as f:
                         json.dump(existing, f, ensure_ascii=False, indent=1)
 
+            # §3.82 E1 ⭐ 采纳事件埋点：每条 promoted（沙盒转正=采纳）记录 adoption 事件
+            # （effect_metrics 此前"无采纳事件→采纳率不可精确计算"，本埋点补精确数据源）
+            if persisted > 0:
+                try:
+                    from services.adoption_tracker import record_adoption
+                    for entry in promoted_candidates:
+                        record_adoption(
+                            "quality_gate.promote", True,
+                            content=(entry.get("content") or ""),
+                        )
+                except Exception:
+                    pass
+
             return {
                 "promoted": promoted_n,
                 "purged": purged_n,
