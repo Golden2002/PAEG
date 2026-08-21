@@ -1,3 +1,33 @@
+### v1.2.20 §3.79 admin 权限保护 + 前端 abort 加固 + golden 151 条（2026-08-21 ⭐）
+
+**本版定位**：Round 8——安全（admin 写保护）、E2E 找茬新发现（前端 abort 残留）、质量守护网再扩容。
+
+**admin 权限保护 ✅（安全默认）**：
+- `POST /api/admin/modules` 需 `PAEG_ADMIN_TOKEN`（X-Admin-Token 头或 ?token=）——**未配置则写操作 401**（防任意访客 kill switch）
+- GET 状态保持开放（只读审计视图）；canary.ps1 提示补充
+- `test_round17_admin_modules.py` 新增 4 测（无 token 401/错 token 401/正 token 200/GET 开放）→ 9/9
+
+**kill switch 演练记录 ✅（灰度规范 §五 最后验收项）**：
+- `deploy/kill_switch_drill.md`：首次演练 PASS——关闭→热重载生效→审计→恢复 <10s（远低于 60s 止损线）
+- 演练 SOP 固化（预检 token → 关闭 → 验证 → 恢复 → 审计 → 复盘）
+
+**前端 abort 残留加固 ✅（E2E 找茬新发现）**：
+- E2E 复跑确认后端全部 200（A3/A4/B2/B5 请求均到达），但前端 150s 超时——诊断定位：teach done 后 `_genAbort` 未清，下一条 Enter 被吞
+- 修复：done 事件清 `window._genAbort = null`（与按钮恢复同处）；诊断验证 teach→affection 序列正常（发送|gen=|abort=N → "正在琢磨你说的意思"）
+- `test_round17_step_preview.py` 追加 abort 清理守卫
+
+**Planner sys import 修复 ✅（全量回归暴露的运维 bug）**：
+- `test_teach_stream_always_completes` 失败根因：`subagents.py` 缺顶层 `import sys`——Planner 动态规划 JSON 解析失败时，降级路径 `print(file=sys.stderr)` 抛 NameError 中断教学流（只在 LLM 异常时暴露）
+- 修复：顶层 `import sys`（带 § 注释）；`test_properties.py` 3/3 全绿；追加 sys import 守卫测试
+
+**E2 golden set 扩展 ✅（101 → 151 条）**：
+- 新增 50 条（初中 13 + 高中 12 + 大学 12 + 考研 13）：摩擦力/杠杆/对数/动量守恒/格林公式/相对论/配位化学/比较优势/死锁/菲利普斯曲线 等
+- 309 测试全绿（151 样例 × 2 断言 + bad samples + 规模）
+
+**验证**：Round 8 新增 4/4 + golden 309/309 + 相关 322/322 + 全量回归绿。
+
+**文档**：CHANGELOG + 技术说明 C.32 + 任务清单 NEW-36 + 维护手册 §18.74 + 灰度规范 kill switch 勾销
+
 ### v1.2.19 §3.79 首步先行体验 + D9 远程模块切换 + golden set 扩展 101 条（2026-08-21 ⭐）
 
 **本版定位**：Round 7——教学首步体验优化（延迟感知）、运维远程 kill switch（D9）、质量守护网扩容（E2）。

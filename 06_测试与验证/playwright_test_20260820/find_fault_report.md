@@ -1,6 +1,6 @@
-# PAEG 找茬式 E2E 报告（2026-08-21T06:09:06）
+# PAEG 找茬式 E2E 报告（2026-08-21T09:56:57）
 
-- 通过：11 · 问题：5
+- 通过：12 · 问题：4
 
 ## 问题清单
 
@@ -8,7 +8,6 @@
 - **A4 找答案**：Page.wait_for_function: Timeout 150000ms exceeded.
 - **B2 乱码输入**：Page.wait_for_function: Timeout 150000ms exceeded.
 - **B5 情绪+学习混合**：Page.wait_for_function: Timeout 150000ms exceeded.
-- **前端控制台错误**：Failed to load resource: the server responded with a status of 429 (TOO MANY REQUESTS)
 
 ## 通过清单
 
@@ -21,5 +20,6 @@
 - B6 快速连续发送 页面存活
 - D1 模式快速切换 稳定
 - B7 非法 learner_id 不 500
+- 前端无控制台错误
 - C1 并发 health×20 无 5xx
 - C2 并发 teach/stream×6 无 5xx

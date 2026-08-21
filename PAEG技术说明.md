@@ -1962,3 +1962,19 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 **E2 golden set 扩容 51 → 101 条**：
 - 新增 50 条（初中 12/高中 12/大学 13/考研 13）：地理/历史/英语/政治/统计/经济/心理/社会/法律/生物/语文 等新学科
 - 209 测试全绿（101 × 学段特征+呈现长度 + 5 坏样例 + 规模）
+
+### C.32 admin 权限保护 + 前端 abort 加固 + golden 151 条（v1.2.20 §3.79 ⭐）
+
+**admin 写保护（安全默认）**：
+- `POST /api/admin/modules` 需 `PAEG_ADMIN_TOKEN`（X-Admin-Token 头或 ?token=）；未配置 → 401（防任意访客 kill switch）
+- GET 状态开放（只读审计视图）；与 canary.ps1 配合：运维设 token 后远程止损
+- 安全原则：写操作默认拒绝（fail-closed），配置 token 才放行
+
+**前端 abort 残留（E2E 找茬新发现）**：
+- 现象：E2E 复跑后端全部 200（A3/A4/B2/B5 请求均到达），但前端 150s 超时——诊断定位 teach done 后 `_genAbort` 未清，下一条 Enter 走 abort 分支/按钮残留
+- 修复：done 事件清 `window._genAbort = null`（与按钮恢复同处）；诊断验证 teach→affection 序列正常
+- 教训：SSE 流式前端的状态机（done 后流未关闭）需在 done 事件立即清理生成状态，不能等 finally
+
+**kill switch 演练（灰度规范 §五 收尾）**：deploy/kill_switch_drill.md——关闭→热重载→审计→恢复 <10s PASS；SOP 固化（季度 red team）
+
+**E2 golden 151 条**：新增 50 条（摩擦力/杠杆/对数/动量守恒/格林公式/相对论/配位化学/比较优势/死锁/菲利普斯曲线 等）——309 测试全绿

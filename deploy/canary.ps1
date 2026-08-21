@@ -81,7 +81,8 @@ function Invoke-KillSwitch {
     $cfg.PSObject.Properties["$Module"] = $false
     $cfg | ConvertTo-Json -Depth 5 | Set-Content $cfgPath -Encoding UTF8
     Write-Output "✔ Kill switch: $Module 已关闭（module_registry 热重载，无需重启）"
-    Write-Output "  验证: Invoke-RestMethod $BaseUrl/api/health | 检查模块状态；60s 止损计时开始"
+    Write-Output "  验证: Invoke-RestMethod $BaseUrl/api/admin/modules | 检查模块状态；60s 止损计时开始"
+    Write-Output "  注意: POST /api/admin/modules 需 PAEG_ADMIN_TOKEN（X-Admin-Token 头）；见维护手册 18.73"
     return 0
 }
 

@@ -22,6 +22,21 @@ client = app.test_client()
 _CFG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                     "paeg_modules.json")
 
+# §3.79 Round 8 ⭐ admin 权限保护：写操作需 PAEG_ADMIN_TOKEN
+_ADMIN_TOKEN = "e2e_test_admin_token_round8"
+
+
+@pytest.fixture(autouse=True)
+def _admin_token_env(monkeypatch):
+    """测试期间设置 PAEG_ADMIN_TOKEN（POST 鉴权用）。"""
+    monkeypatch.setenv("PAEG_ADMIN_TOKEN", _ADMIN_TOKEN)
+    yield
+
+
+def _post_modules(payload):
+    return client.post("/api/admin/modules", json=payload,
+                       headers={"X-Admin-Token": _ADMIN_TOKEN})
+
 
 @pytest.fixture()
 def backup_cfg():
@@ -52,7 +67,7 @@ def test_modules_toggle_single(backup_cfg):
     # 先读当前状态
     st = client.get("/api/admin/modules").get_json()["modules"]
     cur = st["voice"]["enabled"]
-    r = client.post("/api/admin/modules", json={"module": "voice", "enabled": not cur})
+    r = _post_modules({"module": "voice", "enabled": not cur})
     assert r.status_code == 200, r.get_data(as_text=True)[:200]
     body = r.get_json()
     assert body.get("ok") is True
@@ -69,8 +84,7 @@ def test_modules_toggle_single(backup_cfg):
 
 def test_modules_toggle_batch(backup_cfg):
     """POST 批量切换。"""
-    r = client.post("/api/admin/modules",
-                    json={"modules": {"weather": False, "history": True}})
+    r = _post_modules({"modules": {"weather": False, "history": True}})
     assert r.status_code == 200
     body = r.get_json()
     assert len(body["applied"]) == 2
@@ -85,8 +99,7 @@ def test_modules_toggle_audit_event(backup_cfg):
     from observability import _EVENTS_FILE
     # 记录切换前文件大小
     _before = os.path.getsize(_EVENTS_FILE) if os.path.exists(_EVENTS_FILE) else 0
-    client.post("/api/admin/modules", json={"module": "mcp", "enabled": False,
-                                            "operator": "e2e_test"})
+    _post_modules({"module": "mcp", "enabled": False, "operator": "e2e_test"})
     # 读取切换后追加的行
     _lines = []
     if os.path.exists(_EVENTS_FILE):
@@ -99,6 +112,39 @@ def test_modules_toggle_audit_event(backup_cfg):
 
 
 def test_modules_toggle_invalid(backup_cfg):
-    """无参数 → 400（契约保护）。"""
-    r = client.post("/api/admin/modules", json={})
+    """无参数 → 400（契约保护，带 token）。"""
+    r = _post_modules({})
     assert r.status_code == 400
+
+
+# ────────────────────────────────────────────
+# §3.79 Round 8 ⭐ admin 权限保护（写操作需 token）
+# ────────────────────────────────────────────
+def test_modules_post_requires_token(backup_cfg, monkeypatch):
+    """无 token → 401（安全默认：未配置 PAEG_ADMIN_TOKEN 时写操作禁用）。"""
+    monkeypatch.delenv("PAEG_ADMIN_TOKEN", raising=False)
+    r = client.post("/api/admin/modules", json={"module": "voice", "enabled": False})
+    assert r.status_code == 401
+    body = r.get_json()
+    assert "PAEG_ADMIN_TOKEN" in body.get("error", "")
+
+
+def test_modules_post_wrong_token(backup_cfg):
+    """错误 token → 401。"""
+    r = client.post("/api/admin/modules", json={"module": "voice", "enabled": False},
+                    headers={"X-Admin-Token": "wrong_token"})
+    assert r.status_code == 401
+
+
+def test_modules_post_correct_token(backup_cfg):
+    """正确 token → 200（X-Admin-Token 头）。"""
+    r = _post_modules({"module": "voice", "enabled": False})
+    assert r.status_code == 200
+    assert r.get_json().get("ok") is True
+
+
+def test_modules_get_open(backup_cfg, monkeypatch):
+    """GET 状态无需 token（只读审计视图开放）。"""
+    monkeypatch.delenv("PAEG_ADMIN_TOKEN", raising=False)
+    r = client.get("/api/admin/modules")
+    assert r.status_code == 200

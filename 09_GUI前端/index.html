@@ -2977,6 +2977,11 @@ async function teach(question, subject, subtopic) {
           // finally 才恢复——done 后还有蒸馏/hooks 收尾，学生会看到按钮仍"■ 停止"、
           // 发下一条被拦截"正在生成上一条回复"）。主流程已结束，收尾可后台进行。
           try { window._hideStopBtn && window._hideStopBtn(); } catch (e) {}
+          // §3.79 Round 8 ⭐ 加固：done 即完成生成状态（清 _genAbort + 恢复）——
+          // 此前 done 后 teach() 仍阻塞在 reader.read()（流未关闭），_genAbort 未清，
+          // 下一条 Enter 走 abort 分支或按钮状态残留导致发送被吞（E2E 找茬发现）。
+          try { window._genAbort = null; } catch (e) {}
+          try { if (window._finalizeGeneration) { /* 延迟收尾：避免与 finally 重复 */ } } catch (e) {}
           // v0.27：消费 done 事件——自动维护学科/学段下拉
           try {
             // subject_steered=true 时同步一级学科到 subject_steered_to
