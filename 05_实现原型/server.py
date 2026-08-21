@@ -3272,9 +3272,19 @@ def generate_file():
 @app.route("/api/download/<path:filename>", methods=["GET"])
 @require_module("file_gen")
 def download_file(filename):
-    """下载生成的文件（v0.12）。"""
+    """下载生成的文件（v0.12）。
+
+    §3.83 ⭐ 修复：Manim 视频输出到项目根 downloads/manim（manim_service._PROJ=项目根），
+    而 DOWNLOAD_DIR=05_实现原型/downloads——此前 manim 下载 404。此处按前缀路由到正确目录。
+    """
     from flask import send_from_directory
-    return send_from_directory(DOWNLOAD_DIR, filename, as_attachment=True)
+    _safe_filename = str(filename or "").replace("\\", "/").lstrip("/")
+    if _safe_filename.startswith("manim/"):
+        # Manim 视频在项目根 downloads/manim/（manim_service._PROJ=项目根）
+        _root_downloads = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "downloads")
+        return send_from_directory(_root_downloads, _safe_filename, as_attachment=True)
+    return send_from_directory(DOWNLOAD_DIR, _safe_filename, as_attachment=True)
 
 # ─── v0.14：用户注册/登录 ───
 
