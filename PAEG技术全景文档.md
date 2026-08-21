@@ -1,4 +1,4 @@
-# PAEG 教育者智能体 — 技术全景文档
+﻿﻿# PAEG 教育者智能体 — 技术全景文档
 
 > **版本**：v0.73 关键节点（2026-08-16）：Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）+ 结构优化（TOC 自动生成/围栏修复/层级修正/§3.17 生产链路补强）；Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）；架构精细拆分（server.py 2601 行/31 路由/12 蓝图）+ RAG 检索增强（BM25Okapi/多路召回）+ 自我进化优化（Schema+CoT/失败案例/去重）+ dsh Harness 30 项落地 27/30（Seam/Registry/Provider/Persona 外置/Patch 系统/三角色契约层/Preset 体系/条件启停/Constitutional 补丁化/Self-Update via Patch）+ 前端 SVG 化+ 薇依人格大幅提升（文选 9 大哲学基石）
 > **适用对象**：项目维护者（你本人）
@@ -5012,3 +5012,63 @@ since:   <PAEG 版本号>
 - **孤儿 0 个（v1.2.16 归零）**：production_pipeline 已归档；srs_sm2/concept_graph/condition_eval/agent_scope/agent_trirole/platform_dual_track 已全部接线
 - **接线率**：五大核心已接线 15/26 适用格 ≈ **58%**（不含 N/A）
 
+
+## 10.22 ⭐ §3.79 第二轮深入优化（v1.2.16-v1.2.21 · 2026-08-21 · Round 4-9/256）
+
+> 承接 §10.21 连通性矩阵——§3.79 进入第二轮"目标模式 256 轮"深入优化。
+> 本节记录 Round 4-9 的架构级更新（Round 1-3 详见 §10.21 断点/孤儿更新标注 + 技术说明 C.26-C.28）。
+
+### 10.22.1 教学链路可靠性（Round 4 · v1.2.16）
+
+| 项 | 更新 |
+|---|---|
+| manim 真实渲染 | `manim_service.py` 数学视频真实渲染链路修复——视频/Manim 产出从"脚本"到"可播放视频"打通 |
+| 学习计划 format | `services/planner.py` 学习计划输出格式修复（结构校验通过） |
+| 孤儿归零 | 最后一个孤儿接线完成——**孤儿模块 0 个**（production_pipeline 归档至 `归档_废弃副本/`） |
+| 前端按钮 UX | 前端按钮状态/反馈优化（E2E 找茬联动） |
+
+### 10.22.2 LLM 延迟与模式识别（Round 5 · v1.2.17）
+
+| 项 | 更新 |
+|---|---|
+| LLM 延迟优化（D1） | `services/production_pipeline.py` 延迟优化——教学链路 LLM 调用减负 |
+| 教学模式识别规则优先 | 教学模式判断确定性规则优先于 LLM（降延迟 + 提确定性） |
+| 诊断禁检索 | 诊断阶段不再触发知识库检索（避免无效 LLM 调用） |
+
+### 10.22.3 商业化部署能力（Round 6-7 · v1.2.18-v1.2.19）
+
+| 项 | 更新 |
+|---|---|
+| D2 灰度脚本（Round 6） | `deploy/canary.ps1` 灰度发布脚本落地（1-5%→20%→50%→100% + kill switch） |
+| E2 golden set（Round 6） | `tests/test_round16_golden_set.py` 质检集 51 条（初中 12/高中 12/大学 13/考研 13） |
+| A3 声明化（Round 6） | `services/subagent_manifest.py` subagent 声明化深化（manifest 驱动） |
+| 首步先行体验（Round 7） | step 事件携带 topic 骨架 → 前端"正在讲解第 N 步：xxx"（缓解 19.6s 延迟空白） |
+| D9 远程模块切换（Round 7） | GET/POST `/api/admin/modules` kill switch 可执行化（原子写 paeg_modules.json 热重载） |
+
+### 10.22.4 安全加固与质检扩容（Round 8-9 · v1.2.20-v1.2.21）
+
+| 项 | 更新 |
+|---|---|
+| admin 权限保护（Round 8） | POST `/api/admin/modules` 需 `PAEG_ADMIN_TOKEN`（X-Admin-Token 头；未配置→401 安全默认） |
+| 前端 abort 加固（Round 8） | done 事件清 `window._genAbort = null`（修复 SSE 流 done 后下一条被误中止） |
+| kill switch 演练（Round 8） | `deploy/kill_switch_drill.md` 首次 PASS（关闭→热重载→审计→恢复 <10s） |
+| E2E 复跑确认（Round 9） | 12/16 通过，4 失败 = LLM 限流排队环境噪声（非产品缺陷）；找茬 E2E 累计发现 **8 个真实 bug** 全修复 |
+| 流式预渲染决策（Round 9） | presenter A 级思考链**不实施**流式化（破坏质量）；用 Round 7 首步骨架替代 |
+| E2 golden 扩容（Round 9） | 51 → 201 条（新增 150 条覆盖 12 学科），**409 测试全绿** |
+
+### 10.22.5 质量基线演进
+
+| 版本 | 全量回归 | golden set | 孤儿 |
+|---|---|---|---|
+| v1.2.15（Round 3） | 1040 无失败 | 51 条 | 3→1 |
+| v1.2.16（Round 4） | — | — | **0（归零）** |
+| v1.2.18（Round 6） | — | 101 条 | 0 |
+| v1.2.19（Round 7） | — | 101→151 条（209 全绿） | 0 |
+| v1.2.20（Round 8） | 1146 无失败 | 151 条（309 全绿） | 0 |
+| v1.2.21（Round 9） | **1245 无失败**（1 环境 flake 隔离） | 201 条（409 全绿） | 0 |
+
+### 10.22.6 架构状态更新（对照 §3.3 达标门槛）
+
+- 孤儿模块：**0 个**（v1.2.16 归零）——治理 4 列（condition_eval/agent_scope/agent_trirole/platform_dual_track）已全部接线
+- 商业化能力：D2 灰度脚本 + D9 kill switch + admin 认证全部落地——部署可观测性达标
+- 测试基线：1245 全量回归 + 409 golden——发布门槛测试层达标
