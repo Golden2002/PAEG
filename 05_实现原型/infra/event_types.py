@@ -60,6 +60,7 @@ PAEG_EVENT_TYPES = frozenset({
     "profile/stale-refreshed",  # §3.12 ⭐ 画像陈旧轻量诊断触发
     "config/invalid",           # §3.42 W11 ⭐ 配置 schema 校验失败
     "audit/violation",          # §3.42 W10 ⭐ 运行时不变式违规
+    "module/toggle",            # §3.79 D9 ⭐ kill switch 远程模块切换审计
 })
 
 KNOWN_EVENT_TYPES = CORE_EVENT_TYPES | PLUGIN_EVENT_TYPES | PAEG_EVENT_TYPES

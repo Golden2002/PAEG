@@ -1946,3 +1946,19 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 **A3 声明化深化**：
 - `validate_declaration_fields`：声明字段完整性（id/name/role/keywords）——与 registry 一致 + scopes + contracts 组成四层校验链
+
+### C.31 首步先行体验 + D9 远程模块切换 + golden set 扩容（v1.2.19 §3.79 ⭐）
+
+**首步先行体验优化**：
+- 问题：presenter 首步 LLM 生成 19.6s（Round 5 归因）——学生提交后 20s 无输出
+- 修复：`step` 事件携带 `topic` 骨架（40 字截断），前端 `updateTeachingStage('正在讲解第 N 步：{topic}…')`——骨架先行于内容（实测 step@16.9s vs presentation@38s）
+- 价值：学生感知"系统正在工作"而非空白等待；也是教学透明性（TutorOS 单步教学的可视化）
+
+**D9 远程模块切换（kill switch 可执行化）**：
+- `GET /api/admin/modules` 状态视图；`POST` 单/批量切换（原子写 paeg_modules.json → module_registry 热重载，无需重启）
+- 审计：`module/toggle` 事件（infra/event_types 注册），operator 字段可追溯
+- 与 deploy/canary.ps1 配合：灰度中发现问题 → 60s 内 API 关闭模块 → 复盘 → golden set 补回归
+
+**E2 golden set 扩容 51 → 101 条**：
+- 新增 50 条（初中 12/高中 12/大学 13/考研 13）：地理/历史/英语/政治/统计/经济/心理/社会/法律/生物/语文 等新学科
+- 209 测试全绿（101 × 学段特征+呈现长度 + 5 坏样例 + 规模）

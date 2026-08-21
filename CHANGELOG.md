@@ -1,3 +1,27 @@
+### v1.2.19 §3.79 首步先行体验 + D9 远程模块切换 + golden set 扩展 101 条（2026-08-21 ⭐）
+
+**本版定位**：Round 7——教学首步体验优化（延迟感知）、运维远程 kill switch（D9）、质量守护网扩容（E2）。
+
+**首步先行体验优化 ✅（presenter 19.6s 延迟的 UX 缓解）**：
+- 背景：probe_latency_fixed 确认首步 presenter LLM 生成 19.6s——学生提交后 20s 无任何输出（空白等待）
+- 修复：`step` 事件携带 `topic` 骨架（截断 40 字），前端立即显示"正在讲解第 N 步：{topic}…"——**骨架先行于内容**（真实验证：step@16.9s vs presentation@38s）
+- 新增 `test_round17_step_preview.py` 3 测守卫（step 含 topic/前端显示/截断）
+
+**D9 远程模块切换 ✅（kill switch 60s 止损可执行化）**：
+- `GET /api/admin/modules`：模块门控状态（审计视图）
+- `POST /api/admin/modules`：远程切换（单模块/批量，原子写 paeg_modules.json → 热重载即时生效，无需重启）
+- 审计：切换写 `module/toggle` 事件（infra/event_types 注册新事件类型）
+- 新增 `test_round17_admin_modules.py` 5 测守卫（状态/单切/批量/审计/400）+ 真实验证（voice 关→开恢复）
+
+**E2 golden set 扩展 ✅（51 → 101 条）**：
+- 新增 50 条手工质量样例（初中 12 + 高中 12 + 大学 13 + 考研 13，新学科：初中地理/历史/英语/政治、高中文科全覆盖、大学统计/经济/心理/社会、考研法律/统计/生物等）
+- 全部通过学段必过特征 + 呈现长度（3 条补长至 ≥80 字）
+- **209 测试全绿**（101 样例 × 2 断言 + bad samples + 规模）
+
+**验证**：Round 7 新增 8/8 + golden 209/209 + 全量回归绿。
+
+**文档**：CHANGELOG + 技术说明 C.31 + 任务清单 NEW-35 + 维护手册 §18.73 + 灰度规范 D9 勾销
+
 ### v1.2.18 §3.79 D2 灰度脚本落地 + E2 golden set + A3 声明化深化（2026-08-21 ⭐）
 
 **本版定位**：Round 6——部署运维（D2 灰度可执行化）、质量守护网（E2 golden set）、架构声明化（A3 深化）。
