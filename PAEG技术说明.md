@@ -2083,6 +2083,27 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 **验证**：P2 测试 14/14（templates 8 + manim_judge 6）+ P0/P1 回归 28/28；SURFACE 真实 LLM 评审抛物线动画 → overall 3.25 verdict=review（识别"教学引导不足"——评审真实有效非形式化）。
 
+
+### C.37 E1 采纳埋点 + C5 家长看板 + B3 OTel 导出（§3.82 · v1.2.25 ⭐）
+
+> 总需求文档三大遗留项（E1 埋点增强 / C5 家长实时看板 / B3 OTel 导出）同日落地。
+
+**E1 采纳事件埋点**（采纳率从"不可精确计算"到"精确事件计数"）：
+- `services/adoption_tracker.py`：record_adoption()（append-only evolve_data/adoption_events.jsonl）+ compute_acceptance()
+- `quality_gate.promote_to_insights`（沙盒转正=采纳）接入埋点
+- effect_metrics 优先读精确事件——"无采纳事件→不可精确计算"标注消除
+
+**C5 家长学情看板**（教育合规 P0-9 深化）：
+- `services/parent_dashboard.py`：会话数/学科分布/近 7 日趋势/掌握度/反思数 + 干预建议
+- 端点 `GET /api/parent/dashboard/<child_uid>`（PII 脱敏沿用 mask_pii）
+- 干预建议规则：近 7 日无活动 / 学科集中 >60% / 掌握度 <0.4
+
+**B3 OTel 导出**（SLO 可执行支撑）：
+- `services/otel_export.py`：export_telemetry()（trace 全链路按 trace_id 归组）+ failure_classification()（协议/业务/环境三分类）+ otlp_json_export()（OTLP 兼容 JSON，零外部依赖）
+- `/api/metrics` 接入 otel 摘要
+
+**验证**：三项测试 15/15（adoption 5 + dashboard 6 + otel 4）+ P0/P1 回归 14/14 = 29/29；SURFACE 三项实测（采纳率 0.67 / 看板 suggestions=1 / events=505 trace 归组正常）。
+
 ### C.34 隐患与既有 bug 挖掘修复 + 文档融贯（v1.2.22 §3.79 ⭐）
 
 > 融贯整合见正文 **§7.11 主线五**（数据安全与既有 bug 挖掘）；此条仅保留版本追溯要点。
