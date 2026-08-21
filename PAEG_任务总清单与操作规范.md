@@ -3362,10 +3362,36 @@ server.py `teach_video` 端点：
 
 **纠偏**：用户提到的"AgentKit"实为混淆——OpenAI AgentKit（DevDay 2025）是闭源可视化工具；"今天公开"的实为 **Codex Harness**（2026-08-20）；teleport/fork 是 Claude Code 概念（非 OpenAI）。
 
-### Oracle 借鉴设计（bg_9dfcd4af）
+### Oracle 借鉴设计（bg_9dfcd4af · 已完成）✅
 
-（待收集——收到后填入高 ROI 借鉴清单 + 实施路径）
+**Bottom line**：借架构模式不借实现语言——Codex 核心创新（事件流/技能惰性加载/能力声明）与 Rust/JSON-RPC 解耦，Python/Flask 可落地；性能增益来自 harness 设计而非语言。
+
+**高 ROI 借鉴清单（按 ROI 排序）**：
+
+| 优先级 | 借鉴项 | 现状 | 策略 | 实施点 |
+|---|---|---|---|---|
+| P0 | **Rollout 持久化**（teach_stream 可暂停/恢复/分支） | 六阶段状态在内存，崩溃即丢，无分支 | 阶段流转包装为 Rollout 事件（stage_enter/exit/material_emitted/student_response）+ SQLite append-only + RunState 快照 | paeg/rollout/store.py + restore.py + teach_stream 包裹 emitter（schema 带 version） |
+| P0 | **Skills + Manifest 延迟加载**（55 模块性能瓶颈） | 55 模块 eager import，冷启动+内存线性增长 | 每模块 YAML manifest（id/deps/lazy_from）+ 注册表按需解析 | paeg/skills/registry.py + schema.py + 55 模块重写为 Skill 包装（模块级 import 改函数级） |
+| P1 | **AGENTS.md 层级化**（自我进化可审计） | 进化洞见散落/临时，未沉淀为机构记忆 | Codex init-deep：根/域/模块三级 AGENTS.md + golden principles（correctness>safety>brevity>performance） | paeg/evolution/agents_md_writer.py + PAEG.md 顶层原则 |
+| P1 | **subagent 显式图**（13 subagent 可观测/可演进） | 调度硬编码/扁平注册表 | subagent_graph.json（节点+trigger/routing/依赖边）+ 版本控制 + admin 可视化 | paeg/agents/graph.py + config/ JSON + admin viewer |
+| P2 | **MCP 连接集中管理**（3 server 卫生化） | 3 MCP 直连无生命周期管理 | MCPConnectionManager 单例（注册/健康检查/重连） | paeg/mcp/manager.py + app factory 替换直接 import |
+| P3 | Thread/Turn/Item 对齐验证 | 已有三层模型 | 仅审计 Item 10K token 上限是否强制 | 验证项 |
+| P3 | <500 LoC 模块 | — | CI lint 规则 | 长期维持 |
+
+**不借鉴项（成本>收益）**：
+- **Rust 重写**：教学负载瓶颈在 LLM I/O 非 CPU；ARC 增益来自 harness 设计；改写 6-12 个月零性能收益
+- **JSON-RPC v2**：客户端是 Web UI+Flask 路由，REST 够用；迁移=全调用方破坏性变更
+- **V8 code-mode 沙箱**：PAEG 不执行任意用户代码；subprocess+资源限制足够
+- **多 model provider 抽象**：无模型切换需求前不引入复杂度
+- **完整 Manifest+Capabilities 沙箱**：教学智能体无需文件系统级沙箱
+
+**3 波实施路径**：
+- **Wave 1（1-2 周）**：MCP 集中管理（<1d）+ 模块尺寸 lint（2h）+ Thread/Turn/Item 审计（1d）
+- **Wave 2（3-4 周）**：Skills 延迟加载（1-2d）+ Rollout 持久化（1-2d）+ AGENTS.md 层级（1d）
+- **Wave 3（4-6 周）**：subagent 图（1-2d）+ 可选 shell-escalation 审批（1d）
+
+**风险提示**：Rollout schema 必须带 version；Skills 延迟加载需改函数级 import（55 模块统一扫描）；AGENTS.md 深度≤3 层
 
 ### 实施记录
 
-（待 Oracle 策略后实施）
+（待排期实施——Wave 1 优先）
