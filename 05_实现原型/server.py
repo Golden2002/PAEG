@@ -193,8 +193,8 @@ def _slo_before():
     try:
         from flask import g as _g
         _g._slo_start = time.time()
-    except Exception:
-        pass
+    except Exception as _slo_e:
+        print(f"[PAEG][server.py] SLO start 异常忽略: {_slo_e}")
 
 
 @app.after_request
@@ -209,8 +209,8 @@ def _slo_after(resp):
                 (time.time() - _start) * 1000.0,
                 ok=(resp.status_code < 500),
             )
-    except Exception:
-        pass
+    except Exception as _slo2_e:
+        print(f"[PAEG][server.py] SLO record 异常忽略: {_slo2_e}")
     return resp
 
 # ═══════════════════════════════════════════════════════════
@@ -621,6 +621,7 @@ def preset_apply():
                 "learner_id": _learner_id or "", "from": "preset/apply",
             })
         except Exception as _ee:
+            print(f"[PAEG][server.py] preset_apply 审计事件异常忽略: {_ee}")
             pass
         _res = resolve_preset(_preset)
         return jsonify({
@@ -691,7 +692,8 @@ def parent_conversations(child_uid):
                 for _m in _pv.get("messages") or []:
                     if _m.get("content"):
                         _m["content"] = mask_pii(str(_m["content"]))
-        except Exception:
+        except Exception as _se:
+            print(f"[PAEG][server.py] parent_conversations 异常忽略: {_se}")
             pass
         return jsonify(_out)
     except Exception as _e:
@@ -875,7 +877,8 @@ def _teach_stream_gen(data):
             try:
                 from services.usage_guard import register_usage
                 register_usage(SESSIONS, str(learner_id))
-            except Exception:
+            except Exception as _se:
+                print(f"[PAEG][server.py] _save_teach_turn 异常忽略: {_se}")
                 pass
             if CONV_STORE is not None and _is_registered(learner_id):
                 _cid = SESSIONS.get(f"conv_{learner_id}")
@@ -1249,7 +1252,8 @@ def _teach_stream_gen(data):
                             f"『我们接下来是继续学习这个新话题，还是回去接着刚才的内容学习？"
                             f"你随时告诉我你的想法就可以。』"
                             f"若学生选择继续新话题，就顺着往下讲；若他主动问起之前的内容，再无缝衔接。")
-                except Exception:
+                except Exception as _se:
+                    print(f"[PAEG][server.py] gen_unknown 异常忽略: {_se}")
                     pass
             elif _rel == "revisit":
                 # 绕回历史话题：从主题栈恢复
@@ -1271,7 +1275,8 @@ def _teach_stream_gen(data):
                                 (f"学生绕回之前学的「{_hit.get('concept', '')}」"
                                  + (f"（上次讲到这里：{_prev_summary}）" if _prev_summary else "")
                                  + "：先简要衔接上次内容，再继续推进，不要重头重复。"))
-                    except Exception:
+                    except Exception as _se:
+                        print(f"[PAEG][server.py] gen_unknown 异常忽略: {_se}")
                         pass
                 _llm_intent = _prev_intent
                 _llm_conf = _follow.get("confidence", 0.5)

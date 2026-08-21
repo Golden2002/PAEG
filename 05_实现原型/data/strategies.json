@@ -322,5 +322,122 @@
     },
     "concept": "什么是熵？",
     "score": 0.88
+  },
+  {
+    "discovered_at": "2026-08-21T01:04:30.028384",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "什么是熵？",
+    "score": 0.927
+  },
+  {
+    "discovered_at": "2026-08-21T01:04:30.028407",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "什么是熵？",
+    "score": 0.927
+  },
+  {
+    "discovered_at": "2026-08-21T01:04:30.028413",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "什么是熵？",
+    "score": 0.927
+  },
+  {
+    "discovered_at": "2026-08-21T01:04:30.028416",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "什么是熵？",
+    "score": 0.927
+  },
+  {
+    "discovered_at": "2026-08-21T01:05:35.960515",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "为什么特洛伊战争持续十年？",
+    "score": 0.88
+  },
+  {
+    "discovered_at": "2026-08-21T01:06:59.691366",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "电车难题该拉开关吗？",
+    "score": 0.88
+  },
+  {
+    "discovered_at": "2026-08-21T01:06:59.691376",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "电车难题该拉开关吗？",
+    "score": 0.927
+  },
+  {
+    "discovered_at": "2026-08-21T01:06:59.691380",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "电车难题该拉开关吗？",
+    "score": 0.88
+  },
+  {
+    "discovered_at": "2026-08-21T01:06:59.691383",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "电车难题该拉开关吗？",
+    "score": 0.927
+  },
+  {
+    "discovered_at": "2026-08-21T01:07:50.229235",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "为什么负负得正？",
+    "score": 0.927
+  },
+  {
+    "discovered_at": "2026-08-21T01:07:50.229245",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "为什么负负得正？",
+    "score": 0.88
+  },
+  {
+    "discovered_at": "2026-08-21T01:07:50.229250",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "为什么负负得正？",
+    "score": 0.88
+  },
+  {
+    "discovered_at": "2026-08-21T01:07:50.229253",
+    "learner_profile": {
+      "grade_level": "high_school",
+      "cognitive_style": "visual"
+    },
+    "concept": "为什么负负得正？",
+    "score": 0.88
   }
 ]

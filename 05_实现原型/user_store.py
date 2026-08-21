@@ -40,6 +40,17 @@ class UserStore:
             with open(self.data_path, encoding='utf-8') as f:
                 self._data = json.load(f)
         except Exception:
+            # v1.2.22 ⭐ P0 修复（Round 10 审计挖掘）：此前损坏/被清空时静默兜底
+            # 空模板 → 后续任意 _save() 把空模板写回磁盘 → 注册用户数据永久丢失
+            # （users.json 曾被清空为 {"users": {}, "next_id": 1}，u106 等降级匿名）。
+            # 现在：文件存在但损坏 → 先备份留证再兜底，绝不静默覆盖。
+            if os.path.exists(self.data_path) and os.path.getsize(self.data_path) > 0:
+                _bad = f"{self.data_path}.corrupt_{int(time.time())}"
+                try:
+                    os.rename(self.data_path, _bad)
+                    print(f"[UserStore] users.json 损坏，已备份到 {_bad}，重建空模板")
+                except Exception as _be:
+                    print(f"[UserStore] users.json 损坏但备份失败: {_be}")
             self._data = {"users": {}, "next_id": 1}
         self._data.setdefault("users", {})
         self._data.setdefault("next_id", 1)
