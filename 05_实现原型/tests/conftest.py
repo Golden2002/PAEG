@@ -81,8 +81,23 @@ def _snapshot_real_data() -> dict:
 
 
 def _restore_real_data(snapshot: dict) -> None:
-    """把真实 users.json 还原成快照（保证测试不污染生产数据）。"""
+    """把真实 users.json 还原成快照（保证测试不污染生产数据）。
+
+    §3.79 Round 11 ⭐ 防数据丢失加固：快照为空模板（{"users": {}, "next_id": 1}）时
+    **不写回**——空模板只可能是"文件缺失/损坏/已被污染"，写回会把空固化（曾发生
+    注册用户数据反复丢失：服务器 _save 与 pytest restore 并发互相覆盖）。
+    仅当快照含真实用户（users 非空或 next_id>1）才还原，保护既有数据。
+    """
     try:
+        _snap_users = (snapshot or {}).get("users") or {}
+        _snap_next = int((snapshot or {}).get("next_id") or 1)
+        if not _snap_users and _snap_next <= 1:
+            # 空模板快照：不写回（防污染固化）；仅当文件当前也不存在时才补一个空模板
+            if not os.path.isfile(_REAL_USERS_JSON):
+                with open(_REAL_USERS_JSON, "w", encoding="utf-8") as f:
+                    json.dump({"users": {}, "next_id": 1}, f,
+                              ensure_ascii=False, indent=1)
+            return
         with open(_REAL_USERS_JSON, "w", encoding="utf-8") as f:
             json.dump(snapshot, f, ensure_ascii=False, indent=1)
     except Exception:

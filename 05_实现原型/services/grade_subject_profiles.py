@@ -197,20 +197,115 @@ SUBJECT_GRADE_DEPTH: Dict[Tuple[str, str], dict] = {
 # ─────────────────────────────────────
 # 注入钩子
 # ─────────────────────────────────────
+# §3.79 Round 11 ⭐ 学段通用输出质量强化（用户需求：大学生 lecture 式 + 高屋建瓴
+# 解题方法 + 举一反三例题；高中"例题+误区"；考研"考点+题型+易错"。注入侧质量增强，
+# 与 grade_quality_gate 输出侧守门互补——本处提前约束 LLM，减少守门补充依赖。）
+# ─────────────────────────────────────
+GRADE_OUTPUT_QUALITY: Dict[str, str] = {
+    "middle_school": (
+        "【输出质量·初中】讲解多用生活化比喻与直观现象，避免抽象术语；"
+        "每段结尾引导用自己的话复述。"),
+    "high_school": (
+        "【输出质量·高中】讲清定义/公式后，必须给出 1 个典型例题示范（含解题步骤），"
+        "并提醒 1 个常见误区或易错点；尽量举一反三：换条件问一句变式。"),
+    "undergraduate": (
+        "【输出质量·大学本科（lecture 式）】按课堂讲义风格组织：严格定义 → 定理/性质 → "
+        "推导思路 → 应用举例。重视高屋建瓴：先给该知识点的学科定位与核心思想（一句话点透"
+        "本质），再落到具体推导。解题类内容必须给出方法论/通法（不只是本题答案），并设计 "
+        "举一反三变式（换条件/换场景/反向问题）引导学生迁移。"),
+    "graduate_exam": (
+        "【输出质量·考研】围绕考点讲：先点明考什么、怎么考（题型）、考频；"
+        "给解题套路/模板（可套用的步骤）；给易错点与踩分点；尽量带真题示范。"),
+}
+
+# 常见本科/研究生学科 × 大学/考研 深度阶梯补全（§3.79 Round 11 ⭐ 扩展现有 5 学科）
+SUBJECT_GRADE_DEPTH_EXT: Dict[Tuple[str, str], dict] = {
+    # ── college_english ──
+    ("college_english", "undergraduate"): {
+        "scope": "大学英语（四六级/专业阅读）",
+        "avoid_terms": [],
+        "must_terms": ["长难句", "段落主旨", "语境", "学术表达"],
+        "depth_examples": ["长难句拆解三步法", "阅读主旨定位法"],
+    },
+    ("college_english", "graduate_exam"): {
+        "scope": "考研英语",
+        "avoid_terms": [],
+        "must_terms": ["考点", "题型套路", "易错", "得分"],
+        "depth_examples": ["阅读理解题型套路", "写作模板与踩分点"],
+    },
+    # ── computer ──
+    ("computer", "undergraduate"): {
+        "scope": "计算机科学基础（数据结构/操作系统/组成原理）",
+        "avoid_terms": [],
+        "must_terms": ["抽象", "复杂度", "算法", "严格定义"],
+        "depth_examples": ["数据结构抽象思维", "复杂度分析方法论"],
+    },
+    ("computer", "graduate_exam"): {
+        "scope": "计算机考研（408）",
+        "avoid_terms": [],
+        "must_terms": ["考点", "题型套路", "易错", "得分"],
+        "depth_examples": ["数据结构大题模板", "OS 题型套路"],
+    },
+    # ── economics ──
+    ("economics", "undergraduate"): {
+        "scope": "经济学原理/中级微观宏观",
+        "avoid_terms": [],
+        "must_terms": ["模型假设", "边际", "均衡", "严格定义"],
+        "depth_examples": ["边际分析通法", "一般均衡思想"],
+    },
+    ("economics", "graduate_exam"): {
+        "scope": "经济学考研",
+        "avoid_terms": [],
+        "must_terms": ["考点", "题型套路", "易错", "得分"],
+        "depth_examples": ["微观计算题套路", "宏观模型答题模板"],
+    },
+    # ── law ──
+    ("law", "undergraduate"): {
+        "scope": "法学基础（法理/民法/刑法）",
+        "avoid_terms": [],
+        "must_terms": ["规范", "构成要件", "严格定义", "案例"],
+        "depth_examples": ["构成要件分析法", "案例研习四步"],
+    },
+    ("law", "graduate_exam"): {
+        "scope": "法学考研",
+        "avoid_terms": [],
+        "must_terms": ["考点", "题型套路", "易错", "得分"],
+        "depth_examples": ["论述题框架模板", "案例分析踩分点"],
+    },
+    # ── philosophy ──
+    ("philosophy", "undergraduate"): {
+        "scope": "哲学导论/西方哲学史",
+        "avoid_terms": [],
+        "must_terms": ["论证", "概念澄清", "文本", "严格定义"],
+        "depth_examples": ["论证重构三步", "概念辨析法"],
+    },
+    ("philosophy", "graduate_exam"): {
+        "scope": "哲学考研",
+        "avoid_terms": [],
+        "must_terms": ["考点", "题型套路", "易错", "得分"],
+        "depth_examples": ["简答论述模板", "原著引证要点"],
+    },
+}
+
+
+# ─────────────────────────────────────
 def inject_grade_profiles(system: str, subject: str = "", grade: str = "") -> str:
     """注入学段学科 profile（深度阶梯 + 收尾模板）到 system prompt。
 
     - 深度阶梯：命中 (subject, grade) → 注入 scope/avoid/must
     - 收尾模板：命中 grade → 注入 closing_questions
     - 考研学科：subject 命中别名 → 注入考点解剖风格
+    - §3.79 Round 11 ⭐ 输出质量指令：命中 grade → 注入 GRADE_OUTPUT_QUALITY
+      （lecture 式/高屋建瓴/举一反三/考点套路——与 grade_quality_gate 输出守门互补）
     - 无命中 → 原样返回（幂等）
     """
     if not system:
         return system
     parts = []
 
-    # 1. 深度阶梯
-    depth = SUBJECT_GRADE_DEPTH.get((subject, grade))
+    # 1. 深度阶梯（基础表 + Round 11 扩展表）
+    depth = SUBJECT_GRADE_DEPTH.get((subject, grade)) \
+        or SUBJECT_GRADE_DEPTH_EXT.get((subject, grade))
     if depth:
         parts.append(
             f"【学段学科深度 {subject}/{grade}】范围：{depth['scope']}；"
@@ -227,6 +322,10 @@ def inject_grade_profiles(system: str, subject: str = "", grade: str = "") -> st
     if subject in KOREAN_EXAM_STYLES:
         parts.append(f"【考研风格】{KOREAN_EXAM_STYLES[subject]}")
 
+    # 4. §3.79 Round 11 ⭐ 学段通用输出质量指令（lecture 式/高屋建瓴/举一反三）
+    if grade in GRADE_OUTPUT_QUALITY:
+        parts.append(GRADE_OUTPUT_QUALITY[grade])
+
     if not parts:
         return system
     if "【学段学科深度" in system:
@@ -235,4 +334,5 @@ def inject_grade_profiles(system: str, subject: str = "", grade: str = "") -> st
 
 
 __all__ = ["KOREAN_EXAM_STYLES", "KOREAN_EXAM_ALIASES", "CLOSING_QUESTIONS",
-           "SUBJECT_GRADE_DEPTH", "inject_grade_profiles"]
+           "SUBJECT_GRADE_DEPTH", "SUBJECT_GRADE_DEPTH_EXT",
+           "GRADE_OUTPUT_QUALITY", "inject_grade_profiles"]

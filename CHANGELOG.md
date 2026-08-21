@@ -1,3 +1,44 @@
+### v1.2.23 §3.79 后续步骤后台预生成 + 教学输出/物料质量强化 + 3 个既有 bug 修复（2026-08-21 ⭐）
+
+**本版定位**：Round 11——兑现 Round 9"后续步骤后台预生成"决策（教学体验强化）、教学输出与物料生产质量第三轮专门强化、LLM failover 链路隐患挖掘修复。
+
+**① 后续步骤后台预生成（教学体验）**：
+- 首轮第 1 步 presenter（19.6s）讲解期间，后台线程（独立 Presenter + learner 浅拷贝 + daemon）预生成剩余步骤 → 续讲轮**零 LLM 等待**直接消费缓存（8.6s/步 → ~0）
+- 并行启动优化：plan 生成后立即启动（与首步 presenter 并行，此前串行浪费 30s+）；步间 1.5s 节流（30 req/min 环境限流防护）
+- 缓存失效语义：`continue_step`（"用户要继续"）与缓存**兼容**（缓存正是后续内容）；仅 re_explain/give_example/switch_angle/request_full_content/detour/revisit/困惑 remediation 失效
+
+**② P0 既有 bug 挖掘——续讲轮永远只讲 1 步（Round 11 联动发现）**：
+- 根因：续讲轮判定 `_is_continuation` 在 L1795-1796 pop 后重新读 `teach_plan_done_` → 恒 False → 续讲轮被误判新 plan（只讲 1 步、剩余又存回）→ 多步 plan 永远讲不完，学生只能反复追问推进
+- 修复：判定在 pop 前定格 `_is_continuation = bool(_pending_steps)`；真实 E2E 验证续讲轮从 26 → 126 presentation 分片（剩余步骤真正讲完）
+
+**③ 教学输出质量强化（第三轮专门强化）**：
+- `GRADE_OUTPUT_QUALITY` 4 学段输出质量指令（大学 lecture 式：严格定义→定理→推导→应用 + **高屋建瓴**（先点透本质/学科定位）+ **举一反三**变式；高中例题+误区；考研考点/题型/易错；初中生活化）
+- `SUBJECT_GRADE_DEPTH_EXT` 扩展 5 学科 × 2 学段深度阶梯（英语/计算机/经济/法学/哲学 × 大学/考研）
+- 真实 E2E：大学"线性变换" 6/6 特征全过——lecture 式输出含几何直觉、完整推导（为什么 det J 是放大倍数）、线性→非线性换元法学科视野；考研"二重积分" 3/3（考点/题型/易错）
+
+**④ P0 既有 bug 挖掘——LLM failover 签名不一致（Anthropic/Mock 必 TypeError）**：
+- 根因：`llm_adapter.AdapterLLM.chat` failover 对全部候选统一传 `tools/tool_choice`，但 `AnthropicModelAPI.chat`/`MockModelAPI.chat` 签名缺这两个参数 → 主候选失败时兜底候选必然 TypeError → `AllProvidersFailedError`（日志实锤："got an unexpected keyword argument 'tools'"）
+- 修复：Anthropic 签名对齐（tools 透传 + tool_choice 归一化辅助方法）；Mock 签名对齐；`test_round18_llm_failover_sig.py` 参数化签名契约守卫（4 子类全查）
+
+**⑤ 物料生产质量强化（第三轮）**：
+- 新增 `check_ppt_outline` PPT 大纲结构检查（分页/每页要点/无空页/无占位），接入 LessonPrep `quality_report.ppt_check`（补齐 handout/script/mindmap 覆盖）
+- 既有 handout（真实数据例题）/script（口语过渡）/mindmap 检查器回归全过
+
+**⑥ 张宇扬课件知识库接线（用户小需求，Round 11 补全）**：
+- 课件目录已入 Library/common（Round 12 完成），但 library_loader 只索引 .md/.txt/.json → **课件主体（22 份 PDF）仅登记不可检索**
+- 修复：PDF（pypdf）/PPTX（python-pptx）文本提取 → `raw_files[].content` → `search_facts` 接入课件检索（`kind="courseware"`）——真实验证：`遗传`→HWE/IBD/近交系、`生态`→岛屿物种形成、`生物信息`→序列到功能演化
+- **性能优化**：全量提取 352s → 落盘缓存（`.courseware_cache.json` 按 mtime）+ `_manifest` 清单快速路径 → 二次构造 **43s → 0.22s（200 倍）**
+
+**⑦ P0 既有 bug 复发根治——users.json 反复清空（Round 11 挖掘）**：
+- 复发现象：Round 10 恢复的 3 用户又变空模板（users:0, next_id:1）
+- **根因**：服务器进程内存与磁盘 users.json 不同步——服务器启动时文件恰为空模板 → 内存空 → 后续任何 `_save()`（register/login/save_learner）用空内存覆盖磁盘恢复的数据
+- **根治**：①conftest `_restore_real_data` 空模板快照不再写回（防 pytest 与服务器并发互相覆盖）；②`UserStore._load` 检测"空模板但 users_data 有 u 画像目录"→ 数据丢失征兆告警；③恢复数据后必须重启服务器
+- **L2923 静默异常**：`_auto_build_video_outline` 的 `except: pass`（视频大纲降级路径）补日志
+
+**验证**：Round 18 新增 62/62（pregen 12 + output_quality 13 + failover_sig 9 + material 11 + courseware 6 + step_preview 5 + material_outputs 6）+ golden 409/409 + 全量回归 1290 passed（1 断言修复）+ audit 40/40。
+
+**文档**：CHANGELOG + 技术说明（§7.11 融贯更新 + C.35）+ 任务清单 NEW-39 + 维护手册 §18.78
+
 ### v1.2.22 §3.79 隐患与既有 bug 挖掘修复 + 文档融贯（2026-08-21 ⭐）
 
 **本版定位**：Round 10——按用户要求"挖掘并修复项目代码中的隐患和既有 bug"，审计 36/40 → **40/40 全绿**；技术说明文档融贯化（新增内容融入结构而非简单附随）。

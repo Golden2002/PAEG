@@ -54,6 +54,25 @@ class UserStore:
             self._data = {"users": {}, "next_id": 1}
         self._data.setdefault("users", {})
         self._data.setdefault("next_id", 1)
+        # v1.2.23 ⭐ 数据丢失征兆检测（Round 11 复发）：users.json 为合法空模板
+        # （users 空 + next_id<=1）但 users_data 目录存在 u 前缀画像目录 → 高度疑似
+        # 数据被清空（服务器 _save 与 pytest restore 并发覆盖）。仅告警不自动改数据
+        # （避免误删真实空库），运维据此恢复（git 历史 / .bak）。
+        try:
+            _base = os.path.dirname(os.path.abspath(__file__))
+            _ud = os.path.join(_base, 'users_data')
+            if (not self._data.get("users") and int(self._data.get("next_id") or 1) <= 1
+                    and os.path.isdir(_ud)):
+                import re as _re
+                _profiles = [d for d in os.listdir(_ud)
+                             if _re.match(r'^u\d+$', d)
+                             and os.path.isfile(os.path.join(_ud, d, 'profile.json'))]
+                if len(_profiles) >= 1:
+                    print(f"[UserStore] ⚠️ 数据丢失征兆：users.json 为空模板但 users_data "
+                          f"存在 {len(_profiles)} 个 u 画像目录（{_profiles[:5]}）——"
+                          f"注册用户可能被清空，请从 git 历史/.bak 恢复")
+        except Exception:
+            pass
 
     def _save(self):
         # v0.46 ⭐ P0-5 修复：原子写（tmp + os.replace）——此前直接写可能因

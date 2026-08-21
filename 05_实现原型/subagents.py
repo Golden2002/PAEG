@@ -2675,9 +2675,11 @@ class LessonPrep:
         # §3.78 B3 ⭐ 视频脚本检查结果并入质量报告（结构化、可审计）
         quality_report["video_script_check"] = _video_check
         # §3.79 Q7 ⭐ 讲义/讲稿/思维导图结构检查（services/material_quality 对称补齐）
+        # §3.79 Round 11 ⭐ PPT 大纲结构检查（check_ppt_outline 新增，PPT 质量上乘守护）
         try:
             from services.material_quality import (
-                check_handout, check_lecture_script, check_mindmap)
+                check_handout, check_lecture_script, check_mindmap,
+                check_ppt_outline)
             quality_report["handout_check"] = check_handout(handout) if handout else {
                 "passed": True, "errors": [], "checked": False, "sections_found": []}
             quality_report["script_check"] = check_lecture_script(script) if script else {
@@ -2685,6 +2687,16 @@ class LessonPrep:
                 "has_open": False, "has_body": False, "has_close": False, "has_duration": False}
             quality_report["mindmap_check"] = check_mindmap(mindmap) if mindmap else {
                 "passed": True, "errors": [], "checked": False, "list_items": 0, "levels": []}
+            _ppt_outline_txt = ""
+            if isinstance(ppt_outline, list):
+                import json as _mq_json  # 局部导入（本模块无全局 json）
+                _ppt_outline_txt = "\n".join(
+                    str(x) if isinstance(x, str) else
+                    _mq_json.dumps(x, ensure_ascii=False) for x in ppt_outline)
+            elif isinstance(ppt_outline, str):
+                _ppt_outline_txt = ppt_outline
+            quality_report["ppt_check"] = check_ppt_outline(_ppt_outline_txt) if _ppt_outline_txt else {
+                "passed": True, "errors": [], "checked": False, "pages": 0, "items_per_page": []}
         except Exception as _mq_e:
             print(f"[PAEG][subagents.py] 物料质量检查忽略: {_mq_e}")
         # §3.79 Round 9 ⭐ 部分产出请求评分口径修复：

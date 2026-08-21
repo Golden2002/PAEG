@@ -267,6 +267,7 @@ def reload_library() -> int:
 def _load_library_instance():
     """构造 KnowledgeLibrary 实例并注册到 KB（供 reload_library 复用）。"""
     from library_loader import KnowledgeLibrary
-    _lib = KnowledgeLibrary()
+    # §3.79 Round 11 ⭐ 单例缓存：PDF/PPTX 课件提取较重，进程内只构造一次
+    _lib = KnowledgeLibrary._get_instance()
     _lib.register(get_kb())
     return _lib
