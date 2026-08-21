@@ -3333,3 +3333,39 @@ server.py `teach_video` 端点：
 ### 实施记录
 
 （按优先级实施中——P0 优先）
+
+## §3.85 借鉴 OpenAI Codex Harness（2026-08-21）
+
+### 用户要求（原文）
+
+"还要调研openai今天公开的harness，咨询oracle，借鉴其项目，提出需求和策略，更新入需求文档"
+
+### 调研发现（librarian bg_bfaf2cb5 · 已完成）✅
+
+**OpenAI Codex Harness**（2026-08-20 开源 = "今天公开"项目）：
+
+| 维度 | 详情 |
+|---|---|
+| 仓库 | openai/codex（Apache-2.0，110.9k⭐，17k forks） |
+| 核心组件 | codex-rs（Rust 引擎）+ codex-cli + sdk + app-server（JSON-RPC） |
+| 性能 | harness 优化使 ARC-AGI-3 13.3%→38.3%；token 消耗降至 1/6 |
+
+**8 大核心机制**：
+1. **Thread/Turn/Item 三层会话**（Turn=模型 step；Item 有界≤10K tokens）
+2. **JSON-RPC app-server v2**（thread/start/read/resume + camelCase + cursor 分页 + schema 自动生成）
+3. **Rollout 持久化 + RunState 恢复**（会话事件流 append-only，跨进程恢复）
+4. **Manifest + Capabilities 沙箱**（工作区契约 + Shell/Filesystem/Skills/Memory/Compaction 即插即用）
+5. **MCP 中心化连接管理器**（MCPConnectionManager 避免散连）
+6. **shell-escalation + execpolicy 权限分级**（allow/ask/deny）
+7. **多模型 provider + 本地 LLM**（Ollama/LMStudio）
+8. **agent-graph-store 子智能体图 + code-mode V8 隔离执行**
+
+**纠偏**：用户提到的"AgentKit"实为混淆——OpenAI AgentKit（DevDay 2025）是闭源可视化工具；"今天公开"的实为 **Codex Harness**（2026-08-20）；teleport/fork 是 Claude Code 概念（非 OpenAI）。
+
+### Oracle 借鉴设计（bg_9dfcd4af）
+
+（待收集——收到后填入高 ROI 借鉴清单 + 实施路径）
+
+### 实施记录
+
+（待 Oracle 策略后实施）
