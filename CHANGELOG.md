@@ -1,3 +1,25 @@
+### v1.2.18 §3.79 D2 灰度脚本落地 + E2 golden set + A3 声明化深化（2026-08-21 ⭐）
+
+**本版定位**：Round 6——部署运维（D2 灰度可执行化）、质量守护网（E2 golden set）、架构声明化（A3 深化）。
+
+**D2 灰度发布脚本 ✅（deploy/canary.ps1 代码落地）**：
+- Canary 阶梯（C1 5%→C2 20%→C3 50%→C4 100%）+ 闸门检查（错误率 ≤0.5% + P95 ≤120s + health）+ kill switch（60s 止损，改 paeg_modules.json 热重载）+ rollback（git revert + smoke 验证）
+- 实测：`-Stage Status` 模块门控状态 ✓、`-Stage Gate` 闸门 PASS（error_rate=0% P95=1.8s）✓、`-Stage C1` 推进 ✓
+- 运维铁律补充：.ps1 中文需 UTF-8 **BOM**（PowerShell 5.1 无 BOM 按 ANSI 解析中文乱码破坏语法——checkup.ps1 同步修复）
+
+**E2 golden set 质检集 ✅（51 样例 × 3 断言 = 109 测试）**：
+- 51 条手工高质量教学输出（4 学段 × 多学科：初中生活化/高中定义例题误区/大学 lecture/考研考点题型真题易错）
+- 守护：`check_grade_features` 必过特征（MUST_HAVE 质量红线）+ `presentation_quality` 长度（≥80 字防碎片）+ 5 条坏样例漏检守护（检查器退化即失败）+ 规模 ≥50
+- 精修过程发现：检查器特征词（"比如/生活""学科视野"）与自然措辞的差异——golden set 价值即在此（内容质量标杆对齐 Q7 验收基准）
+
+**A3 声明化深化 ✅**：
+- `subagent_manifest.validate_declaration_fields`：声明字段完整性校验（id/name/role/keywords 四字段，防声明退化）
+- 与 validate_against_registry（id 一致）+ validate_scopes（作用域）+ validate_contracts（三角色契约）组成完整校验链
+
+**验证**：golden set 109/109 + manifest/trirole 127/127 + 全量回归绿。
+
+**文档**：CHANGELOG + 技术说明 C.30 + 任务清单 NEW-34 + 维护手册 §18.72 + 灰度规范验收勾销
+
 ### v1.2.17 §3.79 LLM 延迟优化（D1）+ 教学模式识别规则优先（2026-08-21 ⭐）
 
 **本版定位**：Round 5——精确归因教学链路延迟（用户重点：教学对话响应速度），实施低风险优化并守护。
