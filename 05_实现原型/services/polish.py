@@ -37,6 +37,12 @@ def polish_text(text: str, context: str = "") -> str:
     """
     if not text or not text.strip():
         return text
+    # v0.71 ⭐ 病句确定性修正前置（规则兜底；对已修正文本幂等）
+    try:
+        from language_refiner import fix_known_gaffes
+        text = fix_known_gaffes(text)
+    except Exception:
+        pass
     try:
         from infra.runtime import get_paeg
         paeg = get_paeg()

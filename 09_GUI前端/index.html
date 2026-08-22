@@ -3210,11 +3210,22 @@ async function generalChat(text) {
     clearInterval(timeoutTimer);
     removeThinking(thinking);
     // 用 marked 渲染最终累积文本（替换纯文本为 markdown）
-    const textParts = Array.from(bubbleBody.querySelectorAll('span')).map(s => s.textContent).join('');
+    // v1.2.26 ⭐ 修复（用户反馈"✓知识库检索与回答连在一起"）：retrieval 徽章先于
+    // seg 插入气泡，其内部含 <span class="check">✓</span> 等 span——此前的
+    // querySelectorAll('span') 会把徽章文本也收进 textParts → marked 渲染成
+    // "<p>✓知识库检索你好…"（徽章混入正文）。现只收集**非徽章**的流式文本 span：
+    // 徽章 span 带 class（.check/.label-name），流式 seg span 无 class。
+    const textParts = Array.from(bubbleBody.querySelectorAll('span'))
+      .filter(s => !s.className)  // 徽章 span 有 class，流式文本 span 无 class
+      .map(s => s.textContent).join('');
     if (textParts) {
       try {
         const fixedText = fixMathCodeBlocks(fixBracketedFormulas(sanitizeFormulas(textParts)));
-        bubbleBody.innerHTML = toolCards.map(c => c.outerHTML).join('') +
+        // v1.2.26 ⭐ 保留检索徽章：重建前取出徽章 outerHTML，重建后放回顶部
+        // （原 innerHTML 整体替换会把徽章清除——徽章与正文分属独立 DOM 块）
+        const _badgeEl = bubbleBody.querySelector('.retrieval-badge');
+        const _badgeHtml = _badgeEl ? _badgeEl.outerHTML : '';
+        bubbleBody.innerHTML = _badgeHtml + toolCards.map(c => c.outerHTML).join('') +
           '<div class="md-content">' + (typeof marked !== 'undefined' ? marked.parse(fixedText) : escapeHtml(textParts)) + '</div>' +
           '<div class="msg-actions"><input type="checkbox" class="msg-select" title="选择此回复（可多选生成文档）" /><button class="msg-copy" title="复制此回复" aria-label="复制此回复" onclick="copyMsg(this)">复制</button><button class="msg-copy" title="朗读此回复" aria-label="朗读此回复" onclick="playMsgTTS(this)"><img class="link-icon" src="assets/icons/volume-2.svg" alt="朗读" style="width:13px;height:13px;vertical-align:middle"/></button></div>';
         // 保存原始文本（复制/文档用）
