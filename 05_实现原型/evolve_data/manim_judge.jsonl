@@ -1,0 +1,3 @@
+{"ts": "2026-08-21T22:08:00.339985", "topic": "导数", "result": {"checked": true, "dims": {"clarity": 4, "pedagogy": 5, "correctness": 4, "focus": 5}, "overall": 4.5, "verdict": "pass", "reason": "OK"}}
+{"ts": "2026-08-21T22:08:16.286116", "topic": "导数", "result": {"checked": true, "dims": {"clarity": 4, "pedagogy": 5, "correctness": 4, "focus": 5}, "overall": 4.5, "verdict": "pass", "reason": "OK"}}
+{"ts": "2026-08-21T22:09:01.147862", "topic": "抛物线 y=x²", "result": {"checked": true, "dims": {"clarity": 3, "pedagogy": 2, "correctness": 4, "focus": 4}, "overall": 3.25, "verdict": "review", "reason": "OK"}}

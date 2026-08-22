@@ -754,8 +754,8 @@ def parent_dashboard(child_uid):
             _out["subject_distribution"] = {
                 mask_pii(str(k)) if len(str(k)) > 4 else k: v for k, v in _subj.items()
             }
-        except Exception:
-            pass
+        except Exception as _pd_e2:
+            print(f"[PAEG][server.py] parent_dashboard 脱敏忽略: {_pd_e2}")
         return jsonify(_out)
     except Exception as _pd_e:
         return jsonify({"child_uid": child_uid, "error": str(_pd_e)}), 500
@@ -905,6 +905,17 @@ def _teach_stream_gen(data):
 
     # v0.69+ §3.20 ⭐ 深入版互动：strict_checkpoint 模式（交互式教学请求启用——每步后挂起等学生回答）
     _strict_checkpoint = bool(data.get("strict_checkpoint")) or bool(data.get("interactive"))
+
+    # §3.85 ⭐ Rollout 持久化（Codex Harness 借鉴 P0）：教学六阶段状态事件流 +
+    # RunState 快照——崩溃可恢复、审计可回放。事件记录失败静默降级（不影响教学）。
+    _rollout_id = ""
+    try:
+        from services.rollout import begin_run
+        _rl_learner = str(data.get("learner_id") or "anon")
+        _rl_concept = str(data.get("concept") or "")[:200]
+        _rollout_id = begin_run(_rl_learner, _rl_concept)
+    except Exception as _rl_e:
+        print(f"[PAEG][server.py] rollout 启动忽略: {_rl_e}")
 
 
     # v0.68+ P0-2（Step4）：hooks 事件触发（session.start / message.before_user），永不阻断
@@ -1782,6 +1793,14 @@ def _teach_stream_gen(data):
             print(f"[PAEG][server.py] srs_reminder 忽略: {_srs_e}")
             pass
         # 诊断
+        # §3.85 ⭐ Rollout 事件：diagnosis 阶段进入
+        try:
+            if _rollout_id:
+                from services.rollout import record_event
+                record_event(_rollout_id, "diagnosis", "stage_enter",
+                             {"concept": str(concept)[:100]})
+        except Exception as _rl_e2:
+            print(f"[PAEG][server.py] rollout diagnosis 事件忽略: {_rl_e2}")
         yield f"event: diagnosis\ndata: {json.dumps({'status': 'diagnosing'})}\n\n"
         # v0.27 ⭐ 需求：对话输出前检索状态标志（前端小徽章"已完成知识库检索"）
         # v0.36.1 ⭐ 修复：教学路径联网检索——知识库无匹配时自动联网补充，badge 动态显示
@@ -1923,6 +1942,20 @@ def _teach_stream_gen(data):
             plan = paeg.planner.run(learner, diagnosis, subject, concept, tone_info,
                                     teach_state=_planner_state, action=_planner_action)
             yield f"event: plan\ndata: {json.dumps(plan, ensure_ascii=False)}\n\n"
+            # §3.85 ⭐ Rollout 事件：plan 阶段完成 + RunState 快照（崩溃可恢复）
+            try:
+                if _rollout_id:
+                    from services.rollout import record_event, save_state
+                    _steps_n = len(plan.get("steps") or [])
+                    record_event(_rollout_id, "plan", "stage_exit",
+                                 {"steps": _steps_n})
+                    save_state(_rollout_id, str(learner_id), str(concept)[:200],
+                               {"stage": "plan", "steps": _steps_n,
+                                "plan_summary": {k: plan.get(k) for k in
+                                                 ("strategy", "strategy_name")
+                                                 if k in plan}})
+            except Exception as _rl_e3:
+                print(f"[PAEG][server.py] rollout plan 事件忽略: {_rl_e3}")
 
         # v0.26 ⭐ C3-3 P0 修复：teach_stream 补 Individuality 注入 + 用户资料注入
         # （此前只有同步 paeg.teach 有——流式教学主路径缺个体化/用户资料，检视确认的断链）
@@ -2250,6 +2283,16 @@ def _teach_stream_gen(data):
                 pass
             _assistant_parts.append(presentation.get("content") or "")  # v0.21.3
             _prev_presentations.append(presentation)  # v0.21.8：累积讲解供下一轮参考
+            # §3.85 ⭐ Rollout 事件：material_emitted（教学步骤产出）
+            try:
+                if _rollout_id:
+                    from services.rollout import record_event
+                    record_event(_rollout_id, "presentation", "material_emitted",
+                                 {"step": i + 1,
+                                  "content_len": len(presentation.get("content") or ""),
+                                  "topic": str(step.get("topic") or "")[:60]})
+            except Exception as _rl_e4:
+                print(f"[PAEG][server.py] rollout material 事件忽略: {_rl_e4}")
             # v0.40.2 ⭐ 修复：教学主循环 presentation 分片 yield（此前整段一次性 yield → 前端"等很久突然一大段"）
             # 对齐早退分支（[i:i+60] 分片）与 chat 的 seg 模式——用户感知逐步输出
             import time as _t_split
@@ -2524,6 +2567,16 @@ def _teach_stream_gen(data):
             pass
         _done_payload = {"status": "completed"}
         _done_payload.update(_done_extra)
+        # §3.85 ⭐ Rollout 事件：done + 最终快照（审计回放/崩溃恢复闭环）
+        try:
+            if _rollout_id:
+                from services.rollout import record_event, save_state
+                record_event(_rollout_id, "done", "done",
+                             {"mode": _done_payload.get("mode", "teach")})
+                save_state(_rollout_id, str(learner_id), str(concept)[:200],
+                           {"stage": "done", "status": "completed"})
+        except Exception as _rl_e5:
+            print(f"[PAEG][server.py] rollout done 事件忽略: {_rl_e5}")
         yield f"event: done\ndata: {json.dumps(_done_payload, ensure_ascii=False)}\n\n"
         # v0.68+ P0-2（Step4）：hooks 事件触发（message.after_assistant），永不阻断
         try:

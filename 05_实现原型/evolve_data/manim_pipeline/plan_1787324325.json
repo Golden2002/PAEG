@@ -1,0 +1,322 @@
+{
+  "meta": {
+    "title": "抛物线：从对称到焦点",
+    "subject": "抛物线",
+    "audience": "高中",
+    "target_duration_sec": 120,
+    "style": "3blue1brown",
+    "core_intuition": "抛物线是到定点（焦点）与到定直线（准线）距离相等的点的轨迹——这一对称性赋予了它反射聚焦的物理本质。",
+    "learning_objectives": [
+      "理解抛物线的定义：到焦点与到准线距离相等",
+      "从几何轨迹过渡到标准方程 y² = 2px",
+      "感知焦点在抛物线反射性质中的核心地位"
+    ]
+  },
+  "narrative_arc": {
+    "act1": "直觉建立：用直观的几何动效展示“到定点与到定直线距离相等”的运动轨迹，不出现任何符号。",
+    "act2": "符号引入：在已建立的几何对象上叠加坐标轴与字母标注，定义焦点 F 与准线 l。",
+    "act3": "形式化：给出抛物线标准方程，并展示方程与几何定义的对应关系。",
+    "act4": "升华与回看：通过反射光线的动效，展示焦点在物理中的意义，回看定义，形成闭环。"
+  },
+  "visual_system": {
+    "palette": {
+      "focus": "#FF5252",
+      "directrix": "#4CAF50",
+      "parabola": "#2196F3",
+      "path_trace": "#FFC107",
+      "auxiliary": "#9E9E9E"
+    },
+    "semantic_binding": {
+      "焦点": "focus",
+      "准线": "directrix",
+      "抛物线轨迹": "parabola",
+      "动点轨迹/光线路径": "path_trace",
+      "辅助线/坐标轴": "auxiliary"
+    },
+    "spatial_roles": {
+      "焦点": "固定点，位于抛物线内部",
+      "准线": "固定直线，位于抛物线外部",
+      "抛物线": "由动点生成的曲线",
+      "动点": "沿抛物线运动的点，其到焦点与到准线的距离始终相等"
+    }
+  },
+  "scenes": [
+    {
+      "id": "scene1_symmetry_discovery",
+      "concept": "对称的轨迹",
+      "duration_sec": 20,
+      "pause_after_sec": 3,
+      "prerequisites": [],
+      "narration": "想象一个点，它到一个固定点和一条固定直线的距离总是相等。当它运动时，会画出怎样一条曲线？",
+      "on_screen_text": "距离相等",
+      "animations": [
+        {
+          "t": 0,
+          "mobjects": [
+            "fixed_point",
+            "fixed_line",
+            "moving_point"
+          ],
+          "action": "fade_in",
+          "description": "在画面左下方显示一个固定点（红色），在其下方显示一条水平固定直线（绿色），在两者之间偏右处显示一个移动点（黄色）",
+          "duration_sec": 2
+        },
+        {
+          "t": 2,
+          "mobjects": [
+            "moving_point",
+            "distance_to_point",
+            "distance_to_line"
+          ],
+          "action": "show_distance_equality",
+          "description": "从移动点分别画虚线到固定点和到固定直线（垂线段），两条虚线长度相等，用等长标记动画强调",
+          "duration_sec": 4
+        },
+        {
+          "t": 6,
+          "mobjects": [
+            "moving_point",
+            "parabola_path"
+          ],
+          "action": "trace_path",
+          "description": "移动点开始沿一个U形轨迹运动，同时留下一条蓝色轨迹线（抛物线形状），移动过程中两条距离虚线始终等长",
+          "duration_sec": 8
+        },
+        {
+          "t": 14,
+          "mobjects": [
+            "moving_point",
+            "parabola_path"
+          ],
+          "action": "highlight_symmetry",
+          "description": "轨迹画完后，移动点回到顶点位置，整个抛物线左右对称地闪烁一下，强调其对称性",
+          "duration_sec": 3
+        }
+      ]
+    },
+    {
+      "id": "scene2_labeling",
+      "concept": "焦点与准线",
+      "duration_sec": 18,
+      "pause_after_sec": 3,
+      "prerequisites": [
+        "scene1_symmetry_discovery"
+      ],
+      "narration": "这个固定的点，我们叫它焦点；这条固定的直线，叫它准线。抛物线上任意一点，到焦点的距离，等于到准线的距离。",
+      "on_screen_text": "焦点·准线",
+      "animations": [
+        {
+          "t": 0,
+          "mobjects": [
+            "fixed_point",
+            "fixed_line",
+            "parabola_path"
+          ],
+          "action": "fade_in",
+          "description": "将上一幕结束时的画面淡入：红色固定点、绿色固定直线和蓝色抛物线轨迹",
+          "duration_sec": 2
+        },
+        {
+          "t": 2,
+          "mobjects": [
+            "fixed_point",
+            "label_focus"
+          ],
+          "action": "add_label",
+          "description": "在红色固定点旁边添加字母 F（红色），并让点闪烁一下，表示这是焦点",
+          "duration_sec": 3
+        },
+        {
+          "t": 5,
+          "mobjects": [
+            "fixed_line",
+            "label_directrix"
+          ],
+          "action": "add_label",
+          "description": "在绿色直线一端添加字母 l（绿色），并让直线闪烁一下，表示这是准线",
+          "duration_sec": 3
+        },
+        {
+          "t": 8,
+          "mobjects": [
+            "moving_point",
+            "parabola_path"
+          ],
+          "action": "replay_with_labels",
+          "description": "移动点重新沿抛物线运动一次，这次运动时，虚线到 F 和到 l 的距离用等长标记强调，画面一角显示文字“焦点”和“准线”",
+          "duration_sec": 7
+        }
+      ]
+    },
+    {
+      "id": "scene3_equation_intro",
+      "concept": "坐标与方程",
+      "duration_sec": 22,
+      "pause_after_sec": 4,
+      "prerequisites": [
+        "scene2_labeling"
+      ],
+      "narration": "现在，让我们把坐标系放进来。把准线放在 y 轴上，焦点放在 x 轴正半轴上。设焦点到准线的距离为 p，那么焦点的坐标就是 (p/2, 0)，准线方程是 x = -p/2。",
+      "on_screen_text": "设距离为 p",
+      "animations": [
+        {
+          "t": 0,
+          "mobjects": [
+            "coordinate_axes"
+          ],
+          "action": "fade_in_axes",
+          "description": "在画面中央淡入 x 轴和 y 轴（灰色），原点在抛物线顶点位置",
+          "duration_sec": 3
+        },
+        {
+          "t": 3,
+          "mobjects": [
+            "fixed_point",
+            "fixed_line"
+          ],
+          "action": "snap_to_axes",
+          "description": "焦点 F 移动到 x 轴正半轴 (p/2, 0) 位置，准线 l 移动到与 y 轴重合的直线 x = -p/2 位置，抛物线随之调整",
+          "duration_sec": 5
+        },
+        {
+          "t": 8,
+          "mobjects": [
+            "distance_p_label"
+          ],
+          "action": "show_p_distance",
+          "description": "在焦点和准线之间画一条水平双箭头线段，标注长度 p（灰色），并让 p 闪烁",
+          "duration_sec": 4
+        },
+        {
+          "t": 12,
+          "mobjects": [
+            "focus_coordinate_label",
+            "directrix_equation_label"
+          ],
+          "action": "show_symbols",
+          "description": "在焦点旁出现坐标 (p/2, 0)，在准线旁出现方程 x = -p/2，两个标注用辅助色",
+          "duration_sec": 6
+        }
+      ]
+    },
+    {
+      "id": "scene4_equation_derivation",
+      "concept": "距离公式推导",
+      "duration_sec": 30,
+      "pause_after_sec": 5,
+      "prerequisites": [
+        "scene3_equation_intro"
+      ],
+      "narration": "设抛物线上任意一点为 M(x, y)。它到焦点 F(p/2, 0) 的距离，用两点间距离公式；它到准线 x = -p/2 的距离，就是 x + p/2。令两者相等，两边平方，就得到 y² = 2px。",
+      "on_screen_text": "y² = 2px",
+      "animations": [
+        {
+          "t": 0,
+          "mobjects": [
+            "coordinate_axes",
+            "parabola_path",
+            "moving_point"
+          ],
+          "action": "fade_in",
+          "description": "淡入坐标系、蓝色抛物线和移动点 M（黄色），M 位于抛物线右支上",
+          "duration_sec": 3
+        },
+        {
+          "t": 3,
+          "mobjects": [
+            "distance_to_focus_formula"
+          ],
+          "action": "show_formula",
+          "description": "在 M 到 F 的虚线上方出现公式：|MF| = √((x - p/2)² + y²)",
+          "duration_sec": 5
+        },
+        {
+          "t": 8,
+          "mobjects": [
+            "distance_to_directrix_formula"
+          ],
+          "action": "show_formula",
+          "description": "在 M 到准线的垂线段旁出现公式：d = x + p/2",
+          "duration_sec": 5
+        },
+        {
+          "t": 13,
+          "mobjects": [
+            "equality_equation"
+          ],
+          "action": "show_equation",
+          "description": "在画面中央出现等式：√((x - p/2)² + y²) = x + p/2，并高亮等号",
+          "duration_sec": 4
+        },
+        {
+          "t": 17,
+          "mobjects": [
+            "final_equation"
+          ],
+          "action": "transform_equation",
+          "description": "等式通过平滑变形（rate_func: smooth）变为最终形式：y² = 2px，蓝色高亮，并让抛物线闪烁呼应",
+          "duration_sec": 8
+        }
+      ]
+    },
+    {
+      "id": "scene5_reflection",
+      "concept": "反射聚焦",
+      "duration_sec": 30,
+      "pause_after_sec": 5,
+      "prerequisites": [
+        "scene4_equation_derivation"
+      ],
+      "narration": "抛物线有一个奇妙的性质：从焦点发出的光线，经抛物线反射后，会平行射出；反过来，平行光射向抛物线，会全部汇聚到焦点。这就是为什么卫星天线和手电筒要用抛物面。",
+      "on_screen_text": "反射聚焦",
+      "animations": [
+        {
+          "t": 0,
+          "mobjects": [
+            "parabola_path",
+            "focus_point"
+          ],
+          "action": "fade_in",
+          "description": "淡入蓝色抛物线（开口向右）和红色焦点 F，隐藏坐标轴和准线",
+          "duration_sec": 3
+        },
+        {
+          "t": 3,
+          "mobjects": [
+            "light_ray_from_focus"
+          ],
+          "action": "emit_rays",
+          "description": "从焦点 F 向抛物线不同位置发出 3-4 条黄色光线，每条光线到达抛物线后反射为水平向右的平行光线",
+          "duration_sec": 10
+        },
+        {
+          "t": 13,
+          "mobjects": [
+            "parallel_incoming_rays"
+          ],
+          "action": "reverse_rays",
+          "description": "动画倒放：水平平行光线从右侧射向抛物线，反射后全部汇聚到焦点 F，汇聚瞬间焦点闪烁",
+          "duration_sec": 10
+        },
+        {
+          "t": 23,
+          "mobjects": [
+            "application_icons"
+          ],
+          "action": "show_applications",
+          "description": "在画面下方淡入两个小图标：一个卫星天线（碟形）和一个手电筒，分别对应汇聚和发射两种情形，用辅助色边框",
+          "duration_sec": 4
+        }
+      ]
+    }
+  ],
+  "qa_self_check": {
+    "no_formula_in_first_two_scenes": true,
+    "single_concept_per_scene": true,
+    "consistent_color_semantics": true,
+    "total_duration_sec": 120,
+    "duration_within_target": true,
+    "pause_after_key_moments_sec": 5,
+    "notes": "前两个 scene 仅使用文字标注和几何动效，无任何数学符号；第 3 个 scene 才引入 p 和坐标，第 4 个 scene 才出现完整公式。颜色语义全程一致：焦点红色、准线绿色、轨迹蓝色、动点黄色。每个 scene 时长 18-30 秒，总时长 120 秒，符合目标。关键推导和反射处均设置了 4-5 秒停顿。"
+  }
+}
