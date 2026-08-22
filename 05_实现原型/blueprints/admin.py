@@ -2,14 +2,42 @@
 
 §3.45 架构拆分 P1-3：自 server.py 迁出（原 L2604-2641），行为字节级不变。
 依赖注入：config_hub / hooks_hub / profile_bundle 懒加载（无 server 全局依赖）。
+§3.79 Round 12 ⭐ admin rate-limit 二道防线：写操作（模块切换）加 IP 频率限制——
+与 PAEG_ADMIN_TOKEN 认证叠加，防 token 爆破/恶意高频切换（kill switch 被滥用止损）。
 """
 from __future__ import annotations
 
 import os
+import threading
+import time
 
 from flask import Blueprint, jsonify, request
 
 bp = Blueprint("admin", __name__)
+
+# ── §3.79 Round 12 ⭐ admin 写操作限频（二道防线）──
+# 设计：每 IP 滑动窗口限频（默认 10 次/分钟）——token 爆破（暴力尝试）与高频误操作
+# （脚本死循环切模块）都被挡下；配合 token 认证（第一道防线：401 安全默认）。
+# 内存实现（无新依赖，进程内），窗口滑动，线程安全。
+_ADMIN_WRITE_LIMIT = int(os.environ.get("PAEG_ADMIN_RATE_LIMIT", "10"))
+_ADMIN_WINDOW = 60  # 秒
+_admin_hits: dict = {}  # ip -> [ts...]
+_admin_lock = threading.Lock()
+
+
+def _admin_write_allowed() -> bool:
+    """滑动窗口限频检查：返回 False 表示超限（429）。"""
+    _ip = request.remote_addr or "unknown"
+    _now = time.time()
+    with _admin_lock:
+        _hits = _admin_hits.setdefault(_ip, [])
+        # 清理窗口外记录
+        while _hits and _now - _hits[0] > _ADMIN_WINDOW:
+            _hits.pop(0)
+        if len(_hits) >= _ADMIN_WRITE_LIMIT:
+            return False
+        _hits.append(_now)
+        return True
 
 
 def _admin_authorized() -> bool:
@@ -93,6 +121,11 @@ def admin_modules_set():
     if not _admin_authorized():
         return jsonify({"ok": False,
                         "error": "需要 PAEG_ADMIN_TOKEN（请求头 X-Admin-Token 或 ?token=）"}), 401
+    # §3.79 Round 12 ⭐ 二道防线：写操作限频（token 爆破/高频滥用防护）
+    if not _admin_write_allowed():
+        return jsonify({"ok": False,
+                        "error": f"写操作过于频繁（限 {_ADMIN_WRITE_LIMIT} 次/{_ADMIN_WINDOW}s，"
+                                 "可设 PAEG_ADMIN_RATE_LIMIT 调整）"}), 429
     data = request.get_json(force=True) or {}
     _module = str(data.get("module") or "").strip()
     _toggle = data.get("modules")

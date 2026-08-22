@@ -148,3 +148,52 @@ def test_modules_get_open(backup_cfg, monkeypatch):
     monkeypatch.delenv("PAEG_ADMIN_TOKEN", raising=False)
     r = client.get("/api/admin/modules")
     assert r.status_code == 200
+
+
+# ─────────────────────────────────────────────
+# §3.79 Round 12 ⭐ admin rate-limit 二道防线（token 爆破/高频滥用防护）
+# ─────────────────────────────────────────────
+class TestAdminRateLimit:
+    """写操作限频：同一 IP 超限 → 429；GET 不受限；限频可配置。"""
+
+    def test_write_limited_after_threshold(self, backup_cfg, monkeypatch):
+        import blueprints.admin as _adm
+        # 调低阈值（3 次）便于测试
+        monkeypatch.setattr(_adm, "_ADMIN_WRITE_LIMIT", 3)
+        monkeypatch.setattr(_adm, "_admin_hits", {})  # 清空命中表
+        r1 = _post_modules({"module": "voice", "enabled": False})
+        r2 = _post_modules({"module": "voice", "enabled": True})
+        r3 = _post_modules({"module": "voice", "enabled": False})
+        r4 = _post_modules({"module": "voice", "enabled": True})
+        assert r1.status_code == 200
+        assert r2.status_code == 200
+        assert r3.status_code == 200
+        assert r4.status_code == 429, "第 4 次写操作应被限频（429）"
+        assert "频繁" in (r4.get_json() or {}).get("error", "")
+
+    def test_get_not_rate_limited(self, backup_cfg, monkeypatch):
+        import blueprints.admin as _adm
+        monkeypatch.setattr(_adm, "_ADMIN_WRITE_LIMIT", 2)
+        monkeypatch.setattr(_adm, "_admin_hits", {})
+        # GET 不受写限频影响（读审计视图）
+        for _ in range(5):
+            assert client.get("/api/admin/modules").status_code == 200
+
+    def test_unauthorized_not_counted(self, backup_cfg, monkeypatch):
+        """401（无 token）不消耗限频额度（限频只针对认证后的写请求）。"""
+        import blueprints.admin as _adm
+        monkeypatch.setattr(_adm, "_ADMIN_WRITE_LIMIT", 3)
+        monkeypatch.setattr(_adm, "_admin_hits", {})
+        for _ in range(5):
+            r = client.post("/api/admin/modules",
+                            json={"module": "voice", "enabled": False})
+            assert r.status_code == 401  # 无 token → 401（限频不介入）
+        # 正确 token 仍可用（额度未被 401 消耗）
+        assert _post_modules({"module": "voice", "enabled": False}).status_code == 200
+
+    def test_rate_limit_configurable(self, backup_cfg, monkeypatch):
+        import blueprints.admin as _adm
+        monkeypatch.setattr(_adm, "_ADMIN_WRITE_LIMIT", 1)
+        monkeypatch.setattr(_adm, "_admin_hits", {})
+        assert _post_modules({"module": "voice", "enabled": False}).status_code == 200
+        assert _post_modules({"module": "voice", "enabled": True}).status_code == 429

@@ -862,6 +862,29 @@ def teach_stream():
     """
     data = request.get_json(force=True)
     from flask import stream_with_context
+    # §3.79 Round 12 ⭐ Attempt Token 幂等护栏（Codex Harness 借鉴 A11）：
+    # 同 (learner_id, attempt_token) 短窗口内重复请求 → 短路返回（网络重试/前端连点
+    # 不重复触发 LLM 生成与落盘）。客户端带 X-Attempt-Token 头或请求体 attempt_token。
+    try:
+        _att_token = (request.headers.get("X-Attempt-Token")
+                      or str((data or {}).get("attempt_token") or "")).strip()
+        _att_learner = str((data or {}).get("learner_id") or "").strip()
+        if _att_token and _att_learner:
+            from services.idempotency import begin_attempt, attempt_status
+            if not begin_attempt(_att_learner, _att_token):
+                _st = attempt_status(_att_learner, _att_token) or "processing"
+                _dup_payload = json.dumps({
+                    "status": "duplicate_attempt",
+                    "attempt_token": _att_token,
+                    "prior": _st,
+                    "message": "该请求已提交（相同 attempt_token），未重复执行",
+                }, ensure_ascii=False)
+                return Response(
+                    "event: done\ndata: " + _dup_payload + "\n\n",
+                    mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache"}), 200
+    except Exception as _att_e:
+        print(f"[PAEG][server.py] attempt 幂等检查忽略: {_att_e}")
     return Response(
         stream_with_context(_teach_stream_gen(data)),
         mimetype="text/event-stream",

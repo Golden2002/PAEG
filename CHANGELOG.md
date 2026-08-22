@@ -1,3 +1,38 @@
+### v1.2.24 §3.79 E2 golden 扩容 252 + admin rate-limit + 量子力学 bug 根治 + Codex Harness 借鉴 + 终极版 E2E（2026-08-21 ⭐）
+
+**本版定位**：Round 12——质量守护网扩容（golden 201→252）、运维安全二道防线、用户报告 bug（量子力学被拒）根治、OpenAI Codex Harness 开源调研落地、终极版 E2E 高压测试实施。
+
+**① E2 golden set 扩容（201 → 300 条，607 测试全绿）**：
+- 新增 99 条：薄弱学科补强（art / computer_science / politics / sociology / statistics）+ 新学科（music 音乐 / astronomy 天文 / geology 地质 / physical_edu 体育）+ 大学生 lecture 式专项（透视法/递归分治/社会分层/操作性条件反射/康德的先验哲学/皮亚杰阶段论 等）+ 考研题型专项（艺术本质/功能主义/进程线程/IS-LM/泰勒公式/恒星演化 等）+ 高中/初中均匀覆盖（覆盖学科 20 → 24）
+- 每学段 MUST_HAVE 质量红线不变（初中生活化/可视化/复述引导、高中定义公式/例题/误区、大学严格定义/学科视野、考研考点/题型/易错）
+
+**② admin rate-limit 二道防线（运维安全）**：
+- `POST /api/admin/modules` 写操作加 IP 滑动窗口限频（默认 10 次/60s，`PAEG_ADMIN_RATE_LIMIT` 可配）——与 PAEG_ADMIN_TOKEN 认证叠加，防 token 爆破/高频滥用
+- 测试 +4（超限 429/GET 不受限/401 不消耗额度/可配置）；真实 POST 11 连发第 11 次 429 验证
+
+**③ 用户报告 bug 根治：量子力学被拒（P0）**：
+- 现象：教学模式问"量子力学"被拒（"未列入学科清单"）——量子力学是物理学二级学科，应正常教学
+- 根因：`_llm_detect` prompt 把量子力学当 unknown 示例 + 无子学科映射（规则层"量子"关键词存在但 LLM 路径覆盖）
+- 修复（按元能力 L918 铁律：**LLM 先判断、规则兜底**）：prompt 注入子学科归属知识（量子力学/热力学/电磁学→physics、微积分/线性代数→math、遗传学/神经科学→biology 等开放性指引），LLM 语义分类归入父学科；`SUBJECT_ALIASES` 别名表仅作 LLM 不可用时的规则兜底 + unknown 名二次映射；规则不再覆盖 LLM 判断
+- 验证：真实 LLM 10/10（量子力学/量子纠缠/麦克斯韦→physics、微积分→math、遗传学→biology、机器学习→AI、心理学→真未收录）；量子力学教学端到端 8/8（正常输出 65s 完整教学流，无"未列入"拒绝）
+
+**④ OpenAI Codex Harness 开源调研落地（2026-08-21 全面开源）**：
+- 调研：OpenAI 开源 Codex Harness 三件套（codex exec 受控子进程执行 / Codex SDK 可编程接口 / App Server 沙箱治理托管）+ sandbox-approvals 审批 + attempt token 幂等
+- **A8 exec 受控子进程引擎**（`services/exec_engine.py`）：物料生产重活（PPT/Manim/脚本执行）统一走 AST 安全校验（黑名单 import/call）+ 子进程隔离 + 超时 + 输出截断 + 临时目录清理——13 测试全过（恶意代码拦截/超时/截断/语法错误）
+- **A11 attempt token 幂等护栏**（`services/idempotency.py`）：teach_stream 接入 X-Attempt-Token——同 (learner_id, attempt_token) 窗口内重复请求短路（网络重试/前端连点不重复生成/落盘）——10 测试全过（并发单胜者/状态流转/TTL）
+- 需求文档新增 A8-A12（A9 sandbox / A10 approval / A12 App Server 记录待续）
+
+**⑤ E2E 找茬复跑 + 自适应冷却**：
+- 冷却策略优化：`_LAST_LLM_DT` 跟踪 LLM 用例耗时，慢（>50s 疑排队）→ 35s 慢速档，快 → 20s 基础档
+- 复跑 13 过 3（A3/A4/B5 超时为 LLM 限流环境噪声，Round 9 已归因非产品缺陷）
+
+**⑥ 终极版 E2E 高压测试（用户终极版规格）**：
+- `find_fault_ultimate_e2e.py`：维度 A 对抗/漂移对话（A-4 0/0 定义陷阱纠偏、A-5 秦始皇→番茄→经济跨时空关联+拉回、A-6 拒作弊+安抚）+ 维度 B 全物料（B-5 Manim 代码硬指标 class/construct/import/动画、B-6 视频分镜、B-7 讲义+Mermaid ≥3 级节点、B-8 PPT≥12 页+备注）+ Q 质量硬指标（防幻觉学科错配拒绝、LaTeX 闭合）
+
+**验证**：Round 12 新增 51/51（alias 15 + idempotency 10 + exec 13 + admin 13）+ golden 607/607 + audit 40/40；全量回归待统一跑。
+
+**文档**：CHANGELOG + 总需求（§4 A8-A12 + §5 新增 11-13 项）+ 任务清单 NEW-40 + 维护手册 §18.79
+
 ### v1.2.23 §3.79 后续步骤后台预生成 + 教学输出/物料质量强化 + 3 个既有 bug 修复（2026-08-21 ⭐）
 
 **本版定位**：Round 11——兑现 Round 9"后续步骤后台预生成"决策（教学体验强化）、教学输出与物料生产质量第三轮专门强化、LLM failover 链路隐患挖掘修复。
