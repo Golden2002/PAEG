@@ -1,4 +1,4 @@
-﻿﻿# PAEG 教育智能体 — 简明技术说明（v1.1.9）
+# PAEG 教育智能体 — 简明技术说明（v1.1.9）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -1437,7 +1437,7 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 
 **质量守门（§3.71/§3.75）**：每份产出过四类评分（教案 6 维 / 讲义 / PPT 大纲 5 维 / 视频脚本）+ **15 条硬性检查**（7 自动 + 5 LLM 评审 + 3 条 §3.75：三维结构/案例教学/互动环节），产出 `dim_scores` 与 `eval_mode`；`/api/lesson_prep/feedback` 收集教师反馈（L3 人工评估）。**PPT 自动配图**：三级来源（用户资料库 → 公共文件夹 → 联网 Bing 免 key）+ 缓存，缺图不阻塞。
 
-### 7.11 工程化就绪：Round 4-11 优化融贯（§3.79 · v1.2.14-v1.2.23 ⭐）
+### 7.11 工程化就绪：Round 4-12 优化融贯（§3.79 · v1.2.14-v1.2.24 ⭐）
 
 > 本小节把 Round 4-11 逐轮改进按主题融贯成五条主线（版本追溯见附录 C.26-C.35）——不再按版本流水账罗列，而是呈现"从功能可用到商业就绪"的完整链路。
 
@@ -1451,11 +1451,12 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 **主线二：质量守护网（学段×深度双层守门 + 输出质量注入 + golden set）**：
 - **teach_stream 守门接线**：学段特征/内容深度守门此前只挂 sync 路径 `paeg.teach`，GUI 实际走的 `/api/teach/stream` 从不执行 → 主循环接入（同门控 llm_generated+PAEG_GRADE_GATE）→ probe 4/4 全特征通过
 - **输出质量注入（Round 11 ⭐ 第三轮专门强化）**：`GRADE_OUTPUT_QUALITY` 4 学段输出指令（大学 lecture 式：严格定义→定理→推导→应用 + 高屋建瓴（先点透本质）+ 举一反三变式；高中例题+误区；考研考点/题型/易错；初中生活化）+ `SUBJECT_GRADE_DEPTH_EXT` 扩展 5 学科 × 2 学段深度阶梯（英语/计算机/经济/法学/哲学）——真实 E2E：大学"线性变换" 6/6 特征全过（含几何直觉、完整推导、学科视野）
-- **golden set 质检集**：51 → 101 → 151 → **201 条** × 3 断言 = **409 测试全绿**——学段特征必过（per-grade MUST_HAVE 质量红线）+ 呈现长度（≥80 字防碎片）+ 坏样例漏检守护；覆盖 20+ 学科 × 4 学段
+- **golden set 质检集**：51 → 101 → 151 → 201 → **252 条（Round 12 ⭐）** × 3 断言 = **511 测试全绿**——学段特征必过（per-grade MUST_HAVE 质量红线）+ 呈现长度（≥80 字防碎片）+ 坏样例漏检守护；覆盖 20+ 学科 × 4 学段；Round 12 补薄弱学科（art/CS/politics/sociology/statistics）+ 大学生 lecture 式/考研题型专项
 
-**主线三：运维可治理（灰度/回滚/kill switch/观测）**：
+**主线三：运维可治理（灰度/回滚/kill switch/限频/观测）**：
 - `deploy/canary.ps1` 灰度发布可执行化：Canary 阶梯（C1 5%→C4 100%）+ 闸门检查（错误率≤0.5%/P95≤120s/health）+ rollback（git revert+smoke）；修复 .ps1 中文 UTF-8 BOM（PS 5.1 无 BOM 按 ANSI 解析乱码）
 - **kill switch**：`paeg_modules.json` 热重载 60s 止损 + `GET/POST /api/admin/modules` 远程切换（PAEG_ADMIN_TOKEN 写保护，未配置→401 安全默认）+ `module/toggle` 事件注册；首次演练 PASS（关闭→热重载→审计→恢复 <10s）
+- **admin rate-limit 二道防线（Round 12 ⭐）**：`POST /api/admin/modules` 每 IP 滑动窗口限频（默认 10 次/60s，PAEG_ADMIN_RATE_LIMIT 可配）——与 token 认证叠加防爆破；401 不消耗额度、GET 不受限
 - 观测：`/api/metrics` + 效果指标管道 + SLO 分模式（D1 延迟归因：teach 35s = 路由/诊断 1.3s + 规划 5.6s + 首步讲解 19.6s 主导 + 其余 8.6s，presenter 长输出为基础设施级主因）
 
 **主线四：教学对话体验（模式识别/首步先行/后台预生成/前端健壮）**：
@@ -1469,9 +1470,15 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 - **根因加固**：`user_store._load` 遇损坏静默兜底空模板 + 后续 `_save()` 写回磁盘固化丢失 → 损坏先备份 `.corrupt_<ts>` 留证再兜底
 - **续讲轮判定 P0（Round 11）**：`_is_continuation` 在 pop 后重读 `teach_plan_done_` → 恒 False → 续讲轮被误判新 plan 只讲 1 步 → 多步永远讲不完；修复为 pop 前定格 `bool(_pending_steps)`
 - **LLM failover 签名 P0（Round 11）**：failover 统一传 tools/tool_choice，但 Anthropic/Mock chat 签名缺参 → 兜底必 TypeError（"got an unexpected keyword argument 'tools'"）；签名对齐 + 参数化契约测试
+- **量子力学被拒 P0（Round 12，用户报告）**：教学模式问"量子力学"被拒（"未列入学科清单"）——根因：LLM prompt 把量子力学当 unknown 示例 + 无子学科映射；按**元能力 L918 铁律（LLM 先判断、规则兜底）**修复：prompt 注入子学科归属知识（开放性指引），LLM 语义归入父学科；`SUBJECT_ALIASES` 别名表仅作 LLM 不可用兜底 + unknown 名二次映射；规则不覆盖 LLM 判断；真实 LLM 10/10 + 端到端 8/8
 - **审计基建**：audit_check.py 40/40 全绿——重构完整检查适配 wrapper 重构（`_teach_stream_gen` 函数体）；静默异常 except:pass 7→0 处；数据卫生 users_data 53→18
 
-**验证基线**：golden 409/409 + 全量回归绿 + audit 40/40 + E2E 找茬累计发现修复 8 个真实 bug。
+**主线六：Codex Harness 借鉴（Round 12 ⭐ OpenAI 2026-08-21 全面开源）**：
+- **A8 受控子进程执行引擎**（`services/exec_engine.py`）：物料生产重活（PPT/Manim/脚本执行）统一走 AST 安全校验（黑名单 import/call）+ 子进程隔离 + 超时 + 输出截断 + 临时目录清理——仿 `codex exec`（Codex Harness 三件套之一）；13 测试全过
+- **A11 attempt token 幂等护栏**（`services/idempotency.py`）：teach_stream 带 X-Attempt-Token，同 (learner_id, token) 90s 窗口内重复请求短路（网络重试/前端连点不重复生成/落盘）；10 测试全过（并发单胜者/状态流转/TTL）
+- A9 sandbox 治理 / A10 approval 审批流 / A12 App Server 托管——已登记需求文档 §4，待续
+
+**验证基线**：golden 511/511（252 条）+ 全量回归绿 + audit 40/40 + E2E 找茬累计发现修复 8 个真实 bug + 终极版 E2E 高压测试（对抗对话/全物料/防幻觉）。
 
 ## 附录 A 术语表
 
@@ -2103,6 +2110,17 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 - `/api/metrics` 接入 otel 摘要
 
 **验证**：三项测试 15/15（adoption 5 + dashboard 6 + otel 4）+ P0/P1 回归 14/14 = 29/29；SURFACE 三项实测（采纳率 0.67 / 看板 suggestions=1 / events=505 trace 归组正常）。
+
+### C.38 golden 扩容 300 + 量子力学根治 + Codex Harness 借鉴（v1.2.24 §3.79 · Round 12 ⭐）
+
+> 融贯整合见正文 **§7.11**（主线二质量/主线三运维/主线五 bug/主线六 Codex Harness）；此条保留版本追溯要点。
+
+- **E2 golden 扩容 201→300**：新增 99 条（薄弱学科 art/CS/politics/sociology/statistics + 新学科 music/astronomy/geology/physical_edu + 大学生 lecture 式/考研题型专项）——**607 测试全绿**
+- **量子力学被拒根治（用户报告 P0）**：LLM prompt 把量子力学当 unknown 示例 + 无子学科映射；按元能力 L918（LLM 先判断、规则兜底）修复——prompt 注入子学科归属知识，`SUBJECT_ALIASES` 仅作 LLM 不可用兜底；真实 LLM 10/10 + 端到端 8/8
+- **Codex Harness 借鉴（OpenAI 2026-08-21 开源）**：A8 `services/exec_engine.py` 受控子进程执行引擎（AST 黑名单+超时+截断，13 测）+ A11 `services/idempotency.py` attempt token 幂等（teach_stream 重复提交短路，10 测）
+- **admin rate-limit 二道防线**：`POST /api/admin/modules` 每 IP 10 次/60s 滑动窗口（429 真实验证）
+- **终极版 E2E 高压测试**：`find_fault_ultimate_e2e.py`（对抗对话/全物料 Manim+Mermaid+PPT/防幻觉/LaTeX）；消息聚合修复（.msg-bubble 内容气泡）
+- **验证**：golden 607/607 + Round 12 新增 51/51 + audit 40/40
 
 ### C.34 隐患与既有 bug 挖掘修复 + 文档融贯（v1.2.22 §3.79 ⭐）
 
