@@ -5177,3 +5177,25 @@ since:   <PAEG 版本号>
 
 - admin rate-limit 二道防线：`POST /api/admin/modules` 每 IP 10 次/60s（429 真实验证）
 - E2E 找茬自适应冷却（LLM 慢→35s 慢速档）；终极版 E2E 高压测试实施（A 对抗对话/B 全物料/Q 硬指标）
+
+
+## 10.26 ⭐ §3.85 Rollout 持久化落地 + golden 300（Round 12 续 · v1.2.25 · 2026-08-22）
+
+> 承接 §3.85 Oracle 策略 P0——Rollout 持久化（教学六阶段状态可审计回放/崩溃可恢复）。
+
+### 10.26.1 Rollout 持久化（Codex Harness 借鉴 P0 ✅）
+
+| 组件 | 说明 |
+|---|---|
+| `services/rollout.py` | Rollout 事件流（append-only SQLite rollouts 表）+ RunState 快照（run_state 表覆盖写）——8 测试全过 |
+| teach_stream 接入 | 生成器入口 `begin_run` → diagnosis `stage_enter` → plan `stage_exit` + 快照 → presentation `material_emitted` → done `done` + 最终快照；事件记录失败静默降级（不影响教学） |
+| 真实验证 | teach "什么是质数" → run `dec28aa6af78` 完整事件流 `run_start→stage_enter→stage_exit→material_emitted→done`（5 事件） |
+| 运维视图 | `recent_runs()` 最近运行列表（审计） |
+
+### 10.26.2 E2 golden 扩容 300（607 测试全绿）
+
+- 201 → 252 → **300 条**：新增 99 条（薄弱学科 art/CS/politics/sociology/statistics + 新学科 music/astronomy/geology/physical_edu + 大学生 lecture 式/考研题型专项）——覆盖学科 20 → 24
+
+### 10.26.3 运维排障（重要）
+
+- **残留进程事故**：端口 5000 曾被 21:37 启动的旧服务器（PID 30440）占用——新服务器 bind 失败（MCP 8765 也冲突）→ 旧进程加载不含新代码的 server.py → 功能"没生效"实为旧进程在服务。**排障**：改代码后先查端口监听进程启动时间（`Get-NetTCPConnection` + `Get-Process StartTime`），确认加载的是最新代码。

@@ -1476,9 +1476,10 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 **主线六：Codex Harness 借鉴（Round 12 ⭐ OpenAI 2026-08-21 全面开源）**：
 - **A8 受控子进程执行引擎**（`services/exec_engine.py`）：物料生产重活（PPT/Manim/脚本执行）统一走 AST 安全校验（黑名单 import/call）+ 子进程隔离 + 超时 + 输出截断 + 临时目录清理——仿 `codex exec`（Codex Harness 三件套之一）；13 测试全过
 - **A11 attempt token 幂等护栏**（`services/idempotency.py`）：teach_stream 带 X-Attempt-Token，同 (learner_id, token) 90s 窗口内重复请求短路（网络重试/前端连点不重复生成/落盘）；10 测试全过（并发单胜者/状态流转/TTL）
+- **Rollout 持久化（§3.85 P0 ⭐）**：`services/rollout.py`——教学六阶段事件流（append-only SQLite）+ RunState 快照（覆盖写）——崩溃可恢复、审计可回放；teach_stream 已接入（run_start→stage_enter→stage_exit→material_emitted→done）；8 测试全过 + 真实 teach 事件流验证
 - A9 sandbox 治理 / A10 approval 审批流 / A12 App Server 托管——已登记需求文档 §4，待续
 
-**验证基线**：golden 511/511（252 条）+ 全量回归绿 + audit 40/40 + E2E 找茬累计发现修复 8 个真实 bug + 终极版 E2E 高压测试（对抗对话/全物料/防幻觉）。
+**验证基线**：golden 607/607（300 条）+ 全量回归绿 + audit 40/40 + E2E 找茬累计发现修复 8 个真实 bug + 终极版 E2E 高压测试（对抗对话/全物料/防幻觉）。
 
 ## 附录 A 术语表
 
@@ -2121,6 +2122,14 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 - **admin rate-limit 二道防线**：`POST /api/admin/modules` 每 IP 10 次/60s 滑动窗口（429 真实验证）
 - **终极版 E2E 高压测试**：`find_fault_ultimate_e2e.py`（对抗对话/全物料 Manim+Mermaid+PPT/防幻觉/LaTeX）；消息聚合修复（.msg-bubble 内容气泡）
 - **验证**：golden 607/607 + Round 12 新增 51/51 + audit 40/40
+
+### C.39 Rollout 持久化 + golden 300（v1.2.25 §3.85 · Round 12 续 ⭐）
+
+> 融贯整合见正文 **§7.11 主线六**（Codex Harness 借鉴）；此条保留版本追溯要点。
+
+- **Rollout 持久化（§3.85 P0 ✅）**：`services/rollout.py`——教学六阶段事件流（append-only SQLite）+ RunState 快照（覆盖写）；teach_stream 接入（begin_run→stage_enter→stage_exit→material_emitted→done）；8 测试全过 + 真实 teach 事件流验证（run dec28aa6af78 5 事件）
+- **E2 golden 扩容 300**：201→252→300（24 学科，music/astronomy/geology/physical_edu 新学科）——**607 测试全绿**
+- **残留进程事故排障**：端口被旧服务器占用 → 新服务器 bind 失败仍"运行"；排障 SOP（端口反查 PID + CreationDate vs 文件修改时间）写入维护手册 §18.80
 
 ### C.34 隐患与既有 bug 挖掘修复 + 文档融贯（v1.2.22 §3.79 ⭐）
 

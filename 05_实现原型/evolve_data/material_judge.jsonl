@@ -1,0 +1,1 @@
+{"ts": "2026-08-21T17:03:38.586860", "run_id": "test_run_001", "topic": "测试主题", "result": {"checked": true, "dims": {"factuality": 5}, "overall": 5.0, "deep_checks": {"analogy": true}}}

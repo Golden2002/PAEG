@@ -1,3 +1,24 @@
+### v1.2.25 §3.85 Rollout 持久化落地 + golden 300（2026-08-22 ⭐）
+
+**本版定位**：Round 12 续——实施 §3.85 Oracle 策略 P0 项（Rollout 持久化）、E2 golden 扩容至 300、排障残留进程事故。
+
+**① Rollout 持久化（Codex Harness 借鉴 P0 ✅）**：
+- `services/rollout.py`：Rollout 事件流（append-only SQLite rollouts 表：run_start/stage_enter/stage_exit/material_emitted/student_response/done）+ RunState 快照（run_state 表覆盖写）——8 测试全过
+- teach_stream 接入：生成器入口 begin_run → diagnosis stage_enter → plan stage_exit+快照 → presentation material_emitted → done+最终快照；事件失败静默降级
+- 真实验证：teach "什么是质数" → run 完整事件流 5 事件（run_start→stage_enter→stage_exit→material_emitted→done）
+- 用途：教学审计回放、崩溃恢复（get_state 续讲）、运维视图 recent_runs
+
+**② E2 golden 扩容 300（607 测试全绿）**：
+- 201 → 252 → **300 条**（24 学科）：薄弱学科补强 + 新学科 music/astronomy/geology/physical_edu + 大学生 lecture 式/考研题型专项
+
+**③ 残留进程事故排障（运维教训）**：
+- 端口 5000 被旧服务器（21:37 启动）占用 → 新服务器 bind 失败仍"运行" → 功能"没生效"实为旧进程服务
+- 排障 SOP：端口反查 PID + 进程 CreationDate vs 文件修改时间；已写入维护手册 §18.80/技术全景 §10.26.3
+
+**验证**：rollout 8/8 + golden 607/607 + Round 12 全部新增 59/59。
+
+**文档**：CHANGELOG + 技术全景 §10.26 + 维护手册 §18.80 + 任务清单 NEW-40 完结
+
 ### v1.2.24 §3.79 E2 golden 扩容 252 + admin rate-limit + 量子力学 bug 根治 + Codex Harness 借鉴 + 终极版 E2E（2026-08-21 ⭐）
 
 **本版定位**：Round 12——质量守护网扩容（golden 201→252）、运维安全二道防线、用户报告 bug（量子力学被拒）根治、OpenAI Codex Harness 开源调研落地、终极版 E2E 高压测试实施。
