@@ -19,12 +19,20 @@
 - 第 5 章 扩展指南
 - 第 5A 章 可扩展模块（框架化 · v0.70 ⭐）
 - 第 5B 章 DeepSeek Harness 借鉴蓝图（2026-08-14 调研 · 30 项中 27 项已落地）
+- 第 5C 章 OpenAI Codex Harness 借鉴（2026-08-21 开源调研 · §3.85，见 §7.11 主线六）
 - 第 6 章 未来规划（Roadmap · Oracle 咨询 2026-08-14）
-- 第 7 章 能力全景与引用来源（v1.1.9 · 含 §7.11 工程化就绪融贯）
+- 第 7 章 能力全景与引用来源（v1.1.9）
+  - §7.1 能力全景 / §7.2 能力增强 / **§7.3 引用来源（[1]-[48]：技术栈+学术+教育 Agent 项目）**
+  - §7.4-§7.10 专项（Docker/双远程/fallback/进度/结构/技术栈/备课）
+  - **§7.11 工程化就绪融贯（Round 4-12 六主线）**
 - 附录 A 术语表
 - 附录 B 核心文件索引
-- 附录 C 技术创新亮点（v0.70 ⭐ · C.1-C.34）
+- 附录 C 技术创新亮点（v0.70 ⭐ · C.1-C.41 版本追溯）
 - 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
+
+> **结构说明**：正文 §7.11 为融贯主线（按主题组织 Round 4-12 优化）；附录 C 为
+> 版本追溯（按轮次登记，供对照 CHANGELOG）。新功能先入 §7.11 对应主线，附录 C 仅
+> 登记追溯要点——避免"简单附随末尾"。
 
 ---
 
@@ -1033,6 +1041,27 @@ PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可�
 **[38] Tavily Search API. tavily.com.**（F7 联网检索降级）
 **[39] Serper API. serper.dev.**（F7 联网检索降级）
 **[40] Bing Search API. Microsoft Azure Cognitive Search.**（F7 联网检索降级）
+
+#### 7.3.5 教育 Agent 参考项目与 GitHub 库（2026-08-21 增补 ⭐）
+
+> 本轮（§3.79 Round 12 + §3.81-3.85）调研并借鉴的教育智能体/Agent 工程参考项目——
+> 与 7.3.1-7.3.4 并列编号。用户执行标准：参考的所有项目、GitHub 库均须在此登记。
+
+**[41] shiguangzhe666. (2025). Chinese-Teaching-AI-Agent [Computer software]. GitHub. https://github.com/shiguangzhe666/Chinese-Teaching-AI-Agent**（面向语文教师的大模型备课助手——结构化 Prompt 模板/角色/分步生成/多维配置；PAEG 备课模式与提示词结构化对齐）
+
+**[42] Guo, X. et al. (2025). Knowledge-Enhanced LLM Lesson Planning. Humanities and Social Sciences Communications, 12, 06004-2. https://link.springer.com/article/10.1057/s41599-025-06004-2**（知识增强 LLM 教案生成——PAEG 备课素材注入 B1 联网 + B2 用户资料库即知识增强路径）
+
+**[43] 多智能体教学设计（EduPlanner）. (2025). ERIC EJ1469583. https://eric.ed.gov/?id=EJ1469583**（LLM 多智能体定制教学设计——PAEG 10 subagent 分诊：诊断/计划/呈现/评估/调整对齐）
+
+**[44] OpenAI. (2026). Codex Harness（全面开源：codex exec / Codex SDK / App Server 三件套）. GitHub. https://github.com/openai/codex**（2026-08-21 开源 · Apache-2.0 · 110.9k⭐——Agent 运行时治理新标杆：Thread/Turn/Item 事件流 + Rollout 持久化 + sandbox/approval + attempt token；PAEG 借鉴 A8 exec 引擎 / A11 幂等 / Rollout / A9 sandbox / A10 approval / A12 App Server，详见 §7.11 主线六）
+
+**[45] OpenAI. (2026). Codex as a platform: build on the open agent harness. OpenAI Developers Blog. https://developers.openai.com/blog/codex-as-a-platform**（Codex Harness 平台化设计说明——三层集成接口）
+
+**[46] deepseek-ai. (2026). DeepSeek Harness (dsh) [Computer software]. GitHub. https://github.com/deepseek-ai/deepseek-harness**（本机运行时 dsh@0.1.0-rc.7——PAEG"一切皆插件"基础设施借鉴其 Cordis 事件体系，落地 9 处；§5B 完整蓝图）
+
+**[47] Dai5297. (2026). harness-engineer-codex [Computer software]. GitHub. https://github.com/Dai5297/harness-engineer-codex**（Codex Harness 工程化实践——sandbox/approvals 中文指南，A9/A10 落地参考）
+
+**[48] 张宇扬课件（公共知识库）. (2026). 用户提供课件集（演化/生态/生物信息/实验设计/生物统计/遗传学 7 门课）. Library/common/张宇扬课件/**（教学材料质量特征基准：文献锚定/精确概念定义/机制解释/分层递进——PAEG material_quality 检查器与输出守门吸收）
 
 > **标注规范**：每个借鉴模块文件头统一注释块（零运行时开销）：
 ```
@@ -2131,9 +2160,10 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 - **E2 golden 扩容 300**：201→252→300（24 学科，music/astronomy/geology/physical_edu 新学科）——**607 测试全绿**
 - **残留进程事故排障**：端口被旧服务器占用 → 新服务器 bind 失败仍"运行"；排障 SOP（端口反查 PID + CreationDate vs 文件修改时间）写入维护手册 §18.80
 
-### C.34 隐患与既有 bug 挖掘修复 + 文档融贯（v1.2.22 §3.79 ⭐）
+### C.40 隐患与既有 bug 挖掘修复 + 文档融贯（v1.2.22 §3.79 ⭐）
 
 > 融贯整合见正文 **§7.11 主线五**（数据安全与既有 bug 挖掘）；此条仅保留版本追溯要点。
+> （编号修正：与 §3.81 的 C.34 冲突，原 v1.2.22 追溯条目改排 C.40）
 
 - **审计误报修复**：`audit_check.py` 重构完整检查只匹配 `def teach_stream():` 薄封装（v1.2.7 重构后真实函数体在 `_teach_stream_gen(data)`）→ subtopic 定义永远找不到 → P0 误报；改为优先匹配 `_teach_stream_gen` 函数体
 - **users.json 数据丢失（P0 数据事故）**：磁盘 users.json 被清空为默认空模板（历史 503f416 含 u106=团聚体+真实哈希 712011e4…）→ 注册用户降级匿名；从 git 历史重建（u3/u8/u106 + learner 同步 profile.json 三方一致 + next_id=466），`/api/profile/u106`=团聚体恢复
@@ -2141,9 +2171,10 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 - **数据卫生**：users_data 53→18（清理 >4h 陈旧 web_* 会话 + 空会话孤儿目录）
 - **静默异常清零**：except:pass 7→0 处；**audit 36/40 → 40/40 全绿**
 
-### C.35 后台预生成 + 教学输出/物料质量强化 + LLM failover 修复（v1.2.23 §3.79 ⭐）
+### C.41 后台预生成 + 教学输出/物料质量强化 + LLM failover 修复（v1.2.23 §3.79 ⭐）
 
 > 融贯整合见正文 **§7.11**（主线一物料/主线二质量/主线四体验/主线五 bug）；此条保留版本追溯要点。
+> （编号修正：与 §3.81 的 C.35 冲突，原 v1.2.23 追溯条目改排 C.41）
 
 - **后续步骤后台预生成**：首轮第 1 步讲解期间后台线程预生成剩余步骤（独立 Presenter + learner 浅拷贝 + daemon + 步间节流）→ 续讲轮命中缓存零 LLM 等待；缓存失效语义精确化（continue_step 兼容）
 - **续讲轮判定 P0 修复**：`_is_continuation` pop 后重读恒 False → 多步 plan 永远只讲 1 步；改 pop 前定格

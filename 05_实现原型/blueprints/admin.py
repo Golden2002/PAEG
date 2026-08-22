@@ -109,6 +109,37 @@ def admin_modules_status():
         return jsonify({"ok": False, "error": str(_me)}), 500
 
 
+@bp.route("/api/admin/health", methods=["GET"])
+def admin_health():
+    """§3.85 ⭐ A12 App Server 托管：管理面独立健康视图。
+
+    Codex Harness App Server 借鉴——管理面（admin/kill switch/指标/图）与教学面
+    分离托管：教学面故障不影响管理面可观测（运维可诊断）。本端点只依赖管理面
+    组件（module_registry/subagent_graph），不触碰教学管线。
+    """
+    try:
+        from module_registry import module_status
+        _mods = module_status()
+        _mgmt = {
+            "ok": True,
+            "management_plane": "alive",
+            "modules": len(_mods),
+            "modules_enabled": sum(1 for m in _mods.values()
+                                   if isinstance(m, dict) and m.get("enabled")),
+            "ts": time.time(),
+        }
+        # subagent 图视图（P1 声明图——管理面可视化）
+        try:
+            from services.subagent_graph import graph_view
+            _mgmt["subagent_graph"] = graph_view()
+        except Exception:
+            _mgmt["subagent_graph"] = None
+        return jsonify(_mgmt)
+    except Exception as _ah_e:
+        return jsonify({"ok": False, "management_plane": "degraded",
+                        "error": str(_ah_e)}), 500
+
+
 @bp.route("/api/admin/modules", methods=["POST"])
 def admin_modules_set():
     """§3.79 D9 ⭐ 远程模块切换（kill switch 60s 止损的可执行化）。
@@ -133,6 +164,20 @@ def admin_modules_set():
         _toggle = {_module: bool(data.get("enabled"))}
     if not isinstance(_toggle, dict) or not _toggle:
         return jsonify({"ok": False, "error": "需 {module, enabled} 或 {modules: {...}}"}), 400
+    # §3.85 ⭐ Approval 审批流（Codex Harness 借鉴 A10）：**禁用模块（kill switch）是
+    # 破坏性操作**——第一次请求（无 confirm）返回"需要确认"提示（不执行）；客户端带
+    # confirm:true（或 X-Confirm:1 头）才真正执行。防误触 kill switch（运维事故防线，
+    # 与 token 认证/限频叠加为第三道防线）。
+    _disabling = any(not bool(v) for v in _toggle.values())
+    _confirmed = bool(data.get("confirm")) or request.headers.get("X-Confirm") == "1"
+    if _disabling and not _confirmed:
+        return jsonify({
+            "ok": False,
+            "error": "该操作将禁用模块（kill switch 破坏性操作），需显式确认："
+                     "请求体带 confirm:true 或请求头 X-Confirm:1 后重试",
+            "needs_confirm": True,
+            "modules": {k: bool(v) for k, v in _toggle.items()},
+        }), 409
     import os
     from pathlib import Path
     _cfg_path = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "paeg_modules.json"

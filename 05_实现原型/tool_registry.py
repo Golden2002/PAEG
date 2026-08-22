@@ -952,6 +952,19 @@ def execute_tool(name: str, arguments: Dict[str, Any]) -> str:
     if not isinstance(arguments, dict):
         arguments = {}
 
+    # §3.85 ⭐ Sandbox 治理（Codex Harness 借鉴 A9）：工具执行前过 sandbox 判定——
+    # 写操作/执行操作按角色 preset 拒绝（教学默认只读；备课放行物料写；admin 全量）。
+    # 越权返回友好拒绝（不静默执行）。sandbox 失败静默放行（ratchet：不阻断既有路径）。
+    try:
+        from services.sandbox import check as _sandbox_check, preset_for_mode
+        _sb_preset = preset_for_mode(str(arguments.get("_mode") or
+                                       getattr(execute_tool, "_mode_hint", "") or ""))
+        _sb_ok, _sb_reason = _sandbox_check(name, _sb_preset)
+        if not _sb_ok:
+            return f"[sandbox 拒绝] {_sb_reason}"
+    except Exception:
+        pass
+
     # §3.42 W5：解析生效的 timeoutMs（工具声明 > config/hooks.json > 默认 30s）
     timeout_ms = _get_timeout_for_tool(name)
 

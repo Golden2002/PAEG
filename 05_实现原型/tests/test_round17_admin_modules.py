@@ -67,7 +67,11 @@ def test_modules_toggle_single(backup_cfg):
     # 先读当前状态
     st = client.get("/api/admin/modules").get_json()["modules"]
     cur = st["voice"]["enabled"]
-    r = _post_modules({"module": "voice", "enabled": not cur})
+    # §3.85 A10 ⭐ 禁用（toggle 到 False）需 confirm（破坏性操作审批）；启用不需
+    _payload = {"module": "voice", "enabled": not cur}
+    if cur:  # 当前启用 → 切换为禁用 → 需 confirm
+        _payload["confirm"] = True
+    r = _post_modules(_payload)
     assert r.status_code == 200, r.get_data(as_text=True)[:200]
     body = r.get_json()
     assert body.get("ok") is True
@@ -83,8 +87,9 @@ def test_modules_toggle_single(backup_cfg):
 
 
 def test_modules_toggle_batch(backup_cfg):
-    """POST 批量切换。"""
-    r = _post_modules({"modules": {"weather": False, "history": True}})
+    """POST 批量切换（含禁用项需 confirm——A10 审批流）。"""
+    r = _post_modules({"modules": {"weather": False, "history": True},
+                       "confirm": True})
     assert r.status_code == 200
     body = r.get_json()
     assert len(body["applied"]) == 2
@@ -99,7 +104,8 @@ def test_modules_toggle_audit_event(backup_cfg):
     from observability import _EVENTS_FILE
     # 记录切换前文件大小
     _before = os.path.getsize(_EVENTS_FILE) if os.path.exists(_EVENTS_FILE) else 0
-    _post_modules({"module": "mcp", "enabled": False, "operator": "e2e_test"})
+    _post_modules({"module": "mcp", "enabled": False, "operator": "e2e_test",
+                   "confirm": True})
     # 读取切换后追加的行
     _lines = []
     if os.path.exists(_EVENTS_FILE):
@@ -137,8 +143,8 @@ def test_modules_post_wrong_token(backup_cfg):
 
 
 def test_modules_post_correct_token(backup_cfg):
-    """正确 token → 200（X-Admin-Token 头）。"""
-    r = _post_modules({"module": "voice", "enabled": False})
+    """正确 token → 200（X-Admin-Token 头）；禁用需 confirm（A10）。"""
+    r = _post_modules({"module": "voice", "enabled": True})
     assert r.status_code == 200
     assert r.get_json().get("ok") is True
 
@@ -161,9 +167,9 @@ class TestAdminRateLimit:
         # 调低阈值（3 次）便于测试
         monkeypatch.setattr(_adm, "_ADMIN_WRITE_LIMIT", 3)
         monkeypatch.setattr(_adm, "_admin_hits", {})  # 清空命中表
-        r1 = _post_modules({"module": "voice", "enabled": False})
+        r1 = _post_modules({"module": "voice", "enabled": False, "confirm": True})
         r2 = _post_modules({"module": "voice", "enabled": True})
-        r3 = _post_modules({"module": "voice", "enabled": False})
+        r3 = _post_modules({"module": "voice", "enabled": False, "confirm": True})
         r4 = _post_modules({"module": "voice", "enabled": True})
         assert r1.status_code == 200
         assert r2.status_code == 200
@@ -188,12 +194,75 @@ class TestAdminRateLimit:
             r = client.post("/api/admin/modules",
                             json={"module": "voice", "enabled": False})
             assert r.status_code == 401  # 无 token → 401（限频不介入）
-        # 正确 token 仍可用（额度未被 401 消耗）
-        assert _post_modules({"module": "voice", "enabled": False}).status_code == 200
+        # 正确 token 仍可用（额度未被 401 消耗）；禁用需 confirm（A10）
+        assert _post_modules({"module": "voice", "enabled": True}).status_code == 200
 
     def test_rate_limit_configurable(self, backup_cfg, monkeypatch):
         import blueprints.admin as _adm
         monkeypatch.setattr(_adm, "_ADMIN_WRITE_LIMIT", 1)
         monkeypatch.setattr(_adm, "_admin_hits", {})
-        assert _post_modules({"module": "voice", "enabled": False}).status_code == 200
-        assert _post_modules({"module": "voice", "enabled": True}).status_code == 429
+        assert _post_modules({"module": "voice", "enabled": True}).status_code == 200
+        assert _post_modules({"module": "voice", "enabled": False}).status_code == 429
+
+
+# ─────────────────────────────────────────────
+# §3.85 ⭐ Approval 审批流（Codex Harness 借鉴 A10）——禁用模块需显式确认
+# ─────────────────────────────────────────────
+class TestAdminApproval:
+    """kill switch 破坏性操作：无 confirm → 409 需确认；带 confirm → 200。"""
+
+    def test_disable_requires_confirm(self, backup_cfg, monkeypatch):
+        import blueprints.admin as _adm
+        monkeypatch.setattr(_adm, "_ADMIN_WRITE_LIMIT", 20)
+        monkeypatch.setattr(_adm, "_admin_hits", {})
+        r = _post_modules({"module": "voice", "enabled": False})
+        assert r.status_code == 409, f"禁用无 confirm 应 409: {r.status_code}"
+        body = r.get_json()
+        assert body.get("needs_confirm") is True
+        assert "confirm" in body.get("error", "")
+
+    def test_disable_with_confirm_ok(self, backup_cfg, monkeypatch):
+        import blueprints.admin as _adm
+        monkeypatch.setattr(_adm, "_ADMIN_WRITE_LIMIT", 20)
+        monkeypatch.setattr(_adm, "_admin_hits", {})
+        r = _post_modules({"module": "voice", "enabled": False, "confirm": True})
+        assert r.status_code == 200, f"带 confirm 应 200: {r.status_code}"
+
+    def test_disable_confirm_header(self, backup_cfg, monkeypatch):
+        import blueprints.admin as _adm
+        monkeypatch.setattr(_adm, "_ADMIN_WRITE_LIMIT", 20)
+        monkeypatch.setattr(_adm, "_admin_hits", {})
+        r = client.post("/api/admin/modules",
+                        json={"module": "voice", "enabled": False},
+                        headers={"X-Admin-Token": _ADMIN_TOKEN, "X-Confirm": "1"})
+        assert r.status_code == 200, f"X-Confirm 头应 200: {r.status_code}"
+
+    def test_enable_no_confirm_needed(self, backup_cfg, monkeypatch):
+        import blueprints.admin as _adm
+        monkeypatch.setattr(_adm, "_ADMIN_WRITE_LIMIT", 20)
+        monkeypatch.setattr(_adm, "_admin_hits", {})
+        # 启用（非破坏性）不需确认
+        r = _post_modules({"module": "voice", "enabled": True})
+        assert r.status_code == 200
+
+
+# ─────────────────────────────────────────────
+# §3.85 ⭐ A12 App Server 托管——管理面独立健康视图
+# ─────────────────────────────────────────────
+class TestAdminHealth:
+    """管理面健康视图：独立于教学面可观测（模块+subagent 图）。"""
+
+    def test_admin_health_ok(self):
+        r = client.get("/api/admin/health")
+        assert r.status_code == 200
+        body = r.get_json()
+        assert body.get("management_plane") == "alive"
+        assert body.get("modules") >= 1
+        assert body.get("subagent_graph") is not None
+        assert body["subagent_graph"]["stats"]["nodes"] >= 10
+
+    def test_admin_health_open_no_token(self, monkeypatch):
+        # 管理面健康视图无需 token（运维诊断开放）
+        monkeypatch.delenv("PAEG_ADMIN_TOKEN", raising=False)
+        r = client.get("/api/admin/health")
+        assert r.status_code == 200

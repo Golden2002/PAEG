@@ -1,0 +1,28 @@
+{
+  "version": "1",
+  "schema": "paeg.subagent_graph.v1",
+  "nodes": [
+    {"id": "diagnostor", "role": "学情诊断", "trigger": "教学会话开始（诊断学生当前状态/掌握度）", "routing": ["planner"]},
+    {"id": "planner", "role": "教学规划", "trigger": "诊断完成后规划教学路径（LLM 动态规划/静态兜底）", "routing": ["presenter"]},
+    {"id": "presenter", "role": "内容呈现", "trigger": "每步教学输出（A 级思考链；后台预生成剩余步骤）", "routing": ["evaluator"]},
+    {"id": "evaluator", "role": "教学评估", "trigger": "每步呈现后评估理解度（presentation_quality + learner_state）", "routing": ["adapter", "planner"]},
+    {"id": "adapter", "role": "教学调整", "trigger": "评估未达标时调整策略（switch_style/reinforce）", "routing": ["presenter"]},
+    {"id": "answer_solver", "role": "找答案", "trigger": "answer 模式（直接输出完整答案，不受教学范式约束）", "routing": []},
+    {"id": "affection_supportor", "role": "情绪陪伴", "trigger": "affection 模式/危机信号检测（先陪伴后教学）", "routing": ["presenter"]},
+    {"id": "individuality", "role": "个体画像建模", "trigger": "每轮教学前 LLM 建模（学习风格/薄弱点/动机）", "routing": ["presenter"]},
+    {"id": "resource_librarian", "role": "资料检索", "trigger": "教学/备课前检索 KB+facts+用户资料+联网", "routing": ["presenter", "lesson_prep"]},
+    {"id": "lesson_prep", "role": "备课产出", "trigger": "备课模式（教案/讲义/讲稿/PPT/视频/思维导图 8 步）", "routing": []}
+  ],
+  "edges": [
+    {"from": "diagnostor", "to": "planner"},
+    {"from": "planner", "to": "presenter"},
+    {"from": "presenter", "to": "evaluator"},
+    {"from": "evaluator", "to": "adapter"},
+    {"from": "evaluator", "to": "planner", "cycle": true},
+    {"from": "adapter", "to": "presenter", "cycle": true},
+    {"from": "individuality", "to": "presenter"},
+    {"from": "resource_librarian", "to": "presenter"},
+    {"from": "resource_librarian", "to": "lesson_prep"},
+    {"from": "affection_supportor", "to": "presenter"}
+  ]
+}
