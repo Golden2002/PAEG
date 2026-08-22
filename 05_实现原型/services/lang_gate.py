@@ -23,6 +23,12 @@ def lang_gate_content(text: str, context: str = "", apply_l2: bool = True) -> st
     if not text or not text.strip():
         return text
     _out = text
+    # ── L0-0：病句确定性修正（v0.71 ⭐ 规则兜底，不依赖 AI 味检测）──
+    try:
+        from language_refiner import fix_known_gaffes
+        _out = fix_known_gaffes(_out)
+    except Exception:
+        pass
     # ── L0：基础语言修正 ──
     try:
         from services.polish import polish_text
@@ -46,6 +52,12 @@ def lang_gate_content(text: str, context: str = "", apply_l2: bool = True) -> st
                     pass
         except Exception:
             pass
+    # ── 最终收口：病句规则再跑一遍（refine 改写可能重新引入悬空'听着你'）──
+    try:
+        from language_refiner import fix_known_gaffes
+        _out = fix_known_gaffes(_out)
+    except Exception:
+        pass
     return _out
 
 
@@ -54,7 +66,18 @@ def lang_gate_short(text: str, context: str = "") -> str:
     if not text or not text.strip():
         return text
     try:
+        from language_refiner import fix_known_gaffes
+        text = fix_known_gaffes(text)
+    except Exception:
+        pass
+    try:
         from services.polish import polish_text
-        return polish_text(text, context=context)
+        _out = polish_text(text, context=context)
     except Exception:
         return text
+    # 最终收口：polish/refine 改写后规则再跑一遍（保证'听着你'不变量）
+    try:
+        from language_refiner import fix_known_gaffes
+        return fix_known_gaffes(_out)
+    except Exception:
+        return _out

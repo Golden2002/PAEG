@@ -1,4 +1,4 @@
-﻿# PAEG 教育智能体 — 简明技术说明（v1.1.9）
+# PAEG 教育智能体 — 简明技术说明（v1.2.26）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -19,12 +19,21 @@
 - 第 5 章 扩展指南
 - 第 5A 章 可扩展模块（框架化 · v0.70 ⭐）
 - 第 5B 章 DeepSeek Harness 借鉴蓝图（2026-08-14 调研 · 30 项中 27 项已落地）
+- 第 5C 章 OpenAI Codex Harness 借鉴（2026-08-21 开源调研 · §3.85，见 §7.11 主线六）
 - 第 6 章 未来规划（Roadmap · Oracle 咨询 2026-08-14）
-- 第 7 章 能力全景与引用来源（v1.1.9）
+- 第 7 章 能力全景与引用来源（v1.2.26）
+  - §7.1 能力全景 / §7.2 能力增强 / **§7.3 引用来源（[1]-[48]：技术栈+学术+教育 Agent 项目）**
+  - §7.4-§7.10 专项（Docker/双远程/fallback/进度/结构/技术栈/备课）
+  - **§7.11 工程化就绪融贯（Round 4-12 六主线）**
 - 附录 A 术语表
 - 附录 B 核心文件索引
-- 附录 C 技术创新亮点（v0.70 ⭐ · C.1-C.13）
+- 附录 C 技术创新亮点（v0.70 ⭐ · C.1-C.13 技术亮点 + C.14 主题总表）
 - 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
+- 附录 E 功能×模块连通性矩阵（§3.77 盘点）
+
+> **结构说明**：正文 §7.11 为融贯主线（按主题组织 Round 4-12 优化）；附录 C 为
+> 技术亮点（C.1-C.13 单点亮点 + C.14 主题总表），**非版本流水账**——逐版本追溯见
+> `CHANGELOG.md`。新功能先入 §7.11 对应主线，附录 C 仅登记技术亮点。
 
 ---
 
@@ -806,6 +815,7 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 | 增删违禁词 | `forbidden_words` MCP 工具（list/add/remove）或编辑 `data/forbidden_words.json` 三类（网络用语/伪共情/套话） |
 | 统一入口 | 所有生成内容过 `lang_gate_content`（L0 规则 + L2 薇依语料矫正），外部 agent 可调 `normalize_text` |
 | 内嵌默认 | AI_TELLS 577 项（去重 555）+ LANGUAGE_STYLE 规范 + 薇依语料 few-shot——完整保留 |
+| 病句规则（v0.71） | `fix_known_gaffes` 确定性修正悬空"听着你"（缺补语病句，用户反馈）——句末/停顿锚定只修病句、负向保护"听着你说"类合法搭配；接入 L0-0 前置 + 最终收口，保证"输出永不含悬空'听着你'"不变量 |
 
 ### C. 配置体系框架（config_hub）
 
@@ -1033,6 +1043,27 @@ PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可�
 **[38] Tavily Search API. tavily.com.**（F7 联网检索降级）
 **[39] Serper API. serper.dev.**（F7 联网检索降级）
 **[40] Bing Search API. Microsoft Azure Cognitive Search.**（F7 联网检索降级）
+
+#### 7.3.5 教育 Agent 参考项目与 GitHub 库（2026-08-21 增补 ⭐）
+
+> 本轮（§3.79 Round 12 + §3.81-3.85）调研并借鉴的教育智能体/Agent 工程参考项目——
+> 与 7.3.1-7.3.4 并列编号。用户执行标准：参考的所有项目、GitHub 库均须在此登记。
+
+**[41] shiguangzhe666. (2025). Chinese-Teaching-AI-Agent [Computer software]. GitHub. https://github.com/shiguangzhe666/Chinese-Teaching-AI-Agent**（面向语文教师的大模型备课助手——结构化 Prompt 模板/角色/分步生成/多维配置；PAEG 备课模式与提示词结构化对齐）
+
+**[42] Guo, X. et al. (2025). Knowledge-Enhanced LLM Lesson Planning. Humanities and Social Sciences Communications, 12, 06004-2. https://link.springer.com/article/10.1057/s41599-025-06004-2**（知识增强 LLM 教案生成——PAEG 备课素材注入 B1 联网 + B2 用户资料库即知识增强路径）
+
+**[43] 多智能体教学设计（EduPlanner）. (2025). ERIC EJ1469583. https://eric.ed.gov/?id=EJ1469583**（LLM 多智能体定制教学设计——PAEG 10 subagent 分诊：诊断/计划/呈现/评估/调整对齐）
+
+**[44] OpenAI. (2026). Codex Harness（全面开源：codex exec / Codex SDK / App Server 三件套）. GitHub. https://github.com/openai/codex**（2026-08-21 开源 · Apache-2.0 · 110.9k⭐——Agent 运行时治理新标杆：Thread/Turn/Item 事件流 + Rollout 持久化 + sandbox/approval + attempt token；PAEG 借鉴 A8 exec 引擎 / A11 幂等 / Rollout / A9 sandbox / A10 approval / A12 App Server，详见 §7.11 主线六）
+
+**[45] OpenAI. (2026). Codex as a platform: build on the open agent harness. OpenAI Developers Blog. https://developers.openai.com/blog/codex-as-a-platform**（Codex Harness 平台化设计说明——三层集成接口）
+
+**[46] deepseek-ai. (2026). DeepSeek Harness (dsh) [Computer software]. GitHub. https://github.com/deepseek-ai/deepseek-harness**（本机运行时 dsh@0.1.0-rc.7——PAEG"一切皆插件"基础设施借鉴其 Cordis 事件体系，落地 9 处；§5B 完整蓝图）
+
+**[47] Dai5297. (2026). harness-engineer-codex [Computer software]. GitHub. https://github.com/Dai5297/harness-engineer-codex**（Codex Harness 工程化实践——sandbox/approvals 中文指南，A9/A10 落地参考）
+
+**[48] 张宇扬课件（公共知识库）. (2026). 用户提供课件集（演化/生态/生物信息/实验设计/生物统计/遗传学 7 门课）. Library/common/张宇扬课件/**（教学材料质量特征基准：文献锚定/精确概念定义/机制解释/分层递进——PAEG material_quality 检查器与输出守门吸收）
 
 > **标注规范**：每个借鉴模块文件头统一注释块（零运行时开销）：
 ```
@@ -1401,13 +1432,93 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 
 **关键约束**：公网部署必须经 cloudflared 或 TLS 终结（HTTPS 是 STT 前置条件）；Docker 依赖同步纪律见 §7.4；可选重依赖（torch / pix2tex）默认不装、缺失降级。
 
+### 7.10 备课模式（§3.69/§3.73/§3.75 · v1.1.9+ 第 10 个 subagent）
+
+> **「我要备课」是备课模式的独立激活词**（ULW 风格）——在教学模式下，**在输入内容前加上「我要备课」** 即进入备课模式，启用 LessonPrep 备课 subagent，按张宇扬课件级质量标准渐进式产出完整教学物料。
+
+**三种使用方式**（§3.73/§3.75）：
+
+```
+方式一：一步到位（推荐）
+  用户：我要备课：高中数学，函数单调性，45分钟，重点讲图像变换
+  PAEG：提取需求（topic/subject/grade/duration/extra_requirement）→ 直接产出
+
+方式二：先激活后补充
+  用户：我要备课
+  PAEG：（引导·结构化缺失提示）我还需要：1.学科+学段 2.知识点 3.课时长度（已填字段自动剔除）
+  用户：高中数学，函数单调性，45分钟
+  PAEG：确定性短路识别补充句 → 自动合并产出
+
+方式三：多轮修改（§3.75）
+  用户：（生成后）重点讲图像变换
+  PAEG：识别修改指令 → 基于上一版重新生成（mode=lesson_prep_modify）
+```
+
+**技术实现**：
+
+| 组件 | 说明 |
+|---|---|
+| `magic_intent.py` | 独立激活词正则：`^我要备课$`（纯词→引导）与 `^我要备课[:：\s、,，]*(.{1,60}?)$`（带需求→直接生成）；不做变体匹配 |
+| `meta_router._extract_lesson_topic()` | 零 LLM 提取 {topic, subject, grade, duration_min, extra_requirement}；先剥离"我要备课"前缀 → 再 extra（重点讲X）→ 学科/学段 → 时长；topic 空但有 subject/grade → 返回部分 dict（供引导剔除已填字段） |
+| `server.py` fast-path | 三分类：topic 完整→直接生成；topic 空→引导分支（零 LLM SSE + intent_frame 结构化）；pending 标记 + 确定性短路→引导后补充合并 |
+| `server.py` 多轮修改 | `_MODIFY_RE` 修改指令识别（独立于 rfi intent）+ `lesson_prep_last_{learner_id}` 状态 + 修改路由（mode=lesson_prep_modify） |
+| `LessonPrep`（subagents.py） | 8 步渐进式生成：教案骨架→完整教案→讲义→讲稿→PPT 大纲→视频脚本（理科）→思维导图→质量报告；独立 token 预算 25000；`run` 支持 `prior_lesson_plan`（多轮修改基于上一版） |
+
+**质量标准（三源融合 + §3.75 教师AI指引）**：张宇扬课件 18 条 + 教育部课标/UbD/5E/Bloom + Mayer 多媒体 12 原则；**§3.75 新增**——教案须分课前/课中/课后三维（stage: pre/during/post），课中段必含 1 案例教学 + 1 互动环节（均含设计目的/实施步骤/预期效果）。
+
+**质量守门（§3.71/§3.75）**：每份产出过四类评分（教案 6 维 / 讲义 / PPT 大纲 5 维 / 视频脚本）+ **15 条硬性检查**（7 自动 + 5 LLM 评审 + 3 条 §3.75：三维结构/案例教学/互动环节），产出 `dim_scores` 与 `eval_mode`；`/api/lesson_prep/feedback` 收集教师反馈（L3 人工评估）。**PPT 自动配图**：三级来源（用户资料库 → 公共文件夹 → 联网 Bing 免 key）+ 缓存，缺图不阻塞。
+
+### 7.11 工程化就绪：Round 4-12 优化融贯（§3.79 · v1.2.14-v1.2.24 ⭐）
+
+> 本小节把 Round 4-11 逐轮改进按主题融贯成五条主线（版本追溯见附录 C.26-C.35）——不再按版本流水账罗列，而是呈现"从功能可用到商业就绪"的完整链路。
+
+**主线一：物料生产真实联通（PPT/讲义/讲稿/思维导图/视频）**：
+- `teach_materials` 工作流 7 步真实运行暴露并修复 2 断链：outline 步 Planner 签名不匹配（`run()` 缺参）→ `_run_subagent` planner 分支适配；knowledge_map/keyword_doc 工具未注册 → `_run_tool` 兜底（优先复用 handler，失败回退 LLM 生成）
+- 静态讲稿缺生活化例子（`_static_script` 补例子/类比收尾）、`_parse_outline` 只收 str 而 LessonPrep 产 list（备课→PPT 断链）→ 兼容 list；真实 .pptx 落盘 6 页 + 文本物料 4/4 过检查器
+- **manim 数学视频真实出片**：AST 安全校验 → 真实渲染 → mp4 落盘；修复 `render_manim` 未指定 encoding 导致 Windows GBK 解码崩溃 + 质量档输出目录 5 档（480p15…2160p60）
+- 学习计划 format bug：`unsupported format string passed to dict.__format__`（mastery 值 float/dict 混用）→ `_fmt_mastery` 鲁棒格式化
+- **PPT 大纲结构检查（Round 11 ⭐）**：`check_ppt_outline`（分页/每页要点/无空页/无占位）接入 LessonPrep `quality_report.ppt_check`——物料检查补齐 handout/script/mindmap/ppt 四类覆盖
+
+**主线二：质量守护网（学段×深度双层守门 + 输出质量注入 + golden set）**：
+- **teach_stream 守门接线**：学段特征/内容深度守门此前只挂 sync 路径 `paeg.teach`，GUI 实际走的 `/api/teach/stream` 从不执行 → 主循环接入（同门控 llm_generated+PAEG_GRADE_GATE）→ probe 4/4 全特征通过
+- **输出质量注入（Round 11 ⭐ 第三轮专门强化）**：`GRADE_OUTPUT_QUALITY` 4 学段输出指令（大学 lecture 式：严格定义→定理→推导→应用 + 高屋建瓴（先点透本质）+ 举一反三变式；高中例题+误区；考研考点/题型/易错；初中生活化）+ `SUBJECT_GRADE_DEPTH_EXT` 扩展 5 学科 × 2 学段深度阶梯（英语/计算机/经济/法学/哲学）——真实 E2E：大学"线性变换" 6/6 特征全过（含几何直觉、完整推导、学科视野）
+- **golden set 质检集**：51 → 101 → 151 → 201 → **252 条（Round 12 ⭐）** × 3 断言 = **511 测试全绿**——学段特征必过（per-grade MUST_HAVE 质量红线）+ 呈现长度（≥80 字防碎片）+ 坏样例漏检守护；覆盖 20+ 学科 × 4 学段；Round 12 补薄弱学科（art/CS/politics/sociology/statistics）+ 大学生 lecture 式/考研题型专项
+
+**主线三：运维可治理（灰度/回滚/kill switch/限频/观测）**：
+- `deploy/canary.ps1` 灰度发布可执行化：Canary 阶梯（C1 5%→C4 100%）+ 闸门检查（错误率≤0.5%/P95≤120s/health）+ rollback（git revert+smoke）；修复 .ps1 中文 UTF-8 BOM（PS 5.1 无 BOM 按 ANSI 解析乱码）
+- **kill switch**：`paeg_modules.json` 热重载 60s 止损 + `GET/POST /api/admin/modules` 远程切换（PAEG_ADMIN_TOKEN 写保护，未配置→401 安全默认）+ `module/toggle` 事件注册；首次演练 PASS（关闭→热重载→审计→恢复 <10s）
+- **admin rate-limit 二道防线（Round 12 ⭐）**：`POST /api/admin/modules` 每 IP 滑动窗口限频（默认 10 次/60s，PAEG_ADMIN_RATE_LIMIT 可配）——与 token 认证叠加防爆破；401 不消耗额度、GET 不受限
+- 观测：`/api/metrics` + 效果指标管道 + SLO 分模式（D1 延迟归因：teach 35s = 路由/诊断 1.3s + 规划 5.6s + 首步讲解 19.6s 主导 + 其余 8.6s，presenter 长输出为基础设施级主因）
+
+**主线四：教学对话体验（模式识别/首步先行/后台预生成/前端健壮）**：
+- `_detect_teaching_mode` 规则优先（deep/easy 关键词命中零 LLM）+ LLM 结果缓存 10 分钟（上限 256）；Diagnostor include_kb=False
+- **首步先行**：presenter 19.6s 延迟 UX 缓解——`step` 事件携带 topic 骨架（截 40 字），前端显示"正在讲解第 N 步：xxx"（骨架先行于内容：step@16.9s vs presentation@38s 真实验证）；流式预渲染决策：presenter A 级思考链流式化破坏质量 → 不实施，替代为后续步骤后台预生成
+- **后续步骤后台预生成（Round 11 ⭐ 兑现）**：首轮第 1 步讲解期间，后台线程（独立 Presenter + learner 浅拷贝 + daemon + 步间节流防限流）预生成剩余步骤 → 续讲轮命中缓存**零 LLM 等待**（8.6s/步 → ~0）；缓存失效语义精确化（continue_step 兼容，仅改变讲解方式指令/话题切换/困惑 remediation 失效）
+- 前端健壮：`friendlyHttpError`（429/500 UX）、done 后按钮恢复 + `_genAbort` 清理（E2E 找茬发现"正在生成上一条回复"吞消息 bug）
+
+**主线五：数据安全与既有 bug 挖掘（Round 10-11 ⭐）**：
+- **users.json 数据丢失事故**：审计发现磁盘 users.json 被清空为默认空模板（历史 commit 503f416 含 u106=团聚体+真实密码哈希）→ 注册用户降级匿名"学习者"、登录系统失效；从 git 历史重建（真实用户 u3/u8/u106 + learner 同步当前 profile.json 三方一致 + next_id=466），API 验证恢复
+- **根因加固**：`user_store._load` 遇损坏静默兜底空模板 + 后续 `_save()` 写回磁盘固化丢失 → 损坏先备份 `.corrupt_<ts>` 留证再兜底
+- **续讲轮判定 P0（Round 11）**：`_is_continuation` 在 pop 后重读 `teach_plan_done_` → 恒 False → 续讲轮被误判新 plan 只讲 1 步 → 多步永远讲不完；修复为 pop 前定格 `bool(_pending_steps)`
+- **LLM failover 签名 P0（Round 11）**：failover 统一传 tools/tool_choice，但 Anthropic/Mock chat 签名缺参 → 兜底必 TypeError（"got an unexpected keyword argument 'tools'"）；签名对齐 + 参数化契约测试
+- **量子力学被拒 P0（Round 12，用户报告）**：教学模式问"量子力学"被拒（"未列入学科清单"）——根因：LLM prompt 把量子力学当 unknown 示例 + 无子学科映射；按**元能力 L918 铁律（LLM 先判断、规则兜底）**修复：prompt 注入子学科归属知识（开放性指引），LLM 语义归入父学科；`SUBJECT_ALIASES` 别名表仅作 LLM 不可用兜底 + unknown 名二次映射；规则不覆盖 LLM 判断；真实 LLM 10/10 + 端到端 8/8
+- **审计基建**：audit_check.py 40/40 全绿——重构完整检查适配 wrapper 重构（`_teach_stream_gen` 函数体）；静默异常 except:pass 7→0 处；数据卫生 users_data 53→18
+
+**主线六：Codex Harness 借鉴（Round 12 ⭐ OpenAI 2026-08-21 全面开源）**：
+- **A8 受控子进程执行引擎**（`services/exec_engine.py`）：物料生产重活（PPT/Manim/脚本执行）统一走 AST 安全校验（黑名单 import/call）+ 子进程隔离 + 超时 + 输出截断 + 临时目录清理——仿 `codex exec`（Codex Harness 三件套之一）；13 测试全过
+- **A11 attempt token 幂等护栏**（`services/idempotency.py`）：teach_stream 带 X-Attempt-Token，同 (learner_id, token) 90s 窗口内重复请求短路（网络重试/前端连点不重复生成/落盘）；10 测试全过（并发单胜者/状态流转/TTL）
+- **Rollout 持久化（§3.85 P0 ⭐）**：`services/rollout.py`——教学六阶段事件流（append-only SQLite）+ RunState 快照（覆盖写）——崩溃可恢复、审计可回放；teach_stream 已接入（run_start→stage_enter→stage_exit→material_emitted→done）；8 测试全过 + 真实 teach 事件流验证
+- A9 sandbox 治理 / A10 approval 审批流 / A12 App Server 托管——已登记需求文档 §4，待续
+
+**验证基线**：golden 607/607（300 条）+ 全量回归绿 + audit 40/40 + E2E 找茬累计发现修复 8 个真实 bug + 终极版 E2E 高压测试（对抗对话/全物料/防幻觉）。
+
 ## 附录 A 术语表
 
 | 术语 | 含义 |
 |---|---|
 | meta_router | 意图路由器（15 意图分类，LLM 优先+规则兜底+模式短路） |
 | SUBJECT_STYLES | 35 学科教学风格字典（persona/语言/结构/侧重/方法论/例题） |
-| subagent | 领域专家子代理（9 个，职责单一+上下文隔离） |
+| subagent | 领域专家子代理（10 个，职责单一+上下文隔离） |
 | MCP | Model Context Protocol——工具链（filesystem/brave-search 等 14 工具） |
 | Skill | 按需加载的专业能力（SKILL.md，L1 目录+L2 激活） |
 | Workflow | 声明式流程（JSON DAG，如 teach_minimal 诊断→计划→实施→评估） |
@@ -1554,3 +1665,93 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 **工作流**：任务核对 → 按优先级执行 → 每项完成更新状态 → 完成验证 → 调研落盘 → 重大改动回归 → 更新技术快照
 
 **元技能**：**"先记录，后执行"是第一纪律**——需求文档是团队记忆的外部载体，也是版本化的决策日志；没有需求文档的工作流不可追溯、不可复盘、不可交接。
+### C.14 技术亮点主题总表（v1.2.14-v1.2.25 · 去日志化整合）
+
+> 说明：以下为 §3.79-§3.85 各轮技术亮点的**主题化整合**（非版本流水账）。
+> 逐版本追溯见 `CHANGELOG.md`；架构级融贯叙述见正文 §7.11 六主线。
+
+**主题 1 · 教学输出质量**（对应 §7.11 主线二）
+- 学段特征守门（grade_quality_gate：check_grade_features 四学段 MUST_HAVE + check_content_depth 五要素）接入 teach_stream 主循环
+- 输出质量注入：GRADE_OUTPUT_QUALITY 四学段指令（大学 lecture 式+高屋建瓴+举一反三 / 高中例题+误区 / 考研考点+题型+易错 / 初中生活化）+ SUBJECT_GRADE_DEPTH_EXT 五学科扩展
+- 教学意图解读（§3.58 topic 四分类：followup/detour/revisit/off_topic）+ 绕出柔性引导策略（不强制拉回）
+- 学科子学科映射（subject_detector：量子力学→physics 等，LLM 先判断规则兜底——元能力 L918）
+
+**主题 2 · 教学体验**（对应 §7.11 主线四）
+- 首步先行：step 事件 topic 骨架（截 40 字）缓解 presenter 长生成空白
+- 后续步骤后台预生成：首步讲解期间预生成剩余步骤 → 续讲轮命中缓存零 LLM 等待；缓存失效语义精确化
+- LLM 延迟优化：教学模式识别规则优先 + 结果缓存 10 分钟 + Diagnostor include_kb=False
+- 前端健壮：friendlyHttpError（429/500 UX）+ done 后按钮恢复 + _genAbort 清理
+
+**主题 3 · 物料生产**（对应 §7.11 主线一）
+- teach_materials 工作流七步联通（Planner 签名适配 + _run_tool 兜底）
+- 物料产出真实化：PPT 真实落盘 / manim 数学视频渲染（5 质量档）/ 学习计划 format 修复
+- 物料质量评审：material_judge（5 维 LLM-as-judge + 5 深检）+ material_quality 结构检查器（handout/script/mindmap/ppt_outline）+ feedback_aggregator 聚合面板 + golden 物料化
+- 视频多模板视觉（default/comparison/example/formula）+ Manim 叙事复核（manim_judge 4 维）
+- exec_engine 受控子进程执行引擎（物料重活下沉，AST 安全校验）
+
+**主题 4 · 质量守护网**（对应 §7.11 主线二）
+- E2 golden set：51→101→151→201→252→**300 条**（24 学科，607 测试全绿）
+- 坏样例漏检守护 + 呈现长度 ≥80 字红线 + 学段特征必过（MUST_HAVE）
+- 终极版 E2E 高压测试（对抗对话/全物料 Manim+Mermaid+PPT/防幻觉/LaTeX 闭合）
+
+**主题 5 · 运维可治理**（对应 §7.11 主线三）
+- 灰度发布：canary.ps1（C1 5%→C4 100% + 闸门错误率≤0.5%/P95≤120s）
+- kill switch：paeg_modules.json 热重载 + /api/admin/modules 远程切换（token 认证 + rate-limit 二道防线 + approval 审批流）
+- App Server 管理面：/api/admin/health 独立健康视图 + subagent 图视图
+- 观测：/api/metrics + SLO 分模式 + OTel 导出 + 效果指标管道（四指标）
+
+**主题 6 · 数据安全与既有 bug 修复**（对应 §7.11 主线五）
+- users.json 数据丢失事故修复 + 复发根治（服务器内存/磁盘同步 + conftest 防写空 + 征兆告警）
+- LLM failover 签名对齐（Anthropic/Mock chat tools/tool_choice）
+- 续讲轮判定 P0 修复（_is_continuation pop 前定格）
+- 静默异常清零（except:pass 7→0 处）+ audit 40/40
+
+**主题 7 · Agent 架构与 Codex Harness 借鉴**（对应 §7.11 主线六）
+- 后台预生成（独立 Presenter + learner 浅拷贝 + 步间节流）
+- attempt token 幂等护栏（services/idempotency.py：重复提交短路）
+- Rollout 持久化（services/rollout.py：教学六阶段事件流 + RunState 快照）
+- subagent 显式图（config/subagent_graph.json：10 节点 + 边 + 环检测）
+- sandbox 治理（services/sandbox.py：工具分域 + 角色 preset）
+- AGENTS.md 层级（根级机构记忆 + Golden Principles）
+
+**主题 8 · 知识库与自进化**
+- 张宇扬课件知识库接线（PDF/PPTX 文本提取 → search_facts 课件检索 + 落盘缓存 _manifest 快速路径）
+- 自我更新闭环：QualityGate（promote=采纳事件）+ adoption_tracker 精确采纳率 + E1 埋点
+- C5 家长学情看板 + B3 OTel 导出
+
+---
+
+## 附录 E 功能×模块连通性矩阵（§3.77 盘点）
+
+> 接线盘点：五大核心功能与 55 个模块/库/工具的连通状态。
+> 完整行列清单（39 行 × 55 列）见 `audit/PAEG架构设计标准.md` 附录；此处保留结论与断点。
+
+### 矩阵总览（✅ 已接线 / ⚠️ 部分·间接 / ❌ 未接线 / — 不适用）
+
+| 功能 | 教学管线 | 物料生产 | 知识检索 | 自我进化 | 运维治理 |
+|---|---|---|---|---|---|
+| teach 教学 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| chat 对话 | ✅ | — | ✅ | ✅ | ✅ |
+| answer 找答案 | ✅ | — | ✅ | ✅ | ✅ |
+| method 学习方法 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| knowledge 知识库 | ✅ | — | ✅ | ✅ | ✅ |
+| affection 情绪陪伴 | ✅ | — | ✅ | ✅ | ✅ |
+| lesson_prep 备课 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| video 视频 | ✅ | ✅ | — | ✅ | ✅ |
+| ppt 演示 | ✅ | ✅ | — | ✅ | ✅ |
+| voice 语音 | ✅ | — | — | — | ✅ |
+
+### 关键结论
+
+- **断点已清零**：B1-B5（备课×3/查资料×1/倾诉×1）全部接线修复；孤儿模块归零
+- **接线率**：五大核心已接线 15/26 适用格 ≈ 58%（不含 N/A）——剩余为平台化方向（多租户/计费）
+- **治理四列**（condition_eval/agent_scope/agent_trirole/platform_dual_track）已全部接线
+
+### 版本追溯指引
+
+| 文档 | 内容 |
+|---|---|
+| `CHANGELOG.md` | 逐版本变更记录（v1.2.1-v1.2.26） |
+| `PAEG技术全景文档.md` §10.21-§10.26 | 架构级轮次记录 |
+| `PAEG_任务总清单与操作规范.md` | NEW-xx 任务状态与需求 §3.79-§3.85 |
+| `维护手册.md` §18.x | 运维要点与教训 |
