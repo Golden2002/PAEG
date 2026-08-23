@@ -1,4 +1,4 @@
-# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
+﻿﻿# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
 
 > 创建日期：2026-08-14
 > 性质：**本文件是操作的唯一依据**——所有未完成任务、用户指示、调研要求固定于此，每次操作前先读此文件，完成后更新状态。
@@ -3396,3 +3396,31 @@ server.py `teach_video` 端点：
 ### 实施记录
 
 （待排期实施——Wave 1 优先）
+
+## §3.86 模块整合接线（2026-08-24 · Harness 改动效果评估后）
+
+### 来源
+
+用户指示"修复问题，整合项目当前模块功能，完成接线"——评估 §3.79 Round 12/§3.85 Codex 借鉴改动后发现的部分模块未接线。
+
+### 评估结论（修正前期误判）
+
+1. **sandbox 预设缺陷**：❌ 误判——sandbox 预设完整（teaching 只读/lesson_prep 放行物料写/admin 全量），且已接入 execute_tool（L955 sandbox 判定）；前期评估直接调 check() 绕过 execute_tool 导致误报
+2. **exec_engine 零引用**：✅ 真实问题——tool_registry 未注册 exec 工具（execute_python 显示"未知工具"）
+3. **subagent_graph 调度未用**：✅ 部分——已接 admin 可视化，调度未接入（Wave 3 排期）
+
+### 修复实施（已完成）
+
+**exec_engine 接线到 tool_registry**：
+- 新增 `_exec_execute_python` handler（调 exec_engine.validate_code + exec_code，黑名单校验 + 子进程隔离 + 超时）
+- 注册到 `_HANDLERS`（"execute_python": _exec_execute_python）
+- sandbox preset_for_mode 补 admin/ops/maintenance → admin preset（此前 admin 模式走默认 teaching，exec 工具无法放行）
+
+### 验证
+
+- 接线实测：admin 执行 `hello from exec` ✅ / teach 模式 sandbox 拒绝 ✅ / admin+恶意代码 `[exec 校验拒绝] 禁止 import: os` ✅
+- 回归 41/41 全绿（wiring 6 + exec_engine 15 + sandbox + idempotency）
+
+### 待办
+
+- subagent_graph 调度接入（Wave 3 排期，非本轮）

@@ -71,6 +71,8 @@ def preset_for_mode(mode: str) -> str:
     """教学模式 → sandbox preset。"""
     if mode == "lesson_prep" or mode == "lesson_prep_modify":
         return "lesson_prep"
+    if mode in ("admin", "ops", "maintenance"):
+        return "admin"
     if mode in ("teach", "chat", "answer", "method", "knowledge", "affection"):
         return "teaching"
     return _DEFAULT_PRESET

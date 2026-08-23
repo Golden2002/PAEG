@@ -831,6 +831,29 @@ def _exec_material(material_type: str, arguments: dict) -> str:
         return f"物料流水线 {material_type} 调用失败: {str(e)[:120]}"
 
 
+def _exec_execute_python(code: str = "", language: str = "python", **kw) -> str:
+    """§3.86 ⭐ 受控 Python 执行（Codex Harness A8 接线：exec_engine 统一入口）。
+
+    经 exec_engine 黑名单校验 + 子进程隔离 + 超时截断——物料生产/批处理重活
+    走此工具，崩溃不拖垮主服务。sandbox 已把 execute_python 列为 exec 域（仅 admin）。
+    """
+    _c = str(code or "")
+    if not _c.strip():
+        return "execute_python 需要 code 参数（要执行的 Python 代码）"
+    try:
+        from services.exec_engine import validate_code, exec_code
+        _ok, _err = validate_code(_c)
+        if not _ok:
+            return f"[exec 校验拒绝] {_err}"
+        _r = exec_code(_c, language=language, timeout=30)
+        if _r.get("ok"):
+            _out = str(_r.get("stdout", "")).strip()
+            return _out if _out else "(执行完成，无输出)"
+        return f"执行失败: {_r.get('error', '')} {str(_r.get('stderr', ''))[:100]}"
+    except Exception as _ee:
+        return f"exec_engine 不可用: {str(_ee)[:80]}"
+
+
 _HANDLERS: Dict[str, Callable[..., str]] = {
     "web_search": _wrap("web_search", _exec_web_search, retries=2),
     "verify_math": _wrap("verify_math", _exec_verify_math, retries=1),
@@ -859,6 +882,8 @@ _HANDLERS: Dict[str, Callable[..., str]] = {
     "generate_script": lambda **kw: _exec_material("script", kw),
     "generate_ppt": lambda **kw: _exec_material("ppt", kw),
     "generate_mindmap": lambda **kw: _exec_material("mindmap", kw),
+    # §3.86 ⭐ exec_engine 接线：受控 Python 执行（sandbox exec 域，仅 admin）
+    "execute_python": _exec_execute_python,
 }
 
 # §3.36 ⭐ 配置驱动：启动即合并外部工具（mcp_tools.json 声明；失败不阻塞）
