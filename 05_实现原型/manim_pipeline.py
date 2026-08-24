@@ -37,7 +37,7 @@ import os
 import re
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 _BASE = os.path.dirname(os.path.abspath(__file__))
 _PIPELINE_DIR = os.path.join(_BASE, "evolve_data", "manim_pipeline")
@@ -273,20 +273,69 @@ def _safe_chat(llm, sys_p, user_p, max_tokens=2000):
 def run_pipeline(llm, topic: str, audience: str = "高中",
                  duration_target_sec: int = 120, style: str = "3blue1brown",
                  prerequisites: str = "", intuition: str = "",
-                 objectives: str = "") -> Dict[str, Any]:
-    """执行完整 Manim 流水线。返回 {ok, video_path, url, script, code, stages, errors}"""
+                 objectives: str = "", job_id: str = "",
+                 progress_callback: Callable = None,
+                 user_requirements: str = "") -> Dict[str, Any]:
+    """执行完整 Manim 流水线。返回 {ok, video_path, url, script, code, stages, errors}
+
+    §3.94 ⭐ 分阶段联通（Oracle 方案）：
+    - job_id：稳定任务 id（缺省自动生成），脚本/代码/manifest 按此落盘，可下载
+    - progress_callback：阶段进度回调（{"stage","status","percent","message","artifact_url"}）
+    - user_requirements：用户详细要求，拼进 phase1_plan 提示词（intuition 增强）
+    """
+    # 稳定 job_id
+    job_id = job_id or f"m_{uuid.uuid4().hex[:12]}"
+    job_dir = os.path.join(_PIPELINE_DIR, "jobs", job_id)
+    os.makedirs(job_dir, exist_ok=True)
+
     result = {"ok": False, "video_path": "", "url": "", "script": None,
-              "code": None, "stages": {}, "errors": []}
+              "code": None, "stages": {}, "errors": [], "job_id": job_id,
+              "job_dir": job_dir, "artifacts": {}}
+
+    def _emit(stage, status, percent, message, artifact_url=""):
+        if progress_callback:
+            try:
+                progress_callback({"stage": stage, "status": status,
+                                   "percent": percent, "message": message,
+                                   "artifact_url": artifact_url})
+            except Exception:
+                pass
+
+    def _save_artifact(name, content):
+        """落盘中间产物（脚本/代码/manifest），返回相对 URL。"""
+        _p = os.path.join(job_dir, name)
+        try:
+            if isinstance(content, (dict, list)):
+                with open(_p, "w", encoding="utf-8") as f:
+                    json.dump(content, f, ensure_ascii=False, indent=2)
+            else:
+                with open(_p, "w", encoding="utf-8") as f:
+                    f.write(str(content))
+            return f"/api/manim/jobs/{job_id}/{name}"
+        except Exception:
+            return ""
+
     _ensure_dir()
+    _emit("script", "running", 10, "正在生成动画脚本…")
 
     # ── Phase 1 规划（含门控 + 修复回路）──
+    # §3.94 用户要求拼进 intuition（若用户提供了详细要求）
+    _intuition = intuition
+    if user_requirements and not intuition:
+        _intuition = user_requirements
+    elif user_requirements:
+        _intuition = f"{intuition}；补充要求：{user_requirements}"
     script = phase1_plan(llm, topic, audience, duration_target_sec,
-                         style, prerequisites, intuition, objectives)
+                         style, prerequisites, _intuition, objectives)
     if not script:
         result["errors"].append("Phase1 规划失败")
         return result
     result["stages"]["plan"] = "ok"
     result["script"] = script
+    # 落盘脚本
+    result["artifacts"]["script"] = {"status": "done",
+                                     "url": _save_artifact("script.json", script)}
+    _emit("script", "done", 30, "脚本已生成", result["artifacts"]["script"]["url"])
 
     # 门控 + 修复回路（规划阶段）
     for _r in range(MAX_FIX_ROUNDS):
@@ -304,21 +353,30 @@ def run_pipeline(llm, topic: str, audience: str = "高中",
                 if _m:
                     script = json.loads(_m.group(0))
                     result["script"] = script
+                    # 修复后覆盖落盘
+                    result["artifacts"]["script"]["url"] = _save_artifact("script.json", script)
         except Exception:
             break
     else:
         result["errors"].append("Phase1 门控修复超轮")
     result["stages"]["gates"] = "ok" if not run_all_gates(script) else "fail"
+    _emit("script", "done", 35, "脚本门控通过")
 
     # ── Phase 2A 草稿（含修复回路）──
+    _emit("code", "running", 40, "正在生成 Manim 代码…")
     code = phase2_draft(llm, script)
     if not code:
         result["errors"].append("Phase2A 草稿失败")
         return result
     result["stages"]["draft"] = "ok"
     result["code"] = code
+    # 落盘代码
+    result["artifacts"]["code"] = {"status": "done",
+                                   "url": _save_artifact("scene.py", code)}
+    _emit("code", "done", 60, "代码已生成", result["artifacts"]["code"]["url"])
 
     # ── Phase 2B 实现（AST 校验 + 渲染 + 修复回路）──
+    _emit("video", "running", 65, "正在渲染视频…")
     impl = phase2_implement(code)
     for _r in range(MAX_FIX_ROUNDS):
         if impl.get("ok"):
@@ -332,41 +390,51 @@ def run_pipeline(llm, topic: str, audience: str = "高中",
             if _raw and "class " in _raw:
                 code = _raw
                 result["code"] = code
+                result["artifacts"]["code"]["url"] = _save_artifact("scene.py", code)
                 impl = phase2_implement(code)
         except Exception:
             break
     if not impl.get("ok"):
         result["errors"].append(f"Phase2B 实现失败: {impl.get('error','')}")
+        _emit("video", "failed", 80, f"渲染失败: {impl.get('error','')}")
         return result
     result["stages"]["implement"] = "ok"
     result["video_path"] = impl.get("path", "")
     result["url"] = impl.get("url", "")
+    result["artifacts"]["video"] = {"status": "done", "url": impl.get("url", "")}
+    _emit("video", "done", 90, "视频渲染完成", impl.get("url", ""))
 
     # ── Phase 3 审查（视觉门）──
     review = phase3_review(llm, impl.get("path", ""))
     result["stages"]["review"] = "ok" if review.get("ok") else "fail"
     if not review.get("ok"):
         result["errors"].append(f"Phase3 视觉审查失败: {review.get('verdict','')}")
+    _emit("review", "done", 95, "审查完成")
 
     # ── Phase 4 合成：输出 + 中间产物落盘 ──
     try:
         _job = {
-            "topic": topic, "audience": audience,
+            "job_id": job_id, "topic": topic, "audience": audience,
             "duration_target_sec": duration_target_sec,
+            "intuition": _intuition, "objectives": objectives,
             "script": script, "code": code,
             "stages": result["stages"],
+            "artifacts": result["artifacts"],
             "video_url": result["url"],
             "ts": time.time(),
         }
-        _out = os.path.join(_PIPELINE_DIR, f"job_{uuid.uuid4().hex[:8]}.json")
+        _out = os.path.join(job_dir, "manifest.json")
         with open(_out, "w", encoding="utf-8") as f:
             json.dump(_job, f, ensure_ascii=False, indent=2)
         result["job_path"] = _out
+        result["artifacts"]["manifest"] = {"status": "done",
+                                           "url": f"/api/manim/jobs/{job_id}/manifest"}
         result["stages"]["compose"] = "ok"
     except Exception as e:
         result["errors"].append(f"Phase4 合成失败: {e}")
 
     result["ok"] = not result["errors"]
+    _emit("done", "done", 100, "完成")
     return result
 
 

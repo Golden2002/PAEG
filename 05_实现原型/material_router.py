@@ -375,20 +375,37 @@ def _gen_script(llm, topic, subject, learner_id, **kw) -> MaterialResult:
 
 
 def _gen_manim(llm, topic, subject, learner_id, **kw) -> MaterialResult:
-    """Manim 数学动画生成（走 MaterialPipeline v2.0 长路径）。§3.92 透传 llm/grade。"""
+    """Manim 数学动画生成（走 MaterialPipeline v2.0 长路径）。
+    §3.92 透传 llm/grade；§3.94 透传用户要求 + 阶段产物 artifacts。"""
     try:
         from manim_service import generate_manim_video
-        _r = generate_manim_video(topic, subject, learner_id,
-                                  llm=llm, grade=kw.get("grade", "high_school")) or {}
+        _r = generate_manim_video(
+            topic, subject, learner_id,
+            llm=llm, grade=kw.get("grade", "high_school"),
+            intuition=kw.get("intuition") or "",
+            objectives=kw.get("objectives") or "",
+            prerequisites=kw.get("prerequisites") or "",
+            style=kw.get("style") or "3blue1brown",
+            duration_target_sec=int(kw.get("duration_target_sec") or 120),
+            job_id=kw.get("job_id") or "",
+            user_requirements=kw.get("user_requirements") or kw.get("user_input") or "") or {}
         _url = _r.get("url") or _r.get("video_path") or ""
+        _artifacts = _r.get("artifacts") or {}
+        _job_id = _r.get("job_id", "")
         if _r.get("ok") and _url:
             _narr = _r.get("narrative_judge", {})
             _judge_str = ""
             if _narr.get("checked"):
                 _judge_str = f" [叙事评分: {_narr.get('overall', 0):.1f}/5]"
-            _content = f"数学动画已生成{_judge_str}：<a href='{_url}' target='_blank'>观看/下载动画</a>"
+            _dl = ""
+            if _artifacts.get("script", {}).get("url"):
+                _dl += f" <a href='{_artifacts['script']['url']}' target='_blank'>下载脚本</a>"
+            if _artifacts.get("code", {}).get("url"):
+                _dl += f" <a href='{_artifacts['code']['url']}' target='_blank'>下载代码</a>"
+            _content = f"数学动画已生成{_judge_str}：<a href='{_url}' target='_blank'>观看/下载动画</a>{_dl}"
             return {"ok": True, "content": _content, "url": _url,
-                    "error": "", "step_type": "manim"}
+                    "error": "", "step_type": "manim",
+                    "job_id": _job_id, "artifacts": _artifacts}
         if _r.get("ok"):
             _script = _r.get("script") or _r.get("code") or ""
             _scenes = _r.get("scenes")
@@ -401,7 +418,19 @@ def _gen_manim(llm, topic, subject, learner_id, **kw) -> MaterialResult:
             else:
                 _content = f"数学动画已生成（{topic}）。可查看 downloads/manim/ 目录。"
             return {"ok": True, "content": _content, "url": _url,
-                    "error": "", "step_type": "manim"}
+                    "error": "", "step_type": "manim",
+                    "job_id": _job_id, "artifacts": _artifacts}
+        # 失败但含部分产物（脚本/代码）→ 提供下载
+        if _artifacts:
+            _dl = ""
+            if _artifacts.get("script", {}).get("url"):
+                _dl += f" <a href='{_artifacts['script']['url']}' target='_blank'>下载脚本</a>"
+            if _artifacts.get("code", {}).get("url"):
+                _dl += f" <a href='{_artifacts['code']['url']}' target='_blank'>下载代码</a>"
+            _content = f"数学动画生成中（{topic}）：{_r.get('error', '渲染超时')}。脚本/代码已生成{_dl}"
+            return {"ok": False, "content": _content, "url": "",
+                    "error": _r.get("error", ""), "step_type": "manim",
+                    "job_id": _job_id, "artifacts": _artifacts}
         return {"ok": False, "content": f"数学动画生成中（{topic}）：{_r.get('error', '渲染超时')}。可稍后查看 downloads/manim/。",
                 "url": "", "error": _r.get("error", ""), "step_type": "manim"}
     except Exception as e:
@@ -415,8 +444,13 @@ def _gen_manim(llm, topic, subject, learner_id, **kw) -> MaterialResult:
 def route_material(magic_match: Dict[str, Any], llm, subject: str,
                    learner_id: str, concept: str = "",
                    learner=None, save_turn: Callable = None,
-                   grade: str = "high_school") -> Iterator[str]:
+                   grade: str = "high_school",
+                   user_requirements: str = "",
+                   intuition: str = "", objectives: str = "") -> Iterator[str]:
     """物料路由主入口：生成 SSE 事件流（presentation + done）。
+
+    §3.95 ⭐ 用户输入注入：user_requirements/intuition/objectives 透传生成器
+    （用户要求作为提示词拼接到物料生成依据）。
 
     Args:
         magic_match: match_magic() 返回值 {intent, reason, matched_text}
@@ -427,6 +461,8 @@ def route_material(magic_match: Dict[str, Any], llm, subject: str,
         learner: 学习者对象（handout/mindmap 需要）
         save_turn: _save_teach_turn 回调（None 则不存）
         grade: 学段（§3.92 透传给生成器，注入模板/learner）
+        user_requirements: 用户详细要求（§3.95 注入物料生成提示词）
+        intuition/objectives: 用户学习目标/直觉（§3.95 透传 manim）
 
     Yields: SSE 事件字符串。
     """
@@ -440,10 +476,13 @@ def route_material(magic_match: Dict[str, Any], llm, subject: str,
     if not topic:
         topic = concept[:60]
 
-    # 调用生成器（统一异常围栏）——§3.92 透传 grade/learner
+    # 调用生成器（统一异常围栏）——§3.92 透传 grade/learner；§3.95 透传用户要求
     try:
         result = route.generator(llm, topic, subject, learner_id,
-                                 learner=learner, grade=grade)
+                                 learner=learner, grade=grade,
+                                 user_requirements=user_requirements,
+                                 user_input=user_requirements or concept,
+                                 intuition=intuition, objectives=objectives)
     except Exception as e:
         result = {"ok": False, "content": route.fallback_msg, "url": "",
                   "error": str(e), "step_type": route.step_type}

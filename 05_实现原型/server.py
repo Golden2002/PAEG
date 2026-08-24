@@ -41,7 +41,7 @@ if not logger.handlers:  # 避免重复添加 handler（模块重载时）
     logger.addHandler(_h)
     logger.setLevel(logging.INFO)
 
-from flask import Flask, Response, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory, send_file
 from flask_cors import CORS
 
 # v0.27 ⭐ P0-1 模块化门控：让 paeg_modules.json 真正控制路由可达性
@@ -1064,10 +1064,14 @@ def _teach_stream_gen(data):
                 from material_router import route_material, is_material_intent
                 if is_material_intent(_magic):
                     _mr_save = lambda _mt, _b: _save_teach_turn(_mt, _b)
+                    # §3.95 ⭐ 用户输入注入：完整 concept 作为 user_requirements
+                    # （用户详细要求拼接到物料生成提示词）
                     yield from route_material(
                         _magic, paeg.model, subject, learner_id,
                         concept=str(concept), learner=learner,
-                        save_turn=_mr_save)
+                        save_turn=_mr_save,
+                        grade=getattr(learner, "grade_level", "high_school"),
+                        user_requirements=str(concept))
                     return
             except Exception as _mr_e:
                 print(f"[PAEG] material_router 异常，回退旧分支: {_mr_e}")
@@ -3158,8 +3162,9 @@ def teach_video():
 @app.route("/api/manim/generate", methods=["POST"])
 def manim_generate():
     """v6.1 数学动画生成：LLM/模板生成 Manim 代码 -> 隔离渲染 -> 数学动画视频。
-    请求：{topic, subject, learner_id}。响应：{ok, url, error}。
-    独立模块：不影响 /api/teach/video（现有视频流程）。
+    §3.94 ⭐ 请求：{topic, subject, learner_id, grade, intuition, objectives,
+    prerequisites, style, duration_target_sec, user_requirements}。
+    响应：{ok, url, error, job_id, artifacts{script/code/video/manifest}}。
     """
     data = request.get_json(force=True) or {}
     topic = (data.get("topic") or "").strip()
@@ -3169,12 +3174,62 @@ def manim_generate():
         return jsonify({"ok": False, "error": "topic is required"}), 400
     try:
         from manim_service import generate_manim_video
-        result = generate_manim_video(topic, subject, learner_id)
+        result = generate_manim_video(
+            topic, subject, learner_id,
+            llm=paeg.model if hasattr(paeg, "model") else None,
+            grade=data.get("grade") or "high_school",
+            intuition=data.get("intuition") or "",
+            objectives=data.get("objectives") or "",
+            prerequisites=data.get("prerequisites") or "",
+            style=data.get("style") or "3blue1brown",
+            duration_target_sec=int(data.get("duration_target_sec") or 120),
+            job_id=data.get("job_id") or "",
+            user_requirements=data.get("user_requirements") or data.get("details") or "")
         if result.get("ok"):
+            return jsonify(result)
+        # 流水线失败但含部分产物（脚本/代码）→ 仍返回供下载
+        if result.get("artifacts"):
             return jsonify(result)
         return jsonify({"ok": False, "error": result.get("error") or "数学动画生成失败"}), 500
     except Exception as e:
         return jsonify({"ok": False, "error": f"数学动画生成异常: {e}"}), 500
+
+
+@app.route("/api/manim/jobs/<job_id>/<artifact>", methods=["GET"])
+def manim_job_artifact(job_id: str, artifact: str):
+    """§3.94 ⭐ 阶段产物下载/预览：script.json / scene.py / manifest.json。
+
+    白名单 job_id + artifact，禁止暴露任意本地路径（安全约束）。
+    """
+    import re as _re_job
+    if not _re_job.fullmatch(r"[A-Za-z0-9_-]+", job_id):
+        return jsonify({"ok": False, "error": "invalid job_id"}), 400
+    allowed = {"script.json", "scene.py", "manifest.json"}
+    if artifact not in allowed:
+        return jsonify({"ok": False, "error": "invalid artifact"}), 400
+    try:
+        _base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        _pipeline_dir = os.path.join(_base, "05_实现原型", "evolve_data", "manim_pipeline")
+        # 兼容：job 目录在 evolve_data/manim_pipeline/jobs/<job_id>/
+        _job_dir = os.path.join(_pipeline_dir, "jobs", job_id)
+        _fp = os.path.join(_job_dir, artifact)
+        if not os.path.isfile(_fp):
+            return jsonify({"ok": False, "error": "artifact not found"}), 404
+        # 安全：realpath 校验在 job_dir 内
+        _real = os.path.realpath(_fp)
+        _real_dir = os.path.realpath(_job_dir)
+        if not _real.startswith(_real_dir):
+            return jsonify({"ok": False, "error": "path traversal"}), 403
+        _view = request.args.get("view") == "1"
+        if artifact.endswith(".json") and _view:
+            return jsonify(json.load(open(_fp, encoding="utf-8")))
+        _mime = {"script.json": "application/json",
+                 "scene.py": "text/x-python",
+                 "manifest.json": "application/json"}.get(artifact, "application/octet-stream")
+        return send_file(_fp, mimetype=_mime, as_attachment=True,
+                         download_name=f"{job_id}_{artifact}")
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/uploads/<path:filename>")

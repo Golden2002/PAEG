@@ -194,18 +194,18 @@ def _get_llm_for_manim():
 
 def generate_manim_video(topic: str, subject: str = 'math',
                          learner_id: str = 'anon',
-                         llm=None, grade: str = "high_school") -> dict:
+                         llm=None, grade: str = "high_school",
+                         intuition: str = "", objectives: str = "",
+                         prerequisites: str = "", style: str = "3blue1brown",
+                         duration_target_sec: int = 120,
+                         job_id: str = "", progress_callback=None,
+                         user_requirements: str = "") -> dict:
     """LLM 生成 Manim 代码 → 渲染视频。返回 {ok, path, url, error}
 
-    v0.63 ⭐ 意图层：match_manim_intent 把简单话（"画个抛物线"）映射为
-    场景专属 prompt（含教学叙事）+ 对应模板 key，LLM 按精确指令生成。
-
-    v1.1 ⭐ §3.34 智绘科普范式：若已生成 script.json（manim_pipeline 规划产物），
-    则优先走流水线（多阶段+门控+自动修复）；否则回退原单段流程（兼容）。
-
-    §3.92 ⭐ 修复（Oracle 根因）：接受 caller 的 llm 透传（此前 _get_llm_for_manim()
-    新建实例导致 caller 上下文丢失）；修复 _safe_chat 缺参（L247）；修复
-    collect_all_resources 误传 _safe_chat 为 llm；修复 judge_manim_narrative 缺 llm。
+    §3.94 ⭐ 分阶段联通（Oracle 方案）：
+    - intuition/objectives/prerequisites/style/duration：用户要求透传 phase1_plan
+    - user_requirements：用户详细要求（拼进 intuition）
+    - job_id/progress_callback：阶段进度 + 产物落盘
     """
     # 接受 caller llm，无则新建（兼容旧调用）
     _llm = llm or _get_llm_for_manim()
@@ -218,13 +218,27 @@ def generate_manim_video(topic: str, subject: str = 'math',
         # 尝试用现有流水线（含 Phase1 规划→门控→草稿→实现→修复）
         _r = run_pipeline(
             llm=_llm,
-            topic=topic, audience=_grade_cn, duration_target_sec=120,
-            style="3blue1brown", prerequisites="",
-            intuition="", objectives="")
+            topic=topic, audience=_grade_cn, duration_target_sec=duration_target_sec,
+            style=style, prerequisites=prerequisites,
+            intuition=intuition, objectives=objectives,
+            job_id=job_id, progress_callback=progress_callback,
+            user_requirements=user_requirements)
         if _r.get("ok"):
             return {"ok": True, "path": _r.get("video_path", ""),
                     "url": _r.get("url", ""), "error": "",
-                    "pipeline": "multi-stage"}
+                    "pipeline": "multi-stage",
+                    "job_id": _r.get("job_id", ""),
+                    "artifacts": _r.get("artifacts", {}),
+                    "stages": _r.get("stages", {})}
+        # 流水线未 ok 但仍产出脚本/代码 → 返回部分产物（供 UI 展示/下载）
+        if _r.get("artifacts"):
+            return {"ok": False, "path": _r.get("video_path", ""),
+                    "url": _r.get("url", ""),
+                    "error": "; ".join(_r.get("errors", ["渲染失败"])),
+                    "pipeline": "multi-stage",
+                    "job_id": _r.get("job_id", ""),
+                    "artifacts": _r.get("artifacts", {}),
+                    "stages": _r.get("stages", {})}
     except Exception as _pe:
         print(f"[manim_service] 流水线尝试失败（回退单段）: {_pe}")
     # v0.63 ⭐ 意图匹配：简单话 → 场景 prompt + 模板 key
