@@ -8,13 +8,22 @@ LLM 生成 Manim 代码 → 隔离渲染 → 数学动画视频
 import os, re, ast, subprocess, tempfile, uuid, sys, io
 
 # §3.97 ⭐ LaTeX 可用性检测：manim MathTex/Tex 依赖 latex.exe，缺失时降级
+_MIKTEX_BIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "manim_env", "miktex",
+                          "texmfs", "install", "miktex", "bin", "x64")
+
+
 def _latex_available() -> bool:
-    """检测系统是否有 latex 可执行文件。"""
+    """检测 LaTeX 可用性：系统 PATH 或 MiKTeX 安装路径。"""
     try:
         import shutil as _sh
-        return _sh.which("latex") is not None or _sh.which("latex.exe") is not None
+        if _sh.which("latex") is not None or _sh.which("latex.exe") is not None:
+            return True
+        # MiKTeX 便携安装
+        if os.path.isfile(os.path.join(_MIKTEX_BIN, "latex.exe")):
+            return True
     except Exception:
-        return False
+        pass
+    return False
 
 
 _LATEX_OK = _latex_available()
@@ -182,9 +191,12 @@ def render_manim(code: str, scene_class: str = None, quality: str = '-qm',
         # §3.79 Round 4 ⭐ 运维修复：Windows 下 manim 输出含 UTF-8 中文/转义码，
         # 默认 GBK 解码会 UnicodeDecodeError → 指定 utf-8（errors=replace 兜底），
         # 并禁用 text 模式的 locale 猜测（encoding='utf-8' 显式传入）
-        # §3.97 ⭐ 注入 ffmpeg PATH：manim/pydub 需要 ffmpeg，但系统 PATH 无
-        #（manim_env 内 imageio_ffmpeg 静态版存在）——注入子进程 PATH 修复
+        # §3.97 ⭐ 注入 ffmpeg + LaTeX PATH：manim 需要 ffmpeg（视频）与 latex（公式）
         _env = dict(os.environ)
+        # MiKTeX LaTeX bin 注入（MathTex 数学公式渲染）
+        if os.path.isdir(_MIKTEX_BIN) and _MIKTEX_BIN not in _env.get("PATH", ""):
+            _env["PATH"] = _MIKTEX_BIN + os.pathsep + _env.get("PATH", "")
+            print(f"[manim_service] LaTeX PATH 注入: {_MIKTEX_BIN}")
         try:
             # §3.97 修复：优先 manim_env 内 ffmpeg（系统 PATH 无），次选 imageio_ffmpeg
             _ff = ""
