@@ -1,4 +1,4 @@
-﻿============================= test session starts =============================
+============================= test session starts =============================
 platform win32 -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\鍥㈣仛浣揬AppData\Local\Python\pythoncore-3.14-64\python.exe
 cachedir: .pytest_cache
 rootdir: D:\妗岄潰\鏅鸿兘浣撴灦鏋勪笌寮€鍙戯紙鍚ぇ妯″瀷锛塡14_鏁欒偛鑰匒gent椤圭洰\06_娴嬭瘯涓庨獙璇乗tests

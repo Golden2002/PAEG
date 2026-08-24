@@ -1,4 +1,4 @@
-﻿# deploy/canary.ps1 —— PAEG 灰度发布脚本（§3.79 D2 · 依据 deploy/灰度回滚规范.md）
+# deploy/canary.ps1 —— PAEG 灰度发布脚本（§3.79 D2 · 依据 deploy/灰度回滚规范.md）
 # 用途：Canary 阶梯（C1 1-5% → C2 20% → C3 50% → C4 100%）+ 闸门检查 + kill switch + 回滚。
 # 用法：
 #   pwsh deploy/canary.ps1 -Stage C1        # 推进到 C1（1-5% 流量）

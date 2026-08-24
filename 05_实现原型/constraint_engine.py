@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """PAEG 约束引擎（v0.70 §3.29 ⭐ MCP 化 · Oracle 设计）
 
 把 prompts.py 的 L0-L8 分层动态约束系统暴露为标准接口（MCP tool + 内部函数双面）。

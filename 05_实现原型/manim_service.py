@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """v6.1 ⭐ Manim 数学动画服务（独立模块）
 LLM 生成 Manim 代码 → 隔离渲染 → 数学动画视频
 - 独立于 video_service.py（不互相依赖）

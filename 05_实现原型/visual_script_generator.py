@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 visual_script_generator.py — PAEG 数学可视化脚本生成器（v0.70+ §3.26）
 

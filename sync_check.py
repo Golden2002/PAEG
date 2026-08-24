@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """PAEG 三处一致性校验脚本（本地目录 ↔ GitHub ↔ Release）
 用法: python sync_check.py [--fix]
 --fix: 自动推送本地差异文件到 GitHub（本地为权威源）

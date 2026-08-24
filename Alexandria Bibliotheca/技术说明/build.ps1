@@ -1,4 +1,4 @@
-﻿# build.ps1 — 图册构建流水线（Oracle 重新设计方案 · 统一入口）
+# build.ps1 — 图册构建流水线（Oracle 重新设计方案 · 统一入口）
 # 四阶段：extract（严格解析+幽灵块检测）→ pre_render（逐图SVG）→ render（原方法PDF）→ verify（质量门）
 # 用法：powershell -ExecutionPolicy Bypass -File build.ps1
 # 退出码：0=成功，1=失败（任一阶段失败即中止）

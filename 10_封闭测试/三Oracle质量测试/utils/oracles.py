@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """三 Oracle 评分器 —— LLM-as-judge 基类 + 教学流/倾诉/物料评分器。
 
 设计（Oracle 方案）：

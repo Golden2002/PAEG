@@ -1,4 +1,4 @@
-﻿---
+---
 name: teach
 description: 多会话教学系统：基于间隔重复（spacing）、回忆练习（retrieval practice）和交错练习（interleaving）的存储强度训练。在 PAEG 中，当学生想要长期掌握一个学科主题或技能（而非一次性查询）时使用，例如"我要系统学微积分""帮我备考线性代数""教我写作"。每次产出 1 节短 HTML 课（lessons/*.html）+ 参考文档（reference/*.html）+ 学习记录（learning-records/*.md），并基于最近发展区（zone of proximal development）挑选下一课主题。
 disable-model-invocation: true

@@ -1,4 +1,4 @@
-﻿﻿# PAEG Docker 化（v0.67 单容器最小可行版 → v0.73 魔搭部署兼容）
+# PAEG Docker 化（v0.67 单容器最小可行版 → v0.73 魔搭部署兼容）
 # 用户方案：Docker 统一 Python 3.12——manim 0.19 兼容 3.12，无需隔离 venv。
 # 覆盖：教学/闲聊/PPT/讲义/manim 动画 五大场景。
 # 魔搭创空间（ModelScope Studio）要求：服务监听 7860 端口 + ms_deploy.json 声明

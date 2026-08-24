@@ -1,4 +1,4 @@
-﻿# PAEG 技术文档 PDF 模板（可循环复用）
+# PAEG 技术文档 PDF 模板（可循环复用）
 
 > v0.70+ 交付物 · 由 visual-engineering 微 agent 设计 · 可复用、可升级
 
