@@ -263,14 +263,27 @@ def _run_material(args, harness, oracle: Oracle3Material) -> Dict:
         "teaching_video": f"生成教学视频：{args.topic}",
         "math_video": f"生成数学动画：{args.topic}",
     }[args.material_type]
-    body = harness.send(keyword_map, wait_ms=120000)
+    # §3.97 ⭐ manim 渲染 2-5 分钟，120s 等不到（此前 0/20 分是评测时序问题）
+    _wait = 300000 if args.material_type == "math_video" else 120000
+    body = harness.send(keyword_map, wait_ms=_wait)
     material_text = body[-2500:]
+    # §3.97 ⭐ 判断完成状态（渲染中/失败/成功——避免把中间态当最终质量）
+    _status = "unknown"
+    if "已生成" in material_text:
+        _status = "done"
+    elif "渲染" in material_text or "失败" in material_text or "生成中" in material_text:
+        _status = "pending_or_failed"
     shot = harness.screenshot(f"material_{args.material_type}.png")
     result = oracle.score_material(material_text, args.topic, f"截图: {shot}")
     result["material_type"] = args.material_type
     result["topic"] = args.topic
     result["screenshot"] = shot
     result["material_text"] = material_text
+    result["completion_status"] = _status
+    # §3.97 ⭐ 未完成（中间态）不判分——记录待重测
+    if _status != "done":
+        result["total"] = 0
+        result["note"] = "物料未在等待窗口内完成（渲染中/失败），需重测"
     result["defects"] = _grade_defects(result)
     return result
 
