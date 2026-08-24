@@ -4611,3 +4611,46 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 ### 实施记录
 
 （实施完成后按阶段二→阶段三执行）
+
+
+---
+
+## §3.100 3B1B 风格 manim 制作指南 + 优秀脚本调研（2026-08-24 · 用户指示 ⭐）
+
+### 用户要求（原文）
+
+- "我相信对manim的视频，其实互联网上非常的资源来描述得，怎样做一个像three blue one brown一样的好视频，也有很多现成的脚本，优秀的脚本可以学习"
+- "你只需要去看生成的代码质量高不高，是否是一个详尽的展示，是否是把脚本给编写成了一个非常好的视频代码就可以"（§3.99 同源）
+
+### librarian 调研结果（bg_ab8e2ba1 已返回 ✅）
+
+**3B1B 视觉化原则（8 条）**：
+1. 视觉先于符号：先画几何/直觉图，再写公式
+2. 动画即论证：动画是推理载体，非装饰
+3. 具体→一般：先特殊例子建立直觉，再抽象
+4. 放慢节奏给"暂停思考"：关键洞见前 wait/run_time 放大（Fast-fast-SLOW）
+5. 颜色即语义：input=BLUE/output=GREEN/key=YELLOW 稳定一致
+6. 渐进披露：TransformMatchingTex 逐步展开公式（不 FadeOut 重建）
+7. 空间编码：推导左→右，结论居中，过程置边，不透明度分级
+8. 黑板美学 + 钩子：默认 2D 黑板感，开头"提问性图像"
+
+**优秀脚本（5 个）**：3b1b/videos inventing_math.py（模块常量+工厂+.split 拆词）/ _2023/clt/main.py（TransformMatchingTex 推导链）/ 3b1b/manim example_scenes.py（animate/always_redraw/make_number_changeable 现代 API）/ ManimCommunity gallery（单 API 最小示例）/ adithya-s-k/manim_skill（三幕叙事 Hook→Geometric→Numeric）
+
+**manim 代码质量 rubric（5 维）**：
+- A 叙事结构 30%：Scene 命名=教学动作/钩子开头/recap 结尾/单一职责
+- B 公式几何 25%：MathTex 非 Text/TransformMatchingTex 推导/颜色语义/isolate
+- C 节奏时机 20%：wait≥1/推导 run_time 2-4/装饰 0.5-1/LaggedStart 编排
+- D 视觉布局 15%：暗背景/不透明度分级/留白/颜色一致
+- E 可读健壮 10%：工厂函数/常量/步骤注释/restore 复用
+
+**来源（15 个）**：AMS Notices 2022 / Grant Sanderson substack / Smart Venture / Stanford Daily / 3b1b/videos / 3b1b/manim / ManimCommunity / adithya-s-k/manim_skill / browser-use/video-use / openclaw manim-composer / OpenMontage / bookseal linear-algebra / Math-To-Manim 等
+
+### 落地三件套（实施中）
+
+1. **visual_script_generator.py**：提示词增量（7 条 3B1B 原则：Scene 命名=教学动作/MathTex+TransformMatchingTex/wait≥1/颜色语义/Fast-fast-SLOW/recap/几何公式联动）
+2. **manim_templates.py**：模板扩充（基础三件套/公式推导链/三幕叙事/单 API 示例）
+3. **manim_judge.py**：rubric 增强（A-E 五维 30/25/20/15/10）
+
+### 实施记录
+
+（三件套实施中）
