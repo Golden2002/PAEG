@@ -4903,3 +4903,46 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 ### 实施记录
 
 （librarian 调研 bg_b811dbb0 中 → L1 设计 → 7 情景接入 → 文档同步 → 同版本名更新）
+
+
+---
+
+## §3.106 L1 启发式提示词调研结果（2026-08-24 · bg_b811dbb0 已返回 ✅）
+
+### 8 条 L1 设计原则（含权威来源）
+
+1. **先沉思再产出**：<thinking>/<output> 标签分离思考与输出（Anthropic 2026 Prompting Best Practices）
+2. **概念分析五问**：What/What-not/Why/Example/Pitfall（Springer 2026 Concept Analysis）
+3. **展示方案给自由度**：不预先指定图表类型，让 LLM 思考数据特征后自选（VisAlchemy 2024）
+4. **Intent-First 教学**：5E 阶段识别 + 三类障碍诊断（概念/策略/元认知）后选策略（5E-Structured Coach 2026）
+5. **情绪验证分层级**：EVA 四层（倾听→镜像→认可→真诚），避免过早给建议（ACL Findings 2026）
+6. **引导而非替代**：给思考清单不给标准答案（Anthropic Extended Thinking）
+7. **元认知触发器**：产出前自检"是否覆盖核心机制/误区/独立可解"（AIED 2025）
+8. **标签隔离**：think/analysis/strategy/reflect 四段式（Anthropic 推荐）
+
+### 3 场景 L1 范本
+
+- **物料生成**：沉思→概念分析→展示路径候选（2-3 种比较）→选定+理由→输出→自检
+- **教学讲解**：5E 阶段→障碍诊断→前概念扫描→苏格拉底策略选择→响应（镜像+策略+保留主体性）→自检
+- **情绪陪伴**：情绪观察→验证层级判断→共情策略（镜像+认可，避空洞共情）→阶段感→响应→自检
+
+### 分层架构（L3→L1→L2→L0）
+
+- L3 路由：识别场景（物料/教学/倾诉）→ 选 L1+L2 组合
+- L1 启发式：引导沉思（思考启动器，非填空模板）
+- L2 模板化：将 analysis+strategy 填入结构化模板（material_prompts）
+- L0 守门：剥离 <thinking>/<analysis>/<reflection>，仅留 <output> 给用户
+
+### 关键洞察
+
+- LLM 共情 83-90% 走同一模板 `[VXER]+[AIP]+`——L1 必须打破模板化共情
+- 情绪场景分层级（早期倾听+镜像 L1-L2，后期认可+真诚 L3-L4）
+- 教学按 5E 阶段响应，避免跳过学习者思考直接给答案
+
+### 29 条权威引用（摘要）
+
+Anthropic Prompting Best Practices 2026 / Extended Thinking / think tool / OpenAI Reasoning Best Practices / GPT-5 Prompting Guide / Springer Digital Prompting 2026 / ARPG+ 2026 / 5E-Structured Coach / EVA (ACL Findings 2026) / ESCA (AAAI 2026) / Implicit Empathy / VisAlchemy / Visualizationary / Could You Be Wrong / Metacognitive Scaffolds / SocraticAI / PCK framework / AI Templatic Empathy 等
+
+### 实施
+
+（L1 提示词层接入 7 情景：teaching/material/confide/answer/method/chat/knowledge——在 PromptRegistry 各情景块前注入 L1 沉思引导）
