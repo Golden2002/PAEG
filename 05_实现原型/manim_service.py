@@ -138,15 +138,27 @@ def validate_manim_code(code: str):
 
 
 def _sanitize_code_no_latex(code: str) -> str:
-    """§3.97 ⭐ 无 LaTeX 环境：MathTex/Tex → Text 降级（避免 latex.exe FileNotFound）。"""
-    if _LATEX_OK or not code:
-        return code
-    # MathTex("x^2") → Text("x^2")（manim Text 支持纯文本，不需 LaTeX）
-    _fixed = code.replace("MathTex(", "Text(").replace("Tex(", "Text(")
-    if _fixed != code:
-        print("[manim_service] 无 LaTeX → MathTex/Tex 降级为 Text")
-    return _fixed
+    """§3.97 ⭐ 代码清洗：MathTex/Tex → Text 降级 + 全角标点转半角 + LaTeX 残留剥离。
 
+    - 无 LaTeX：MathTex/Tex → Text（避免 latex.exe FileNotFound）
+    - 全角标点（U+FF0C/U+FF1A 等）在 Python 代码中导致 SyntaxError → 转半角
+    - LaTeX 残留 $ 符号（LLM 常混入数学记号）剥离
+    """
+    if not code:
+        return code
+    _orig = code
+    # 1) MathTex/Tex → Text（无 LaTeX 时降级）
+    if not _LATEX_OK:
+        code = code.replace("MathTex(", "Text(").replace("Tex(", "Text(")
+    # 2) 全角标点 → 半角（保留语法结构）
+    _F2H = {"，": ",", "；": ";", "：": ":", "（": "(", "）": ")",
+            "！": "!", "？": "?", "“": chr(34), "”": chr(34), "‘": chr(39), "’": chr(39)}
+    code = "".join(_F2H.get(_ch, _ch) for _ch in code)
+    # 3) 剥离 LaTeX $ 符号残留
+    code = code.replace("$", "")
+    if code != _orig:
+        print("[manim_service] 代码清洗：MathTex/全角标点/LaTeX 残留已处理")
+    return code
 
 def render_manim(code: str, scene_class: str = None, quality: str = '-qm',
                  timeout: int = 180):
