@@ -24,6 +24,10 @@ DIMS = {
     "pedagogy": "是否有教学价值（动画帮助理解而非炫技）",
     "correctness": "数学/内容是否正确（无错误符号/逻辑）",
     "focus": "是否聚焦主题（无无关内容）",
+    # §3.100 ⭐ 3B1B 叙事维度（调研成果落地：钩子/渐进披露/recap/节奏）
+    "hook": "是否以提问性/反直觉图像开头激发好奇心（非直接宣告主题）",
+    "progressive": "是否渐进披露（先几何直觉后公式，TransformMatchingTex 逐步推导，非一次性呈现）",
+    "recap": "是否以核心结论回顾结尾（narration 总结 + 视觉重现关键图形）",
 }
 
 
@@ -60,8 +64,9 @@ def judge_manim_narrative(topic: str, subject: str, code: str,
         system = (
             "你是数学动画评审员（3Blue1Brown 风格标准）。评审以下 Manim 动画方案。\n"
             f"主题：{topic} 学科：{subject}\n\n"
-            f"【4 维评分（每维 1-5 整数）】\n{_dim_lines}\n\n"
-            '只输出 JSON：{"dims": {"clarity": N, "pedagogy": N, "correctness": N, "focus": N}, '
+            f"【{len(DIMS)} 维评分（每维 1-5 整数）】\n{_dim_lines}\n\n"
+            '只输出 JSON：{"dims": {"clarity": N, "pedagogy": N, "correctness": N, "focus": N, '
+            '"hook": N, "progressive": N, "recap": N}, '
             '"verdict": "pass"|"review"|"fail"}'
             "（verdict：pass=可直接用 / review=需小改 / fail=需重做）"
         )
