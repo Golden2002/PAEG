@@ -193,7 +193,8 @@ def _get_llm_for_manim():
 
 
 def generate_manim_video(topic: str, subject: str = 'math',
-                         learner_id: str = 'anon') -> dict:
+                         learner_id: str = 'anon',
+                         llm=None, grade: str = "high_school") -> dict:
     """LLM 生成 Manim 代码 → 渲染视频。返回 {ok, path, url, error}
 
     v0.63 ⭐ 意图层：match_manim_intent 把简单话（"画个抛物线"）映射为
@@ -201,14 +202,23 @@ def generate_manim_video(topic: str, subject: str = 'math',
 
     v1.1 ⭐ §3.34 智绘科普范式：若已生成 script.json（manim_pipeline 规划产物），
     则优先走流水线（多阶段+门控+自动修复）；否则回退原单段流程（兼容）。
+
+    §3.92 ⭐ 修复（Oracle 根因）：接受 caller 的 llm 透传（此前 _get_llm_for_manim()
+    新建实例导致 caller 上下文丢失）；修复 _safe_chat 缺参（L247）；修复
+    collect_all_resources 误传 _safe_chat 为 llm；修复 judge_manim_narrative 缺 llm。
     """
+    # 接受 caller llm，无则新建（兼容旧调用）
+    _llm = llm or _get_llm_for_manim()
+    # 学段中文化（注入 audience）
+    _grade_cn = {"middle_school": "初中", "high_school": "高中",
+                 "undergraduate": "大学", "graduate_exam": "考研"}.get(grade, "高中")
     # v1.1 ⭐ 优先：script.json 流水线（若存在规划产物）
     try:
         from manim_pipeline import run_pipeline
         # 尝试用现有流水线（含 Phase1 规划→门控→草稿→实现→修复）
         _r = run_pipeline(
-            llm=_get_llm_for_manim(),
-            topic=topic, audience="高中", duration_target_sec=120,
+            llm=_llm,
+            topic=topic, audience=_grade_cn, duration_target_sec=120,
             style="3blue1brown", prerequisites="",
             intuition="", objectives="")
         if _r.get("ok"):
@@ -233,9 +243,10 @@ def generate_manim_video(topic: str, subject: str = 'math',
         from subagents import _safe_chat
         _sys = _MANIM_SYSTEM
         # v0.66 ⭐ 统一资源门面：注入 KB/用户物料/网络检索（动画主题有事实依据）
+        # §3.92 修复：llm 传 _llm（此前误传 _safe_chat 函数）
         try:
             from services.library import collect_all_resources
-            _res = collect_all_resources(learner_id, topic, llm=_safe_chat,
+            _res = collect_all_resources(learner_id, topic, llm=_llm,
                                          subject=subject, include_web=False)
             if _res.get("has_any"):
                 _sys += "\n\n## 可用资源（动画应基于这些事实）\n" + _res["block"]
@@ -244,7 +255,10 @@ def generate_manim_video(topic: str, subject: str = 'math',
         if _scene_prompt:
             _sys = _sys + "\n\n## 本次动画要求（场景专属）\n" + _scene_prompt
         for _attempt in range(3):
-            code = _safe_chat(_sys, f"教学问题：{topic}\n学科：{subject}\n生成 Manim 动画代码")
+            # §3.92 修复：_safe_chat 必须传 llm（此前缺参静默失败→走模板）
+            code = _safe_chat(_llm, _sys,
+                              f"教学问题：{topic}\n学科：{subject}\n生成 Manim 动画代码",
+                              max_tokens=4000)
             if code and 'class ' in code:
                 break
             import time as _t
@@ -257,6 +271,25 @@ def generate_manim_video(topic: str, subject: str = 'math',
     if not code or 'class ' not in code:
         from manim_templates import template_for, template_by_key
         code = template_by_key(_template_key, topic) if _template_key else template_for(topic, subject)
+
+    # §3.92 ⭐ 代码清洗：LLM 输出可能含 markdown 代码块/LaTeX $/说明文字——剥离后 AST 校验
+    if code:
+        _orig = code
+        # 1) 剥离 ```python ... ``` / ``` ... ``` 代码块外壳
+        _m = re.search(r"```(?:python)?\s*\n(.*?)```", code, re.S)
+        if _m:
+            code = _m.group(1)
+        # 2) 剥离 LaTeX $ 符号（LLM 误用数学记号）
+        code = code.replace("$", "")
+        # 3) 剥离首尾说明文字（无 class 定义的行）
+        _lines = [ln for ln in code.split("\n")]
+        # 找第一个含 "class " 或 "from manim" 或 "import" 的行作为起点
+        _start = 0
+        for _i, _ln in enumerate(_lines):
+            if "class " in _ln or "from manim" in _ln or _ln.strip().startswith("import "):
+                _start = _i
+                break
+        code = "\n".join(_lines[_start:])
 
     # 2. AST 校验
     ok, err = validate_manim_code(code)
@@ -276,11 +309,12 @@ def generate_manim_video(topic: str, subject: str = 'math',
         _url = f"/api/download/manim/{os.path.basename(path)}"
 
     # §3.81 P2-② ⭐ Manim 教学叙事复核（LLM 评审动画是否表达概念；降级不阻塞）
+    # §3.92 修复：传 llm（此前缺参 → dims 永远空，评审是装饰）
     _narr = {"checked": False}
     try:
         if os.environ.get("PAEG_NO_MANIM_JUDGE") != "1":
             from services.manim_judge import judge_manim_narrative
-            _narr = judge_manim_narrative(topic, subject, code, path)
+            _narr = judge_manim_narrative(topic, subject, code, path, llm=_llm)
     except Exception as _nj_e:
         print(f"[manim_service] 动画叙事复核跳过: {_nj_e}")
 

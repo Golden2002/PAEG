@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterator, Optional
 
 from sse_presenter import fmt_done, fmt_presentation, fmt_progress
+# §3.92 ⭐ 接通结构化提示词模板（Oracle 根因修复：此前模板是"死代码"，生成器未调用）
+from material_prompts import build_material_system, upgrade_simple_intent
 
 
 # ═══════════════════════════════════════════════════════════
@@ -123,35 +125,117 @@ def _safe_chat_wrap(llm, sys_p, usr_p, max_tokens=2000) -> str:
         return ""
 
 
+def _parse_ppt_pages_json(raw: str) -> list:
+    """§3.92 ⭐ 解析 build_material_system 要求的 JSON pages 数组；失败返回 []。"""
+    import json as _json
+    _m = re.search(r"\[.*\]", raw, re.S)
+    if not _m:
+        return []
+    try:
+        pages = _json.loads(_m.group(0))
+        return [p for p in pages if isinstance(p, dict) and p.get("title")]
+    except Exception:
+        return []
+
+
+def _pages_to_markdown(pages: list) -> str:
+    """§3.92 ⭐ JSON pages → markdown 大纲（pptx_mcp_server._parse_outline 兼容格式），
+    保留 visual_focus/notes（写进 HTML 注释）。"""
+    lines = []
+    for i, p in enumerate(pages, 1):
+        lines.append(f"## {p.get('title', f'第{i}页')}")
+        for pt in (p.get("points") or [])[:6]:  # 6×6 硬约束：≤6 条
+            lines.append(f"- {pt}")
+        if p.get("visual_focus"):
+            lines.append(f"<!-- 视觉焦点：{p['visual_focus']} -->")
+        if p.get("notes"):
+            lines.append(f"<!-- 教师备注：{p['notes']} -->")
+    return "\n".join(lines)
+
+
+def _collect_sources(llm, learner_id, topic, subject, include_web=True) -> str:
+    """§3.92 ⭐ 资源注入（KB/网络检索 → 物料有事实依据）；不可用返回空串。"""
+    try:
+        from services.library import collect_all_resources
+        _r = collect_all_resources(learner_id, topic, llm=llm,
+                                   subject=subject, include_web=include_web)
+        if _r.get("has_any"):
+            return _r.get("block", "")
+    except Exception:
+        pass
+    return ""
+
+
+def _validate_video_scenes(scenes: list) -> tuple:
+    """§3.92 ⭐ 节奏校验：每镜 8-15s 硬约束 + 总长 ≥60s；返回 (ok, 修正后 scenes)。"""
+    fixed = []
+    for s in scenes:
+        try:
+            d = int(s.get("duration_s") or s.get("duration_sec") or 10)
+        except Exception:
+            d = 10
+        d = max(8, min(15, d))  # 硬约束
+        s["duration_s"] = d
+        fixed.append(s)
+    total = sum(s["duration_s"] for s in fixed)
+    if total < 60 and fixed:
+        for s in fixed:
+            s["duration_s"] = 12  # 拉满保底
+    return bool(fixed), fixed
+
+
 def _gen_ppt(llm, topic, subject, learner_id, **kw) -> MaterialResult:
-    """PPT 生成（复用 pptx_mcp_server 排版，返回下载 URL）。"""
+    """PPT 生成（§3.92 ⭐ build_material_system 结构化大纲 + sources 注入 + 6×6 硬约束）。"""
     import json
     try:
         import pptx_mcp_server as _pptx
-        # PPT topic 净化（沿用旧 L1070）
+        # 1. topic 净化
         _ppt_topic = re.sub(r"(做|制作|整理|创建|生成|一份|关于|的)?(PPT|ppt|演示文稿|课件|幻灯片).*$",
                             "", topic).strip() or "教学演示"
-        # 大纲：LLM 生成
-        _outline = _safe_chat_wrap(
-            llm,
-            "你是教学 PPT 大纲生成器。为给定主题生成教学 PPT 大纲。严格使用以下格式：\n"
-            "## 章节标题\n- 要点1\n- 要点2\n要求：5-7 个章节，每章 2-4 个要点；内容准确、有例子、由浅入深；只输出大纲。",
-            f"主题：{_ppt_topic}", max_tokens=1200)
-        if "## " not in _outline:
-            _outline = (
+        # 2. 结构化系统 prompt（角色+schema+硬约束+范例四件套——Oracle 根因修复）
+        _grade = kw.get("grade", "high_school")
+        _sys = build_material_system("ppt", _ppt_topic, subject, _grade)
+        _usr = upgrade_simple_intent(_ppt_topic, "ppt", subject, _grade)
+        # 3. 资源注入（KB/网络 → 大纲有事实依据）
+        _sources = _collect_sources(llm, learner_id, _ppt_topic, subject, include_web=True)
+        if _sources:
+            _usr += "\n\n## 可用资料（PPT 大纲应基于这些事实）\n" + _sources
+        # 4. LLM 生成 JSON 大纲（强制 schema 校验 + 兜底）
+        _outline_raw = _safe_chat_wrap(llm, _sys, _usr, max_tokens=1500)
+        _pages = _parse_ppt_pages_json(_outline_raw)
+        if _pages and 4 <= len(_pages) <= 12:
+            _outline = _pages_to_markdown(_pages)
+        else:
+            _outline = _outline_raw if "## " in _outline_raw else (
                 f"## {_ppt_topic}引入\n- 生活实例\n- 学习目标\n"
                 f"## {_ppt_topic}核心概念\n- 定义\n- 原理\n- 例子\n"
                 f"## 典型例题\n- 例题1\n- 例题2\n## 常见误区\n- 易错点\n"
                 f"## 总结\n- 要点回顾\n- 课后思考")
+        # 5. 调用 pptx_mcp_server（带 sources）
         _pres = _pptx.generate_presentation(
-            topic=_ppt_topic, outline=_outline, style="paeg_standard", uid=learner_id)
+            topic=_ppt_topic, outline=_outline, sources=_sources,
+            style="paeg_standard", uid=learner_id)
         _path = _pres.get("path") or ""
         _slides = _pres.get("slides") or 0
         if _path:
             import urllib.parse
             _name = os.path.basename(_path)
             _url = f"/api/download/ppt/{urllib.parse.quote(_name)}"
-            _content = f"PPT 已生成（{_slides} 页）：<a href='{_url}' target='_blank'>下载 PPT</a>"
+            # §3.92 ⭐ 附大纲摘要（评测可读内容 + 用户预览，非仅链接）
+            _outline_preview = ""
+            if _pages:
+                _preview_pages = _pages[:6]
+                _outline_preview = "\n\n大纲预览（前 6 页）：\n"
+                for _i, _p in enumerate(_preview_pages, 1):
+                    _pts = "；".join((_p.get("points") or [])[:3])
+                    _vf = _p.get("visual_focus", "")
+                    _outline_preview += f"{_i}. {_p.get('title', '')}"
+                    if _pts:
+                        _outline_preview += f"：{_pts}"
+                    if _vf:
+                        _outline_preview += f"〔视觉焦点：{_vf}〕"
+                    _outline_preview += "\n"
+            _content = f"PPT 已生成（{_slides} 页）：<a href='{_url}' target='_blank'>下载 PPT</a>{_outline_preview}"
             return {"ok": True, "content": _content, "url": _url,
                     "error": "", "step_type": "ppt"}
         return {"ok": False, "content": "PPT 生成失败", "url": "",
@@ -162,11 +246,37 @@ def _gen_ppt(llm, topic, subject, learner_id, **kw) -> MaterialResult:
 
 
 def _gen_handout(llm, topic, subject, learner_id, **kw) -> MaterialResult:
-    """讲义生成（复用 file_generator.save_answer——与 material_pipeline.handout_pipeline 同路径）。"""
+    """讲义生成（§3.92 ⭐ generate_handout 6 段完整讲义 + learner 注入 + 模板兜底）。
+
+    Oracle 根因修复：此前用 save_answer（任意回答存档路径），非教学讲义专用
+    generate_handout（6 段结构：教学目标/导入/新课3.1-3.3/巩固练习/小结/作业）。
+    """
     try:
         from file_generator import FileGenerator
         fg = FileGenerator(llm)
-        # save_answer 内部生成讲义内容（无需 learner 对象，旧分支同路径）
+        _learner = kw.get("learner")
+        # 首选：generate_handout（6 段结构 + learner 注入 + lang_gate 语言守门）
+        if _learner is not None:
+            try:
+                _content, _fname, _structured = fg.generate_handout(
+                    _learner, subject, topic, length="medium")
+                if _structured and _structured.get("content"):
+                    return {"ok": True, "content": _structured["content"][:1500],
+                            "url": "", "error": "", "step_type": "handout"}
+                if _content:
+                    return {"ok": True, "content": _content[:1500], "url": "",
+                            "error": "", "step_type": "handout"}
+            except Exception:
+                pass
+        # 兜底：无 learner 或生成失败 → material_prompts 4 块模板
+        _grade = kw.get("grade", "high_school")
+        _sys = build_material_system("handout", topic, subject, _grade)
+        _usr = upgrade_simple_intent(topic, "handout", subject, _grade)
+        _md = _safe_chat_wrap(llm, _sys, _usr, max_tokens=2000)
+        if _md and len(_md.strip()) > 200:
+            return {"ok": True, "content": _md[:1500], "url": "",
+                    "error": "", "step_type": "handout"}
+        # 最终兜底：save_answer（历史路径）
         md, _html = fg.save_answer(topic, topic, subject)
         if md:
             return {"ok": True, "content": md[:1500], "url": "",
@@ -179,23 +289,37 @@ def _gen_handout(llm, topic, subject, learner_id, **kw) -> MaterialResult:
 
 
 def _gen_video(llm, topic, subject, learner_id, **kw) -> MaterialResult:
-    """教学视频分镜脚本生成。"""
+    """教学视频分镜脚本生成（§3.92 ⭐ 模板驱动 + 8-15s 节奏硬约束 + KB 注入）。"""
     import json as _json
     try:
-        _raw = _safe_chat_wrap(
-            llm,
-            "你是教学视频编剧。为给定主题设计 3-8 个镜头（scene）的教学视频脚本，"
-            "每镜：id、concept、narration（旁白台词）、duration_sec（8-15 秒）、visual_goal（画面目标）。"
-            "总长 60-180 秒：引入（钩子）→主体→take-away 结尾。输出 JSON 数组 scenes。",
-            f"主题：{topic}\n学科：{subject}", max_tokens=2000)
+        _grade = kw.get("grade", "high_school")
+        _sys = build_material_system("video", topic, subject, _grade)
+        _usr = upgrade_simple_intent(topic, "video", subject, _grade)
+        # KB/网络注入 → 旁白有事实依据
+        _sources = _collect_sources(llm, learner_id, topic, subject, include_web=True)
+        if _sources:
+            _usr += "\n\n## 可用资料（旁白应基于这些事实）\n" + _sources
+        _raw = _safe_chat_wrap(llm, _sys, _usr, max_tokens=2500)
+        _scenes = []
         _m = re.search(r"\[.*\]", _raw, re.S)
         if _m:
-            _scenes = _json.loads(_m.group(0))
-            _content = f"教学视频脚本已生成（{len(_scenes)} 镜）：\n"
+            try:
+                _scenes = _json.loads(_m.group(0))
+            except Exception:
+                _scenes = []
+        if _scenes:
+            _ok, _scenes = _validate_video_scenes(_scenes)
+            _total = sum(int(s.get("duration_s", 10)) for s in _scenes)
+            _content = f"教学视频脚本已生成（{len(_scenes)} 镜，总长 {_total}s）：\n"
             for _sc in _scenes[:8]:
-                _content += f"- [{_sc.get('duration_sec', 10)}s] {_sc.get('concept', '')}: {_sc.get('narration', '')}\n"
+                _dur = _sc.get("duration_s", 10)
+                _nar = _sc.get("narration", "")
+                _vis = _sc.get("on_screen") or _sc.get("visual_goal", "")
+                _content += f"- [{_dur}s] 画面:{str(_vis)[:30]} 旁白:{str(_nar)[:60]}\n"
             return {"ok": True, "content": _content, "url": "",
                     "error": "", "step_type": "video"}
+        return {"ok": bool(_raw), "content": _raw or "教学视频脚本生成失败", "url": "",
+                "error": "", "step_type": "video"}
         return {"ok": bool(_raw), "content": _raw or "教学视频脚本生成失败", "url": "",
                 "error": "", "step_type": "video"}
     except Exception as e:
@@ -251,13 +375,18 @@ def _gen_script(llm, topic, subject, learner_id, **kw) -> MaterialResult:
 
 
 def _gen_manim(llm, topic, subject, learner_id, **kw) -> MaterialResult:
-    """Manim 数学动画生成（走 MaterialPipeline v2.0 长路径）。"""
+    """Manim 数学动画生成（走 MaterialPipeline v2.0 长路径）。§3.92 透传 llm/grade。"""
     try:
         from manim_service import generate_manim_video
-        _r = generate_manim_video(topic, subject, learner_id) or {}
+        _r = generate_manim_video(topic, subject, learner_id,
+                                  llm=llm, grade=kw.get("grade", "high_school")) or {}
         _url = _r.get("url") or _r.get("video_path") or ""
         if _r.get("ok") and _url:
-            _content = f"数学动画已生成：<a href='{_url}' target='_blank'>观看/下载动画</a>"
+            _narr = _r.get("narrative_judge", {})
+            _judge_str = ""
+            if _narr.get("checked"):
+                _judge_str = f" [叙事评分: {_narr.get('overall', 0):.1f}/5]"
+            _content = f"数学动画已生成{_judge_str}：<a href='{_url}' target='_blank'>观看/下载动画</a>"
             return {"ok": True, "content": _content, "url": _url,
                     "error": "", "step_type": "manim"}
         if _r.get("ok"):
@@ -285,7 +414,8 @@ def _gen_manim(llm, topic, subject, learner_id, **kw) -> MaterialResult:
 # ═══════════════════════════════════════════════════════════
 def route_material(magic_match: Dict[str, Any], llm, subject: str,
                    learner_id: str, concept: str = "",
-                   learner=None, save_turn: Callable = None) -> Iterator[str]:
+                   learner=None, save_turn: Callable = None,
+                   grade: str = "high_school") -> Iterator[str]:
     """物料路由主入口：生成 SSE 事件流（presentation + done）。
 
     Args:
@@ -296,6 +426,7 @@ def route_material(magic_match: Dict[str, Any], llm, subject: str,
         concept: 原始用户输入（topic 兜底）
         learner: 学习者对象（handout/mindmap 需要）
         save_turn: _save_teach_turn 回调（None 则不存）
+        grade: 学段（§3.92 透传给生成器，注入模板/learner）
 
     Yields: SSE 事件字符串。
     """
@@ -309,9 +440,10 @@ def route_material(magic_match: Dict[str, Any], llm, subject: str,
     if not topic:
         topic = concept[:60]
 
-    # 调用生成器（统一异常围栏）
+    # 调用生成器（统一异常围栏）——§3.92 透传 grade/learner
     try:
-        result = route.generator(llm, topic, subject, learner_id, learner=learner)
+        result = route.generator(llm, topic, subject, learner_id,
+                                 learner=learner, grade=grade)
     except Exception as e:
         result = {"ok": False, "content": route.fallback_msg, "url": "",
                   "error": str(e), "step_type": route.step_type}
