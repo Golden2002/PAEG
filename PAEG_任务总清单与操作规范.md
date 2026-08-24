@@ -3424,3 +3424,35 @@ server.py `teach_video` 端点：
 ### 待办
 
 - subagent_graph 调度接入（Wave 3 排期，非本轮）
+
+## §3.87 物料生成触发链路修复（2026-08-24 · 三 Oracle 测试暴露）
+
+### 用户要求（原文）
+
+"在我的设计当中，无论你是在输入框中输入PPT、讲义等关键词，还是点击对话框上方的按钮，都应该激活对应的物料生成途径。请你格外注意这一点，不仅功能要实现，而且输出质量要"
+"必须修复特定的魔法关键词，还有对话框上方的按钮都必须正确地激发物料的制作"
+
+### 根因（三 Oracle 测试暴露）
+
+| 问题 | 根因 |
+|---|---|
+| 输入"帮我做一份关于光合作用的PPT"未触发 PPT 生成 | teach_stream 不消费 ppt 意图：meta_router 的 `is_ppt_request`（L214）能识别，但 `rule_fallback_intent` 对部分口令返回 chat（其他规则优先）；且 server.py 从不读取 `INTENT_TO_CAPABILITY_HINT` 的 auto_tools（0 引用） |
+| 对话框上方按钮（cmd-trigger-ppt 等）点击后不激发 | 前端按钮只切标签显示（setPptMode），teach() 只传 enable_manim/enable_video，**漏传 enable_ppt/enable_handout**；且后端 teach_stream 也不读 enable 字段 |
+
+### 修复方案
+
+1. **前端**：teach() 请求体补齐 `enable_ppt` / `enable_handout`（对齐 enable_manim/enable_video 模式）
+2. **后端**：teach_stream 优先级链（crisis→emotion→lesson_prep→file→steer→teaching）中，**lesson_prep 前插入 ppt 意图早退**：
+   - 用独立的 `is_ppt_request()` 判断（不依赖 rule_fallback_intent，因其对部分口令返回 chat）
+   - LLM 生成 PPT 大纲（## 标题 + - 要点）→ `pptx_mcp_server.generate_presentation` 生成 → SSE 返回下载链接
+   - 大纲生成失败降级为结构化占位大纲（不中断生成）
+
+### 实施记录
+
+（修复中——验证后更新）
+
+### 待办
+
+- 讲义（handout）意图早退（与 PPT 同模式）
+- 验证：输入关键词 + 点击按钮双路径都触发
+- 输出质量：PPT 需满足"排版好看/内容详实/例子丰富/适用课堂"（Oracle3 rubric）
