@@ -4328,3 +4328,42 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 ### 实施记录
 
 （Oracle 方案扩展后实施）
+
+
+---
+
+## §3.96 提示词拼接动态清单架构（2026-08-24 · Oracle 咨询中）
+
+### 用户要求（原文）
+
+- "最好拼接提示词的模块能够动态维护一个列表，将所有的系统的固定提示词和可以扩展的，以及在不同阶段会在不同情况下调用的动态提示词维护起来一个列表，这样清晰明白，方便维护"
+- "咨询一下oracle这个架构"
+
+### 核心需求
+
+**提示词清单（Prompt Registry）**：
+1. **固定提示词**：系统级恒定（LANGUAGE_STYLE/TRUTH_GROUNDING/L0 保底等）
+2. **可扩展提示词**：可热更新/添加（学科模板/物料模板/约束层内容）
+3. **动态提示词**：不同阶段/不同情况才调用（分阶段物料提示词/用户输入/上下文）
+4. **清单化维护**：单一列表/注册表，清晰可见、易维护、可追溯
+
+### 现状
+
+- 提示词散落多处：prompts.py（LANGUAGE_STYLE/SUBJECT_STYLES/_GROUP_RULES）+ material_prompts.py（物料模板）+ constraint_config.json（约束层）+ material_router.py（生成器内联）+ subagents.py（注入链 17 段）
+- **无统一清单**——拼接顺序靠 build_presenter_system/build_material_system 硬编码
+- 用户输入（user_input）未作为动态提示词统一注入
+
+### 方案（Oracle 咨询中）
+
+1. **PromptRegistry 单独存储**（用户强调 ⭐）：独立 JSON 文件维护提示词清单——结构本身包含调用情景信息（如"物料制作"情景 = 固定提示词 + 物料相关提示词 + 用户输入）
+2. **清单 schema**：{id, type(固定/可扩展/动态), content, 触发情景, 优先级, 来源, 是否含用户输入}
+3. **情景驱动拼接**：如物料制作情景 → 自动拼 固定(L0/LANGUAGE_STYLE) + 物料模板 + 用户输入；教学情景 → 固定 + 学段/学科 + 用户输入
+4. **拼接器**：按情景查表 → 按优先级组装 → 输出可追溯清单
+5. **热更新**：可扩展项存 JSON（prompt_registry.json，如 constraint_config.json 模式）
+6. **可追溯**：每轮拼接记录清单（哪些提示词被拼入、来源、情景）
+
+**单独存储价值**：结构（含情景信息）与代码解耦——改表不改码；情景化拼接不易出错（固定+物料+用户输入自动组装）。
+
+### 实施记录
+
+（咨询中）
