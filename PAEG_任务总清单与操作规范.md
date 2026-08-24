@@ -4502,15 +4502,48 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 
 **单独存储价值**：结构（含情景信息）与代码解耦——改表不改码；情景化拼接不易出错（固定+物料+用户输入自动组装）。
 
-### Oracle 咨询状态
+### Oracle 方案（bg_4be7cd5c 已返回 ✅ · 不加压缩记载）
 
-- **状态**：待启动（§3.96 于 2026-08-24 登记，Oracle 咨询尚未发起）
-- **待咨询问题**：提示词清单 PromptRegistry 单独存储架构——{id, type(固定/可扩展/动态), content, 触发情景, 优先级, 来源} schema 设计、情景驱动拼接器、与现有 build_presenter_system/build_material_system/constraint_config.json 的关系、热更新与可追溯
-- **关联**：§3.95 三层联通（用户输入拼接所有提示词）依赖此清单；§3.94 物料分阶段（用户意图注入）也需清单支撑
+**核心设计：PromptRegistry 单独存储（data/prompt_registry.json）+ 情景驱动装配**
+
+**1. 清单 schema**：
+```json
+{"version":"1.0.0","blocks":[{
+  "id":"truth_grounding","type":"fixed","category":"safety",
+  "scenarios":["*"],"priority":1,
+  "source":"const:prompts.TRUTH_GROUNDING","hot_reload":false,
+  "contains_user_input":false,"stage":null
+}, ...],"scenarios":{
+  "teaching":{"stages":["diagnose","plan","present","evaluate","adjust","reflect"],"engine":"AgentEngine","subagent":"Presenter"},
+  "material":{"stages":["outline","slide_paint","render"],"pipeline":["outline→slides→PPT","script→code→video","topics→handout"]},
+  "confide":{"stages":["intake","attend","ground"],"agent":"AffectionSupportor"},
+  "answer":{"stages":["retrieve","compose","cite"]},
+  "chat":{"stages":["respond"]},"method":{"stages":["assess_level","advise"]},
+  "knowledge":{"stages":["list_or_search"]}
+}}
+```
+**字段**：type(fixed/dynamic/user_input) + scenarios(情景列表，[*]全情景) + priority(越小越前，user_input=99 强制末尾) + source(const:/yml:/json:/runtime:/material_prompts:) + hot_reload(热更新) + contains_user_input(trace 红标记) + stage(子阶段过滤) + condition(运行时表达式) + trigger(紧急触发)
+
+**2. 情景装配计划**（7 情景）：teaching/material/confide/answer/chat/knowledge/method——每情景 = 固定块(必出) + 扩展块(condition) + 动态块(运行时) + 用户输入
+
+**3. 拼接器**（prompt_registry.py ~150 行）：
+- `assemble(scenario, stage, inputs) -> (system_prompt, trace)`：按情景查表→按优先级排序→拼装；trace 列出拼入块/来源/优先级/长度/user_input 标记
+- user_input 强制末尾（避免干扰 system 身份设定）
+- priority 语义化间隔：1 底线/10 身份/20 角色/30 深度/40 上下文/45 语言/50 扩展/99 用户
+
+**4. 接线（最小侵入）**：build_presenter_system(L1826 签名不变，体内委托 registry)/build_presenter_user(L2963)/build_general_chat_system(L2786 _MODE_SCENE 外提)/build_material_system(material_prompts.py)/constraint_config.json(注册为块)/AgentEngine(引擎本体零改动)/observability(trace 复用 events.jsonl)
+
+**5. 物料分阶段 stage-aware**：data/material_stages.json——PPT(outline→slide_paint→render_pptx)/video(script→manim_code→tts_video) 每阶段专属 block 清单，同一物料不同阶段拼出不同 system
+
+**6. 热更新**：registry.reload_if_changed() + POST /admin/prompt-reload（hot_reload:true 的块零停机；硬约束 hot_reload:false 需重启+回归）
+
+**7. 实施 3 PR**：PR1 立骨架（registry.json+prompt_registry.py+test_registry，不调用现有路径）/ PR2 教学情景迁移（build_presenter_system/user 体内改，132 测试无 diff）/ PR3 全情景+物料 stage（_MODE_SCENE+material_stages+admin reload；prompts.py 3076→~1200 行）
+
+**8. 现状诊断**：prompts.py 25 万字节无清单可追溯；_MODE_SCENE 已是小清单但硬编码；constraint_config.json 是唯一真热更新；AgentEngine 与 prompt 拼接脱钩
 
 ### 实施记录
 
-（Oracle 咨询返回后实施）
+（按 3 PR 实施：PR1 立骨架 → PR2 教学迁移 → PR3 全情景+物料 stage；§3.94/3.95 依赖此清单）
 
 
 ---
