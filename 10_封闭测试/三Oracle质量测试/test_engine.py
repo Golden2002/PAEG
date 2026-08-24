@@ -273,8 +273,26 @@ def _run_material(args, harness, oracle: Oracle3Material) -> Dict:
         _status = "done"
     elif "渲染" in material_text or "失败" in material_text or "生成中" in material_text:
         _status = "pending_or_failed"
+    # §3.99 ⭐ manim 评"代码质量"——读落盘的 scene.py（脚本忠实度/详尽展示）
+    _code_text = material_text
+    if args.material_type == "math_video":
+        try:
+            import glob as _glob
+            _pipeline = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+                os.path.abspath(__file__)))), "05_实现原型", "evolve_data",
+                "manim_pipeline", "jobs", "*", "scene.py")
+            _newest = None
+            for _f in sorted(_glob.glob(_pipeline), key=os.path.getmtime, reverse=True):
+                _newest = _f
+                break
+            if _newest and os.path.getmtime(_newest) > time.time() - 600:
+                with open(_newest, encoding="utf-8") as _f:
+                    _code_text = _f.read()[:4000]
+                _status = "done"
+        except Exception:
+            pass
     shot = harness.screenshot(f"material_{args.material_type}.png")
-    result = oracle.score_material(material_text, args.topic, f"截图: {shot}")
+    result = oracle.score_material(_code_text, args.topic, f"截图: {shot}")
     result["material_type"] = args.material_type
     result["topic"] = args.topic
     result["screenshot"] = shot

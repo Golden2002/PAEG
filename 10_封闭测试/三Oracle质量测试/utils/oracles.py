@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """三 Oracle 评分器 —— LLM-as-judge 基类 + 教学流/倾诉/物料评分器。
 
 设计（Oracle 方案）：
@@ -185,11 +185,45 @@ ORACLE3_RUBRIC = {
 }
 
 
+# §3.99 ⭐ manim 数学动画专属 rubric：评"生成代码质量"（非渲染视频——渲染是引擎问题）
+ORACLE3_MANIM_RUBRIC = {
+    "dimensions": {
+        "详尽展示": {
+            "weight": 0.25,
+            "anchor_1": "代码仅少量元素，未覆盖脚本分镜（单场景/少步骤）",
+            "anchor_5": "多场景/多步骤完整覆盖脚本，每步有明确视觉呈现（几何直觉/公式/变换过程）",
+        },
+        "脚本忠实度": {
+            "weight": 0.25,
+            "anchor_1": "代码与脚本 scenes 脱节，概念/视觉目标未实现",
+            "anchor_5": "代码忠实实现 script.json 的每个 scene（concept/visual_goal/narration 对应）",
+        },
+        "视频代码结构": {
+            "weight": 0.20,
+            "anchor_1": "结构混乱（无 construct/类组织差/教学节奏缺失）",
+            "anchor_5": "Scene 子类 + construct 清晰，wait/pause 教学节奏，动画分组有序",
+        },
+        "数学表达": {
+            "weight": 0.15,
+            "anchor_1": "数学公式缺失或错误（无 MathTex/公式符号错误）",
+            "anchor_5": "MathTex 公式正确呈现，逐步展开/编号/对齐（LaTeX 符号保留）",
+        },
+        "可运行性": {
+            "weight": 0.15,
+            "anchor_1": "代码 AST 校验失败/无法运行",
+            "anchor_5": "代码通过 AST 校验，import 合法，可被 manim 引擎渲染",
+        },
+    },
+}
+
+
 class Oracle3Material(LLMJudge):
     """备课物料质量评分（PPT/教学视频/数学视频/讲义通用 rubric）。"""
 
     def __init__(self, material_type: str):
-        super().__init__(f"物料质量-{material_type}", ORACLE3_RUBRIC)
+        # §3.99 ⭐ manim 用代码质量 rubric（评生成代码，非渲染视频）
+        _rubric = ORACLE3_MANIM_RUBRIC if material_type in ("math_video", "数学动画", "manim") else ORACLE3_RUBRIC
+        super().__init__(f"物料质量-{material_type}", _rubric)
         self.material_type = material_type
 
     def score_material(self, material_text: str, topic: str,
