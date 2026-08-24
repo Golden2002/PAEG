@@ -4990,9 +4990,42 @@ L3 脚本路由
 2. 设计：subject_inducers.py（学科诱导）+ 与 material_prompts 物料模板融合
 3. 接入：PromptRegistry 按 subject 注入学科诱导 + 按物料注入物料诱导
 
+### 用户最新理解（⭐ 全拼接确认）
+
+- "学段和学科的组合，不过就是说任何一次输入都要把用户的输入，包括历史对话、用户画像等等和学段加学科两个提示词，这些所有的都拼接到一起"
+- "首先请你确认都有哪些可以拼接，包括固定的和动态的提示词"
+
+### 可拼接提示词清单（确认中）
+
+**A. 固定提示词（每次发送）**：
+1. 大模型自我设定/角色设定（人格/身份）
+2. 语言规范（LANGUAGE_STYLE）
+3. 真实底线（TRUTH_GROUNDING）
+4. L0 保底约束（安全/公式/反AI腔）
+
+**B. 动态提示词（运行时拼接）**：
+1. **用户输入**（当前问题——核心）
+2. **对话历史**（前几轮上下文）
+3. **用户画像**（学段/风格/薄弱点/昵称）
+4. **学段提示词**（_GRADE_GUIDE[grade] 深度）
+5. **学科提示词**（SUBJECT_STYLES[subject] persona/structure）
+6. **学段×学科组合诱导**（grade_subject_inducers——§3.107 新增）
+7. **L1 启发式沉思引导**（heuristic_prompts——§3.106）
+8. **教授级教学法骨架**（constraint D 层 skeleton_full）
+9. **约束层**（constraint_config L0-L7 动态调节）
+10. **知识库检索结果**（kb_node）
+11. **教学记忆/自我更新补丁**（subject_patches/tool_lessons）
+12. **物料专属诱导**（material_inducers——§3.107）
+
+### 现状（确认结果）
+
+- ✅ build_presenter_system 已含：学段/学科/画像/约束层/知识库
+- ✅ 学段×学科组合诱导已接入（§3.107）
+- ⚠️ 待确认：用户输入注入位置（build_presenter_user？）/ 对话历史 / L1 启发式在 presenter 的接入
+
 ### 实施记录
 
-（调研设计中）
+（全拼接清单确认 → 补齐缺失要素 → 技术说明体现）
 
 
 ---
