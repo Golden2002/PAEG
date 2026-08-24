@@ -4286,3 +4286,45 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 ### 实施记录
 
 （Oracle 方案落地后按序实施；前置：draft 保留在 result + 下载 API + 用户提示词注入）
+
+
+---
+
+## §3.95 物料生产三层联通 + Harness 驱动（2026-08-24 · Oracle 方案扩展）
+
+### 用户要求（原文）
+
+- "你要确认这个分阶段，联通不仅是和A其他架构连通，不仅是生产物料流水线内部的联通，也是和agent的其他架构的联通，并且还要是和用户交互的联通"
+- "你要一定要确保A的架构是清晰的，用户的输入作为提示词，被拼接到所有的动态的和固定的拼接提示词中去"
+- "对于物料生产这个特殊的过程，用户的输入会根据agent的harness逐步调用大模型先生成中间的文件，中间的良好的文件又指导下一环节的物料的制作"
+
+### 三层联通（用户确认）
+
+| 层 | 联通内容 | 现状 |
+|---|---|---|
+| ① 物料流水线内部 | 阶段间联通（脚本→代码→视频；大纲→每页→PPT） | ✅ MaterialPipeline.run() 已有 spec/draft/implement |
+| ② agent 其他架构 | subagent/harness/约束层联通 | ⚠️ material_pipeline 用 _safe_chat 直调，未走 AgentEngine harness |
+| ③ 用户交互 | 用户输入→提示词→拼接所有动态/固定提示词 | ❌ user_input 未注入生成器 |
+
+### Harness 驱动（用户要求）
+
+- 物料生产由 **AgentEngine（Plan→Act→Observe→Reflect）** 逐步调用 LLM
+- 用户输入作为提示词拼接到所有动态和固定提示词
+- 先生成中间文件（脚本/大纲），中间良好文件指导下一环节
+
+### 现状核实（2026-08-24）
+
+- `agent_engine.py`：AgentEngine 有 _plan/_act（tool_registry.run_agent_loop）/_reflect/run ✅
+- `material_pipeline.py`：用 _safe_chat 直调 LLM，**未走 AgentEngine harness**；`user_input` 未注入（False）
+- `subagents.py`：有 material/ppt 引用（99 处 ppt），部分联通
+- 用户输入仅作为 topic，未作为生成依据提示词拼接
+
+### 方案（Oracle 扩展中）
+
+1. 物料生成器统一接收 user_input，拼接进所有动态/固定提示词（build_material_system 已支持动态约束层）
+2. 复杂物料（PPT/视频/Manim）走 AgentEngine harness 逐步执行（Plan 规划→Act 生成中间文件→Reflect 质检→下一阶段）
+3. 中间产物（脚本/大纲/代码）既指导下一环节，也向用户开放下载
+
+### 实施记录
+
+（Oracle 方案扩展后实施）
