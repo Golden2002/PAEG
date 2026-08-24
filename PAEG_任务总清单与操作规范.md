@@ -3749,9 +3749,24 @@ server.py `teach_video` 端点：
 - "好的结构才能有好的功能"
 - 要求：① 拓展更多层级（现 L1-L7 七层）② 优化已有层级内容 ③ **层间正交**（M 节奏/R 修辞/T 温度/D 教学法深度/S 学科教学法/P 哲学框架 之间不重叠不干扰——例如"比喻"不应同时属于 R 修辞 与 D 教学法，需明确归属）④ 正交性需设计原则（每层单一职责、无交叉触发）
 
-### 实施记录
+### 实施记录（全部完成 ✅）
 
-（进行中：librarian 标准调研 ✅ 完成 + Oracle 根因分析 ✅ 完成（prompts.py:2994 是核心）；动态约束架构改革 Oracle 咨询中）
+1. ✅ **检测**：标杆同题实测基线（学术深度 71% 强，误区/结构/类比/边界/延伸 0%）
+2. ✅ **调研**：librarian 8 维标准（Merrill/Rosenshine/Chi/CLT/Khanmigo/MRBench/PSI）+ Oracle 根因（prompts.py:2994 硬编码 5 段模板是核心）
+3. ✅ **token 放开**：llm_enhanced_presenter L70 512→8000 + L43/57 长度限制放开（保留接口注释）
+4. ✅ **动态约束架构改革**（Oracle 方案）：
+   - constraint_config.json 扩展：layer_meta + group_rules 结构化（default/unlocked + D.skeleton_full/brief）+ default_layer 4→7
+   - constraint_layer_set config 模式自拼（含 D 层骨架注入）；layer_scope 加 layer_meta
+   - prompts.py L2994 硬编码骨架 → 抽离至 config（数据驱动）
+   - subagents.py Presenter 注入约束告知块（L0-L7 清单 + 当前层 + 你能做什么）
+   - 移除 v0.26 easy/normal/deep 类型化硬分支（用户反对类型化）
+5. ✅ **验证**：8 约束测试全绿 + 105 回归全绿 + 标杆同题 6 层骨架完整呈现（核心前提→基础机制→底层原理→现实权衡→⚠️边界条件→延伸引导→小结 + 费雪方程 + 例题 + 检查理解）
+6. ✅ **8 维提升**：结构层次 0%→45%、学术深度 71%→88%、延伸引导 0%→20%（冲销干预）
+7. ✅ **物料质量确认（主线 B）**：PPT 85 / 讲义 85 / 教学视频 87.8 / 数学动画 77.2（三 Oracle）
+8. 🔄 **物料模块针对性优化（用户新要求 ⭐）**：
+   - "分别针对性优化各个物料生产模块，进一步提升。每一个物料生产模块具体怎么优化，咨询oracle"
+   - 各模块现状与短板待 Oracle 诊断：PPT 85（6×6 原则？）、讲义 85（此前 96 波动）、教学视频 87.8（分镜节奏）、数学动画 77.2（最低——门控/渲染/叙事短板）
+8. ✅ **文档同步**：技术说明 §4.7 + 元能力 §6.74 + 技术全景 §10.27.6 + CHANGELOG v1.2.27
 
 ---
 
@@ -4052,9 +4067,24 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 - "好的结构才能有好的功能"
 - 要求：① 拓展更多层级（现 L1-L7 七层）② 优化已有层级内容 ③ **层间正交**（M 节奏/R 修辞/T 温度/D 教学法深度/S 学科教学法/P 哲学框架 之间不重叠不干扰——例如"比喻"不应同时属于 R 修辞 与 D 教学法，需明确归属）④ 正交性需设计原则（每层单一职责、无交叉触发）
 
-### 实施记录
+### 实施记录（全部完成 ✅）
 
-（进行中：librarian 标准调研 ✅ 完成 + Oracle 根因分析 ✅ 完成（prompts.py:2994 是核心）；动态约束架构改革 Oracle 咨询中）
+1. ✅ **检测**：标杆同题实测基线（学术深度 71% 强，误区/结构/类比/边界/延伸 0%）
+2. ✅ **调研**：librarian 8 维标准（Merrill/Rosenshine/Chi/CLT/Khanmigo/MRBench/PSI）+ Oracle 根因（prompts.py:2994 硬编码 5 段模板是核心）
+3. ✅ **token 放开**：llm_enhanced_presenter L70 512→8000 + L43/57 长度限制放开（保留接口注释）
+4. ✅ **动态约束架构改革**（Oracle 方案）：
+   - constraint_config.json 扩展：layer_meta + group_rules 结构化（default/unlocked + D.skeleton_full/brief）+ default_layer 4→7
+   - constraint_layer_set config 模式自拼（含 D 层骨架注入）；layer_scope 加 layer_meta
+   - prompts.py L2994 硬编码骨架 → 抽离至 config（数据驱动）
+   - subagents.py Presenter 注入约束告知块（L0-L7 清单 + 当前层 + 你能做什么）
+   - 移除 v0.26 easy/normal/deep 类型化硬分支（用户反对类型化）
+5. ✅ **验证**：8 约束测试全绿 + 105 回归全绿 + 标杆同题 6 层骨架完整呈现（核心前提→基础机制→底层原理→现实权衡→⚠️边界条件→延伸引导→小结 + 费雪方程 + 例题 + 检查理解）
+6. ✅ **8 维提升**：结构层次 0%→45%、学术深度 71%→88%、延伸引导 0%→20%（冲销干预）
+7. ✅ **物料质量确认（主线 B）**：PPT 85 / 讲义 85 / 教学视频 87.8 / 数学动画 77.2（三 Oracle）
+8. 🔄 **物料模块针对性优化（用户新要求 ⭐）**：
+   - "分别针对性优化各个物料生产模块，进一步提升。每一个物料生产模块具体怎么优化，咨询oracle"
+   - 各模块现状与短板待 Oracle 诊断：PPT 85（6×6 原则？）、讲义 85（此前 96 波动）、教学视频 87.8（分镜节奏）、数学动画 77.2（最低——门控/渲染/叙事短板）
+8. ✅ **文档同步**：技术说明 §4.7 + 元能力 §6.74 + 技术全景 §10.27.6 + CHANGELOG v1.2.27
 
 ---
 
