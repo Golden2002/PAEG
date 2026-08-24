@@ -1833,6 +1833,8 @@ def build_lesson_planner_system(topic: str, subject: str, grade: str,
 
 
 def build_presenter_system(subject: str, tone: str,
+                         history: Optional[str] = None,  # §3.107 对话历史拼接
+                         enable_l1: bool = True,          # §3.107 L1 启发式开关
                            learner=None, kb_node: Optional[dict] = None,
                            strategy_line: str = "",
                            user_model: Optional[dict] = None,
@@ -1852,6 +1854,19 @@ def build_presenter_system(subject: str, tone: str,
     user_model：v0.11 从对话中推断的用户特征（对象意识）。
     """
     style = get_style(subject)
+
+    # §3.107 ⭐ 对话历史拼接（提升式：有则拼，无则跳过）
+    _hist_line = ""
+    if history:
+        _hist_line = f"\n## 对话历史（前情提要）\n{history[:800]}\n"
+    # §3.107 ⭐ L1 启发式沉思引导（前置，最高优先级）
+    _l1_line = ""
+    if enable_l1:
+        try:
+            from heuristic_prompts import get_heuristic
+            _l1_line = "\n" + get_heuristic("teaching") + "\n"
+        except Exception:
+            pass
 
     # 语气 → 可读的一句话（不再是抽象形容词，而是行为指导）
     tone_lines = {
@@ -2037,7 +2052,8 @@ def build_presenter_system(subject: str, tone: str,
             _preg._last_trace = _blocks
     except Exception:
         pass
-    return f"""{TRUTH_GROUNDING}
+    return f"""
+{_l1_line}{_hist_line}{TRUTH_GROUNDING}
 
 {WEIL_CORE}
 
