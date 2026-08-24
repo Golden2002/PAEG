@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """v6.1 ⭐ Manim 数学动画服务（独立模块）
 LLM 生成 Manim 代码 → 隔离渲染 → 数学动画视频
 - 独立于 video_service.py（不互相依赖）
@@ -6,6 +6,18 @@ LLM 生成 Manim 代码 → 隔离渲染 → 数学动画视频
 - AST 校验防恶意代码 + subprocess 超时
 """
 import os, re, ast, subprocess, tempfile, uuid, sys, io
+
+# §3.97 ⭐ LaTeX 可用性检测：manim MathTex/Tex 依赖 latex.exe，缺失时降级
+def _latex_available() -> bool:
+    """检测系统是否有 latex 可执行文件。"""
+    try:
+        import shutil as _sh
+        return _sh.which("latex") is not None or _sh.which("latex.exe") is not None
+    except Exception:
+        return False
+
+
+_LATEX_OK = _latex_available()
 
 # v0.69+：stdout 包装移入 __main__——模块级替换会破坏 pytest capsys（import 时副作用）
 if __name__ == '__main__':
@@ -125,6 +137,17 @@ def validate_manim_code(code: str):
     return True, ""
 
 
+def _sanitize_code_no_latex(code: str) -> str:
+    """§3.97 ⭐ 无 LaTeX 环境：MathTex/Tex → Text 降级（避免 latex.exe FileNotFound）。"""
+    if _LATEX_OK or not code:
+        return code
+    # MathTex("x^2") → Text("x^2")（manim Text 支持纯文本，不需 LaTeX）
+    _fixed = code.replace("MathTex(", "Text(").replace("Tex(", "Text(")
+    if _fixed != code:
+        print("[manim_service] 无 LaTeX → MathTex/Tex 降级为 Text")
+    return _fixed
+
+
 def render_manim(code: str, scene_class: str = None, quality: str = '-qm',
                  timeout: int = 180):
     """渲染 Manim 代码 → mp4 路径。返回 (path, error)"""
@@ -133,6 +156,8 @@ def render_manim(code: str, scene_class: str = None, quality: str = '-qm',
     temp_dir = os.path.join(_MEDIA_DIR, 'jobs', job_id)
     os.makedirs(temp_dir, exist_ok=True)
     try:
+        # §3.97 ⭐ 无 LaTeX 环境降级
+        code = _sanitize_code_no_latex(code)
         code_file = os.path.join(temp_dir, 'scene.py')
         with open(code_file, 'w', encoding='utf-8') as f:
             f.write(code)
@@ -145,10 +170,31 @@ def render_manim(code: str, scene_class: str = None, quality: str = '-qm',
         # §3.79 Round 4 ⭐ 运维修复：Windows 下 manim 输出含 UTF-8 中文/转义码，
         # 默认 GBK 解码会 UnicodeDecodeError → 指定 utf-8（errors=replace 兜底），
         # 并禁用 text 模式的 locale 猜测（encoding='utf-8' 显式传入）
+        # §3.97 ⭐ 注入 ffmpeg PATH：manim/pydub 需要 ffmpeg，但系统 PATH 无
+        #（manim_env 内 imageio_ffmpeg 静态版存在）——注入子进程 PATH 修复
+        _env = dict(os.environ)
+        try:
+            # §3.97 修复：优先 manim_env 内 ffmpeg（系统 PATH 无），次选 imageio_ffmpeg
+            _ff = ""
+            _manim_ff = os.path.join(_BASE, "..", "manim_env", "venv",
+                                     "Lib", "site-packages", "imageio_ffmpeg",
+                                     "binaries", "ffmpeg-win-x86_64-v7.1.exe")
+            if os.path.isfile(_manim_ff):
+                _ff = _manim_ff
+            else:
+                import imageio_ffmpeg as _iif
+                _ff = _iif.get_ffmpeg_exe()
+            _ff_dir = os.path.dirname(_ff)
+            if _ff_dir and _ff_dir not in _env.get("PATH", ""):
+                _env["PATH"] = _ff_dir + os.pathsep + _env.get("PATH", "")
+                print(f"[manim_service] ffmpeg PATH 注入: {_ff_dir}")
+        except Exception:
+            pass
         try:
             result = subprocess.run(cmd, capture_output=True, text=True,
                                     encoding='utf-8', errors='replace',
-                                    cwd=temp_dir, timeout=timeout, shell=False)
+                                    cwd=temp_dir, timeout=timeout, shell=False,
+                                    env=_env)
         except UnicodeDecodeError:
             # 极老 Python 不支持 encoding 参数：降级 bytes 手动解码
             result = subprocess.run(cmd, capture_output=True,
