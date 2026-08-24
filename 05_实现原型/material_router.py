@@ -388,7 +388,8 @@ def _gen_manim(llm, topic, subject, learner_id, **kw) -> MaterialResult:
             style=kw.get("style") or "3blue1brown",
             duration_target_sec=int(kw.get("duration_target_sec") or 120),
             job_id=kw.get("job_id") or "",
-            user_requirements=kw.get("user_requirements") or kw.get("user_input") or "") or {}
+            user_requirements=kw.get("user_requirements") or kw.get("user_input") or "",
+            progress_callback=kw.get("progress_callback")) or {}
         _url = _r.get("url") or _r.get("video_path") or ""
         _artifacts = _r.get("artifacts") or {}
         _job_id = _r.get("job_id", "")
@@ -477,15 +478,40 @@ def route_material(magic_match: Dict[str, Any], llm, subject: str,
         topic = concept[:60]
 
     # 调用生成器（统一异常围栏）——§3.92 透传 grade/learner；§3.95 透传用户要求
+    # §3.94 ⭐ manim 专属：progress_callback → SSE 阶段进度事件（前端进度条）
+    _progress_queue = None
+    if intent == "manim":
+        try:
+            import queue as _q
+            _progress_queue = _q.Queue()
+
+            def _progress_cb(evt):
+                try:
+                    _progress_queue.put(dict(evt))
+                except Exception:
+                    pass
+        except Exception:
+            _progress_queue = None
     try:
         result = route.generator(llm, topic, subject, learner_id,
                                  learner=learner, grade=grade,
                                  user_requirements=user_requirements,
                                  user_input=user_requirements or concept,
-                                 intuition=intuition, objectives=objectives)
+                                 intuition=intuition, objectives=objectives,
+                                 progress_callback=_progress_cb if intent == "manim" else None)
     except Exception as e:
         result = {"ok": False, "content": route.fallback_msg, "url": "",
                   "error": str(e), "step_type": route.step_type}
+
+    # §3.94 ⭐ manim 进度事件透传（脚本→代码→视频）
+    if _progress_queue is not None and intent == "manim":
+        try:
+            while not _progress_queue.empty():
+                _evt = _progress_queue.get_nowait()
+                yield fmt_progress(_evt.get("percent", 0),
+                                   _evt.get("message", ""))
+        except Exception:
+            pass
 
     if not isinstance(result, dict):
         result = {"ok": False, "content": route.fallback_msg, "url": "",
