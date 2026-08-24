@@ -382,6 +382,20 @@ def generate_manim_video(topic: str, subject: str = 'math',
 
     # 3. 渲染
     path, rerr = render_manim(code)
+    # §3.97 ⭐ 渲染失败（如 LLM 代码 NameError/API 不兼容）→ 模板代码兜底重试
+    if not path:
+        try:
+            from manim_templates import template_for, template_by_key
+            _tpl = template_by_key(_template_key, topic) if _template_key else template_for(topic, subject)
+            if _tpl and _tpl != code:
+                print(f"[manim_service] LLM 代码渲染失败({rerr[:60]}) → 模板兜底重试")
+                path2, rerr2 = render_manim(_tpl)
+                if path2:
+                    code = _tpl
+                    path = path2
+                    rerr = rerr2
+        except Exception:
+            pass
     if not path:
         return {"ok": False, "path": "", "url": "", "error": f"渲染失败: {rerr}"}
 
