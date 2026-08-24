@@ -122,7 +122,14 @@ class PromptRegistry:
         # user_input 强制末尾
         if inputs.get("user_text"):
             body_parts.append(f"## 用户原话\n{inputs['user_text']}")
-        return "\n\n".join(p for p in body_parts if p), trace
+        _body = "\n\n".join(p for p in body_parts if p)
+        # §3.106 ⭐ L1 启发式提示词层：按情景前置沉思引导（最高优先级）
+        try:
+            from heuristic_prompts import prepend_heuristic
+            _body = prepend_heuristic(_body, scenario)
+        except Exception:
+            pass
+        return _body, trace
 
     # ── 内部 ──
     def _eval_condition(self, cond: str, inputs: Dict[str, Any]) -> bool:
