@@ -159,9 +159,11 @@ def _sanitize_code_no_latex(code: str) -> str:
     # 1) MathTex/Tex → Text（无 LaTeX 时降级）
     if not _LATEX_OK:
         code = code.replace("MathTex(", "Text(").replace("Tex(", "Text(")
-    # 2) 全角标点 → 半角（保留语法结构）
+    # 2) 全角标点 → 半角（保留语法结构；覆盖全部常见全角标点）
     _F2H = {"，": ",", "；": ";", "：": ":", "（": "(", "）": ")",
-            "！": "!", "？": "?", "“": chr(34), "”": chr(34), "‘": chr(39), "’": chr(39)}
+            "！": "!", "？": "?", "“": chr(34), "”": chr(34), "‘": chr(39), "’": chr(39),
+            "。": ".", "、": ",", "…": "...", "·": ".", "—": "-", "―": "-",
+            "｛": "{", "｝": "}", "【": "[", "】": "]", "《": "<", "》": ">"}
     code = "".join(_F2H.get(_ch, _ch) for _ch in code)
     # 3) 剥离 LaTeX $ 符号残留
     code = code.replace("$", "")
