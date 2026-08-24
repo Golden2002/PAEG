@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 visual_script_generator.py — PAEG 数学可视化脚本生成器（v0.70+ §3.26）
 
@@ -12,7 +12,53 @@ import os
 from typing import Any, Dict, List, Optional
 
 # ─── 脚本系统提示词（注入 LLM，产出 script.json） ───
+# §3.102 ⭐ Phase 0 概念拆解（Oracle 方案——用户反馈基变换视频未拆解概念）
+# §3.103 ⭐ L1 沉思引导（灵活度最高层——交由 LLM 思考，非模板）
+CONCEPT_DECOMPOSITION_SYSTEM_PROMPT = """先静下来沉思，把下面的数学主题彻底想清楚，再输出分析。
+
+请按你自己的理解回答以下问题（不必拘泥固定格式，可自由组织）：
+1. 这个概念的本质是什么？它"不是"什么（最容易混淆的相邻概念必须显式区分）？
+2. 它的核心机制如何运作（比如是否需要"换一个视角→操作→换回"）？
+3. 哪些具体例子能建立直觉？哪些是常见误区？
+4. 如果要可视化，怎样的展示路径最能让人理解（从直觉到形式化）？
+
+分析完再输出。输出用结构化文本（可含列表/小标题），但由你决定组织方式。"""
+
+
+def _is_complex_topic(topic: str) -> bool:
+    """启发式：是否触发概念拆解（短 + 抽象概念词）。"""
+    if len(topic or "") > 12:
+        return False
+    _KWS = ("变换", "结构", "关系", "性质", "分解", "组成", "定义",
+            "等价", "不变", "同构", "映射", "基", "坐标", "矩阵")
+    return any(k in (topic or "") for k in _KWS)
+
+
+def decompose_concept(llm, topic: str, audience: str = "高中") -> Optional[dict]:
+    """Phase 0：概念拆解。返回教学骨架 JSON；失败返回 None（降级无拆解）。"""
+    try:
+        from subagents import _safe_chat
+        _raw = _safe_chat(llm, CONCEPT_DECOMPOSITION_SYSTEM_PROMPT,
+                          f"主题：{topic}\n受众：{audience}\n输出 JSON 拆解骨架。",
+                          max_tokens=1500)
+        if not _raw:
+            return None
+        _m = re.search(r'\{.*\}', _raw, re.S)
+        return json.loads(_m.group(0)) if _m else None
+    except Exception as _e:
+        print(f"[concept_decompose] 失败: {_e}")
+        return None
+
+
 VISUAL_SCRIPT_SYSTEM_PROMPT = """你是 PAEG 数学可视化剧本设计师。你的唯一任务：把教学主题转化为一幕幕"可被忠实执行的"动画剧本，而不是直接写 Manim 代码。
+
+# 先静下来沉思（§3.103 L1 ⭐ 灵活度最高层）
+在动手写分镜前，先彻底想清楚：
+1. 用户给的主题（可能是简单输入如"基变换"）本质是什么？它"不是"什么（如基变换≠线性变换，是同一向量不同基的表示）？
+2. 要真正讲清这个概念，需要哪些关键展示（如基变换需展示"换进观察者视角→变换→换回"）？
+3. 需要哪些公式（哪些数学表达能帮助理解）？
+4. 需要哪些演示/动画（哪些例子/过程能建立直觉）？
+想清楚后，再按下面的分镜铁律设计 scene。你的展示方案由你决定——不要被固定格式限制，但要忠于概念本质。
 
 # 角色约束
 - 你不写代码。你写的是"导演分镜"，由下游渲染器翻译为 Manim。

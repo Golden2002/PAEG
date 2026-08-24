@@ -1,0 +1,254 @@
+{
+  "meta": {
+    "title": "基变换与坐标系变换",
+    "subject": "线性代数",
+    "target_duration_sec": 120,
+    "style": "3blue1brown",
+    "audience": "高中",
+    "core_intuition": "同一个向量，在不同坐标系下有不同的坐标；基变换就是切换观察视角。",
+    "learning_objectives": [
+      "理解基的概念：基是一组张成空间的向量",
+      "理解同一向量在不同基下的坐标表示不同",
+      "初步理解基变换矩阵的作用：从旧坐标到新坐标的转换"
+    ]
+  },
+  "narrative_arc": {
+    "hook": "同一个箭头，站在不同的人眼里，坐标竟然不同——这怎么可能？",
+    "setup": "用两个不同的坐标系（标准基和另一组基）观察同一个向量，发现坐标不同。",
+    "exploration": "通过动画演示从标准基到新基的变换过程，引入基变换矩阵。",
+    "recap": "回顾核心：向量不变，坐标随基变；基变换矩阵是坐标的转换器。"
+  },
+  "visual_system": {
+    "palette": {
+      "background": "#0d1117",
+      "standard_basis": "#58a6ff",
+      "new_basis": "#f78166",
+      "vector": "#ffd166",
+      "grid": "#2d333b",
+      "text": "#e6edf3",
+      "highlight": "#7ee787"
+    },
+    "semantics": {
+      "standard_basis": "标准基向量 e1, e2",
+      "new_basis": "新基向量 b1, b2",
+      "vector": "目标向量 v",
+      "grid": "坐标系网格",
+      "text": "文字和公式",
+      "highlight": "强调或高亮"
+    }
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "concept": "同一个向量",
+      "duration_sec": 15,
+      "prerequisites": [],
+      "visual_goal": "用固定箭头和标准网格建立视觉锚点，让观众直观看到向量本身未动",
+      "narration": "看这个箭头，它明明没动，但换个角度看，它的坐标就变了。这是为什么？",
+      "on_screen_text": "同一个向量？",
+      "pause_after_sec": 2,
+      "mobjects": [
+        {
+          "id": "vector_v",
+          "type": "arrow",
+          "description": "一个固定不动的箭头，从原点指向右上角",
+          "color": "vector"
+        },
+        {
+          "id": "grid_standard",
+          "type": "grid",
+          "description": "标准坐标系网格（浅灰色）",
+          "color": "grid"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "target": "grid_standard",
+          "duration": 1.5
+        },
+        {
+          "t": 1.5,
+          "action": "create",
+          "target": "vector_v",
+          "duration": 1.5
+        },
+        {
+          "t": 3,
+          "action": "highlight",
+          "target": "vector_v",
+          "duration": 1.0
+        },
+        {
+          "t": 4,
+          "action": "write_text",
+          "target": "text_question",
+          "content": "同一个向量？"
+        }
+      ]
+    },
+    {
+      "id": "setup",
+      "concept": "两个坐标系",
+      "duration_sec": 20,
+      "prerequisites": [
+        "hook"
+      ],
+      "visual_goal": "并排展示标准基和新基下的同一向量，突出坐标数值的不同",
+      "narration": "现在，我们引入另一组基向量 b1 和 b2。同样的箭头，在 b1、b2 的框架下，坐标就变成了另一组数字。",
+      "on_screen_text": "坐标不同，但向量没变",
+      "pause_after_sec": 3,
+      "mobjects": [
+        {
+          "id": "grid_new",
+          "type": "grid",
+          "description": "新基向量 b1, b2 构成的斜网格（橙色）",
+          "color": "new_basis"
+        },
+        {
+          "id": "vector_v_dual",
+          "type": "arrow",
+          "description": "同一个向量，叠加显示在标准网格和新网格中",
+          "color": "vector"
+        },
+        {
+          "id": "label_coords",
+          "type": "text",
+          "description": "显示两组坐标数值，如 (2,1) vs (1.2, 0.8)",
+          "color": "text"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "target": "grid_new",
+          "duration": 2
+        },
+        {
+          "t": 2,
+          "action": "transform",
+          "target": "vector_v_dual",
+          "duration": 1.5
+        },
+        {
+          "t": 3.5,
+          "action": "write_text",
+          "target": "label_coords",
+          "content": "标准基: (2,1)  新基: (1.2, 0.8)"
+        },
+        {
+          "t": 5,
+          "action": "highlight",
+          "target": "label_coords",
+          "duration": 1
+        }
+      ]
+    },
+    {
+      "id": "exploration",
+      "concept": "基变换矩阵",
+      "duration_sec": 25,
+      "prerequisites": [
+        "setup"
+      ],
+      "visual_goal": "动画演示标准基向量 e1,e2 如何旋转拉伸变成新基 b1,b2，并显示矩阵形式",
+      "narration": "怎么从标准基得到新基？把 e1 变成 b1，把 e2 变成 b2。这个变换过程，就可以写成一个矩阵。",
+      "on_screen_text": "基变换矩阵 B = [b1 b2]",
+      "pause_after_sec": 3,
+      "mobjects": [
+        {
+          "id": "basis_standard",
+          "type": "basis_vectors",
+          "description": "标准基向量 e1, e2（蓝色）",
+          "color": "standard_basis"
+        },
+        {
+          "id": "basis_new",
+          "type": "basis_vectors",
+          "description": "新基向量 b1, b2（橙色）",
+          "color": "new_basis"
+        },
+        {
+          "id": "matrix_expression",
+          "type": "formula",
+          "description": "基变换矩阵的公式表示",
+          "color": "highlight"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "target": "basis_standard",
+          "duration": 1.5
+        },
+        {
+          "t": 1.5,
+          "action": "transform",
+          "target": "basis_standard_to_new",
+          "duration": 3
+        },
+        {
+          "t": 4.5,
+          "action": "write_text",
+          "target": "matrix_expression",
+          "content": "B = [[b1_x, b2_x], [b1_y, b2_y]]"
+        },
+        {
+          "t": 6,
+          "action": "highlight",
+          "target": "matrix_expression",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": "recap",
+      "concept": "核心回顾",
+      "duration_sec": 15,
+      "prerequisites": [
+        "exploration"
+      ],
+      "visual_goal": "分屏对比：向量不变，但坐标随基而变，矩阵是转换器",
+      "narration": "记住：向量是那个箭头，它没有变。变的只是我们描述它的坐标。基变换矩阵，就是坐标之间的翻译器。",
+      "on_screen_text": "向量不变，坐标随基变",
+      "pause_after_sec": 2,
+      "mobjects": [
+        {
+          "id": "vector_final",
+          "type": "arrow",
+          "description": "同一个向量，最后再展示一次",
+          "color": "vector"
+        },
+        {
+          "id": "summary_text",
+          "type": "text",
+          "description": "总结性文字：基变换矩阵 = 坐标转换器",
+          "color": "highlight"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "target": "vector_final",
+          "duration": 1.5
+        },
+        {
+          "t": 1.5,
+          "action": "write_text",
+          "target": "summary_text",
+          "content": "基变换矩阵 = 坐标转换器"
+        },
+        {
+          "t": 3,
+          "action": "fade_out",
+          "target": "summary_text",
+          "duration": 1
+        }
+      ]
+    }
+  ]
+}

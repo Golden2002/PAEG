@@ -1,0 +1,286 @@
+{
+  "job_id": "m_0b5a61c35faf",
+  "topic": "基变换与坐标系变换",
+  "audience": "高中",
+  "duration_target_sec": 120,
+  "intuition": "生成数学动画：基变换与坐标系变换",
+  "objectives": "",
+  "script": {
+    "meta": {
+      "title": "基变换与坐标系变换",
+      "subject": "线性代数",
+      "target_duration_sec": 120,
+      "style": "3blue1brown",
+      "audience": "高中",
+      "core_intuition": "同一个向量，在不同坐标系下有不同的坐标；基变换就是切换观察视角。",
+      "learning_objectives": [
+        "理解基的概念：基是一组张成空间的向量",
+        "理解同一向量在不同基下的坐标表示不同",
+        "初步理解基变换矩阵的作用：从旧坐标到新坐标的转换"
+      ]
+    },
+    "narrative_arc": {
+      "hook": "同一个箭头，站在不同的人眼里，坐标竟然不同——这怎么可能？",
+      "setup": "用两个不同的坐标系（标准基和另一组基）观察同一个向量，发现坐标不同。",
+      "exploration": "通过动画演示从标准基到新基的变换过程，引入基变换矩阵。",
+      "recap": "回顾核心：向量不变，坐标随基变；基变换矩阵是坐标的转换器。"
+    },
+    "visual_system": {
+      "palette": {
+        "background": "#0d1117",
+        "standard_basis": "#58a6ff",
+        "new_basis": "#f78166",
+        "vector": "#ffd166",
+        "grid": "#2d333b",
+        "text": "#e6edf3",
+        "highlight": "#7ee787"
+      },
+      "semantics": {
+        "standard_basis": "标准基向量 e1, e2",
+        "new_basis": "新基向量 b1, b2",
+        "vector": "目标向量 v",
+        "grid": "坐标系网格",
+        "text": "文字和公式",
+        "highlight": "强调或高亮"
+      }
+    },
+    "scenes": [
+      {
+        "id": "hook",
+        "concept": "同一个向量",
+        "duration_sec": 15,
+        "prerequisites": [],
+        "visual_goal": "用固定箭头和标准网格建立视觉锚点，让观众直观看到向量本身未动",
+        "narration": "看这个箭头，它明明没动，但换个角度看，它的坐标就变了。这是为什么？",
+        "on_screen_text": "同一个向量？",
+        "pause_after_sec": 2,
+        "mobjects": [
+          {
+            "id": "vector_v",
+            "type": "arrow",
+            "description": "一个固定不动的箭头，从原点指向右上角",
+            "color": "vector"
+          },
+          {
+            "id": "grid_standard",
+            "type": "grid",
+            "description": "标准坐标系网格（浅灰色）",
+            "color": "grid"
+          }
+        ],
+        "animations": [
+          {
+            "t": 0,
+            "action": "create",
+            "target": "grid_standard",
+            "duration": 1.5
+          },
+          {
+            "t": 1.5,
+            "action": "create",
+            "target": "vector_v",
+            "duration": 1.5
+          },
+          {
+            "t": 3,
+            "action": "highlight",
+            "target": "vector_v",
+            "duration": 1.0
+          },
+          {
+            "t": 4,
+            "action": "write_text",
+            "target": "text_question",
+            "content": "同一个向量？"
+          }
+        ]
+      },
+      {
+        "id": "setup",
+        "concept": "两个坐标系",
+        "duration_sec": 20,
+        "prerequisites": [
+          "hook"
+        ],
+        "visual_goal": "并排展示标准基和新基下的同一向量，突出坐标数值的不同",
+        "narration": "现在，我们引入另一组基向量 b1 和 b2。同样的箭头，在 b1、b2 的框架下，坐标就变成了另一组数字。",
+        "on_screen_text": "坐标不同，但向量没变",
+        "pause_after_sec": 3,
+        "mobjects": [
+          {
+            "id": "grid_new",
+            "type": "grid",
+            "description": "新基向量 b1, b2 构成的斜网格（橙色）",
+            "color": "new_basis"
+          },
+          {
+            "id": "vector_v_dual",
+            "type": "arrow",
+            "description": "同一个向量，叠加显示在标准网格和新网格中",
+            "color": "vector"
+          },
+          {
+            "id": "label_coords",
+            "type": "text",
+            "description": "显示两组坐标数值，如 (2,1) vs (1.2, 0.8)",
+            "color": "text"
+          }
+        ],
+        "animations": [
+          {
+            "t": 0,
+            "action": "create",
+            "target": "grid_new",
+            "duration": 2
+          },
+          {
+            "t": 2,
+            "action": "transform",
+            "target": "vector_v_dual",
+            "duration": 1.5
+          },
+          {
+            "t": 3.5,
+            "action": "write_text",
+            "target": "label_coords",
+            "content": "标准基: (2,1)  新基: (1.2, 0.8)"
+          },
+          {
+            "t": 5,
+            "action": "highlight",
+            "target": "label_coords",
+            "duration": 1
+          }
+        ]
+      },
+      {
+        "id": "exploration",
+        "concept": "基变换矩阵",
+        "duration_sec": 25,
+        "prerequisites": [
+          "setup"
+        ],
+        "visual_goal": "动画演示标准基向量 e1,e2 如何旋转拉伸变成新基 b1,b2，并显示矩阵形式",
+        "narration": "怎么从标准基得到新基？把 e1 变成 b1，把 e2 变成 b2。这个变换过程，就可以写成一个矩阵。",
+        "on_screen_text": "基变换矩阵 B = [b1 b2]",
+        "pause_after_sec": 3,
+        "mobjects": [
+          {
+            "id": "basis_standard",
+            "type": "basis_vectors",
+            "description": "标准基向量 e1, e2（蓝色）",
+            "color": "standard_basis"
+          },
+          {
+            "id": "basis_new",
+            "type": "basis_vectors",
+            "description": "新基向量 b1, b2（橙色）",
+            "color": "new_basis"
+          },
+          {
+            "id": "matrix_expression",
+            "type": "formula",
+            "description": "基变换矩阵的公式表示",
+            "color": "highlight"
+          }
+        ],
+        "animations": [
+          {
+            "t": 0,
+            "action": "create",
+            "target": "basis_standard",
+            "duration": 1.5
+          },
+          {
+            "t": 1.5,
+            "action": "transform",
+            "target": "basis_standard_to_new",
+            "duration": 3
+          },
+          {
+            "t": 4.5,
+            "action": "write_text",
+            "target": "matrix_expression",
+            "content": "B = [[b1_x, b2_x], [b1_y, b2_y]]"
+          },
+          {
+            "t": 6,
+            "action": "highlight",
+            "target": "matrix_expression",
+            "duration": 1.5
+          }
+        ]
+      },
+      {
+        "id": "recap",
+        "concept": "核心回顾",
+        "duration_sec": 15,
+        "prerequisites": [
+          "exploration"
+        ],
+        "visual_goal": "分屏对比：向量不变，但坐标随基而变，矩阵是转换器",
+        "narration": "记住：向量是那个箭头，它没有变。变的只是我们描述它的坐标。基变换矩阵，就是坐标之间的翻译器。",
+        "on_screen_text": "向量不变，坐标随基变",
+        "pause_after_sec": 2,
+        "mobjects": [
+          {
+            "id": "vector_final",
+            "type": "arrow",
+            "description": "同一个向量，最后再展示一次",
+            "color": "vector"
+          },
+          {
+            "id": "summary_text",
+            "type": "text",
+            "description": "总结性文字：基变换矩阵 = 坐标转换器",
+            "color": "highlight"
+          }
+        ],
+        "animations": [
+          {
+            "t": 0,
+            "action": "create",
+            "target": "vector_final",
+            "duration": 1.5
+          },
+          {
+            "t": 1.5,
+            "action": "write_text",
+            "target": "summary_text",
+            "content": "基变换矩阵 = 坐标转换器"
+          },
+          {
+            "t": 3,
+            "action": "fade_out",
+            "target": "summary_text",
+            "duration": 1
+          }
+        ]
+      }
+    ]
+  },
+  "code": "```python\nfrom manim import *\nimport numpy as np\n\nclass BasisChangeScene(Scene):\n    def construct(self):\n        # ===== 全局设置 =====\n        self.camera.background_color = \"#0d1117\"\n        \n        # ===== 颜色常量 =====\n        STANDARD_BASIS_COLOR = \"#58a6ff\"\n        NEW_BASIS_COLOR = \"#f78166\"\n        VECTOR_COLOR = \"#ffd166\"\n        GRID_COLOR = \"#2d333b\"\n        TEXT_COLOR = \"#e6edf3\"\n        HIGHLIGHT_COLOR = \"#7ee787\"\n        \n        # ===== 场景1: hook (同一个向量) =====\n        # 标准网格\n        grid_standard = NumberPlane(\n            x_range=[-5, 5, 1],\n            y_range=[-5, 5, 1],\n            background_line_style={\"stroke_color\": GRID_COLOR, \"stroke_width\": 1},\n            axis_config={\"stroke_color\": GRID_COLOR, \"stroke_width\": 2},\n        )\n        \n        # 目标向量 v = (2, 1)\n        vector_v = Arrow(\n            start=ORIGIN, \n            end=np.array([2, 1, 0]),\n            color=VECTOR_COLOR,\n            buff=0,\n            stroke_width=6,\n            max_tip_length_to_length_ratio=0.15\n        )\n        \n        # 问题文字\n        text_question = Text(\"同一个向量？\", color=TEXT_COLOR, font_size=48)\n        text_question.to_corner(UL)\n        \n        # 播放hook场景\n        self.play(Create(grid_standard), run_time=1.5)\n        self.wait(0.5)\n        self.play(Create(vector_v), run_time=1.5)\n        self.wait(0.5)\n        self.play(vector_v.animate.set_color(HIGHLIGHT_COLOR), run_time=1.0)\n        self.play(vector_v.animate.set_color(VECTOR_COLOR), run_time=0.5)\n        self.play(Write(text_question), run_time=1.5)\n        self.wait(2)\n        \n        # ===== 场景2: setup (两个坐标系) =====\n        # 新基向量 b1 = (1.5, 0.5), b2 = (-0.5, 1.5) (斜网格)\n        new_basis_matrix = np.array([[1.5, -0.5], [0.5, 1.5]])\n        \n        # 新网格（斜网格）\n        grid_new = NumberPlane(\n            x_range=[-5, 5, 1],\n            y_range=[-5, 5, 1],\n            background_line_style={\"stroke_color\": NEW_BASIS_COLOR, \"stroke_width\": 1, \"stroke_opacity\": 0.5},\n            axis_config={\"stroke_color\": NEW_BASIS_COLOR, \"stroke_width\": 2},\n        )\n        grid_new.apply_matrix(new_basis_matrix)\n        \n        # 叠加显示向量（保持原样，因为它在标准基下）\n        vector_v_dual = Arrow(\n            start=ORIGIN, \n            end=np.array([2, 1, 0]),\n            color=VECTOR_COLOR,\n            buff=0,\n            stroke_width=6,\n            max_tip_length_to_length_ratio=0.15\n        )\n        \n        # 坐标标签\n        label_coords = Text(\n            \"标准基: (2,1)    新基: (1.2, 0.8)\", \n            color=TEXT_COLOR, \n            font_size=36\n        )\n        label_coords.to_corner(DR)\n        \n        # 播放setup场景\n        self.play(Create(grid_new), run_time=2)\n        self.wait(0.5)\n        self.play(Transform(vector_v, vector_v_dual), run_time=1.5)\n        self.play(Write(label_coords), run_time=1.5)\n        self.play(label_coords.animate.set_color(HIGHLIGHT_COLOR), run_time=1.0)\n        self.wait(3)\n        self.play(label_coords.animate.set_color(TEXT_COLOR), run_time=0.5)\n        \n        # ===== 场景3: exploration (基变换矩阵) =====\n        # 标准基向量\n        e1 = Arrow(\n            start=ORIGIN, end=np.array([1, 0, 0]),\n            color=STANDARD_BASIS_COLOR, buff=0, stroke_width=5,\n            max_tip_length_to_length_ratio=0.15\n        )\n        e2 = Arrow(\n            start=ORIGIN, end=np.array([0, 1, 0]),\n            color=STANDARD_BASIS_COLOR, buff=0, stroke_width=5,\n            max_tip_length_to_length_ratio=0.15\n        )\n        basis_standard = VGroup(e1, e2)\n        \n        # 新基向量（目标位置）\n        b1 = Arrow(\n            start=ORIGIN, end=np.array([1.5, 0.5, 0]),\n            color=NEW_BASIS_COLOR, buff=0, stroke_width=5,\n            max_tip_length_to_length_ratio=0.15\n        )\n        b2 = Arrow(\n            start=ORIGIN, end=np.array([-0.5, 1.5, 0]),\n            color=NEW_BASIS_COLOR, buff=0, stroke_width=5,\n            max_tip_length_to_length_ratio=0.15\n        )\n        basis_new = VGroup(b1, b2)\n        \n        # 矩阵表达式（用简单的几何图形代替，避免复杂公式）\n        matrix_rect = Rectangle(\n            width=3.5, height=1.8, \n            color=HIGHLIGHT_COLOR, stroke_width=3\n        )\n        matrix_bracket_left = Text(\"[\", color=HIGHLIGHT_COLOR, font_size=60)\n        matrix_bracket_right = Text(\"]\", color=HIGHLIGHT_COLOR, font_size=60)\n        matrix_content = Text(\n            \"B = [b1 b2]\",\n            color=HIGHLIGHT_COLOR, font_size=30\n        )\n        matrix_expression = VGroup(\n            matrix_bracket_left, matrix_content, matrix_bracket_right\n        ).arrange(RIGHT, buff=0.1)\n        matrix_expression.scale(0.8)\n        matrix_expression.to_corner(UL)\n        \n        # 淡出setup场景的网格\n        self.play(\n            FadeOut(grid_new),\n            FadeOut(label_coords),\n            FadeOut(vector_v),\n            run_time=1.5\n        )\n        \n        # 创建标准基\n        self.play(\n            Create(e1),\n            Create(e2),\n            run_time=1.5\n        )\n        self.wait(0.5)\n        \n        # 标准基变换为新基（旋转和拉伸）\n        self.play(\n            Transform(e1, b1),\n            Transform(e2, b2),\n            run_time=3\n        )\n        self.wait(0.5)\n        \n        # 显示矩阵表达式\n        self.play(Write(matrix_expression), run_time=1.5)\n        self.play(matrix_expression.animate.set_color(HIGHLIGHT_COLOR), run_time=1.5)\n        self.wait(3)\n        \n        # ===== 场景4: recap (核心回顾) =====\n        # 最终展示同一个向量\n        vector_final = Arrow(\n            start=ORIGIN, \n            end=np.array([2, 1, 0]),\n            color=VECTOR_COLOR,\n            buff=0,\n            stroke_width=6,\n            max_tip_length_to_length_ratio=0.15\n        )\n        \n        # 总结文字\n        summary_text = Text(\n            \"向量不变，坐标随基变\\n基变换矩阵 = 坐标转换器\",\n            color=HIGHLIGHT_COLOR, \n            font_size=36,\n            line_spacing=1.5\n        )\n        summary_text.to_edge(DOWN, buff=1)\n        \n        # 淡出exploration场景\n        self.play(\n            FadeOut(e1),\n            FadeOut(e2),\n            FadeOut(matrix_expression),\n            run_time=1.5\n        )\n        \n        # 创建最终向量\n        self.play(Create(vector_final), run_time=1.5)\n        self.wait(0.5)\n        \n        # 显示总结\n        self.play(Write(summary_text), run_time=2)\n        self.wait(3)\n        \n        # 淡出总结\n        self.play(FadeOut(summary_text), run_time=1)\n        self.wait(1)\n        \n        # 保持最终画面\n        self.wait(2)\n\n# 运行方式: manim -pql 文件名.py BasisChangeScene\n```",
+  "stages": {
+    "plan": "ok",
+    "gates": "ok",
+    "draft": "ok",
+    "implement": "ok",
+    "review": "ok"
+  },
+  "artifacts": {
+    "script": {
+      "status": "done",
+      "url": "/api/manim/jobs/m_0b5a61c35faf/script.json"
+    },
+    "code": {
+      "status": "done",
+      "url": "/api/manim/jobs/m_0b5a61c35faf/scene.py"
+    },
+    "video": {
+      "status": "done",
+      "url": "/api/download/manim/jobs/d722d630/videos/scene/720p30/BasisChangeScene.mp4"
+    }
+  },
+  "video_url": "/api/download/manim/jobs/d722d630/videos/scene/720p30/BasisChangeScene.mp4",
+  "ts": 1787587249.6933587
+}

@@ -1,0 +1,499 @@
+{
+  "meta": {
+    "title": "基变换与坐标系变换",
+    "subject": "线性代数",
+    "target_duration_sec": 120,
+    "style": "3blue1brown",
+    "audience": "高中",
+    "core_intuition": "同一个向量，在不同坐标系下有不同的坐标；基变换就是切换观察视角。",
+    "learning_objectives": [
+      "理解基的概念：基是一组张成空间的向量",
+      "理解同一向量在不同基下的坐标表示不同",
+      "初步理解基变换矩阵的作用：从旧坐标到新坐标的转换"
+    ]
+  },
+  "narrative_arc": {
+    "hook": "同一个箭头，站在不同的人眼里，坐标竟然不同——这怎么可能？",
+    "setup": "用两个不同的坐标系（标准基和另一组基）观察同一个向量，发现坐标不同。",
+    "exploration": "通过动画演示从标准基到新基的变换过程，引入基变换矩阵。",
+    "recap": "回顾核心：向量不变，坐标随基变；基变换矩阵是坐标的转换器。"
+  },
+  "visual_system": {
+    "palette": {
+      "background": "#0d1117",
+      "standard_basis": "#58a6ff",
+      "new_basis": "#f78166",
+      "vector": "#ffd166",
+      "grid": "#2d333b",
+      "text": "#e6edf3",
+      "highlight": "#7ee787"
+    },
+    "semantics": {
+      "standard_basis": "标准基向量 e1, e2",
+      "new_basis": "新基向量 b1, b2",
+      "vector": "目标向量 v",
+      "grid": "坐标系网格",
+      "text": "文字和公式",
+      "highlight": "强调或高亮"
+    }
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "concept": "同一个向量",
+      "duration_sec": 15,
+      "prerequisites": [],
+      "narration": "看这个箭头，它明明没动，但换个角度看，它的坐标就变了。这是为什么？",
+      "on_screen_text": "同一个向量？",
+      "pause_after_sec": 2,
+      "mobjects": [
+        {
+          "id": "vector_v",
+          "type": "arrow",
+          "description": "一个固定不动的箭头，从原点指向右上角",
+          "color": "vector"
+        },
+        {
+          "id": "grid_standard",
+          "type": "grid",
+          "description": "标准坐标系网格（浅灰色）",
+          "color": "grid"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "target": "grid_standard",
+          "duration": 1.5
+        },
+        {
+          "t": 1.5,
+          "action": "create",
+          "target": "vector_v",
+          "duration": 1.5
+        },
+        {
+          "t": 3,
+          "action": "highlight",
+          "target": "vector_v",
+          "duration": 1.0
+        },
+        {
+          "t": 4,
+          "action": "write_text",
+          "target": "text_question",
+          "content": "同一个向量？",
+          "duration": 1.0
+        },
+        {
+          "t": 5,
+          "action": "pause",
+          "duration": 2.0
+        }
+      ]
+    },
+    {
+      "id": "two_views",
+      "concept": "不同坐标",
+      "duration_sec": 20,
+      "prerequisites": [
+        "hook"
+      ],
+      "narration": "从标准坐标系看，它是 (2, 1)；但换一组基，比如这两个斜着的向量，它就变成了 (1.5, 1)。向量没变，坐标却变了。",
+      "on_screen_text": "坐标不同",
+      "pause_after_sec": 2,
+      "mobjects": [
+        {
+          "id": "vector_v",
+          "type": "arrow",
+          "description": "同一个箭头，保持位置不变",
+          "color": "vector"
+        },
+        {
+          "id": "basis_e1",
+          "type": "arrow",
+          "description": "标准基向量 e1（蓝色）",
+          "color": "standard_basis",
+          "position": "origin"
+        },
+        {
+          "id": "basis_e2",
+          "type": "arrow",
+          "description": "标准基向量 e2（蓝色）",
+          "color": "standard_basis",
+          "position": "origin"
+        },
+        {
+          "id": "basis_b1",
+          "type": "arrow",
+          "description": "新基向量 b1（橙色）",
+          "color": "new_basis",
+          "position": "origin"
+        },
+        {
+          "id": "basis_b2",
+          "type": "arrow",
+          "description": "新基向量 b2（橙色）",
+          "color": "new_basis",
+          "position": "origin"
+        },
+        {
+          "id": "text_coords_standard",
+          "type": "text",
+          "description": "显示 (2, 1)",
+          "color": "standard_basis"
+        },
+        {
+          "id": "text_coords_new",
+          "type": "text",
+          "description": "显示 (1.5, 1)",
+          "color": "new_basis"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "show",
+          "target": "basis_e1",
+          "duration": 0.8
+        },
+        {
+          "t": 0.8,
+          "action": "show",
+          "target": "basis_e2",
+          "duration": 0.8
+        },
+        {
+          "t": 1.6,
+          "action": "show",
+          "target": "basis_b1",
+          "duration": 0.8
+        },
+        {
+          "t": 2.4,
+          "action": "show",
+          "target": "basis_b2",
+          "duration": 0.8
+        },
+        {
+          "t": 3.2,
+          "action": "write_text",
+          "target": "text_coords_standard",
+          "content": "(2, 1)",
+          "duration": 1.0
+        },
+        {
+          "t": 4.2,
+          "action": "write_text",
+          "target": "text_coords_new",
+          "content": "(1.5, 1)",
+          "duration": 1.0
+        },
+        {
+          "t": 5.2,
+          "action": "highlight",
+          "target": "text_coords_new",
+          "duration": 1.0
+        },
+        {
+          "t": 6.2,
+          "action": "pause",
+          "duration": 2.0
+        }
+      ]
+    },
+    {
+      "id": "basis_definition",
+      "concept": "基的定义",
+      "duration_sec": 20,
+      "prerequisites": [
+        "two_views"
+      ],
+      "narration": "基就是一组向量，它们能张成整个平面，而且彼此独立。标准基是 (1,0) 和 (0,1)，新基是 (1,1) 和 (-1,1)。",
+      "on_screen_text": "基 = 张成+独立",
+      "pause_after_sec": 2,
+      "mobjects": [
+        {
+          "id": "basis_e1",
+          "type": "arrow",
+          "description": "标准基向量 e1",
+          "color": "standard_basis"
+        },
+        {
+          "id": "basis_e2",
+          "type": "arrow",
+          "description": "标准基向量 e2",
+          "color": "standard_basis"
+        },
+        {
+          "id": "basis_b1",
+          "type": "arrow",
+          "description": "新基向量 b1",
+          "color": "new_basis"
+        },
+        {
+          "id": "basis_b2",
+          "type": "arrow",
+          "description": "新基向量 b2",
+          "color": "new_basis"
+        },
+        {
+          "id": "text_basis_def",
+          "type": "text",
+          "description": "基的定义文字",
+          "color": "text"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "highlight",
+          "target": "basis_e1",
+          "duration": 0.8
+        },
+        {
+          "t": 0.8,
+          "action": "highlight",
+          "target": "basis_e2",
+          "duration": 0.8
+        },
+        {
+          "t": 1.6,
+          "action": "highlight",
+          "target": "basis_b1",
+          "duration": 0.8
+        },
+        {
+          "t": 2.4,
+          "action": "highlight",
+          "target": "basis_b2",
+          "duration": 0.8
+        },
+        {
+          "t": 3.2,
+          "action": "write_text",
+          "target": "text_basis_def",
+          "content": "基 = 张成+独立",
+          "duration": 1.5
+        },
+        {
+          "t": 4.7,
+          "action": "pause",
+          "duration": 2.0
+        }
+      ]
+    },
+    {
+      "id": "coordinate_expression",
+      "concept": "坐标表达式",
+      "duration_sec": 25,
+      "prerequisites": [
+        "basis_definition"
+      ],
+      "narration": "在新基下，向量 v 可以写成 b1 和 b2 的线性组合。系数就是新坐标。",
+      "on_screen_text": "v = c1·b1 + c2·b2",
+      "pause_after_sec": 3,
+      "mobjects": [
+        {
+          "id": "vector_v",
+          "type": "arrow",
+          "description": "目标向量 v",
+          "color": "vector"
+        },
+        {
+          "id": "basis_b1",
+          "type": "arrow",
+          "description": "新基向量 b1",
+          "color": "new_basis"
+        },
+        {
+          "id": "basis_b2",
+          "type": "arrow",
+          "description": "新基向量 b2",
+          "color": "new_basis"
+        },
+        {
+          "id": "formula_coord",
+          "type": "formula",
+          "description": "v = c1 b1 + c2 b2",
+          "color": "text"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "show",
+          "target": "vector_v",
+          "duration": 0.5
+        },
+        {
+          "t": 0.5,
+          "action": "show",
+          "target": "basis_b1",
+          "duration": 0.5
+        },
+        {
+          "t": 1.0,
+          "action": "show",
+          "target": "basis_b2",
+          "duration": 0.5
+        },
+        {
+          "t": 1.5,
+          "action": "write_formula",
+          "target": "formula_coord",
+          "content": "v = c1 b1 + c2 b2",
+          "duration": 2.0
+        },
+        {
+          "t": 3.5,
+          "action": "highlight",
+          "target": "formula_coord",
+          "duration": 1.0
+        },
+        {
+          "t": 4.5,
+          "action": "pause",
+          "duration": 3.0
+        }
+      ]
+    },
+    {
+      "id": "change_of_basis_matrix",
+      "concept": "基变换矩阵",
+      "duration_sec": 25,
+      "prerequisites": [
+        "coordinate_expression"
+      ],
+      "narration": "把新基的坐标写成矩阵，乘以旧坐标，就能得到新坐标。这就是基变换矩阵。",
+      "on_screen_text": "C = [b1 b2]",
+      "pause_after_sec": 3,
+      "mobjects": [
+        {
+          "id": "basis_b1",
+          "type": "arrow",
+          "description": "新基向量 b1",
+          "color": "new_basis"
+        },
+        {
+          "id": "basis_b2",
+          "type": "arrow",
+          "description": "新基向量 b2",
+          "color": "new_basis"
+        },
+        {
+          "id": "matrix_C",
+          "type": "formula",
+          "description": "基变换矩阵 C",
+          "color": "highlight"
+        },
+        {
+          "id": "formula_transform",
+          "type": "formula",
+          "description": "new_coords = C^{-1} old_coords",
+          "color": "text"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "write_formula",
+          "target": "matrix_C",
+          "content": "C = [b1 b2]",
+          "duration": 2.0
+        },
+        {
+          "t": 2.0,
+          "action": "write_formula",
+          "target": "formula_transform",
+          "content": "new = C⁻¹ · old",
+          "duration": 2.0
+        },
+        {
+          "t": 4.0,
+          "action": "highlight",
+          "target": "matrix_C",
+          "duration": 1.0
+        },
+        {
+          "t": 5.0,
+          "action": "pause",
+          "duration": 3.0
+        }
+      ]
+    },
+    {
+      "id": "recap",
+      "concept": "向量不变坐标变",
+      "duration_sec": 15,
+      "prerequisites": [
+        "change_of_basis_matrix"
+      ],
+      "narration": "记住：向量本身没有变，变的是我们的视角。基变换矩阵就是坐标的转换器。",
+      "on_screen_text": "向量不变，坐标变",
+      "pause_after_sec": 2,
+      "mobjects": [
+        {
+          "id": "vector_v",
+          "type": "arrow",
+          "description": "目标向量 v，保持原位",
+          "color": "vector"
+        },
+        {
+          "id": "grid_standard",
+          "type": "grid",
+          "description": "标准网格",
+          "color": "grid"
+        },
+        {
+          "id": "text_recap",
+          "type": "text",
+          "description": "核心结论",
+          "color": "text"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "show",
+          "target": "vector_v",
+          "duration": 0.5
+        },
+        {
+          "t": 0.5,
+          "action": "show",
+          "target": "grid_standard",
+          "duration": 0.5
+        },
+        {
+          "t": 1.0,
+          "action": "write_text",
+          "target": "text_recap",
+          "content": "向量不变，坐标变",
+          "duration": 1.5
+        },
+        {
+          "t": 2.5,
+          "action": "highlight",
+          "target": "text_recap",
+          "duration": 1.0
+        },
+        {
+          "t": 3.5,
+          "action": "pause",
+          "duration": 2.0
+        }
+      ]
+    }
+  ],
+  "qa_self_check": {
+    "hook_present": true,
+    "recap_present": true,
+    "no_formula_in_first_two_scenes": true,
+    "single_focus_per_scene": true,
+    "color_consistency": true,
+    "duration_within_15_percent": true,
+    "notes": "所有场景时长总和为 15+20+20+25+25+15 = 120 秒，符合目标。前两个场景无公式，最后一个场景有总结。颜色语义一致：蓝色标准基，橙色新基，黄色向量。"
+  }
+}

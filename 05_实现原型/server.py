@@ -3210,10 +3210,21 @@ def manim_job_artifact(job_id: str, artifact: str):
     try:
         _base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         _pipeline_dir = os.path.join(_base, "05_实现原型", "evolve_data", "manim_pipeline")
-        # 兼容：job 目录在 evolve_data/manim_pipeline/jobs/<job_id>/
-        _job_dir = os.path.join(_pipeline_dir, "jobs", job_id)
-        _fp = os.path.join(_job_dir, artifact)
-        if not os.path.isfile(_fp):
+        # §3.101 ⭐ 两个 job 目录：pipeline 多阶段（evolve_data/manim_pipeline/jobs）
+        # 和 单段渲染（downloads/manim/jobs）——依次搜索
+        _candidates = [
+            os.path.join(_pipeline_dir, "jobs", job_id),
+            os.path.join(_base, "05_实现原型", "downloads", "manim", "jobs", job_id),
+            os.path.join(_base, "downloads", "manim", "jobs", job_id),  # §3.101 项目根 downloads
+        ]
+        _fp = ""
+        for _cd in _candidates:
+            _f = os.path.join(_cd, artifact)
+            if os.path.isfile(_f):
+                _fp = _f
+                _job_dir = _cd
+                break
+        if not _fp:
             return jsonify({"ok": False, "error": "artifact not found"}), 404
         # 安全：realpath 校验在 job_dir 内
         _real = os.path.realpath(_fp)
