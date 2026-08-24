@@ -1,4 +1,4 @@
-﻿# PAEG 教育智能体 — 简明技术说明（v1.2.27）
+﻿﻿# PAEG 教育智能体 — 简明技术说明（v1.2.27）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -15,7 +15,7 @@
 - 第 1 章 项目概览
 - 第 2 章 能力全景（F1-F7，每功能含技术路线+实现方法）
 - 第 3 章 系统架构（六层）
-- 第 4 章 关键流程（含 4.6 物料路由架构 §3.91 ⭐ + 4.7 动态约束架构 §3.92 ⭐）
+- 第 4 章 关键流程（含 4.6 物料路由 §3.91 + 4.7 动态约束 §3.92 + 4.8 分阶段联通/PromptRegistry §3.94-3.96 ⭐）
 - 第 5 章 扩展指南
 - 第 5A 章 可扩展模块（框架化 · v0.70 ⭐）
 - 第 5B 章 DeepSeek Harness 借鉴蓝图（2026-08-14 调研 · 30 项中 27 项已落地）
@@ -863,6 +863,33 @@ ROUTER = {
 **验证**：96/96 测试全绿（14 新增 router/sse_presenter 单测 + 82 既有）；6 类物料 UI 端到端全 PASS
 （PPT 下载 HTTP 200 / 讲义内容完整 / 教学视频分镜 / 思维导图 / 讲稿多节 / 数学动画真实出片 761KB + 下载 200）。
 物料体系全景见附录 C.15.1；统一流水线见 C.15.2。
+
+### 4.8 物料分阶段联通 + 三层联通 + 提示词清单（§3.94-§3.96 ⭐）
+
+> **背景**：用户要求物料生产"分阶段、与用户界面全联通"——复杂物料（PPT/视频/Manim）
+> 经前置中间产物（大纲/分镜/脚本/代码）逐级生成，中间产物可下载、用户提示词注入生成依据。
+
+**分阶段联通（§3.94）**：
+- `manim_pipeline.run_pipeline` 接收 `job_id` + `progress_callback`，各阶段（脚本→代码→视频）按 job_id 落盘 `evolve_data/manim_pipeline/jobs/<job_id>/`（script.json/scene.py/manifest.json）
+- 下载 API：`/api/manim/jobs/<job_id>/{script,code,manifest}`（白名单校验 + 安全路径）
+- SSE 阶段事件：`progress`（脚本 0-30%/代码 30-60%/视频 60-90%）+ `artifact`（产物可下载）+ `done`（manifest）
+- 前端：三阶段进度条（脚本→代码→视频）+ 详细要求输入框（用户提示词注入）+ 下载链接
+
+**三层联通（§3.95）**：
+- ① 物料流水线内部：阶段间产物传递（MaterialPipeline.run 保留 spec/artifacts）
+- ② agent 架构：material_harness.py 用 AgentEngine（Plan→Act→Observe→Reflect）驱动物料，中间产物落盘指导下一环节
+- ③ 用户交互：用户输入（user_requirements/intuition/objectives）拼进所有生成提示词
+
+**提示词清单 PromptRegistry（§3.96）**：
+- `data/prompt_registry.json`：19 个提示词块 + 7 情景（teaching/material/confide/answer/chat/method/knowledge）
+- `prompt_registry.py`：`assemble(scenario, stage, inputs) -> (system, trace)` 按情景装配 + trace 可追溯
+- 块类型：fixed（固定）/dynamic（运行时）/user_input（用户原文强制末尾）；priority 语义化（1 底线/10 身份/20 角色/30 深度/40 上下文/99 用户）
+- 与 constraint_config.json 的关系：约束层是"深度/节奏/修辞"调节，registry 是"文本块清单"——两者正交配合
+
+**用户要求（§3.95 用户原话）**："用户的输入作为提示词，被拼接到所有的动态的和固定的拼接提示词中去"；
+"物料生产根据 agent 的 harness 逐步调用 LLM 先生成中间的文件，中间的良好文件又指导下一环节的物料制作"。
+
+
 
 ---
 
@@ -1900,6 +1927,30 @@ manim_judge 4 维 + manim_speed 三档）基础上，§3.89 补齐 4 缺口：
 - `manim_judge.py`：4 维评审（概念表达/动画质量/教学节奏/数学准确性）
 - 三 Oracle 质量测试工程（`10_封闭测试/三Oracle质量测试/`）：test_engine --mode
   material 对四类物料实测（PPT 69.0 / 讲义 96.0 / 教学视频 77.2 / 数学动画 待测）
+
+#### C.15.8 分阶段联通 + 3B1B + manim 环境（§3.94-§3.100 ⭐）
+
+**分阶段产物下载**（§3.94）：`/api/manim/jobs/<job_id>/{script,code,manifest}` 脚本/代码/清单下载
+（白名单 job_id + 固定 artifact，安全路径校验）；SSE 阶段事件（progress/artifact/done）驱动前端三阶段进度条。
+
+**用户意图注入**（§3.94/3.95）：UI 详细要求输入框 → `user_requirements` → 拼进 phase1_plan 的 intuition；
+`route_material` 透传 grade/intuition/objectives/user_requirements 到生成器。
+
+**AgentEngine harness 驱动物料**（§3.95）：material_harness.py Plan→Act→Observe→Reflect 循环——
+Plan 生成 spec（中间文件 1）→ Act 调生成器（中间文件 2）→ Observe 门控检查 → Reflect 修正；中间产物落盘可下载。
+
+**PromptRegistry**（§3.96）：data/prompt_registry.json（19 块 + 7 情景）+ prompt_registry.py assemble/trace；
+用户输入作为 user_input 块强制末尾拼接。
+
+**manim 环境修复**（§3.97）：MiKTeX LaTeX（MathTex 真渲染不降级）+ ffmpeg PATH 注入 + 代码清洗
+（全角标点→半角/MathTex 降级/LaTeX 残留）+ 渲染模板兜底 + _find_renderable_scene（多场景选含 construct 类）。
+
+**评测标准**（§3.99）：manim 质量 = 生成代码质量（5 维：详尽展示/脚本忠实/结构/数学/可运行），
+非渲染视频（引擎问题）；test_engine 读 scene.py 供评分。
+
+**3B1B 三件套**（§3.100）：visual_script_generator 铁律 9/10（钩子开头+recap 结尾）+
+manim_judge 4→7 维（hook/progressive/recap）+ manim_templates derivative_chain 公式推导链模板
+（TransformMatchingTex 渐进披露）。
 
 #### C.15.7 物料路由层（§3.91 ⭐ 数据驱动统一调度）
 
