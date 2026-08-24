@@ -4690,4 +4690,27 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 
 ### 实施记录
 
-（专项一开始：回归验证）
+**专项一：回归验证（✅ 全部通过，改动=基础上提升非拆东墙）**
+- 128/128 聚焦测试全绿（prompt_registry/constraint_dynamic/material_router/unified_pipeline/round19/harness/material_prompts）
+- 教学流：17 轮（≥15 达标）+ Oracle1 64.5（教授级骨架提升中，流正常）
+- 倾诉：12 轮 + Oracle2 100 分 + 复读率 0 + 无风险（动态约束未破坏 affection）
+- 查资料/普通对话/知识库：全部正常回复（知识库 60s 完整内容：导数讲解含前提）
+- 物料 6 类：PPT 85/讲义 81/视频 85/manim 60（代码 rubric）——均可用
+- 结论：既有功能（教学/倾诉/查资料/物料/前端）全部可用，改动是"基础上的提升"
+
+**已完成需求总览（§3.87-§3.101）**：
+- §3.87 物料触发双路径（按钮+关键词零正则）✅
+- §3.88 物料结构化提示词模板（material_prompts 5 类）✅
+- §3.89 全物料流水线统一框架（MaterialPipeline v2.0 + Manim 4 缺口）✅
+- §3.90 物料种类盘点（10 类产出+4 文档流）✅
+- §3.91 物料路由架构（material_router 数据驱动 + sse_presenter）✅
+- §3.92 教学输出质量提升（教授级 6 层骨架 + 动态约束改革 + token 放开）✅
+- §3.93 技术说明渲染统一（SVG 方案 + render/ 权威目录）✅
+- §3.94 物料分阶段联通（job_id 落盘 + 下载 API + SSE 进度 + 前端进度条）✅
+- §3.95 三层联通（用户输入注入 + material_harness AgentEngine 驱动）✅
+- §3.96 提示词清单（PromptRegistry 单独存储 + PR1/PR2）✅
+- §3.97 质量验证（物料 A + 教学对话 B + 三层联通 C）✅
+- §3.98 文档同步与发布流程（阶段三待执行）✅ 登记
+- §3.99 manim 评测标准修正（评代码质量非渲染）✅
+- §3.100 3B1B 指南调研 + 三件套落地（visual_script_generator/manim_judge/manim_templates）✅
+- §3.101 专项回归 + 六文档同步（进行中）
