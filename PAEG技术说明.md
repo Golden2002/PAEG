@@ -1192,6 +1192,67 @@ PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可�
 
 **[48] 张宇扬课件（公共知识库）. (2026). 用户提供课件集（演化/生态/生物信息/实验设计/生物统计/遗传学 7 门课）. Library/common/张宇扬课件/**（教学材料质量特征基准：文献锚定/精确概念定义/机制解释/分层递进——PAEG material_quality 检查器与输出守门吸收）
 
+**[49] Anthropic. (2026). Best Practices for Prompt Engineering. claude.com/blog/best-practices-for-prompt-engineering.**（L1 先沉思再产出：CoT/<thinking>/<output> 标签分离——§3.106 启发式提示词层）
+
+**[50] Anthropic. (2026). Claude Platform Docs: Prompt Engineering Best Practices. platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices.**（自检触发器/分块隔离——§3.106 原则 7/8）
+
+**[51] Anthropic. (2026). Extended Thinking. platform.claude.com/docs/en/build-with-claude/extended-thinking.**（引导而非替代：给思考清单不给标准答案——§3.106 原则 6）
+
+**[52] Anthropic. (2026). The "think" Tool. anthropic.com/engineering/claude-think-tool.**（思考工具：LLM 内省可审计——§3.106 分层架构）
+
+**[53] OpenAI. (2026). Reasoning Best Practices. developers.openai.com/api/docs/guides/reasoning-best-practices.**（简单 prompt 最佳——避免过度指令化，§3.106 原则 6）
+
+**[54] OpenAI. (2026). GPT-5 Prompting Guide. developers.openai.com/cookbook/examples/gpt-5/gpt-5_prompting_guide.**（clear goal + constraints + output contract——§3.106 L1 四段式）
+
+**[55] Springer. (2026). Digital Prompting in Education. link.springer.com/article/10.1007/s10648-026-10164-1.**（提示词作为动态脚手架四维——§3.106 概念分析）
+
+**[56] Springer. (2026). Prompt Engineering as Cognitive Scaffolding. link.springer.com/article/10.1007/s44217-026-01134-4.**（Guided Explanation/Contextualised Inquiry/Comparative Reasoning——§3.106 原则 2）
+
+**[57] Springer. (2026). ARPG+: Real-Time Coaching for Educational LLM Prompting. link.springer.com/article/10.1186/s41239-026-00606-9.**（提示词质量 6 维评估——§3.106 原则 8）
+
+**[58] MDPI. (2026). 5E-Structured GenAI Coach. mdpi.com/2227-7102/16/3/384.**（5E 学习周期 + 5S 提示原则——§3.106 教学范本，d=0.68 实证）
+
+**[59] ACL Findings. (2026). EVA: Emotional Validation for Empathetic LLMs. aclanthology.org/2026.findings-acl.1.pdf.**（情绪验证四层级 L1-L4——§3.106 倾诉范本核心）
+
+**[60] AAAI. (2026). ESCA: Emotional Support Conversation Agent. ojs.aaai.org/index.php/AAAI/article/view/38807.**（情绪支持策略规划：强度/信任/行为/阶段——§3.106 倾诉诊断）
+
+**[61] MDPI. (2026). Implicit Empathy Prompting. mdpi.com/2673-4591/129/1/8.**（共情分解特征——§3.106 倾诉策略）
+
+**[62] MDPI. (2024). VisAlchemy: Visualisation Design Ideation. mdpi.com/1999-5903/16/11/406.**（展示方案给自由度，避免过早指定图表类型——§3.106 原则 3）
+
+**[63] arXiv. (2024). Visualizationary: Automating Design Feedback. arxiv.org/html/2409.13109.**（ACGT 工作流：Analyze-Clarify-Guide-Track——§3.106 展示路径候选）
+
+**[64] arXiv. (2025). Capturing Visualization Design Rationale. arxiv.org/html/2506.16571v1.**（选择理由比选择本身重要——§3.106 物料范本）
+
+**[65] Warwick. (2024). Could You Be Wrong: Metacognitive Prompts. wrap.warwick.ac.uk/id/eprint/195836/.**（自我审视/反思提示——§3.106 原则 7）
+
+**[66] AIED. (2025). Metacognitive Scaffolds in AI Programming Education. arxiv.org/html/2509.03171.**（计划-监控-评估三阶段——§3.106 教学障碍诊断）
+
+**[67] arXiv. (2025). SocraticAI. arxiv.org/html/2512.03501v1.**（苏格拉底交互设计——§3.106 教学范本，提升问题分解能力）
+
+**[68] arXiv. (2026). AI Generates Templatic Empathic Responses. arxiv.org/html/2604.08479v2.**（警示：LLM 共情 83-90% 走同一模板——L1 必须打破模板化共情）
+
+**[69] MDPI. (2025). ChatGPT for Lesson Planning (PCK Lens). mdpi.com/2227-7102/15/3/338.**（PCK 视角教案——§3.106 教学结构）
+
+**[70] MDPI. (2026). Pedagogical Content Knowledge in Science Education. mdpi.com/2673-8392/6/2/43.**（PCK 框架——§3.106 概念分析）
+
+**[71] SIGCHI. (2026). Do Prompt-Level Empathy Instructions Influence UX? programs.sigchi.org/cui/2026/.**（共情提示词 UX 影响——§3.106 倾诉验证）
+
+**[72] Grant Sanderson (3Blue1Brown). (2024). How I Animate 3Blue1Brown. 3blue1brown.substack.com/p/how-i-animate-3blue1brown.**（视觉先于符号/黑板美学——§3.100 3B1B 原则）
+
+**[73] AMS Notices. (2022). 3Blue1Brown Creator Grant Sanderson. ams.org/journals/notices/202210/.**（动画即论证/放慢节奏——§3.100 3B1B 原则）
+
+**[74] adithya-s-k. (2026). manim_skill: Manim Best Practices. github.com/adithya-s-k/manim_skill.**（三幕叙事 Hook→Geometric→Numeric——§3.100 manim_templates）
+
+**[75] ManimCommunity. (2026). Manim Docs Example Gallery. docs.manim.community/en/stable/examples.html.**（单 API 最小示例——§3.100 manim_templates）
+
+**[76] 3b1b. (2023). videos: _2023/clt/main.py. github.com/3b1b/videos.**（TransformMatchingTex 公式推导链——§3.100 模板参考）
+
+**[77] 3b1b. (2015). videos: inventing_math.py. github.com/3b1b/videos.**（模块常量+工厂+.split 拆词——§3.100 模板参考）
+
+> **§3.106 引用标注**：以上 [49]-[77] 为 L1 启发式提示词层 + 3B1B manim 方法论调研的权威来源
+> （Anthropic/OpenAI 官方 + AAAI/ACL/Springer/MDPI 2024-2026 学术研究），尊重原作者的智力成果。
+
 > **标注规范**：每个借鉴模块文件头统一注释块（零运行时开销）：
 ```
 source:  <项目名> <版本/commit>  |  repo: <URL>
