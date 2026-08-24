@@ -1,4 +1,4 @@
-﻿﻿# PAEG 教育智能体 — 简明技术说明（v1.2.27）
+﻿# PAEG 教育智能体 — 简明技术说明（v1.2.27）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -869,6 +869,8 @@ ROUTER = {
 ## 第 5 章 扩展指南
 
 | 想做什么 | 怎么做 |
+|---|---|
+| 防长时无监控（§3.92 纪律） | 长任务后台运行+输出重定向+30s 心跳轮询+超时保护（PPT 120s/讲义 60s/视频 90s/manim 300s）+进度可视化（flush=True）+微信进度推送——禁止无限等待 |
 |---|---|
 | 新增学科 | `prompts.py` SUBJECT_STYLES 加键（persona/language/structure/emphasis + 可选 subfield_guide/method_guide/worked_example）+ SUBJECT_GRADES/SUBFIELD_TREE |
 | 新增 subagent | `subagents.py` 建类（run 方法组装 system + 调 _safe_reason_chat）+ 注册到 paeg.py |
