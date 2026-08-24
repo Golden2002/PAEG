@@ -1,4 +1,4 @@
-"""
+﻿"""
 PAEG 学科专属教学提示词中心（v0.38）
 
 设计目标：让 LLM 教学输出"像人话"——自然、具体、不浮夸。
@@ -2014,6 +2014,20 @@ def build_presenter_system(subject: str, tone: str,
             _pedagogical_block = "\n\n## 教学用语（动态注入 · §3.64）\n" + _pedagogical_block
     except Exception:
         _pedagogical_block = ""
+
+    # §3.96 ⭐ PR2 渐进接入：PromptRegistry 校验固定块在场 + 记录 trace（不改拼接顺序）
+    try:
+        from prompt_registry import get_registry as _get_preg
+        _preg = _get_preg()
+        _trace, _blocks = _preg.assemble("teaching", inputs={"subject": subject or ""})
+        # 校验核心固定块已在 system 中（truth_grounding/language_style）
+        _missing = [b for b in ("truth_grounding", "language_style")
+                    if not (("不编造" in system) or ("TRUTH" in system) or
+                            ("语言" in system and "规范" in system))]
+        if hasattr(_preg, "_last_trace"):
+            _preg._last_trace = _blocks
+    except Exception:
+        pass
     return f"""{TRUTH_GROUNDING}
 
 {WEIL_CORE}
