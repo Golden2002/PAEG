@@ -3839,9 +3839,30 @@ server.py `teach_video` 端点：
 | 教学视频 | 大纲 | 分镜脚本 | 稿件（旁白） | 视频合成 | 分镜/稿件可下载 + 提示词指导 |
 | Manim | 脚本 | 分镜代码 | 渲染视频 | — | 脚本/代码可下载 + 提示词指导 |
 
+### 管线现状核实（2026-08-24 · 实施前调查 ✅）
+
+**MaterialPipeline.run()（material_pipeline.py L126-262）已核实**：
+- ✅ `result["spec"]`：规划产物保留（L143）
+- ✅ `result["output"]`：最终产物保留（L229）
+- ✅ 落盘 job json：含 spec + output + stages（L245-251，evolve_data/material_pipeline/）
+- ❌ **`draft`（草稿/中间产物）未保留在 result**——只有 spec 和 output，中间产物丢失
+- ❌ **无中间产物下载 API**——用户只能看最终物料，无法下载 PPT 大纲/每页内容/视频分镜/稿件/Manim 脚本/代码
+- ❌ **用户提示词未注入生成依据**——生成器只接收 topic/subject，用户详细要求（"重点讲切线斜率"）无法传递
+
+**分阶段矩阵（用户确认，非全物料分阶段）**：
+| 物料 | 模式 | 前置产物（需可下载+用户注入） |
+|---|---|---|
+| 思维导图 | 直接 LLM 产出 | — |
+| 讲义 | 直接 LLM 产出 | — |
+| PPT | 分阶段 | 大纲 → 每页内容（title/points/visual_focus/notes） |
+| 教学视频 | 分阶段 | 大纲 → 分镜脚本 → 稿件旁白 |
+| Manim | 分阶段 | 脚本 script.json → 分镜代码 → 渲染视频 |
+
+**Oracle 方案（bg_b85c87b3 咨询中）**：统一阶段产物数据模型 + 产物下载 API + 用户意图注入 + SSE 阶段可视化 + 前端联通。
+
 ### 实施记录
 
-（咨询中）
+（Oracle 方案落地后按序实施；前置：draft 保留在 result + 下载 API + 用户提示词注入）
 
 
 
@@ -4174,9 +4195,30 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 | 教学视频 | 大纲 | 分镜脚本 | 稿件（旁白） | 视频合成 | 分镜/稿件可下载 + 提示词指导 |
 | Manim | 脚本 | 分镜代码 | 渲染视频 | — | 脚本/代码可下载 + 提示词指导 |
 
+### 管线现状核实（2026-08-24 · 实施前调查 ✅）
+
+**MaterialPipeline.run()（material_pipeline.py L126-262）已核实**：
+- ✅ `result["spec"]`：规划产物保留（L143）
+- ✅ `result["output"]`：最终产物保留（L229）
+- ✅ 落盘 job json：含 spec + output + stages（L245-251，evolve_data/material_pipeline/）
+- ❌ **`draft`（草稿/中间产物）未保留在 result**——只有 spec 和 output，中间产物丢失
+- ❌ **无中间产物下载 API**——用户只能看最终物料，无法下载 PPT 大纲/每页内容/视频分镜/稿件/Manim 脚本/代码
+- ❌ **用户提示词未注入生成依据**——生成器只接收 topic/subject，用户详细要求（"重点讲切线斜率"）无法传递
+
+**分阶段矩阵（用户确认，非全物料分阶段）**：
+| 物料 | 模式 | 前置产物（需可下载+用户注入） |
+|---|---|---|
+| 思维导图 | 直接 LLM 产出 | — |
+| 讲义 | 直接 LLM 产出 | — |
+| PPT | 分阶段 | 大纲 → 每页内容（title/points/visual_focus/notes） |
+| 教学视频 | 分阶段 | 大纲 → 分镜脚本 → 稿件旁白 |
+| Manim | 分阶段 | 脚本 script.json → 分镜代码 → 渲染视频 |
+
+**Oracle 方案（bg_b85c87b3 咨询中）**：统一阶段产物数据模型 + 产物下载 API + 用户意图注入 + SSE 阶段可视化 + 前端联通。
+
 ### 实施记录
 
-（咨询中）
+（Oracle 方案落地后按序实施；前置：draft 保留在 result + 下载 API + 用户提示词注入）
 
 
 ---
@@ -4220,6 +4262,27 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 | 教学视频 | 大纲 | 分镜脚本 | 稿件（旁白） | 视频合成 | 分镜/稿件可下载 + 提示词指导 |
 | Manim | 脚本 | 分镜代码 | 渲染视频 | — | 脚本/代码可下载 + 提示词指导 |
 
+### 管线现状核实（2026-08-24 · 实施前调查 ✅）
+
+**MaterialPipeline.run()（material_pipeline.py L126-262）已核实**：
+- ✅ `result["spec"]`：规划产物保留（L143）
+- ✅ `result["output"]`：最终产物保留（L229）
+- ✅ 落盘 job json：含 spec + output + stages（L245-251，evolve_data/material_pipeline/）
+- ❌ **`draft`（草稿/中间产物）未保留在 result**——只有 spec 和 output，中间产物丢失
+- ❌ **无中间产物下载 API**——用户只能看最终物料，无法下载 PPT 大纲/每页内容/视频分镜/稿件/Manim 脚本/代码
+- ❌ **用户提示词未注入生成依据**——生成器只接收 topic/subject，用户详细要求（"重点讲切线斜率"）无法传递
+
+**分阶段矩阵（用户确认，非全物料分阶段）**：
+| 物料 | 模式 | 前置产物（需可下载+用户注入） |
+|---|---|---|
+| 思维导图 | 直接 LLM 产出 | — |
+| 讲义 | 直接 LLM 产出 | — |
+| PPT | 分阶段 | 大纲 → 每页内容（title/points/visual_focus/notes） |
+| 教学视频 | 分阶段 | 大纲 → 分镜脚本 → 稿件旁白 |
+| Manim | 分阶段 | 脚本 script.json → 分镜代码 → 渲染视频 |
+
+**Oracle 方案（bg_b85c87b3 咨询中）**：统一阶段产物数据模型 + 产物下载 API + 用户意图注入 + SSE 阶段可视化 + 前端联通。
+
 ### 实施记录
 
-（咨询中）
+（Oracle 方案落地后按序实施；前置：draft 保留在 result + 下载 API + 用户提示词注入）
