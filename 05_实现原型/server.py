@@ -1043,6 +1043,99 @@ def _teach_stream_gen(data):
         from meta_router import rule_fallback_intent as _rfi, _extract_lesson_topic as _elt
         from magic_intent import match_magic as _mm
         _rfi_res = _rfi(str(concept)[:120])
+        # §3.87 ⭐ 物料魔法关键词早退（零正则·精确关键词——用户设计）
+        # 优先级：magic 物料词 > rule_fallback > 其他。按钮点击 = 发送"生成PPT：主题"等。
+        _magic = _mm(str(concept)[:120])
+        _magic_intent = _magic.get("intent") if _magic else None
+        # 物料关键词 → 生成路径映射（topic 从关键词后缀提取）
+        _material_topic = None
+        if _magic_intent in ("ppt", "handout", "video", "manim"):
+            _m_tail = ""
+            try:
+                _m_tail = (_magic.get("matched_text") or "")
+                _m_tail = re.sub(r"^(生成PPT|生成讲义|生成教学视频|生成数学动画)[:：\s、,，]*", "", _m_tail).strip()
+            except Exception:
+                _m_tail = ""
+            _material_topic = _m_tail or str(concept)[:60]
+        # PPT 生成（magic:ppt 精确关键词 或 兜底 is_ppt_request 正则）
+        _is_ppt_req = _magic_intent == "ppt"
+        if not _is_ppt_req:
+            try:
+                from meta_router import is_ppt_request as _is_ppt_req_fn
+                _is_ppt_req = bool(_is_ppt_req_fn(str(concept)[:120]))
+            except Exception:
+                _is_ppt_req = _rfi_res.get("intent") == "ppt"
+        if _is_ppt_req:
+            _ppt_topic = _material_topic or str(concept)[:80]
+            _ppt_topic = re.sub(r"(做|制作|整理|创建|生成|一份|关于|的)?(PPT|ppt|演示文稿|课件|幻灯片).*$", "", _ppt_topic).strip() or "教学演示"
+            _ppt_outline = None
+            try:
+                from subagents import _safe_chat
+                _o_sys = (
+                    "你是教学 PPT 大纲生成器。为给定主题生成教学 PPT 大纲。"
+                    "严格使用以下格式：\n## 章节标题\n- 要点1\n- 要点2\n"
+                    "要求：5-7 个章节，每章 2-4 个要点；内容准确、有例子、由浅入深；"
+                    "只输出大纲，不要其他文字。"
+                )
+                _o_usr = f"主题：{_ppt_topic}（用户请求：{str(concept)[:80]}）"
+                _o_raw = _safe_chat(paeg.model, _o_sys, _o_usr, max_tokens=1200) or ""
+                if "## " in _o_raw:
+                    _ppt_outline = _o_raw
+            except Exception as _oe:
+                print(f"[PAEG] PPT 大纲生成跳过: {_oe}")
+            if not _ppt_outline:
+                # 降级：结构化占位大纲（保证生成不中断）
+                _ppt_outline = (
+                    f"## {_ppt_topic}引入\n- 生活实例\n- 学习目标\n"
+                    f"## {_ppt_topic}核心概念\n- 定义\n- 原理\n- 例子\n"
+                    f"## 典型例题\n- 例题1\n- 例题2\n"
+                    f"## 常见误区\n- 易错点\n"
+                    f"## 总结\n- 要点回顾\n- 课后思考"
+                )
+            try:
+                import pptx_mcp_server as _pptx
+                _pres = _pptx.generate_presentation(
+                    topic=_ppt_topic, outline=_ppt_outline,
+                    style="paeg_standard", uid=learner_id)
+                _url = _pres.get("url") or ""
+                _slides = _pres.get("slides") or 0
+                _body = f"PPT 已生成（{_slides} 页）：<a href='{_url}' target='_blank'>下载 PPT</a>"
+            except Exception as _pe:
+                _body = f"PPT 生成失败: {_pe}"
+                _url = ""
+            _save_teach_turn("ppt", _body[:300])
+
+            def gen_ppt_early():
+                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _body, 'step_type': 'ppt'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'ppt', 'url': _url}, ensure_ascii=False)}\n\n"
+            yield from gen_ppt_early()
+            return
+
+        # §3.87 ⭐ 讲义魔法关键词早退（magic:handout "生成讲义：主题"）
+        if _magic_intent == "handout":
+            _hd_topic = _material_topic or "讲义"
+            _hd_body = ""
+            try:
+                from subagents import _safe_chat
+                _hd_sys = (
+                    "你是讲义生成器。为给定主题生成结构完整、内容详实的教学讲义。"
+                    "结构：学习目标 → 核心内容 → 典型例题 → 巩固练习 → 小结。"
+                    "要求：内容准确、有具体例子、适合自学。用 Markdown 输出。"
+                )
+                _hd_usr = f"主题：{_hd_topic}"
+                _hd_body = _safe_chat(paeg.model, _hd_sys, _hd_usr, max_tokens=1500) or ""
+            except Exception as _he:
+                print(f"[PAEG] 讲义生成跳过: {_he}")
+            if not _hd_body:
+                _hd_body = f"# {_hd_topic} 讲义\n\n## 学习目标\n理解{_hd_topic}核心概念。\n\n## 核心内容\n（讲义生成失败，请重试）"
+            _save_teach_turn("handout", _hd_body[:300])
+
+            def gen_handout_early():
+                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _hd_body, 'step_type': 'handout'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'handout'}, ensure_ascii=False)}\n\n"
+            yield from gen_handout_early()
+            return
+
         _lp_pending_key = f"lesson_prep_pending_{learner_id}"
         _pending = SESSIONS.get(_lp_pending_key)
         # ── 引导后补充合并：pending 标记 + 确定性短路（A+ 方案：结构化 intent_frame）──

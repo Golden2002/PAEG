@@ -204,9 +204,9 @@ def is_recommend_request(text: str) -> bool:
 # 单独的规则函数（与 is_recommend_request / is_problem_request 都不同语义），
 # 并补齐 VALID_INTENTS 里 "ppt" 选项的兜底路径。
 PPT_PATTERNS = [
-    r"(做|生成|制作|整理|创建).{0,6}(PPT|ppt|演示文稿|课件|幻灯片)",
-    r"(PPT|ppt|演示文稿|课件|幻灯片).{0,6}(做|生成|制作|整理)",
-    r"把.{0,10}(整理|做成|生成).{0,6}(PPT|ppt|演示文稿)",
+    r"(做|生成|制作|整理|创建).{0,20}(PPT|ppt|演示文稿|课件|幻灯片)",
+    r"(PPT|ppt|演示文稿|课件|幻灯片).{0,20}(做|生成|制作|整理)",
+    r"把.{0,20}(整理|做成|生成).{0,20}(PPT|ppt|演示文稿)",
 ]
 PPT_COMPILED = [re.compile(p, re.IGNORECASE) for p in PPT_PATTERNS]
 

@@ -1700,6 +1700,11 @@ body {
       <button class="chip" data-q="电车难题该拉开关吗？">电车难题</button>
       <button class="chip" data-q="为什么人会感到孤独？">孤独</button>
       <button class="chip" data-q="极限的 ε-δ 定义是什么？">ε-δ 定义</button>
+      <!-- §3.87 ⭐ 物料快捷引导（点击=填前缀，与 cmd-trigger 按钮同效果） -->
+      <button class="chip chip-material" data-material="ppt" data-q="生成PPT：">📊 做PPT</button>
+      <button class="chip chip-material" data-material="handout" data-q="生成讲义：">📄 做讲义</button>
+      <button class="chip chip-material" data-material="video" data-q="生成教学视频：">🎬 做视频</button>
+      <button class="chip chip-material" data-material="manim" data-q="生成数学动画：">🎨 做动画</button>
     </div>
 
     <div class="action-bar" id="action-bar">
@@ -2818,6 +2823,10 @@ async function teach(question, subject, subtopic) {
         // v6.1 ⭐ 数学动画/授课视频：仅启用且命中关键词才触发（不默认生成）
         enable_manim: (window._manimModeActive && window._manimModeActive() && window._shouldTriggerManim(question)) || false,
         enable_video: (window._videoModeActive && window._videoModeActive() && window._shouldTriggerVideo(question)) || false,
+        // §3.87 ⭐ 修复：PPT/讲义口令触发漏接（后端有 /api/ppt/generate 能力，
+        // 但前端从未把 enable_ppt/enable_handout 传入——与 manim/video 同模式补齐）
+        enable_ppt: (window._pptModeActive && window._pptModeActive() && window._shouldTriggerPpt(question)) || false,
+        enable_handout: (window._handoutModeActive && window._handoutModeActive() && window._shouldTriggerHandout(question)) || false,
       }),
       signal: controller.signal,
     });
@@ -4805,6 +4814,19 @@ loadSubjectTree();  // v0.27：异步加载学科树，命中后重建下拉（�
 
 document.querySelectorAll('.chip').forEach(chip => {
   chip.addEventListener('click', () => {
+    // §3.87 ⭐ 物料快捷 chip：填前缀不发送（用户补主题后手动回车）
+    if (chip.classList.contains('chip-material')) {
+      questionInput.value = chip.dataset.q || '';
+      questionInput.focus();
+      const pos = questionInput.value.length;
+      questionInput.setSelectionRange(pos, pos);
+      // 高亮对应 cmd-trigger 按钮
+      const btnId = { 'ppt': 'cmd-trigger-ppt', 'handout': 'cmd-trigger-handout',
+                      'video': 'cmd-trigger-video', 'manim': 'cmd-trigger-manim' }[chip.dataset.material];
+      const btn = btnId && document.getElementById(btnId);
+      if (btn) btn.classList.add('active');
+      return;
+    }
     questionInput.value = chip.dataset.q;
     askBtn.click();
   });
@@ -5312,26 +5334,39 @@ document.addEventListener('click', (e) => {
   if (e.target && e.target.id === 'cmd-tag-handout-x') { setHandoutMode(false); }
   if (e.target && e.target.id === 'cmd-tag-ppt-x') { setPptMode(false); }
   if (e.target && e.target.id === 'cmd-tag-deepthink-x') { setDeepThink(false); }
-  // 触发按钮：激活对应标签
-  if (e.target && e.target.id === 'cmd-trigger-manim') {
-    const active = window._manimModeActive && window._manimModeActive();
-    setManimMode(!active);
-    if (!active) addMsg('paeg', '<b>数学动画已启用</b>：当你说"画个图/演示/可视化"时，我会生成 Manim 数学动画。再点一次按钮可关闭。');
-  }
-  if (e.target && e.target.id === 'cmd-trigger-video') {
-    const active = window._videoModeActive && window._videoModeActive();
-    setVideoMode(!active);
-    if (!active) addMsg('paeg', '<b>授课视频已启用</b>：当你说"讲一课/生成视频"时，我会生成教学视频。再点一次按钮可关闭。');
-  }
-  if (e.target && e.target.id === 'cmd-trigger-handout') {
-    const active = window._handoutModeActive && window._handoutModeActive();
-    setHandoutMode(!active);
-    if (!active) addMsg('paeg', '<b>讲义制作已启用</b>：当你说"讲义/要点/笔记"时，我会生成讲义文档。');
-  }
-  if (e.target && e.target.id === 'cmd-trigger-ppt') {
-    const active = window._pptModeActive && window._pptModeActive();
-    setPptMode(!active);
-    if (!active) addMsg('paeg', '<b>PPT 制作已启用</b>：当你说"做 PPT/演示文稿"时，我会生成 PPT。');
+  // §3.87 ⭐ 统一按钮与口令（Oracle 方案 C：显式前缀 + 徽章，不自动发送）
+  // 用户设计：点击按钮 → 填入"生成PPT："前缀 + 光标定位，用户补主题后手动发送。
+  // 不直接发送（用户可能还没想好主题）；删除前缀即取消；按钮高亮提示激活态。
+  const MATERIAL_KEYWORDS = {
+    'cmd-trigger-manim': '生成数学动画：',
+    'cmd-trigger-video': '生成教学视频：',
+    'cmd-trigger-handout': '生成讲义：',
+    'cmd-trigger-ppt': '生成PPT：',
+  };
+  if (e.target && MATERIAL_KEYWORDS[e.target.id]) {
+    const kw = MATERIAL_KEYWORDS[e.target.id];
+    if (questionInput) {
+      // 已填过同前缀 → 再点 = 取消（清空前缀，恢复普通对话）
+      const cur = questionInput.value || '';
+      if (cur.indexOf(kw) === 0) {
+        questionInput.value = cur.slice(kw.length);
+        e.target.classList.remove('active');
+        addMsg('paeg', '<b>已取消物料模式</b>：恢复普通对话。');
+        return;
+      }
+      // 首次点击：填前缀 + 光标定位到末尾（不发送！用户补主题后手动回车）
+      const existing = cur.trim();
+      questionInput.value = existing ? kw + existing : kw;
+      questionInput.focus();
+      // 光标定位到末尾（前缀后）
+      const pos = questionInput.value.length;
+      questionInput.setSelectionRange(pos, pos);
+      e.target.classList.add('active');  // 按钮高亮提示激活
+      addMsg('paeg', `<b>${kw.slice(0, 2)} 制作已启用</b>：请补充主题后回车（如"${kw}光合作用"）。删除前缀可取消。`);
+      // 聚焦输入框等待用户输入（不自动发送）
+      questionInput.focus();
+    }
+    return;
   }
   if (e.target && e.target.id === 'cmd-trigger-deepthink') {
     const active = window._deepThinkActive && window._deepThinkActive();

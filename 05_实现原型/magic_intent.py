@@ -24,6 +24,12 @@ MAGIC_PATTERNS = [
     # §3.73 ⭐ 独立激活词："我要备课"（纯词 → 引导分支；带后缀 → 直接生成）
     (re.compile(r'^我要备课$'), 'lesson_prep', 'magic:lesson_prep'),
     (re.compile(r'^我要备课[:：\s、,，]*(.{1,60}?)$'), 'lesson_prep', 'magic:lesson_prep_topic'),
+    # §3.87 ⭐ 物料魔法关键词（零正则·精确完整关键词——用户设计：单独的完整的词）
+    # 按钮与口令统一：按钮点击 = 向对话框发送这些精确关键词
+    (re.compile(r'^生成PPT[:：\s、,，]*(.{1,60}?)$'), 'ppt', 'magic:ppt'),
+    (re.compile(r'^生成讲义[:：\s、,，]*(.{1,60}?)$'), 'handout', 'magic:handout'),
+    (re.compile(r'^生成教学视频[:：\s、,，]*(.{1,60}?)$'), 'video', 'magic:video'),
+    (re.compile(r'^生成数学动画[:：\s、,，]*(.{1,60}?)$'), 'manim', 'magic:manim'),
 ]
 
 

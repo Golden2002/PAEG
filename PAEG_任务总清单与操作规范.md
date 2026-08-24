@@ -3473,9 +3473,22 @@ server.py `teach_video` 端点：
 - 物料魔法关键词：magic_intent 加 `生成PPT：/生成讲义：/生成教学视频：/生成数学动画：`（零正则精确匹配）
 - 前端按钮：MATERIAL_KEYWORDS 拼接（点击→填前缀+发送）——**待按 Oracle 方案改造为"填前缀不发送+徽章"**
 
+### 实施记录（方案 C 已完成 · 验证通过）✅
+
+**前端（index.html）**：
+- 物料按钮（cmd-trigger-ppt/handout/video/manim）：点击 → 填前缀（生成PPT：等）+ 光标定位 + 按钮高亮，**不自动发送**；再点取消（清前缀）
+- 物料快捷 chips（📊做PPT/📄做讲义/🎬做视频/🎨做动画）：同效果填前缀不发送
+- 验证：填前缀 OK / 高亮 OK / 不自动发送 OK / 取消清空 OK / 补主题发送 → PPT 生成 OK
+
+**后端（server.py + magic_intent.py + meta_router.py）**：
+- magic_intent 加物料精确关键词（生成PPT：/生成讲义：/生成教学视频：/生成数学动画：）
+- teach_stream 加 ppt/handout 意图早退（LLM 生成大纲 → pptx 生成 / 讲义生成）
+- meta_router PPT_PATTERNS 间隔放宽（0,6→0,20）
+
+**快速开始**：物料 chips 已加（点击即填前缀，指示用户精确关键词）
+
 ### 待办
 
-- 前端：按钮点击改为"填前缀+徽章+不自动发送"（用户补主题后手动发送）——Ghost 预览作为增强
-- 快速开始：指示精确关键词（生成PPT：xxx / 生成讲义：xxx 等）
-- 讲义早退已实现（magic:handout）
-- 输出质量：物料需满足 Oracle3 rubric（排版/详实/例子/适用课堂）
+- Ghost 预览模式（Oracle 方案增强，可切换）——后续
+- 纯隐藏模式（高级用户设置项）——后续
+- 输出质量：物料需满足 Oracle3 rubric（排版/详实/例子/适用课堂）——持续用测试工程评估
