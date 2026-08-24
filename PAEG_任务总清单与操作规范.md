@@ -3860,9 +3860,55 @@ server.py `teach_video` 端点：
 
 **Oracle 方案（bg_b85c87b3 咨询中）**：统一阶段产物数据模型 + 产物下载 API + 用户意图注入 + SSE 阶段可视化 + 前端联通。
 
+### Oracle 方案（bg_b85c87b3 已返回 ✅ · 不加压缩记载）
+
+**API 设计**：
+- `/api/manim/generate`（保留同步 JSON 兼容）+ `/api/manim/stream`（新增 SSE 入口）
+- `/api/manim/jobs/<job_id>/manifest` / `script`（?view=1 预览）/ `code` / `video`（?download=1 强下载）——只接受白名单 job_id + 固定 artifact，禁止暴露任意本地路径
+- 终态响应：`{ok, job_id, url, artifacts: {script, code, video: {status, url}}}`
+
+**用户意图注入**：
+- UI 字段 `#manim-details`（主输入，≤1000 字，映射 intuition）+ 可选 `#manim-objectives`
+- 发送前去除 `生成数学动画：` 前缀
+- 后端归一化 `intuition = data.get("intuition") or data.get("details")` → 透传 run_pipeline → phase1_plan → visual_script_generator.build_script_prompt（已有字段，无需改提示词结构）
+
+**SSE 阶段事件**（script 0-30% / code 30-60% / video 60-90% / review 90-100%）：
+- `event: progress` {job_id, stage, status, percent, message}
+- `event: artifact` {job_id, stage, kind, url, view_url, preview}
+- `event: done` {status, mode, job_id, url, artifacts}
+- 实现：同步 generate_manim_video 用 `threading.Thread + queue.Queue` 消费 progress_callback，Flask stream_with_context 推 SSE
+
+**前端展示**：
+- `addManimProgress()` 改三阶段卡片（脚本→代码→视频，pending/running/done/failed + 进度条）
+- artifact 到达即启用下载按钮（safeResourceUrl 校验 + escapeHtml）
+- done 用 artifacts 渲染最终卡片（MP4 `<video controls>` + 下载按钮；脚本预览 scenes；代码 `<details><pre>`）
+- 直接按钮路径 + 自然语言物料路径共用渲染函数
+
+**数据模型**：
+- `evolve_data/manim_pipeline/jobs/<job_id>/{script.json, scene.py, manifest.json}` + `downloads/manim/jobs/<job_id>/.../scene.mp4`
+- manifest: {job_id, topic, stages, artifacts{script/code/video:{status,path,url,size}}, errors}
+- 保留旧 run_pipeline 字符串 stages，新增 artifacts 结构（不破坏 test_material_router）
+
+**改动点**（文件+行）：
+| 文件 | 行号 | 改动 |
+|---|---|---|
+| manim_pipeline.py | 273-369 | run_pipeline 收 job_id+progress_callback；阶段后立即落盘；修复后覆盖旧版 |
+| manim_service.py | 195-228 | 加 grade/intuition/objectives/prerequisites/style/duration/job_id/progress_callback；返回 script/code/artifacts/stages |
+| material_router.py | 377-467 | 透传 intuition/objectives；传 progress_callback；yield progress/artifact；保留 presentation/done 兼容 |
+| sse_presenter.py | 28-31 | fmt_progress 加 stage/status/job_id/artifact_url；新增 fmt_artifact；fmt_done 带 job_id/artifacts |
+| server.py | 1062-1071 | teach_stream 传 intuition/objectives/grade 到 route_material（当前未传——根因） |
+| server.py | 3158-3177 | 保留 generate；新增 stream + 4 下载路由；不套 @require_module("file_gen") |
+| index.html | 5251-5367 | Manim 模式详细要求输入框 |
+| index.html | 4228-4235 | fetchManimVideo 改 stream；去前缀 |
+| index.html | 5387-5437 | addManimProgress 三阶段卡片；teach() 加 progress/artifact 分支 |
+| visual_script_generator.py | 57-64 | 不改（intuition/objectives 已接入） |
+
+**实施步骤（Oracle 7 步）**：1 接通用户要求→2 流式入口+下载契约→3 扩展服务返回→4 流水线 job_id 持久化→5 物料路由+SSE→6 前端卡片→7 回归测试
+**Effort**: Medium（1-2 天，无新依赖）
+
 ### 实施记录
 
-（Oracle 方案落地后按序实施；前置：draft 保留在 result + 下载 API + 用户提示词注入）
+（Oracle 方案落地后按序实施；前置：draft 保留在 result + 下载 API + 用户提示词注入；§3.95 三层联通 + §3.96 提示词清单另行扩展）
 
 
 
@@ -4216,9 +4262,55 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 
 **Oracle 方案（bg_b85c87b3 咨询中）**：统一阶段产物数据模型 + 产物下载 API + 用户意图注入 + SSE 阶段可视化 + 前端联通。
 
+### Oracle 方案（bg_b85c87b3 已返回 ✅ · 不加压缩记载）
+
+**API 设计**：
+- `/api/manim/generate`（保留同步 JSON 兼容）+ `/api/manim/stream`（新增 SSE 入口）
+- `/api/manim/jobs/<job_id>/manifest` / `script`（?view=1 预览）/ `code` / `video`（?download=1 强下载）——只接受白名单 job_id + 固定 artifact，禁止暴露任意本地路径
+- 终态响应：`{ok, job_id, url, artifacts: {script, code, video: {status, url}}}`
+
+**用户意图注入**：
+- UI 字段 `#manim-details`（主输入，≤1000 字，映射 intuition）+ 可选 `#manim-objectives`
+- 发送前去除 `生成数学动画：` 前缀
+- 后端归一化 `intuition = data.get("intuition") or data.get("details")` → 透传 run_pipeline → phase1_plan → visual_script_generator.build_script_prompt（已有字段，无需改提示词结构）
+
+**SSE 阶段事件**（script 0-30% / code 30-60% / video 60-90% / review 90-100%）：
+- `event: progress` {job_id, stage, status, percent, message}
+- `event: artifact` {job_id, stage, kind, url, view_url, preview}
+- `event: done` {status, mode, job_id, url, artifacts}
+- 实现：同步 generate_manim_video 用 `threading.Thread + queue.Queue` 消费 progress_callback，Flask stream_with_context 推 SSE
+
+**前端展示**：
+- `addManimProgress()` 改三阶段卡片（脚本→代码→视频，pending/running/done/failed + 进度条）
+- artifact 到达即启用下载按钮（safeResourceUrl 校验 + escapeHtml）
+- done 用 artifacts 渲染最终卡片（MP4 `<video controls>` + 下载按钮；脚本预览 scenes；代码 `<details><pre>`）
+- 直接按钮路径 + 自然语言物料路径共用渲染函数
+
+**数据模型**：
+- `evolve_data/manim_pipeline/jobs/<job_id>/{script.json, scene.py, manifest.json}` + `downloads/manim/jobs/<job_id>/.../scene.mp4`
+- manifest: {job_id, topic, stages, artifacts{script/code/video:{status,path,url,size}}, errors}
+- 保留旧 run_pipeline 字符串 stages，新增 artifacts 结构（不破坏 test_material_router）
+
+**改动点**（文件+行）：
+| 文件 | 行号 | 改动 |
+|---|---|---|
+| manim_pipeline.py | 273-369 | run_pipeline 收 job_id+progress_callback；阶段后立即落盘；修复后覆盖旧版 |
+| manim_service.py | 195-228 | 加 grade/intuition/objectives/prerequisites/style/duration/job_id/progress_callback；返回 script/code/artifacts/stages |
+| material_router.py | 377-467 | 透传 intuition/objectives；传 progress_callback；yield progress/artifact；保留 presentation/done 兼容 |
+| sse_presenter.py | 28-31 | fmt_progress 加 stage/status/job_id/artifact_url；新增 fmt_artifact；fmt_done 带 job_id/artifacts |
+| server.py | 1062-1071 | teach_stream 传 intuition/objectives/grade 到 route_material（当前未传——根因） |
+| server.py | 3158-3177 | 保留 generate；新增 stream + 4 下载路由；不套 @require_module("file_gen") |
+| index.html | 5251-5367 | Manim 模式详细要求输入框 |
+| index.html | 4228-4235 | fetchManimVideo 改 stream；去前缀 |
+| index.html | 5387-5437 | addManimProgress 三阶段卡片；teach() 加 progress/artifact 分支 |
+| visual_script_generator.py | 57-64 | 不改（intuition/objectives 已接入） |
+
+**实施步骤（Oracle 7 步）**：1 接通用户要求→2 流式入口+下载契约→3 扩展服务返回→4 流水线 job_id 持久化→5 物料路由+SSE→6 前端卡片→7 回归测试
+**Effort**: Medium（1-2 天，无新依赖）
+
 ### 实施记录
 
-（Oracle 方案落地后按序实施；前置：draft 保留在 result + 下载 API + 用户提示词注入）
+（Oracle 方案落地后按序实施；前置：draft 保留在 result + 下载 API + 用户提示词注入；§3.95 三层联通 + §3.96 提示词清单另行扩展）
 
 
 ---
@@ -4283,9 +4375,55 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 
 **Oracle 方案（bg_b85c87b3 咨询中）**：统一阶段产物数据模型 + 产物下载 API + 用户意图注入 + SSE 阶段可视化 + 前端联通。
 
+### Oracle 方案（bg_b85c87b3 已返回 ✅ · 不加压缩记载）
+
+**API 设计**：
+- `/api/manim/generate`（保留同步 JSON 兼容）+ `/api/manim/stream`（新增 SSE 入口）
+- `/api/manim/jobs/<job_id>/manifest` / `script`（?view=1 预览）/ `code` / `video`（?download=1 强下载）——只接受白名单 job_id + 固定 artifact，禁止暴露任意本地路径
+- 终态响应：`{ok, job_id, url, artifacts: {script, code, video: {status, url}}}`
+
+**用户意图注入**：
+- UI 字段 `#manim-details`（主输入，≤1000 字，映射 intuition）+ 可选 `#manim-objectives`
+- 发送前去除 `生成数学动画：` 前缀
+- 后端归一化 `intuition = data.get("intuition") or data.get("details")` → 透传 run_pipeline → phase1_plan → visual_script_generator.build_script_prompt（已有字段，无需改提示词结构）
+
+**SSE 阶段事件**（script 0-30% / code 30-60% / video 60-90% / review 90-100%）：
+- `event: progress` {job_id, stage, status, percent, message}
+- `event: artifact` {job_id, stage, kind, url, view_url, preview}
+- `event: done` {status, mode, job_id, url, artifacts}
+- 实现：同步 generate_manim_video 用 `threading.Thread + queue.Queue` 消费 progress_callback，Flask stream_with_context 推 SSE
+
+**前端展示**：
+- `addManimProgress()` 改三阶段卡片（脚本→代码→视频，pending/running/done/failed + 进度条）
+- artifact 到达即启用下载按钮（safeResourceUrl 校验 + escapeHtml）
+- done 用 artifacts 渲染最终卡片（MP4 `<video controls>` + 下载按钮；脚本预览 scenes；代码 `<details><pre>`）
+- 直接按钮路径 + 自然语言物料路径共用渲染函数
+
+**数据模型**：
+- `evolve_data/manim_pipeline/jobs/<job_id>/{script.json, scene.py, manifest.json}` + `downloads/manim/jobs/<job_id>/.../scene.mp4`
+- manifest: {job_id, topic, stages, artifacts{script/code/video:{status,path,url,size}}, errors}
+- 保留旧 run_pipeline 字符串 stages，新增 artifacts 结构（不破坏 test_material_router）
+
+**改动点**（文件+行）：
+| 文件 | 行号 | 改动 |
+|---|---|---|
+| manim_pipeline.py | 273-369 | run_pipeline 收 job_id+progress_callback；阶段后立即落盘；修复后覆盖旧版 |
+| manim_service.py | 195-228 | 加 grade/intuition/objectives/prerequisites/style/duration/job_id/progress_callback；返回 script/code/artifacts/stages |
+| material_router.py | 377-467 | 透传 intuition/objectives；传 progress_callback；yield progress/artifact；保留 presentation/done 兼容 |
+| sse_presenter.py | 28-31 | fmt_progress 加 stage/status/job_id/artifact_url；新增 fmt_artifact；fmt_done 带 job_id/artifacts |
+| server.py | 1062-1071 | teach_stream 传 intuition/objectives/grade 到 route_material（当前未传——根因） |
+| server.py | 3158-3177 | 保留 generate；新增 stream + 4 下载路由；不套 @require_module("file_gen") |
+| index.html | 5251-5367 | Manim 模式详细要求输入框 |
+| index.html | 4228-4235 | fetchManimVideo 改 stream；去前缀 |
+| index.html | 5387-5437 | addManimProgress 三阶段卡片；teach() 加 progress/artifact 分支 |
+| visual_script_generator.py | 57-64 | 不改（intuition/objectives 已接入） |
+
+**实施步骤（Oracle 7 步）**：1 接通用户要求→2 流式入口+下载契约→3 扩展服务返回→4 流水线 job_id 持久化→5 物料路由+SSE→6 前端卡片→7 回归测试
+**Effort**: Medium（1-2 天，无新依赖）
+
 ### 实施记录
 
-（Oracle 方案落地后按序实施；前置：draft 保留在 result + 下载 API + 用户提示词注入）
+（Oracle 方案落地后按序实施；前置：draft 保留在 result + 下载 API + 用户提示词注入；§3.95 三层联通 + §3.96 提示词清单另行扩展）
 
 
 ---
