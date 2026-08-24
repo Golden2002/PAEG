@@ -1662,6 +1662,15 @@ def build_lesson_planner_system(topic: str, subject: str, grade: str,
                   f"讲解深度与方式：{g['depth']}\n"
                   f"语气：{g['tone_extra']}")
 
+    # §3.107 ⭐ 学段×学科组合诱导（提升式：增加拼接，不破坏现有结构）
+    try:
+        from grade_subject_inducers import get_grade_subject_inducer
+        _gsi = get_grade_subject_inducer(grade_key, subject or "")
+        if _gsi:
+            grade_line += f"\n\n{_gsi}"
+    except Exception:
+        pass
+
     # 复用 3：6 维教学法结构骨架
     try:
         _gm = get_grade_mode(grade_key)
