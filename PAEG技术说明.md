@@ -1,4 +1,4 @@
-﻿﻿# PAEG 教育智能体 — 简明技术说明（v1.2.26）
+﻿﻿# PAEG 教育智能体 — 简明技术说明（v1.2.27）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -15,13 +15,13 @@
 - 第 1 章 项目概览
 - 第 2 章 能力全景（F1-F7，每功能含技术路线+实现方法）
 - 第 3 章 系统架构（六层）
-- 第 4 章 关键流程
+- 第 4 章 关键流程（含 4.6 物料路由架构 §3.91 ⭐）
 - 第 5 章 扩展指南
 - 第 5A 章 可扩展模块（框架化 · v0.70 ⭐）
 - 第 5B 章 DeepSeek Harness 借鉴蓝图（2026-08-14 调研 · 30 项中 27 项已落地）
 - 第 5C 章 OpenAI Codex Harness 借鉴（2026-08-21 开源调研 · §3.85，见 §7.11 主线六）
 - 第 6 章 未来规划（Roadmap · Oracle 咨询 2026-08-14）
-- 第 7 章 能力全景与引用来源（v1.2.26）
+- 第 7 章 能力全景与引用来源（v1.2.27）
   - §7.1 能力全景 / §7.2 能力增强 / **§7.3 引用来源（[1]-[48]：技术栈+学术+教育 Agent 项目）**
   - §7.4-§7.10 专项（Docker/双远程/fallback/进度/结构/技术栈/备课）
   - **§7.11 工程化就绪融贯（Round 4-12 六主线）**
@@ -126,7 +126,7 @@
 
 | 功能 | 用户场景 | 技术路线 | 实现方法 |
 |---|---|---|---|
-| **讲义/PPT/视频/manim/思维导图** | 制作教学材料 | 文件生成器 + MCP | 能力清单注入（_build_capability_manifest）→ LLM 判断何时生成 → manim 动画（manim_service）/PPT（mcp__pptx）/讲义（keyword_doc）/视频脚本（script_service）/思维导图（knowledge_map） |
+| **讲义/PPT/视频/manim/思维导图** | 制作教学材料 | material_router 统一调度 + MaterialPipeline v2.0 | **§3.91 物料路由**（magic_intent 精确关键词 → ROUTER 表 → 生成器 → SSE 统一发流，详见 §4.6）+ 6 类管线（讲义 handout/讲稿 script/PPT/思维导图/教学视频/Manim 数学动画，见 C.15.1） |
 | **MCP 工具链** | 联网/文件/检索 | 14 个 MCP 工具 | filesystem/memory/brave-search/pptx 等；config_hub 统一路由（mcp__ 前缀），spill 溢出防护（超 12000 字符截断） |
 | **语音朗读** | 播放回复 | /api/voice/tts | 前端朗读按钮→TTS |
 | **数学可视化视频** | 生成高质量数学动画 | visual_script_generator + manim_service | 对话+轮询→script.json（3B1B 原则）→Manim 渲染；脚本+讲稿+PPT+讲义+思维导图联动可下载 |
@@ -430,7 +430,6 @@ sequenceDiagram
     T->>P: 续讲(_pending_steps + remediation)
     P-->>S: 继续流式讲解
 ```
-
 
 
 **图 10 · 17 维学生画像独立性模型**
@@ -770,6 +769,55 @@ flowchart LR
 ### 4.5 防幻觉锚定
 TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为绝对命令/允许说不知道 → QualityGate L3 factuality 评分把关自我更新
 
+### 4.6 物料路由架构（§3.91 ⭐ 数据驱动统一调度）
+
+> **背景**：早期物料生成以 6 个 if 早退分支堆叠在 teach_stream（约 195 行重复代码：
+> ppt/handout/video/manim/mindmap/script 各写一遍 topic 提取 + 生成器调用 + SSE 组装）。
+> §3.91 按 Oracle 架构重构为**数据驱动路由表 + 统一调度器**，消除重复并增强路由判断。
+
+**核心模块**（3 个新文件，server.py 净减约 209 行）：
+
+| 模块 | 职责 |
+|---|---|
+| `material_router.py` | ROUTER 表（数据驱动：intent→生成器/超时/降级文案/是否走管线）+ `route_material()` 统一调度 + `is_material_intent()` 意图白名单 + `extract_topic()` 统一 topic 提取 |
+| `sse_presenter.py` | 统一 SSE 事件序列化：`fmt_presentation`/`fmt_done`/`fmt_progress`/`fmt_error`（契约字节级不变，14 单测锚定） |
+| `material_generators.py` | 6 个生成器封装（并入 material_router 内部），返回统一 `{ok, content, url, error, step_type}` dict |
+
+**数据驱动 ROUTER 表**（关键设计）：
+
+```python
+ROUTER = {
+  "ppt":     MaterialRoute("ppt", gen_ppt,     timeout=60,  use_pipeline=False),
+  "handout": MaterialRoute("handout", gen_handout, timeout=30),
+  "video":   MaterialRoute("video", gen_video, timeout=45),
+  "manim":   MaterialRoute("manim", gen_manim, timeout=300, use_pipeline=True),  # 长任务走 MaterialPipeline v2.0
+  "mindmap": MaterialRoute("mindmap", gen_mindmap, timeout=30),
+  "script":  MaterialRoute("script", gen_script, timeout=30),
+}
+```
+
+**调度流程**：`teach_stream` 一行接入（`if is_material_intent(_magic): yield from route_material(...); return`）→
+`extract_topic` 剥离"生成X："前缀 → ROUTER 查表 → 生成器（异常围栏 + fallback_msg 降级）→
+`sse_presenter` 统一发流（presentation + done，契约字节级保持）→ `_save_teach_turn` 存档。
+
+**设计要点**：
+- **默认 5 类直调生成器**（响应快 + SSE 契约稳），**仅 manim 走 MaterialPipeline v2.0**（渲染 2-5min，需 6 阶段门控）
+- **意图冲突消解**：magic_intent 优先级最高（magic > rule_fallback > lesson_prep > 普通教学），router 仅处理 magic 命中
+- **灰度开关** `PAEG_USE_MATERIAL_ROUTER=0` 可回退旧分支（当前默认 1，已删旧分支）
+- 单物料失败不影响其他（try/except 围栏 + fallback_msg 降级文案）
+- 与 magic_intent.py 零耦合（复用其 match_magic 输出）；与 MaterialPipeline v2.0 按需接线（见附录 C.15.2）
+
+**修复的既有 bug**（§3.90 全物料测试暴露）：
+- manim/video 关键词落入普通教学流 → 补早退分支（现已统一由 router 调度）
+- 思维导图/讲稿关键词缺失 → magic_intent 补 `生成思维导图：`/`生成讲稿：`
+- 讲稿空大纲崩溃 → 先生成大纲再 generate_full_script
+- 讲义 learner 依赖 → 改 save_answer 路径（与 material_pipeline.handout_pipeline 同路径）
+- PPT 下载链接缺失 → 从 path 构造 `/api/download/ppt/{filename}`
+
+**验证**：96/96 测试全绿（14 新增 router/sse_presenter 单测 + 82 既有）；6 类物料 UI 端到端全 PASS
+（PPT 下载 HTTP 200 / 讲义内容完整 / 教学视频分镜 / 思维导图 / 讲稿多节 / 数学动画真实出片 761KB + 下载 200）。
+物料体系全景见附录 C.15.1；统一流水线见 C.15.2。
+
 ---
 
 ## 第 5 章 扩展指南
@@ -919,7 +967,7 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 3. 多 agent 不换框架（复用 RALPH）；知识图谱先轻量本体（JSON）确认需求再上 Neo4j
 
 
-## 第 7 章 能力全景与引用来源（v1.1.9）
+## 第 7 章 能力全景与引用来源（v1.2.27）
 
 ### 7.1 能力全景：60 种能力，一套路由
 
@@ -1660,18 +1708,7 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 专业/教学/对象/个体四维评估矩阵——实测全维度达标，同一问题对画像学生与匿名者明显不同对待，从架构上杜绝"千人一面"。详见 §7.7 四维评估小节。
 
-## 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
 
-> **工程治理原则**：`PAEG_任务总清单与操作规范.md` 是项目的**工作流规范中枢**——提出执行标准、工作纪律，并记录需求更新迭代情况。技术/维护/元能力/亮点各文档都从它派生。
-
-**三大职能**：
-1. **执行标准**：操作纪律（git 铁律/引号铁律/正则 AST 铁律/运行卡住 SOP/更新及时记文档/subagent 结果及时移入项目）、任务核对、完成验证（无证据=未完成）、调研落盘、进程管理
-2. **工作纪律**：任务先记录（先写需求文档再动手）/ 实时更新状态（✅🔄⏳ 不批量）/ 借鉴外部项目记录来源 / 每项完成即验证 + 文档落盘
-3. **需求更新迭代记录**：§3.x 按时间顺序记录每次需求（来源/现状/方案/实施记录/验证）——需求的唯一真相源
-
-**工作流**：任务核对 → 按优先级执行 → 每项完成更新状态 → 完成验证 → 调研落盘 → 重大改动回归 → 更新技术快照
-
-**元技能**：**"先记录，后执行"是第一纪律**——需求文档是团队记忆的外部载体，也是版本化的决策日志；没有需求文档的工作流不可追溯、不可复盘、不可交接。
 ### C.14 技术亮点主题总表（v1.2.14-v1.2.25 · 去日志化整合）
 
 > 说明：以下为 §3.79-§3.85 各轮技术亮点的**主题化整合**（非版本流水账）。
@@ -1816,8 +1853,30 @@ manim_judge 4 维 + manim_speed 三档）基础上，§3.89 补齐 4 缺口：
 - 三 Oracle 质量测试工程（`10_封闭测试/三Oracle质量测试/`）：test_engine --mode
   material 对四类物料实测（PPT 69.0 / 讲义 96.0 / 教学视频 77.2 / 数学动画 待测）
 
+#### C.15.7 物料路由层（§3.91 ⭐ 数据驱动统一调度）
+
+> 正文融贯叙述见 §4.6；此处记录路由层与流水线的接线关系。
+
+- **magic_intent 精确关键词**（6 个）：`生成PPT：`/`生成讲义：`/`生成教学视频：`/`生成数学动画：`/`生成思维导图：`/`生成讲稿：` → intent（ppt/handout/video/manim/mindmap/script）——零正则模糊匹配（§3.87 用户设计）
+- **ROUTER 表**（material_router.py）：intent → 生成器/超时/降级文案/use_pipeline 数据驱动；新增物料只需加一行
+- **统一 SSE**（sse_presenter.py）：fmt_presentation/fmt_done/fmt_progress——14 单测字节级锚定前端契约
+- **与流水线接线**：默认 5 类直调生成器（快+契约稳），仅 manim use_pipeline=True 走 MaterialPipeline v2.0（渲染 2-5min 需门控）；后续可平滑切换（改 ROUTER 表 generator 列即可）
+- **灰度**：`PAEG_USE_MATERIAL_ROUTER` 环境变量（默认 1，旧分支已删）
+
 ---
 
+## 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
+
+> **工程治理原则**：`PAEG_任务总清单与操作规范.md` 是项目的**工作流规范中枢**——提出执行标准、工作纪律，并记录需求更新迭代情况。技术/维护/元能力/亮点各文档都从它派生。
+
+**三大职能**：
+1. **执行标准**：操作纪律（git 铁律/引号铁律/正则 AST 铁律/运行卡住 SOP/更新及时记文档/subagent 结果及时移入项目）、任务核对、完成验证（无证据=未完成）、调研落盘、进程管理
+2. **工作纪律**：任务先记录（先写需求文档再动手）/ 实时更新状态（✅🔄⏳ 不批量）/ 借鉴外部项目记录来源 / 每项完成即验证 + 文档落盘
+3. **需求更新迭代记录**：§3.x 按时间顺序记录每次需求（来源/现状/方案/实施记录/验证）——需求的唯一真相源
+
+**工作流**：任务核对 → 按优先级执行 → 每项完成更新状态 → 完成验证 → 调研落盘 → 重大改动回归 → 更新技术快照
+
+**元技能**：**"先记录，后执行"是第一纪律**——需求文档是团队记忆的外部载体，也是版本化的决策日志；没有需求文档的工作流不可追溯、不可复盘、不可交接。
 ## 附录 E 功能×模块连通性矩阵（§3.77 盘点）
 
 > 接线盘点：五大核心功能与 55 个模块/库/工具的连通状态。

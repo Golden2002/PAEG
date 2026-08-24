@@ -5236,7 +5236,29 @@ since:   <PAEG 版本号>
 - **修复**：server.py 补 manim/video 早退分支（§3.87 同模式：匹配关键词 → 提取 topic → 调用生成器 → SSE 返回产物 + 下载链接）
 - **实测**：Playwright「生成数学动画：导数」→ 真实渲染 DerivativeVisual.mp4（761KB）→ 下载 `/api/download/manim/jobs/<job>/videos/scene/720p30/*.mp4` HTTP 200 video/mp4 ✅
 
-### 10.27.5 文档同步
+### 10.27.5 物料路由架构重构（§3.91 ⭐ Oracle 咨询 · 数据驱动统一调度）
+
+**背景**：物料生成早期以 6 个 if 早退分支堆叠在 teach_stream（约 195 行重复：ppt/handout/video/manim/mindmap/script 各写一遍 topic 提取 + 生成器调用 + SSE 组装）。用户质疑"分支一层叠着一层是否优良结构"→ 咨询 Oracle 重构。
+
+**重构（3 新文件，server.py 净减约 209 行）**：
+- `material_router.py`：ROUTER 表（数据驱动：intent→生成器/超时/降级/use_pipeline）+ `route_material()` 统一调度 + `is_material_intent()` 白名单 + `extract_topic()` 统一 topic 提取
+- `sse_presenter.py`：统一 SSE 序列化（presentation/done/progress/error），14 单测字节级锚定前端契约
+- 6 生成器封装返回统一 `{ok, content, url, error, step_type}` dict（并入 material_router 内部）
+
+**设计决策**：
+- 默认 5 类直调生成器（响应快 + SSE 契约稳）；仅 manim use_pipeline=True 走 MaterialPipeline v2.0（渲染 2-5min 需 6 阶段门控）
+- 灰度开关 `PAEG_USE_MATERIAL_ROUTER=0` 可回退（当前默认 1，旧分支已删——ratchet 不可回退）
+- magic_intent 优先级最高（magic > rule_fallback > lesson_prep > 普通教学）
+
+**修复的既有 bug**（§3.90 全物料测试暴露）：
+- manim/video/思维导图/讲稿关键词缺失或落入普通教学流 → magic_intent 补全 6 关键词 + router 统一调度
+- 讲稿空大纲崩溃 → 先生成大纲再 generate_full_script
+- 讲义 learner 依赖 → 改 save_answer 路径
+- PPT 下载链接缺失 → 从 path 构造 `/api/download/ppt/{filename}`
+
+**验证**：96/96 测试全绿（14 新增单测 + 82 既有）；6 类物料 UI 端到端全 PASS（PPT 下载 200 / 讲义 / 教学视频 / 思维导图 / 讲稿 / 数学动画真实出片 761KB + 下载 200）。
+
+### 10.27.6 文档同步
 
 - 技术说明：C.15 物料制作体系全览（10+4 体系）+ F5 多模态产出补 4 类 + 主线一补盘点结论
 - 需求文档：§3.89 实施记录 + §3.90 登记（盘点结果）

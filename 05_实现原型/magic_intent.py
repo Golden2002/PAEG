@@ -30,6 +30,10 @@ MAGIC_PATTERNS = [
     (re.compile(r'^生成讲义[:：\s、,，]*(.{1,60}?)$'), 'handout', 'magic:handout'),
     (re.compile(r'^生成教学视频[:：\s、,，]*(.{1,60}?)$'), 'video', 'magic:video'),
     (re.compile(r'^生成数学动画[:：\s、,，]*(.{1,60}?)$'), 'manim', 'magic:manim'),
+    # §3.90 ⭐ 补充：思维导图精确关键词（此前缺失→落入普通教学流）
+    (re.compile(r'^生成思维导图[:：\s、,，]*(.{1,60}?)$'), 'mindmap', 'magic:mindmap'),
+    # §3.90 ⭐ 补充：讲稿精确关键词（此前缺失→落入普通教学流）
+    (re.compile(r'^生成讲稿[:：\s、,，]*(.{1,60}?)$'), 'script', 'magic:script'),
 ]
 
 

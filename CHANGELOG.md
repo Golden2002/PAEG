@@ -24,6 +24,14 @@
 - A 统一管线 6 类 + B 独立生成器 4 类（quiz/article/study_plan/lesson_prep 五件套）+ C 前端入口（6 按钮 + 4 chip 填前缀激活）
 - 测试：test_unified_pipeline.py 28/28 全绿；三 Oracle 四类物料实测（PPT 69.0/讲义 96.0/教学视频 77.2/数学动画 49.0）
 
+**6. 物料路由架构重构（§3.91 · Oracle 咨询 ⭐）**
+- 背景：6 个 if 早退分支堆叠 teach_stream（约 195 行重复）→ 数据驱动重构
+- 新增 `material_router.py`（ROUTER 表 + route_material 统一调度 + is_material_intent/extract_topic）+ `sse_presenter.py`（统一 SSE 序列化，14 单测字节级锚定契约）
+- server.py 净减约 209 行：6 分支 → 6 行路由调用；灰度开关 PAEG_USE_MATERIAL_ROUTER
+- 修复既有 bug：manim/video/思维导图/讲稿关键词缺失或落入普通教学流（补全 6 关键词）、讲稿空大纲崩溃、讲义 learner 依赖、PPT 下载链接缺失
+- 验证：96/96 测试全绿；6 类物料 UI 端到端全 PASS（数学动画真实出片 761KB + 下载 200；PPT 下载 200）
+- 文档：技术说明 §4.6（正文）+ C.15.7（附录）+ F5 更新；技术全景 §10.27.5
+
 ### v1.2.26 §3.79 用户反馈两项修复：知识库徽章粘连 + "我在这里听着你"病句（2026-08-23 ⭐）
 
 **本版定位**：Round 12 续——用户经前端反馈的两个真实问题（①知识库检索徽章与回答内容粘连；②对话里"我在这里听着你"病句），各按"根因定位→确定性修复→验证"闭环处理。

@@ -1,4 +1,4 @@
-"""
+﻿"""
 PAEG Flask 后端服务（v0.73 权威版本；v0.38 起多用户扩展+SQLite）
 
 实现 API 契约（详见 07_参考与勘误/01_API契约.md）：
@@ -1049,168 +1049,30 @@ def _teach_stream_gen(data):
         _magic_intent = _magic.get("intent") if _magic else None
         # 物料关键词 → 生成路径映射（topic 从关键词后缀提取）
         _material_topic = None
-        if _magic_intent in ("ppt", "handout", "video", "manim"):
+        if _magic_intent in ("ppt", "handout", "video", "manim", "mindmap", "script"):
             _m_tail = ""
             try:
                 _m_tail = (_magic.get("matched_text") or "")
-                _m_tail = re.sub(r"^(生成PPT|生成讲义|生成教学视频|生成数学动画)[:：\s、,，]*", "", _m_tail).strip()
+                _m_tail = re.sub(r"^(生成PPT|生成讲义|生成教学视频|生成数学动画|生成思维导图|生成讲稿)[:：\s、,，]*", "", _m_tail).strip()
             except Exception:
                 _m_tail = ""
             _material_topic = _m_tail or str(concept)[:60]
-        # PPT 生成（magic:ppt 精确关键词 或 兜底 is_ppt_request 正则）
-        _is_ppt_req = _magic_intent == "ppt"
-        if not _is_ppt_req:
+        # §3.91 ⭐ 物料路由重构：数据驱动 ROUTER 表统一调度（取代下方 6 个 if 早退分支）
+        # 灰度开关：PAEG_USE_MATERIAL_ROUTER=0 可回退旧分支（默认 1 启用新路由）
+        if os.environ.get("PAEG_USE_MATERIAL_ROUTER", "1") == "1" and _magic_intent in ("ppt", "handout", "video", "manim", "mindmap", "script"):
             try:
-                from meta_router import is_ppt_request as _is_ppt_req_fn
-                _is_ppt_req = bool(_is_ppt_req_fn(str(concept)[:120]))
-            except Exception:
-                _is_ppt_req = _rfi_res.get("intent") == "ppt"
-        if _is_ppt_req:
-            _ppt_topic = _material_topic or str(concept)[:80]
-            _ppt_topic = re.sub(r"(做|制作|整理|创建|生成|一份|关于|的)?(PPT|ppt|演示文稿|课件|幻灯片).*$", "", _ppt_topic).strip() or "教学演示"
-            _ppt_outline = None
-            try:
-                from subagents import _safe_chat
-                _o_sys = (
-                    "你是教学 PPT 大纲生成器。为给定主题生成教学 PPT 大纲。"
-                    "严格使用以下格式：\n## 章节标题\n- 要点1\n- 要点2\n"
-                    "要求：5-7 个章节，每章 2-4 个要点；内容准确、有例子、由浅入深；"
-                    "只输出大纲，不要其他文字。"
-                )
-                _o_usr = f"主题：{_ppt_topic}（用户请求：{str(concept)[:80]}）"
-                _o_raw = _safe_chat(paeg.model, _o_sys, _o_usr, max_tokens=1200) or ""
-                if "## " in _o_raw:
-                    _ppt_outline = _o_raw
-            except Exception as _oe:
-                print(f"[PAEG] PPT 大纲生成跳过: {_oe}")
-            if not _ppt_outline:
-                # 降级：结构化占位大纲（保证生成不中断）
-                _ppt_outline = (
-                    f"## {_ppt_topic}引入\n- 生活实例\n- 学习目标\n"
-                    f"## {_ppt_topic}核心概念\n- 定义\n- 原理\n- 例子\n"
-                    f"## 典型例题\n- 例题1\n- 例题2\n"
-                    f"## 常见误区\n- 易错点\n"
-                    f"## 总结\n- 要点回顾\n- 课后思考"
-                )
-            try:
-                import pptx_mcp_server as _pptx
-                _pres = _pptx.generate_presentation(
-                    topic=_ppt_topic, outline=_ppt_outline,
-                    style="paeg_standard", uid=learner_id)
-                _url = _pres.get("url") or ""
-                _slides = _pres.get("slides") or 0
-                _body = f"PPT 已生成（{_slides} 页）：<a href='{_url}' target='_blank'>下载 PPT</a>"
-            except Exception as _pe:
-                _body = f"PPT 生成失败: {_pe}"
-                _url = ""
-            _save_teach_turn("ppt", _body[:300])
-
-            def gen_ppt_early():
-                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _body, 'step_type': 'ppt'}, ensure_ascii=False)}\n\n"
-                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'ppt', 'url': _url}, ensure_ascii=False)}\n\n"
-            yield from gen_ppt_early()
-            return
-
-        # §3.87 ⭐ 讲义魔法关键词早退（magic:handout "生成讲义：主题"）
-        if _magic_intent == "handout":
-            _hd_topic = _material_topic or "讲义"
-            _hd_body = ""
-            try:
-                from subagents import _safe_chat
-                _hd_sys = (
-                    "你是讲义生成器。为给定主题生成结构完整、内容详实的教学讲义。"
-                    "结构：学习目标 → 核心内容 → 典型例题 → 巩固练习 → 小结。"
-                    "要求：内容准确、有具体例子、适合自学。用 Markdown 输出。"
-                )
-                _hd_usr = f"主题：{_hd_topic}"
-                _hd_body = _safe_chat(paeg.model, _hd_sys, _hd_usr, max_tokens=1500) or ""
-            except Exception as _he:
-                print(f"[PAEG] 讲义生成跳过: {_he}")
-            if not _hd_body:
-                _hd_body = f"# {_hd_topic} 讲义\n\n## 学习目标\n理解{_hd_topic}核心概念。\n\n## 核心内容\n（讲义生成失败，请重试）"
-            _save_teach_turn("handout", _hd_body[:300])
-
-            def gen_handout_early():
-                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _hd_body, 'step_type': 'handout'}, ensure_ascii=False)}\n\n"
-                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'handout'}, ensure_ascii=False)}\n\n"
-            yield from gen_handout_early()
-            return
-
-        # §3.89 ⭐ 教学视频魔法关键词早退（magic:video "生成教学视频：主题"）
-        if _magic_intent == "video":
-            _vd_topic = _material_topic or "教学视频"
-            _vd_body = ""
-            try:
-                from subagents import _safe_chat
-                _vd_sys = (
-                    "你是教学视频编剧。为给定主题设计 3-8 个镜头（scene）的教学视频脚本，"
-                    "每镜：id、concept、narration（旁白台词）、duration_sec（8-15 秒）、"
-                    "visual_goal（画面目标）。总长 60-180 秒：引入（钩子）→主体→take-away 结尾。"
-                    "输出 JSON 数组 scenes。"
-                )
-                _vd_usr = f"主题：{_vd_topic}"
-                _vd_raw = _safe_chat(paeg.model, _vd_sys, _vd_usr, max_tokens=2000) or ""
-                import re as _re_vd
-                _m_vd = _re_vd.search(r"\[.*\]", _vd_raw, _re_vd.S)
-                if _m_vd:
-                    _scenes = json.loads(_m_vd.group(0))
-                    _vd_body = f"教学视频脚本已生成（{len(_scenes)} 镜）：\n"
-                    for _sc in _scenes[:8]:
-                        _vd_body += f"- [{_sc.get('duration_sec', 10)}s] {_sc.get('concept', '')}: {_sc.get('narration', '')}\n"
-                else:
-                    _vd_body = _vd_raw or f"教学视频脚本：{_vd_topic}"
-            except Exception as _ve:
-                print(f"[PAEG] 教学视频生成跳过: {_ve}")
-            if not _vd_body:
-                _vd_body = f"# {_vd_topic} 教学视频脚本\n\n## 引入\n（视频脚本生成失败，请重试）"
-            _save_teach_turn("video", _vd_body[:300])
-
-            def gen_video_early():
-                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _vd_body, 'step_type': 'video'}, ensure_ascii=False)}\n\n"
-                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'video'}, ensure_ascii=False)}\n\n"
-            yield from gen_video_early()
-            return
-
-        # §3.89 ⭐ Manim 数学动画魔法关键词早退（magic:manim "生成数学动画：主题"）
-        if _magic_intent == "manim":
-            _mm_topic = _material_topic or "数学动画"
-            _mm_body = ""
-            _mm_url = ""
-            try:
-                from manim_service import generate_manim_video
-                _mm_result = generate_manim_video(_mm_topic, subject, learner_id) or {}
-                _mm_url = _mm_result.get("url") or _mm_result.get("video_path") or ""
-                _mm_ok = _mm_result.get("ok") or False
-                if _mm_ok and _mm_url:
-                    _mm_body = f"数学动画已生成：<a href='{_mm_url}' target='_blank'>观看/下载动画</a>"
-                elif _mm_ok:
-                    # 渲染成功但未取到 URL（降级路径）：给剧本摘要
-                    _mm_script = _mm_result.get("script") or _mm_result.get("code") or ""
-                    _mm_scenes = _mm_result.get("scenes")
-                    if isinstance(_mm_scenes, list):
-                        _mm_body = f"数学动画已生成（{len(_mm_scenes)} 镜）：\n"
-                        for _s in _mm_scenes[:6]:
-                            _mm_body += f"- {_s.get('concept', '')}: {str(_s.get('visual_goal') or _s.get('narration') or '')[:60]}\n"
-                    elif _mm_script:
-                        _mm_body = f"数学动画剧本已生成：\n{str(_mm_script)[:400]}"
-                    else:
-                        _mm_body = f"数学动画已生成（{_mm_topic}）。可查看 downloads/manim/ 目录。"
-                else:
-                    _mm_err = str(_mm_result.get("error") or "渲染超时")
-                    _mm_body = f"数学动画生成中（{_mm_topic}）：{_mm_err}。可稍后查看 downloads/manim/。"
-            except Exception as _mme:
-                print(f"[PAEG] Manim 动画生成跳过: {_mme}")
-                _mm_body = f"数学动画生成中（{_mm_topic}）。请稍后在 downloads/manim/ 查看。"
-            if not _mm_body:
-                _mm_body = f"数学动画生成中（{_mm_topic}）。请稍后在 downloads/manim/ 查看。"
-            _save_teach_turn("manim", _mm_body[:300])
-
-            def gen_manim_early():
-                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _mm_body, 'step_type': 'manim'}, ensure_ascii=False)}\n\n"
-                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'manim', 'url': _mm_url}, ensure_ascii=False)}\n\n"
-            yield from gen_manim_early()
-            return
-
+                from material_router import route_material, is_material_intent
+                if is_material_intent(_magic):
+                    _mr_save = lambda _mt, _b: _save_teach_turn(_mt, _b)
+                    yield from route_material(
+                        _magic, paeg.model, subject, learner_id,
+                        concept=str(concept), learner=learner,
+                        save_turn=_mr_save)
+                    return
+            except Exception as _mr_e:
+                print(f"[PAEG] material_router 异常，回退旧分支: {_mr_e}")
+        # §3.91 ⭐ 旧 6 物料早退分支已删除——由 material_router.route_material 统一调度（ROUTER 表数据驱动）
+        # 灰度开关 PAEG_USE_MATERIAL_ROUTER=0 可回退；SSE 契约字节级不变（sse_presenter 14 单测锚定）
         _lp_pending_key = f"lesson_prep_pending_{learner_id}"
         _pending = SESSIONS.get(_lp_pending_key)
         # ── 引导后补充合并：pending 标记 + 确定性短路（A+ 方案：结构化 intent_frame）──

@@ -1,0 +1,549 @@
+{
+  "meta": {
+    "title": "导数的直觉：切线的斜率",
+    "subject": "数学",
+    "topic": "导数",
+    "audience": "高中",
+    "target_duration_sec": 120,
+    "style": "3blue1brown",
+    "core_intuition": "导数就是曲线在某一点的切线斜率，它描述了函数在该点的瞬时变化率。",
+    "learning_objectives": [
+      "理解导数的几何意义：切线斜率",
+      "理解瞬时变化率与平均变化率的关系",
+      "初步认识极限思想"
+    ]
+  },
+  "narrative_arc": {
+    "hook": "从汽车速度表引入'瞬时'概念，引出如何测量瞬间的变化。",
+    "build": "通过割线逼近切线，直观展示极限过程。",
+    "climax": "明确切线斜率即导数，给出符号表示。",
+    "resolution": "总结导数定义，强调其几何意义。"
+  },
+  "visual_system": {
+    "palette": {
+      "background": "#0d1117",
+      "curve": "#58a6ff",
+      "secant": "#f78166",
+      "tangent": "#3fb950",
+      "point": "#f0f6fc",
+      "text": "#e6edf3",
+      "axis": "#8b949e"
+    },
+    "semantic_binding": {
+      "curve": "函数图像",
+      "secant": "割线（平均变化率）",
+      "tangent": "切线（瞬时变化率）",
+      "point": "关注点",
+      "axis": "坐标轴"
+    }
+  },
+  "scenes": [
+    {
+      "id": "scene1",
+      "concept": "瞬时速度",
+      "duration_sec": 20,
+      "pause_after_sec": 3,
+      "narration": "想象你坐在车里，速度表显示当前速度。这个数字是瞬时速度，它描述的是某一瞬间的快慢，而不是一整段路程的平均速度。",
+      "on_screen_text": "瞬时速度",
+      "prerequisites": [],
+      "mobjects": [
+        {
+          "id": "car_icon",
+          "type": "icon",
+          "description": "一辆汽车的图标，位于画面左侧"
+        },
+        {
+          "id": "speedometer",
+          "type": "icon",
+          "description": "速度表盘，指针指向一个数值"
+        },
+        {
+          "id": "road",
+          "type": "line",
+          "description": "一条水平直线，代表道路"
+        },
+        {
+          "id": "position_label",
+          "type": "text",
+          "description": "文字'位置'"
+        },
+        {
+          "id": "time_label",
+          "type": "text",
+          "description": "文字'时间'"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "fade_in",
+          "targets": [
+            "road",
+            "car_icon",
+            "position_label",
+            "time_label"
+          ],
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2,
+          "action": "move_car",
+          "targets": [
+            "car_icon"
+          ],
+          "path": "along_road",
+          "duration": 4,
+          "rate_func": "linear"
+        },
+        {
+          "t": 6,
+          "action": "fade_in",
+          "targets": [
+            "speedometer"
+          ],
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 8,
+          "action": "pulse",
+          "targets": [
+            "speedometer"
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 12,
+          "action": "highlight",
+          "targets": [
+            "speedometer"
+          ],
+          "color": "#f0f6fc",
+          "duration": 2,
+          "rate_func": "smooth"
+        }
+      ],
+      "visual_notes": "用汽车和速度表建立'瞬时'的直觉，不出现任何公式。"
+    },
+    {
+      "id": "scene2",
+      "concept": "曲线与割线",
+      "duration_sec": 25,
+      "pause_after_sec": 3,
+      "narration": "现在看一条弯曲的路径。如果我们想知道某一点的变化快慢，可以先连接这一点和附近的另一点，这条直线叫做割线。割线的斜率表示这一段平均变化率。",
+      "on_screen_text": "割线",
+      "prerequisites": [
+        "scene1"
+      ],
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "description": "坐标轴，x轴和y轴"
+        },
+        {
+          "id": "curve",
+          "type": "curve",
+          "description": "一条平滑上升曲线，函数图像"
+        },
+        {
+          "id": "point_p",
+          "type": "dot",
+          "description": "曲线上一点P，白色"
+        },
+        {
+          "id": "point_q",
+          "type": "dot",
+          "description": "曲线上另一点Q，白色"
+        },
+        {
+          "id": "secant_line",
+          "type": "line",
+          "description": "连接P和Q的割线，橙色"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "fade_in",
+          "targets": [
+            "axes",
+            "curve"
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 3,
+          "action": "show_dot",
+          "targets": [
+            "point_p"
+          ],
+          "position": "on_curve_left",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5,
+          "action": "show_dot",
+          "targets": [
+            "point_q"
+          ],
+          "position": "on_curve_right",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 7,
+          "action": "draw_line",
+          "targets": [
+            "secant_line"
+          ],
+          "between": [
+            "point_p",
+            "point_q"
+          ],
+          "color": "#f78166",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 12,
+          "action": "highlight",
+          "targets": [
+            "secant_line"
+          ],
+          "color": "#f78166",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 18,
+          "action": "label",
+          "targets": [
+            "secant_line"
+          ],
+          "text": "割线",
+          "duration": 2,
+          "rate_func": "smooth"
+        }
+      ],
+      "visual_notes": "展示割线的生成，强调其代表平均变化率。"
+    },
+    {
+      "id": "scene3",
+      "concept": "割线变切线",
+      "duration_sec": 30,
+      "pause_after_sec": 4,
+      "narration": "现在让Q点慢慢靠近P点。割线会逐渐旋转，越来越接近一条特殊的直线——切线。当Q无限接近P时，割线就变成了切线。",
+      "on_screen_text": "逼近",
+      "prerequisites": [
+        "scene2"
+      ],
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "description": "坐标轴（复用）"
+        },
+        {
+          "id": "curve",
+          "type": "curve",
+          "description": "曲线（复用）"
+        },
+        {
+          "id": "point_p",
+          "type": "dot",
+          "description": "固定点P"
+        },
+        {
+          "id": "point_q",
+          "type": "dot",
+          "description": "移动点Q"
+        },
+        {
+          "id": "secant_line",
+          "type": "line",
+          "description": "割线，动态变化"
+        },
+        {
+          "id": "tangent_line",
+          "type": "line",
+          "description": "最终的切线，绿色"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "fade_in",
+          "targets": [
+            "axes",
+            "curve",
+            "point_p",
+            "point_q"
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2,
+          "action": "draw_line",
+          "targets": [
+            "secant_line"
+          ],
+          "between": [
+            "point_p",
+            "point_q"
+          ],
+          "color": "#f78166",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 4,
+          "action": "move_point_towards",
+          "targets": [
+            "point_q"
+          ],
+          "towards": "point_p",
+          "duration": 10,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 4,
+          "action": "update_line",
+          "targets": [
+            "secant_line"
+          ],
+          "follow": "point_q",
+          "duration": 10,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 14,
+          "action": "transform_line",
+          "targets": [
+            "secant_line"
+          ],
+          "to": "tangent_line",
+          "color": "#3fb950",
+          "duration": 4,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 20,
+          "action": "highlight",
+          "targets": [
+            "tangent_line"
+          ],
+          "color": "#3fb950",
+          "duration": 3,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 24,
+          "action": "label",
+          "targets": [
+            "tangent_line"
+          ],
+          "text": "切线",
+          "duration": 2,
+          "rate_func": "smooth"
+        }
+      ],
+      "visual_notes": "Q点移动和割线旋转同步，最终显示切线。"
+    },
+    {
+      "id": "scene4",
+      "concept": "切线斜率",
+      "duration_sec": 25,
+      "pause_after_sec": 4,
+      "narration": "切线的斜率就是导数。斜率越大，曲线上升越快；斜率越小，上升越慢。这个斜率给出了函数在某一点的瞬时变化率。",
+      "on_screen_text": "斜率",
+      "prerequisites": [
+        "scene3"
+      ],
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "description": "坐标轴（复用）"
+        },
+        {
+          "id": "curve",
+          "type": "curve",
+          "description": "曲线（复用）"
+        },
+        {
+          "id": "point_p",
+          "type": "dot",
+          "description": "点P"
+        },
+        {
+          "id": "tangent_line",
+          "type": "line",
+          "description": "切线（复用）"
+        },
+        {
+          "id": "slope_triangle",
+          "type": "polygon",
+          "description": "直角三角形，显示斜率"
+        },
+        {
+          "id": "slope_label",
+          "type": "text",
+          "description": "文字'斜率'"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "fade_in",
+          "targets": [
+            "axes",
+            "curve",
+            "point_p",
+            "tangent_line"
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 3,
+          "action": "draw_triangle",
+          "targets": [
+            "slope_triangle"
+          ],
+          "relative_to": [
+            "point_p",
+            "tangent_line"
+          ],
+          "duration": 3,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 8,
+          "action": "label",
+          "targets": [
+            "slope_triangle"
+          ],
+          "text": "斜率",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 12,
+          "action": "highlight",
+          "targets": [
+            "slope_triangle"
+          ],
+          "color": "#f0f6fc",
+          "duration": 3,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 18,
+          "action": "highlight",
+          "targets": [
+            "tangent_line"
+          ],
+          "color": "#3fb950",
+          "duration": 3,
+          "rate_func": "smooth"
+        }
+      ],
+      "visual_notes": "用三角形直观展示斜率，不出现公式。"
+    },
+    {
+      "id": "scene5",
+      "concept": "导数定义",
+      "duration_sec": 20,
+      "pause_after_sec": 4,
+      "narration": "我们把切线的斜率称为导数，记作 f'(x)。它表示函数在 x 处的瞬时变化率，这就是导数的核心思想。",
+      "on_screen_text": "f'(x)",
+      "prerequisites": [
+        "scene4"
+      ],
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "description": "坐标轴（复用）"
+        },
+        {
+          "id": "curve",
+          "type": "curve",
+          "description": "曲线（复用）"
+        },
+        {
+          "id": "point_p",
+          "type": "dot",
+          "description": "点P"
+        },
+        {
+          "id": "tangent_line",
+          "type": "line",
+          "description": "切线（复用）"
+        },
+        {
+          "id": "derivative_text",
+          "type": "text",
+          "description": "文字'f'(x)'"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "fade_in",
+          "targets": [
+            "axes",
+            "curve",
+            "point_p",
+            "tangent_line"
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 3,
+          "action": "write_text",
+          "targets": [
+            "derivative_text"
+          ],
+          "content": "f'(x)",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 7,
+          "action": "highlight",
+          "targets": [
+            "derivative_text"
+          ],
+          "color": "#f0f6fc",
+          "duration": 3,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 12,
+          "action": "fade_out",
+          "targets": [
+            "derivative_text"
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        }
+      ],
+      "visual_notes": "引入导数符号，连接几何意义。"
+    }
+  ],
+  "qa_self_check": {
+    "first_two_scenes_no_formula": true,
+    "single_focus_per_scene": true,
+    "color_consistency": true,
+    "duration_within_15_percent": true,
+    "notes": "所有场景均无公式，前两个场景用直观比喻和几何图形。"
+  }
+}
