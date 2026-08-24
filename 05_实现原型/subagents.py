@@ -1,4 +1,4 @@
-"""
+﻿"""
 5 个子代理（v0.5 版）。
 
 v0.1：纯规则模拟。
@@ -1181,6 +1181,21 @@ class Presenter:
                     teaching_line = teaching_line + _graph_line
             except Exception:
                 pass
+            # §3.107 ⭐ 对话历史拼接（从 previous 生成前情提要）
+            _hist_for_presenter = ""
+            try:
+                if previous:
+                    _prev_parts = []
+                    for _pv in previous[-3:]:  # 最近 3 轮
+                        _c = _pv.get("concept") or _pv.get("content") or "" if isinstance(_pv, dict) else str(_pv)[:60]
+                        if isinstance(_pv, dict):
+                            _c = _pv.get("concept") or _pv.get("subtopic") or ""
+                        if _c:
+                            _prev_parts.append(str(_c)[:80])
+                    if _prev_parts:
+                        _hist_for_presenter = "；".join(_prev_parts[:3])
+            except Exception:
+                _hist_for_presenter = ""
             system = build_presenter_system(
                 subject=subject or "default",
                 tone=tone,
@@ -1190,6 +1205,7 @@ class Presenter:
                 user_model=getattr(learner, "_user_model", None),
                 subtopic=step.get("subtopic", "") or "",
                 constraint_flags=getattr(learner, "_constraint_flags", ()) or (),  # v0.43 ⭐ 3参数分层放开
+                history=_hist_for_presenter,  # §3.107 ⭐ 对话历史全拼接
             )
             # §3.92 ⭐ 动态约束告知块（Oracle 方案）：告知 LLM 约束层清单 + 当前层状态
             # ——LLM 知悉有哪些层/每层内容/当前放开状态，自主理解用户意图后由上游 subagent 切层
