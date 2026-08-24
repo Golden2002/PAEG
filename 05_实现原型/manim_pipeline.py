@@ -185,6 +185,12 @@ def phase2_implement(code: str) -> Dict[str, Any]:
     """实现 Agent：AST 校验 → 渲染 → 几何审计。返回 {ok, path, url, error, audit}"""
     try:
         from manim_service import validate_manim_code, render_manim
+        # §3.97 ⭐ 代码清洗（全角标点/LaTeX 残留——LLM 代码常混入导致 AST 失败）
+        try:
+            from manim_service import _sanitize_code_no_latex
+            code = _sanitize_code_no_latex(code)
+        except Exception:
+            pass
         ok, err = validate_manim_code(code)
         if not ok:
             return {"ok": False, "error": f"AST 校验失败: {err}"}
