@@ -3517,9 +3517,39 @@ server.py `teach_video` 端点：
 4. 保留 build_lesson_planner_system 不变（备课总产出互补）
 5. 测试：25 用例（5 物料 × 5 简单指令）断言 schema/硬约束/范例/升级器输出
 
+### Oracle 框架设计（bg_d220e048 · 已完成）✅
+
+**核心结论：扩展而非重构**——MaterialPipeline 策略模式已提供 95% 骨架，缺三件：
+1. 6 阶段契约形式化（gates/fix 从隐式提升为可插拔槽位）
+2. 补齐 5 类物料（缺 video + manim）
+3. Manim 4 缺口作为物料专属 extension 注入
+
+**文件结构**：
+- material_pipeline.py → v2.0（加 gates/fix_strategy 槽位）
+- material_extensions/：gates.py（门库）+ fixers.py（retry/escalate/regenerate）+ manim_extensions.py（ScopeRefine+TTS mux）+ teaching_scene.py（Anchor Grid+Block Cleanup）
+- pipelines/：handout/script/ppt/mindmap/video(新)/manim(新)
+- 单一真相源：5 类物料统一落盘 evolve_data/material_pipeline/<type>_<jobid>.json
+
+**5 类物料管线实例**：
+| 物料 | spec | gates | review |
+|---|---|---|---|
+| PPT | pages[] 6-10页 6×6原则 | 页数/密度/视觉焦点 | material_judge |
+| 讲义 | sections[] ≥3节 4块 | 节数/完整性 | material_judge |
+| 教学视频 | scenes[] 8-15s | 镜数/时长/音画对齐 | material_judge |
+| Manim | scenes[]（已有） | beats/时序/可执行/几何 | manim_judge |
+| 思维导图 | tree.json 3-5分支 | 分支数/深度/摘要 | material_judge |
+
+**Manim 4 缺口修复**：
+- Audio-First TTS：pipelines/video.implement 每镜 edge-tts → ffmpeg mux（PAEG v0.36 voice_service 已有）
+- Visual Anchor Grid：teaching_scene.py TeachingScene 基类 place(mob,col,row)
+- ScopeRefine 三级修复：manim_extensions.scope_refine（L1 场景内修补→L2 重写1-3场景→L3 全剧本重生）
+- Block Cleanup：teaching_scene.cleanup VGroup+FadeOut
+
+**实施顺序**：Step1 框架升级 → Step2 video 管线 → Step3 manim 接入 → Step4 teaching_scene → Step5 fixers → Step6 测试矩阵
+
 ### 实施记录
 
-（实施中）
+（按 Step 顺序实施中）
 
 ## §3.89 全物料流水线统一框架（2026-08-24）
 
@@ -3545,6 +3575,36 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 3. 实施：PPT/讲义/教学视频/思维导图各自流水线
 4. 验证 + D4 同步
 
+### Oracle 框架设计（bg_d220e048 · 已完成）✅
+
+**核心结论：扩展而非重构**——MaterialPipeline 策略模式已提供 95% 骨架，缺三件：
+1. 6 阶段契约形式化（gates/fix 从隐式提升为可插拔槽位）
+2. 补齐 5 类物料（缺 video + manim）
+3. Manim 4 缺口作为物料专属 extension 注入
+
+**文件结构**：
+- material_pipeline.py → v2.0（加 gates/fix_strategy 槽位）
+- material_extensions/：gates.py（门库）+ fixers.py（retry/escalate/regenerate）+ manim_extensions.py（ScopeRefine+TTS mux）+ teaching_scene.py（Anchor Grid+Block Cleanup）
+- pipelines/：handout/script/ppt/mindmap/video(新)/manim(新)
+- 单一真相源：5 类物料统一落盘 evolve_data/material_pipeline/<type>_<jobid>.json
+
+**5 类物料管线实例**：
+| 物料 | spec | gates | review |
+|---|---|---|---|
+| PPT | pages[] 6-10页 6×6原则 | 页数/密度/视觉焦点 | material_judge |
+| 讲义 | sections[] ≥3节 4块 | 节数/完整性 | material_judge |
+| 教学视频 | scenes[] 8-15s | 镜数/时长/音画对齐 | material_judge |
+| Manim | scenes[]（已有） | beats/时序/可执行/几何 | manim_judge |
+| 思维导图 | tree.json 3-5分支 | 分支数/深度/摘要 | material_judge |
+
+**Manim 4 缺口修复**：
+- Audio-First TTS：pipelines/video.implement 每镜 edge-tts → ffmpeg mux（PAEG v0.36 voice_service 已有）
+- Visual Anchor Grid：teaching_scene.py TeachingScene 基类 place(mob,col,row)
+- ScopeRefine 三级修复：manim_extensions.scope_refine（L1 场景内修补→L2 重写1-3场景→L3 全剧本重生）
+- Block Cleanup：teaching_scene.cleanup VGroup+FadeOut
+
+**实施顺序**：Step1 框架升级 → Step2 video 管线 → Step3 manim 接入 → Step4 teaching_scene → Step5 fixers → Step6 测试矩阵
+
 ### 实施记录
 
-（实施中）
+（按 Step 顺序实施中）
