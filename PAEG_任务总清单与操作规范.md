@@ -4750,6 +4750,32 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 2. **字幕生命周期管理**：分镜 schema 加文字 enter/exit 时机 + 位置不重叠约束（同位置先 FadeOut 旧字幕）
 3. **验证**：重测基变换——脚本应含"同一向量不同基表示/换视角变换再换回/矩阵分解"
 
+### Oracle 方案（bg_86449f46 已返回 ✅）
+
+**核心：Phase 0 概念拆解 + 字幕生命周期管理**
+
+**1. Phase 0 概念拆解**（visual_script_generator.py 新增）：
+- `CONCEPT_DECOMPOSITION_SYSTEM_PROMPT`：独立提示词，输出教学骨架 JSON（concept_essence 本质/concept_not 非它/core_mechanism 机制/key_examples 例子/common_misconceptions 误区/teaching_path 路径/scene_anchors 锚点映射）
+- `_is_complex_topic(topic)` 启发式：短（≤12字）+ 抽象词（变换/结构/关系/性质/分解/基/坐标/矩阵）→ 自动触发拆解
+- `decompose_concept(llm, topic, audience)`：返回骨架 JSON；失败返回 None（降级无拆解）
+
+**2. 拆解→分镜映射**：
+- `generate_script` 接受 decomposition 参数，注入 system prompt 作为"教学骨架"（禁止凭空编 scene）
+- 每个 scene 必须设 `decomposition_ref`（值域 = scene_anchors 的 role）
+- `gate_decomposition_coverage` 门：每个 scene_anchor 必须被 ≥1 scene 引用
+
+**3. 字幕生命周期**（修字幕重叠）：
+- scene schema 加 `subtitles[]` 数组：{id, text, enter_at, exit_at, position, transition_in, transition_out, predecessor_id, transition_strategy}
+- position 枚举：bottom_center/top_right/top_center/lower_left
+- 同位置连续字幕：下一条 enter_at >= 上一条 exit_at，否则必须显式 crossfade_with_predecessor
+- `gate_subtitle_lifecycle` 门：时间合法 + 同位置重叠检测
+
+**4. 主提示词增量**（2 条新铁律）：拆解骨架消费 + 字幕生命周期
+
+**5. 验证**：拆解触发单元测试 / 门控回归 / 端到端复现基变换（plan JSON 含 decomposition + decomposition_ref + subtitles）
+
+**改动文件**：visual_script_generator.py（~90 行新增 + 签名兼容）+ manim_pipeline.py（phase1_plan 串联 + 2 gate + run_all_gates）
+
 ### 实施记录
 
-（Oracle 咨询返回后实施）
+（按方案实施中：Phase 0 拆解 + 字幕生命周期）
