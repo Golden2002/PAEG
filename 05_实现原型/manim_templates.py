@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """v6.1 ⭐ Manim 模板库（LLM 失败时的兜底 + 演示）
 v0.65 ⭐ 三档分级速度：重复动作快(1.2s)、中间态中速(1.8s)、关键部分慢(3.0s)+Aha(2.5+3.0)。
 引用 manim_speed 常量——用户不需要自己调速度，快慢交替符合教学节奏。
@@ -201,6 +201,46 @@ for _name, _code in _TEMPLATES.items():
     _code = _code.replace('__MID_WAIT__', repr(MID_WAIT))
     _TEMPLATES[_name] = _code
 
+
+# §3.100 ⭐ 3B1B 公式推导链模板（TransformMatchingTex 渐进披露 + hook + recap）
+_TEMPLATES['derivative_chain'] = '''from manim import *
+import numpy as np
+
+class DerivativeChainScene(Scene):
+    """3B1B 风格公式推导链：钩子 → 几何直觉 → 公式逐步变形 → recap。"""
+    def construct(self):
+        # HOOK：反直觉问题（钩子开头，§3.100）
+        hook = Text("割线会变成切线吗？", font_size=36)
+        self.play(Write(hook))
+        self.wait(1.5)
+        self.play(FadeOut(hook))
+
+        # 几何直觉：抛物线 + 割线逼近
+        axes = Axes(x_range=[-2, 3], y_range=[-1, 5], axis_config={"include_numbers": True})
+        graph = axes.plot(lambda x: x**2, color=BLUE)
+        p1 = axes.c2p(1, 1)
+        p2 = axes.c2p(2, 4)
+        secant = Line(p1, p2, color=YELLOW)
+        labels = MathTex("f(x)=x^2").to_corner(UL)
+        self.play(Create(axes), Create(graph))
+        self.play(Write(labels), Create(secant))
+        self.wait(1.5)
+
+        # 渐进披露：公式逐步变形（TransformMatchingTex，§3.100）
+        slope_intro = MathTex("\\text{割线斜率} =", "\\frac{f(b)-f(a)}{b-a}")
+        self.play(Write(slope_intro))
+        self.wait(1.5)
+        limit_form = MathTex("f'(a) =", "\\lim_{b \\to a}", "\\frac{f(b)-f(a)}{b-a}")
+        self.play(TransformMatchingTex(slope_intro, limit_form))
+        self.wait(2.0)
+        tangent_form = MathTex("f'(a) =", "\\lim_{h \\to 0}", "\\frac{f(a+h)-f(a)}{h}")
+        self.play(TransformMatchingTex(limit_form, tangent_form))
+        self.wait(2.0)
+
+        # RECAP：核心结论回顾（recap 结尾，§3.100）
+        recap = Text("导数是切线的斜率", font_size=36, color=GREEN)
+        self.play(Transform(tangent_form, recap))
+        self.wait(2.0)
 
 def template_for(topic: str, subject: str = 'math') -> str:
     """根据主题关键词选模板（LLM 失败时兜底）"""
