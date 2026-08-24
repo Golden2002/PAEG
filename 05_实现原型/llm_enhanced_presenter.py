@@ -40,7 +40,8 @@ def llm_enhanced_present(model: Any, topic: str, node: Optional[Dict[str, Any]],
                 f"学生认知风格：{learner.cognitive_style}\n"
                 f"学生年级：{learner.grade_level}\n\n"
                 f"要求：\n"
-                f"1. 长度 100-300 字\n"
+                # §3.92 ⭐ 功能最强化：放开长度限制（100-300字→完整讲解），商业化时收紧
+                f"1. 讲透机制/思路/方法，不要蜻蜓点水（长度放开，讲完自然收尾）\n"
                 f"2. 必须基于上述事实，不能编造\n"
                 f"3. 体现你（{tone_info.get('tone')}）的语气\n"
                 f"4. 适合该学生认知风格"
@@ -54,10 +55,10 @@ def llm_enhanced_present(model: Any, topic: str, node: Optional[Dict[str, Any]],
                 f"问题：{node['core_question']}\n"
                 f"已有视角：\n{perspectives}\n\n"
                 f"要求：\n"
-                f"1. 长度 100-300 字\n"
-                f"2. 用你自己的话\n"
-                f"3. 体现 {tone_info.get('tone')} 语气\n"
-                f"4. 适合 {learner.grade_level} 学生"
+                # §3.92 ⭐ 功能最强化：放开长度限制，商业化时收紧
+                f"1. 用你自己的话，讲透问题各视角（长度放开）\n"
+                f"2. 体现 {tone_info.get('tone')} 语气\n"
+                f"3. 适合 {learner.grade_level} 学生"
             )
         else:
             user = f"请讲解：{topic}（{node.get('definition', '')}）"
@@ -67,7 +68,8 @@ def llm_enhanced_present(model: Any, topic: str, node: Optional[Dict[str, Any]],
 
     try:
         messages = [{"role": "user", "content": user}]
-        resp = model.generate(messages, system=system, max_tokens=512)
+        # §3.92 ⭐ 功能最强化：max_tokens 放开（原 512→8000），保留形式接口；商业化运营时调小
+        resp = model.generate(messages, system=system, max_tokens=8000)
         return resp.text if hasattr(resp, "text") else str(resp)
     except Exception as e:
         return f"[LLM 生成失败：{e}]"

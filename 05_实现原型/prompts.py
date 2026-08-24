@@ -2990,10 +2990,14 @@ def build_presenter_user(subject: str, topic: str, step_type: str = "present",
     else:
         parts.append("【要求】这是第 1 步，从最直觉的入口开始。")
     # v0.66+ ⭐ Bug2 修复：放开讲解长度（原 300 字太短，讲不透例题+思路+方法）。
-    # 改用 1500 字以内 + 4-6 段结构（引入→概念→推导/例题→方法论→小结）。
+    # §3.92 ⭐ 动态约束告知架构（Oracle 方案）：教授级 6 层骨架已抽离至
+    #   constraint_config.json group_rules.D.skeleton_full（数据驱动，可热更新）——
+    #   由 constraint_engine.constraint_layer_set 按层注入（D 放开→完整版/收紧→简要版）。
+    #   此处仅保留轻量指引，避免内容重复维护。
     parts.append(
-        "请完整讲解，1500 字以内，分 4-6 段结构："
-        "引入→概念→推导/例题→方法论→小结。"
+        "请按当前约束层指定的教学法结构组织讲解（约束层含骨架时走完整 6 层："
+        "核心前提→基础机制→底层原理→现实权衡→边界条件→延伸引导→小结；"
+        "未放开时讲清核心机制+一句话小结即可）。"
         "讲透机制/思路/方法，不要蜻蜓点水；讲完自然收尾。"
     )
     return "\n".join(parts)

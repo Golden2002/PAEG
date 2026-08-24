@@ -1191,6 +1191,55 @@ class Presenter:
                 subtopic=step.get("subtopic", "") or "",
                 constraint_flags=getattr(learner, "_constraint_flags", ()) or (),  # v0.43 ⭐ 3参数分层放开
             )
+            # §3.92 ⭐ 动态约束告知块（Oracle 方案）：告知 LLM 约束层清单 + 当前层状态
+            # ——LLM 知悉有哪些层/每层内容/当前放开状态，自主理解用户意图后由上游 subagent 切层
+            try:
+                from constraint_engine import constraint_layer_scope, constraint_layer_set
+                try:
+                    _scope_txt = constraint_layer_scope() or ""
+                except Exception:
+                    _scope_txt = ""
+                # 当前层：从 constraint_flags 推导（无 flags → 默认层 7 全放开）
+                _flags = getattr(learner, "_constraint_flags", ()) or ()
+                _cur_layer = 7  # §3.92 默认全放开（增强输出）
+                if _flags:
+                    try:
+                        # §3.92 统一从 config 读 mask→layer（prompts._MASK_TO_LAYER 可能旧值）
+                        from constraint_engine import _get_config_from_file
+                        _cfg_d = _get_config_from_file() or {}
+                        _mask_map = {int(k, 2): int(v) for k, v in _cfg_d.get("mask_to_layer", {}).items()}
+                        _mask = 0
+                        for _f in _flags:
+                            _fstr = str(_f).lower()
+                            if "brief" in _fstr or "concise" in _fstr:
+                                _mask |= 0b001
+                            elif "warm" in _fstr or "tender" in _fstr:
+                                _mask |= 0b010
+                            elif "direct" in _fstr or "directness" in _fstr:
+                                _mask |= 0b100
+                        _cur_layer = _mask_map.get(_mask, 7)
+                    except Exception:
+                        _cur_layer = 7
+                try:
+                    _cur_txt = constraint_layer_set(layer=_cur_layer, reason="当前默认")
+                except Exception:
+                    _cur_txt = ""
+                _notice = (
+                    "## ⚡ 约束系统告知（§3.92 ⭐）\n"
+                    "你处于 PAEG 动态约束系统。约束层清单：\n"
+                    f"{_scope_txt}\n\n"
+                    f"## 当前默认约束状态（L{_cur_layer}）\n{_cur_txt}\n\n"
+                    "## 你可以做什么\n"
+                    "- 根据用户表达（'详细讲'/'简单讲'/'打个比方'/'讲快点'/'别太学术'等）理解其真实意图；\n"
+                    "- 需要调整讲解深度/详略/比喻/温度时，由上游 Planner/Adapter 切换约束层；\n"
+                    "- 放开层会自动注入对应骨架（如 L≥5 注入 D 层教学法骨架完整版）；\n"
+                    "- L0 保底规则永不放开（语言规范/公式/反AI腔/安全）。\n"
+                    "─────────────────────\n\n"
+                )
+                if _notice and system:
+                    system = _notice + system
+            except Exception:
+                pass
             # §3.57 ⭐ 教学追问指令注入（Oracle 方案）：teach_stream 判定追问后
             # 把 action 指令存 learner._follow_instruction，此处注入 system prompt
             # §3.62 ⭐ 强化：指令放 system 最开头（最高优先级，避免被其他指令淹没——
@@ -1216,31 +1265,27 @@ class Presenter:
                 system = inject_grade_profiles(system, subject=subject or "", grade=_g)
             except Exception:
                 pass
-            # v0.26 ⭐ 教学模式识别（agent 引导 LLM 判断 easy/normal/deep，不靠关键词）
+            # §3.92 ⭐ 移除 v0.26 easy/normal/deep 类型化硬分支（用户反对类型化意图）：
+            #   深度/详略/风格由动态约束层（L0-L7）控制——LLM 从约束告知块知悉各层内容，
+            #   根据用户真实表达（可能远超三种）由上游 Planner/Adapter 切层，agent 不再预判。
+            #   保留：用户显式表达深度需求时，轻量指引（不强制分类）。
             try:
-                _mode = _detect_teaching_mode(concept, self.model)
-                if _mode == "easy":
+                _expr = str(concept or "")
+                if any(k in _expr for k in ("大概", "简单讲", "通俗", "别太深", "简要")):
                     system = system + (
-                        "\n\n## 教学模式：简单理解（v0.26 ⭐ 用户要'大概懂'）\n"
-                        "学生想要简单理解——只讲两层：①生活类比让他'看见' ②核心机制的简化版（去推导去术语）。\n"
-                        "禁止：严格推导、术语堆砌、层层深入、结尾深问。目标是'懂个大概'。\n"
-                        "用大白话，像给完全没接触过的人讲。"
+                        "\n\n## 用户表达倾向：简洁（§3.92 动态约束）\n"
+                        "用户想要简洁理解——由约束层控制（收紧 D 教学法深度），"
+                        "讲核心机制 + 一句话小结即可，不必走完整骨架。"
                     )
-                elif _mode == "deep":
+                elif any(k in _expr for k in ("讲透", "详细", "深入", "彻底", "原理")):
                     system = system + (
-                        "\n\n## 教学模式：深度教学（v0.26 ⭐ 用户要'讲透'）\n"
-                        "学生想要深入理解——走完整四层：看见→机制→深入（联系/边界/历史）→把握（总结+追问）。\n"
-                        "公式给推导思路，文科给论证与反例。"
+                        "\n\n## 用户表达倾向：详尽（§3.92 动态约束）\n"
+                        "用户想要深入理解——放开 D 教学法深度层，走完整骨架"
+                        "（核心前提→基础机制→底层原理→现实权衡→边界条件→延伸引导→小结）。"
                     )
-                else:
-                    system = system + (
-                        "\n\n## 教学模式：标准教学（v0.26 默认）\n"
-                        "学生未指定深度——正常深入讲解，四层走完，但开头可以稍微快一点进入正题。"
-                    )
+                # 其余情况：不预判，由约束层默认（L7 全放开）支撑充分讲解
             except Exception as _e:
-                print(f"[PAEG][subagents.py] run 异常忽略: {_e}")
-                pass
-                pass
+                print(f"[PAEG][subagents.py] 深度指引异常忽略: {_e}")
             # v0.26 ⭐ 用户资料注入（P0 断链修复：教学能看到用户上传资料）
             try:
                 _uc = getattr(learner, "_user_corpus", "") or ""

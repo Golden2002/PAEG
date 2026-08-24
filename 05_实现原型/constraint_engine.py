@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """PAEG 约束引擎（v0.70 §3.29 ⭐ MCP 化 · Oracle 设计）
 
 把 prompts.py 的 L0-L8 分层动态约束系统暴露为标准接口（MCP tool + 内部函数双面）。
@@ -85,8 +85,10 @@ def _get_config_from_file() -> Optional[dict]:
             "group_rules": groups,
             "group_names": names,
             "mask_to_layer": mask_map,
-            "default_layer": int(data.get("default_layer", 4)),
+            "default_layer": int(data.get("default_layer", 7)),
             "crisis_layer": int(data.get("crisis_layer", 1)),
+            # §3.92 ⭐ layer_meta 透传（约束告知块素材）
+            "layer_meta": data.get("layer_meta", {}),
             "build": None,  # 数据文件模式无 _build_constraint_layers（layer_set 自拼）
         }
     except Exception:
@@ -201,6 +203,14 @@ def constraint_layer_scope() -> str:
     for k in sorted(inner):
         opened = sorted(inner[k])
         lines.append(f"  L{k}: 放开组 {opened if opened else '（无=全约束）'}")
+        # §3.92 ⭐ layer_meta 描述（告知块：LLM 知悉每层内容）
+        meta = (c or {}).get("layer_meta", {})
+        if meta:
+            lines.append("")
+            lines.append("── 每层含义（layer_meta）──")
+            for k2 in sorted(meta, key=lambda x: int(x)):
+                m = meta[k2]
+                lines.append("  L{} {}: {}".format(k2, m.get('name', ''), m.get('desc', '')))
     if ext_layers:
         lines.append("── 外部扩展层（data/constraint_layers.json，可增可改）──")
         for k in sorted(ext_layers):
@@ -252,11 +262,55 @@ def constraint_layer_get(layer: int) -> str:
 def constraint_layer_set(session: Optional[str] = None, layer: int = 4,
                          reason: str = "") -> str:
     """动态切换约束层（教学/考试/自由，支持外部扩展层）。session 可指定会话级覆盖；
-    未指定则返回"当前层配置段"（供拼接进 system prompt）。"""
+    未指定则返回"当前层配置段"（供拼接进 system prompt）。
+
+    §3.92 ⭐ 动态约束告知架构（Oracle 方案）：
+    - config 模式自拼完整层段（含各放开组规则 + D 层教学法骨架注入）
+    - 骨架：D 组放开 → skeleton_full（教授级 6 层）；未放开 → skeleton_brief
+    """
     layer = _clamp_layer(layer)
     c = _get_prompts_constants()
-    # 外部扩展层（>内嵌最大层）→ 用本引擎自拼（prompts._build_constraint_layers 内部 clamp 到 7）
     inner_max = max((int(k) for k in (c["layers"] if c else {})), default=7)
+
+    # ── config 文件模式（数据驱动：group_rules 为 dict 结构）──
+    _cfg = _get_config_from_file()
+    if _cfg is not None:
+        opened = sorted(_merged_layers().get(layer, set()))
+        groups = _merged_groups()  # dict 结构（default_rules/unlocked_rules/skeleton_*）
+        names = dict(c["group_names"]) if c else {}
+        parts = [f"## 输出效果约束（当前 L{layer} · {reason or '默认'}）",
+                 "L0 保底规则全部保留（语言规范/公式/反AI腔/安全）——永不放开。"]
+        for g in sorted(opened):
+            gname = names.get(g, g)
+            g_data = groups.get(g, {})
+            if isinstance(g_data, dict):
+                rules = g_data.get("unlocked_rules", [])
+                parts.append(f"\n### 组[{g}]{gname}（已放开）")
+                for r in rules:
+                    parts.append(f"- {r}")
+                # ★ D 层骨架注入
+                if g == "D":
+                    skel = g_data.get("skeleton_full", "")
+                    if skel:
+                        parts.append(f"\n### ★ 教学法骨架（D 层放开 → 完整版）\n{skel}")
+            else:
+                parts.append(f"\n### 组[{g}]{gname}（已放开）")
+                parts.extend(f"- {r}" for r in g_data[:10])
+        # 未放开组：default_rules 简要提示 + D 层 brief
+        for g in sorted(set(groups.keys()) - set(opened)):
+            g_data = groups.get(g, {})
+            if isinstance(g_data, dict):
+                defaults = g_data.get("default_rules", [])
+                if defaults:
+                    parts.append(f"\n### 组[{g}]{names.get(g, g)}（收紧）：{'；'.join(defaults[:3])}")
+                if g == "D":
+                    brief = g_data.get("skeleton_brief", "")
+                    if brief:
+                        parts.append(f"\n### 教学法骨架（D 层收紧 → 简要版）\n{brief}")
+        parts.append(f"\n放开组：{', '.join(f'{g}({names.get(g, g)})' for g in opened) if opened else '无'}")
+        return "\n".join(parts)
+
+    # 外部扩展层（>内嵌最大层）→ 用本引擎自拼
     if layer > inner_max:
         opened = sorted(_merged_layers().get(layer, set()))
         groups = _merged_groups()
