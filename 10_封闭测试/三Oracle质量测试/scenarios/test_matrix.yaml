@@ -1,0 +1,141 @@
+# 三 Oracle 质量测试 - 场景配置（可扩展，新增话题不改代码）
+# 位置：scenarios/ 目录，按类型分组
+# 用法：测试引擎读此配置驱动 Playwright + 三 Oracle 评分
+
+# ═══════════════════════════════════════════════
+# 1. 教学流话题矩阵（四类学生行为）
+# ═══════════════════════════════════════════════
+teaching_flow:
+  - id: TC-TEACH-01
+    topic: "光合作用"
+    subject: biology
+    grade: "初中"
+    student_profile: "初二学生，理解力中等，好奇心强，易联想，抽象概念易卡"
+    behaviors: ["不理解提问", "联想拐题", "反复不理解", "快速理解深入"]
+    scenario_file: "teaching-flow/photosynthesis.json"
+    enabled: true
+  - id: TC-TEACH-02
+    topic: "李白诗歌的意象"
+    subject: chinese
+    grade: "初中"
+    student_profile: "初三学生，文学感知弱，需具体例子，易联想到其他诗句"
+    behaviors: ["不理解提问", "联想拐题", "反复不理解", "快速理解深入"]
+    scenario_file: "teaching-flow/li_po_imagery.json"
+    enabled: false  # 第二波启用
+  - id: TC-TEACH-03
+    topic: "函数的概念"
+    subject: math
+    grade: "高中"
+    student_profile: "高一学生，抽象定义易混淆，需生活类比"
+    behaviors: ["不理解提问", "联想拐题", "反复不理解", "快速理解深入"]
+    scenario_file: "teaching-flow/function_concept.json"
+    enabled: false
+
+# ═══════════════════════════════════════════════
+# 2. 备课物料话题矩阵（四类物料 × 多话题）
+# ═══════════════════════════════════════════════
+materials:
+  ppt:
+    - id: TC-MAT-PPT-01
+      topic: "光合作用"
+      subject: biology
+      grade: "初中"
+      requirement: "用于初中生物课堂，要求内容详实、有例子、排版美观"
+      enabled: true
+    - id: TC-MAT-PPT-02
+      topic: "细胞分裂"
+      subject: biology
+      grade: "高中"
+      requirement: "需过程图、分步讲解，内容详实"
+      enabled: false
+    - id: TC-MAT-PPT-03
+      topic: "牛顿第一定律"
+      subject: physics
+      grade: "初中"
+      requirement: "需示意图、生活例子、适用于课堂"
+      enabled: false
+
+  teaching_video:
+    - id: TC-MAT-VIDEO-01
+      topic: "光合作用"
+      subject: biology
+      grade: "初中"
+      requirement: "内容详实、教学叙事完整、例子丰富"
+      enabled: true
+    - id: TC-MAT-VIDEO-02
+      topic: "牛顿第一定律"
+      subject: physics
+      grade: "初中"
+      requirement: "有实验演示、生活例子"
+      enabled: false
+
+  math_video:
+    - id: TC-MAT-MATHVIDEO-01
+      topic: "二次函数图像与性质"
+      subject: math
+      grade: "高中"
+      requirement: "推导完整、例题递进、符号规范"
+      enabled: true
+    - id: TC-MAT-MATHVIDEO-02
+      topic: "一元二次方程"
+      subject: math
+      grade: "初中"
+      requirement: "求根公式推导、例题"
+      enabled: false
+
+  handout:
+    - id: TC-MAT-HANDOUT-01
+      topic: "光合作用"
+      subject: biology
+      grade: "初中"
+      requirement: "结构完整、内容详实、可自学"
+      enabled: true
+    - id: TC-MAT-HANDOUT-02
+      topic: "一次函数"
+      subject: math
+      grade: "初中"
+      requirement: "有例题变式、难度梯度"
+      enabled: false
+
+# ═══════════════════════════════════════════════
+# 3. 倾诉场景矩阵（10+ 轮长对话）
+# ═══════════════════════════════════════════════
+confiding:
+  - id: TC-CONFIDE-01
+    theme: "考试失利 + 同伴关系 + 自我否定"
+    student_profile: "高二学生，考试失利，和同学关系紧张，自我否定，怕被评判"
+    rounds: 12
+    scenario_file: "confiding/exam_failure.json"
+    enabled: true
+  - id: TC-CONFIDE-02
+    theme: "家庭矛盾 + 孤独感 + 睡眠问题"
+    student_profile: "高一学生，父母争吵，感到孤独，失眠"
+    rounds: 12
+    scenario_file: "confiding/family_conflict.json"
+    enabled: false
+
+# ═══════════════════════════════════════════════
+# 4. 评估阈值（通用通过线）
+# ═══════════════════════════════════════════════
+thresholds:
+  oracle1_teaching: 85    # 教学流总分合格线
+  oracle2_confiding: 85   # 倾诉总分合格线
+  oracle3_material: 85    # 物料总分合格线
+  material_linkage: 80    # 生成链路能力线
+  one_vote_veto: true     # 一票否决生效
+  repeat_similarity: 0.75 # 复读机检测阈值（相邻回复相似度）
+  repeat_3rounds: 0.8     # 连续 3 轮重复阈值
+
+# ═══════════════════════════════════════════════
+# 5. 发布门槛（退出标准）
+# ═══════════════════════════════════════════════
+exit_criteria:
+  p0_p1_zero: true        # P0/P1 缺陷必须为 0
+  oracle1_min: 85         # 教学流 ≥85
+  oracle2_min: 85         # 倾诉 ≥85
+  oracle3_min: 85         # 物料 ≥85
+  behavior_coverage: 4    # 四类学生行为全覆盖
+  material_all_pass: true # 四类物料全部单独通过
+  confiding_rounds: 10    # 倾诉 ≥10 轮
+  repeat_free: true       # 复读机风险 0
+  p2_max: 2               # P2 缺陷 ≤2

@@ -1,0 +1,614 @@
+{
+  "meta": {
+    "title": "导数与切线：从割线到极限",
+    "subject": "导数与切线",
+    "audience": "高中",
+    "target_duration_sec": 120,
+    "style": "3blue1brown",
+    "core_intuition": "切线是割线在两点无限接近时的极限位置",
+    "learning_objectives": [
+      "理解割线与切线的几何关系",
+      "理解导数作为切线斜率的极限定义",
+      "能够从几何直观过渡到导数符号表示"
+    ]
+  },
+  "narrative_arc": {
+    "hook": "一个静止的点和一条直线，如何找到穿过它的切线？",
+    "build": "从割线出发，观察两点逐渐靠近时割线的变化",
+    "climax": "两点重合的瞬间，割线成为切线，斜率成为极限",
+    "resolution": "引入导数符号，将几何直观转化为数学表达"
+  },
+  "visual_system": {
+    "palette": {
+      "background": "#0b0e14",
+      "curve": "#4fc3f7",
+      "secant": "#ffb74d",
+      "tangent": "#f44336",
+      "points": "#ffffff",
+      "text": "#e0e0e0",
+      "axes": "#616161",
+      "highlight": "#ffeb3b"
+    },
+    "semantic_binding": {
+      "curve": "函数图像",
+      "secant": "割线（两点连线）",
+      "tangent": "切线（极限位置）",
+      "points": "曲线上可移动的点",
+      "axes": "坐标轴",
+      "highlight": "关键点或关键变化"
+    },
+    "global_style": {
+      "font": "CMU Serif",
+      "stroke_width": 3,
+      "point_radius": 0.08
+    }
+  },
+  "scenes": [
+    {
+      "id": "s1_intro",
+      "concept": "切线的直觉",
+      "duration_sec": 15,
+      "pause_after_sec": 2,
+      "narration": "想象一条曲线，我们想要找到在某一点上的切线。直觉上，切线是刚好擦过该点的直线。",
+      "prerequisites": [],
+      "objects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "description": "坐标轴"
+        },
+        {
+          "id": "curve",
+          "type": "function_graph",
+          "function": "x^3/3 - x",
+          "color": "curve"
+        },
+        {
+          "id": "point_p",
+          "type": "dot",
+          "position": [
+            1.5,
+            -0.375,
+            0
+          ],
+          "color": "points",
+          "label": "P"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "create",
+          "target_ids": [
+            "axes"
+          ],
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 1,
+          "type": "create",
+          "target_ids": [
+            "curve"
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 3,
+          "type": "create",
+          "target_ids": [
+            "point_p"
+          ],
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5,
+          "type": "indicate",
+          "target_ids": [
+            "point_p"
+          ],
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 7,
+          "type": "write_text",
+          "text": "切线是什么？",
+          "position": [
+            0,
+            2.5,
+            0
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        }
+      ],
+      "on_screen_text": "切线是什么？"
+    },
+    {
+      "id": "s2_secant_approach",
+      "concept": "割线的逼近",
+      "duration_sec": 18,
+      "pause_after_sec": 3,
+      "narration": "我们引入另一个点Q，连接P和Q形成一条割线。当Q逐渐靠近P时，割线也在变化。",
+      "prerequisites": [
+        "s1_intro"
+      ],
+      "objects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "description": "坐标轴"
+        },
+        {
+          "id": "curve",
+          "type": "function_graph",
+          "function": "x^3/3 - x",
+          "color": "curve"
+        },
+        {
+          "id": "point_p",
+          "type": "dot",
+          "position": [
+            1.5,
+            -0.375,
+            0
+          ],
+          "color": "points",
+          "label": "P"
+        },
+        {
+          "id": "point_q",
+          "type": "dot",
+          "position": [
+            2.5,
+            2.708,
+            0
+          ],
+          "color": "points",
+          "label": "Q"
+        },
+        {
+          "id": "secant_line",
+          "type": "line_between_points",
+          "points": [
+            "point_p",
+            "point_q"
+          ],
+          "color": "secant"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "create",
+          "target_ids": [
+            "point_q"
+          ],
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 1,
+          "type": "create",
+          "target_ids": [
+            "secant_line"
+          ],
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 3,
+          "type": "move_point",
+          "target_id": "point_q",
+          "path": "along_curve",
+          "to": [
+            2.0,
+            0.667,
+            0
+          ],
+          "duration": 3,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 6,
+          "type": "move_point",
+          "target_id": "point_q",
+          "path": "along_curve",
+          "to": [
+            1.8,
+            0.144,
+            0
+          ],
+          "duration": 3,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 9,
+          "type": "move_point",
+          "target_id": "point_q",
+          "path": "along_curve",
+          "to": [
+            1.6,
+            -0.264,
+            0
+          ],
+          "duration": 3,
+          "rate_func": "smooth"
+        }
+      ],
+      "on_screen_text": "割线逼近"
+    },
+    {
+      "id": "s3_limit_formation",
+      "concept": "极限的形成",
+      "duration_sec": 20,
+      "pause_after_sec": 4,
+      "narration": "当Q无限接近P时，割线趋近于一个极限位置，这就是切线。这个极限就是导数的几何意义。",
+      "prerequisites": [
+        "s2_secant_approach"
+      ],
+      "objects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "description": "坐标轴"
+        },
+        {
+          "id": "curve",
+          "type": "function_graph",
+          "function": "x^3/3 - x",
+          "color": "curve"
+        },
+        {
+          "id": "point_p",
+          "type": "dot",
+          "position": [
+            1.5,
+            -0.375,
+            0
+          ],
+          "color": "points",
+          "label": "P"
+        },
+        {
+          "id": "point_q",
+          "type": "dot",
+          "position": [
+            1.55,
+            -0.354,
+            0
+          ],
+          "color": "points",
+          "label": "Q"
+        },
+        {
+          "id": "secant_line",
+          "type": "line_between_points",
+          "points": [
+            "point_p",
+            "point_q"
+          ],
+          "color": "secant"
+        },
+        {
+          "id": "tangent_line",
+          "type": "line_with_slope",
+          "point": "point_p",
+          "slope": 1.25,
+          "color": "tangent"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "move_point",
+          "target_id": "point_q",
+          "path": "along_curve",
+          "to": [
+            1.51,
+            -0.371,
+            0
+          ],
+          "duration": 4,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 4,
+          "type": "create",
+          "target_ids": [
+            "tangent_line"
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 6,
+          "type": "fade_out",
+          "target_ids": [
+            "secant_line"
+          ],
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 7,
+          "type": "flash",
+          "target_ids": [
+            "tangent_line"
+          ],
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 8,
+          "type": "write_text",
+          "text": "极限位置",
+          "position": [
+            0,
+            2.5,
+            0
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        }
+      ],
+      "on_screen_text": "极限位置"
+    },
+    {
+      "id": "s4_slope_visual",
+      "concept": "斜率的几何意义",
+      "duration_sec": 20,
+      "pause_after_sec": 3,
+      "narration": "切线的斜率告诉我们函数在该点的变化率。在图像上，斜率就是切线的倾斜程度。",
+      "prerequisites": [
+        "s3_limit_formation"
+      ],
+      "objects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "description": "坐标轴"
+        },
+        {
+          "id": "curve",
+          "type": "function_graph",
+          "function": "x^3/3 - x",
+          "color": "curve"
+        },
+        {
+          "id": "point_p",
+          "type": "dot",
+          "position": [
+            1.5,
+            -0.375,
+            0
+          ],
+          "color": "points",
+          "label": "P"
+        },
+        {
+          "id": "tangent_line",
+          "type": "line_with_slope",
+          "point": "point_p",
+          "slope": 1.25,
+          "color": "tangent"
+        },
+        {
+          "id": "slope_triangle",
+          "type": "right_triangle",
+          "point": "point_p",
+          "dx": 1,
+          "dy": 1.25,
+          "color": "highlight"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "create",
+          "target_ids": [
+            "slope_triangle"
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2,
+          "type": "write_text",
+          "text": "斜率=1.25",
+          "position": [
+            0,
+            2.5,
+            0
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5,
+          "type": "highlight",
+          "target_ids": [
+            "slope_triangle"
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        }
+      ],
+      "on_screen_text": "斜率=1.25"
+    },
+    {
+      "id": "s5_derivative_symbol",
+      "concept": "导数符号引入",
+      "duration_sec": 25,
+      "pause_after_sec": 4,
+      "narration": "这个极限就是导数。我们记作f'(x)或者dy/dx。它表示函数在某一点的瞬时变化率。",
+      "prerequisites": [
+        "s4_slope_visual"
+      ],
+      "objects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "description": "坐标轴"
+        },
+        {
+          "id": "curve",
+          "type": "function_graph",
+          "function": "x^3/3 - x",
+          "color": "curve"
+        },
+        {
+          "id": "point_p",
+          "type": "dot",
+          "position": [
+            1.5,
+            -0.375,
+            0
+          ],
+          "color": "points",
+          "label": "P"
+        },
+        {
+          "id": "tangent_line",
+          "type": "line_with_slope",
+          "point": "point_p",
+          "slope": 1.25,
+          "color": "tangent"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "write_text",
+          "text": "f'(x)",
+          "position": [
+            0,
+            2.5,
+            0
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 3,
+          "type": "write_text",
+          "text": "dy/dx",
+          "position": [
+            0,
+            1.5,
+            0
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 6,
+          "type": "transform",
+          "from": "slope_triangle",
+          "to": "derivative_symbol",
+          "duration": 3,
+          "rate_func": "smooth"
+        }
+      ],
+      "on_screen_text": "f'(x)"
+    },
+    {
+      "id": "s6_summary",
+      "concept": "总结与回顾",
+      "duration_sec": 22,
+      "pause_after_sec": 4,
+      "narration": "总结：切线是割线的极限，导数就是切线的斜率。这就是微积分的核心思想之一。",
+      "prerequisites": [
+        "s5_derivative_symbol"
+      ],
+      "objects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "description": "坐标轴"
+        },
+        {
+          "id": "curve",
+          "type": "function_graph",
+          "function": "x^3/3 - x",
+          "color": "curve"
+        },
+        {
+          "id": "point_p",
+          "type": "dot",
+          "position": [
+            1.5,
+            -0.375,
+            0
+          ],
+          "color": "points",
+          "label": "P"
+        },
+        {
+          "id": "tangent_line",
+          "type": "line_with_slope",
+          "point": "point_p",
+          "slope": 1.25,
+          "color": "tangent"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "write_text",
+          "text": "切线=极限",
+          "position": [
+            0,
+            2.5,
+            0
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 3,
+          "type": "write_text",
+          "text": "导数=斜率",
+          "position": [
+            0,
+            1.5,
+            0
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 6,
+          "type": "fade_out",
+          "target_ids": [
+            "tangent_line"
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 8,
+          "type": "fade_out",
+          "target_ids": [
+            "curve"
+          ],
+          "duration": 2,
+          "rate_func": "smooth"
+        }
+      ],
+      "on_screen_text": "导数=斜率"
+    }
+  ],
+  "qa_self_check": {
+    "formula_in_first_two_scenes": false,
+    "single_focus_per_scene": true,
+    "color_consistency": true,
+    "pause_at_key_moments": true,
+    "duration_within_15_percent": true,
+    "mobject_count_within_bounds": true,
+    "notes": "所有检查通过。前两个场景无公式，每个场景单一概念，颜色语义一致，关键变换处有停顿，总时长120秒。"
+  }
+}

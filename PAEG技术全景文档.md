@@ -1,4 +1,4 @@
-# PAEG 教育者智能体 — 技术全景文档
+﻿﻿# PAEG 教育者智能体 — 技术全景文档
 
 > **版本**：v0.73 关键节点（2026-08-16）：Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）+ 结构优化（TOC 自动生成/围栏修复/层级修正/§3.17 生产链路补强）；Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）；架构精细拆分（server.py 2601 行/31 路由/12 蓝图）+ RAG 检索增强（BM25Okapi/多路召回）+ 自我进化优化（Schema+CoT/失败案例/去重）+ dsh Harness 30 项落地 27/30（Seam/Registry/Provider/Persona 外置/Patch 系统/三角色契约层/Preset 体系/条件启停/Constitutional 补丁化/Self-Update via Patch）+ 前端 SVG 化+ 薇依人格大幅提升（文选 9 大哲学基石）
 > **适用对象**：项目维护者（你本人）
@@ -5199,3 +5199,44 @@ since:   <PAEG 版本号>
 ### 10.26.3 运维排障（重要）
 
 - **残留进程事故**：端口 5000 曾被 21:37 启动的旧服务器（PID 30440）占用——新服务器 bind 失败（MCP 8765 也冲突）→ 旧进程加载不含新代码的 server.py → 功能"没生效"实为旧进程在服务。**排障**：改代码后先查端口监听进程启动时间（`Get-NetTCPConnection` + `Get-Process StartTime`），确认加载的是最新代码。
+
+---
+
+## 10.27 ⭐ §3.89-§3.90 物料制作统一流水线 + 全体系盘点（Round 13 · v1.2.27 · 2026-08-24）
+
+### 10.27.1 MaterialPipeline v2.0（扩展而非重构）
+
+`material_pipeline.py` 六阶段（规划→草稿→门控→修复→实现→合成）+ **可插拔 gates/fix_strategy 槽位**（v1.1 行为 ratchet 保持）：
+- `gates`：`(content, ctx) -> (ok, reason)` 门列表，门失败可中止或触发修复
+- `fix_strategy`：`(stage_name, content, ctx, errors) -> new_content`（retry 同级重生成 / escalate ScopeRefine 三级升级 / regenerate 整体重跑）
+- 单一真相源：每类物料统一落盘 `evolve_data/material_pipeline/<type>_<jobid>.json`
+
+### 10.27.2 六类管线 + 门库/修复库
+
+| 管线 | 物料 | 专属门 |
+|---|---|---|
+| handout_pipeline | 讲义 | gates_lib（≥3 节/四块/密度） |
+| script_pipeline | 讲稿 | 语言规范门 |
+| ppt_pipeline | PPT | gates_lib（6-10 页/密度/例子） |
+| mindmap_pipeline | 思维导图 | gates_lib（3-5 分支/深度） |
+| video_pipeline | 教学视频 | 视频门（镜数≥3/时长/旁白） |
+| manim_pipeline_unified | 数学动画 | run_all_gates（beats/时序/可执行/几何） |
+
+配套：`gates_lib.py` 通用门库（GATE_REGISTRY 按物料装配）+ `fixers_lib.py` 三修复策略 + `manim_extensions.py`（ScopeRefine 三级 + TTS mux）+ `teaching_scene.py`（Anchor Grid 6×6 + Block Cleanup）。
+
+### 10.27.3 物料体系全盘点（§3.90 · 10 类产出 + 4 类文档流）
+
+- **A 统一管线 6 类**：讲义/讲稿/PPT/思维导图/教学视频/Manim 数学动画（触发词 `生成X：主题` 零正则精确匹配）
+- **B 独立生成器 4 类**：练习题 quiz（generate_quiz 薇依式命题）/ 讲解文章 article（三档字数）/ 学习计划 study_plan / 备课产物 lesson_prep（lesson_plan+handout+script+ppt_outline+quiz 五件套）
+- **C 前端入口**：6 物料按钮 + 4 快速开始 chip——点击填前缀不自动发送（§3.87 方案 C），补主题后回车激活
+
+### 10.27.4 网页端真实下载验证（⭐ 用户核心诉求）
+
+- **发现**：manim/video 魔法关键词落入普通教学流（PPT/handout 有早退分支，manim/video 缺失）
+- **修复**：server.py 补 manim/video 早退分支（§3.87 同模式：匹配关键词 → 提取 topic → 调用生成器 → SSE 返回产物 + 下载链接）
+- **实测**：Playwright「生成数学动画：导数」→ 真实渲染 DerivativeVisual.mp4（761KB）→ 下载 `/api/download/manim/jobs/<job>/videos/scene/720p30/*.mp4` HTTP 200 video/mp4 ✅
+
+### 10.27.5 文档同步
+
+- 技术说明：C.15 物料制作体系全览（10+4 体系）+ F5 多模态产出补 4 类 + 主线一补盘点结论
+- 需求文档：§3.89 实施记录 + §3.90 登记（盘点结果）

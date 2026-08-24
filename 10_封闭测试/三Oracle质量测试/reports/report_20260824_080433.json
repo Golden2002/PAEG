@@ -1,0 +1,36 @@
+{
+  "mode": "material",
+  "timestamp": "2026-08-24 08:02:28",
+  "cases": [
+    {
+      "type": "material",
+      "result": {
+        "scores": {
+          "内容准确性": 5,
+          "内容详实度": 1,
+          "视觉/结构质量": 1,
+          "教学适用性": 1
+        },
+        "total": 40.0,
+        "evidence": {
+          "内容准确性": "未发现知识错误，但内容过少无法充分验证。",
+          "内容详实度": "PPT大纲分页过少（1页），要点为0，仅标题或提纲，缺乏解释和例子。",
+          "视觉/结构质量": "PPT大纲分页过少，结构缺失，视觉标记页占比0%。",
+          "教学适用性": "PPT大纲要点过少，无法直接用于课堂，缺少导入、例题、练习、小结等环节。"
+        },
+        "defects": [
+          {
+            "severity": "P1",
+            "desc": "总分 40.0 < 60，严重不达标",
+            "suggestion": "检查核心链路"
+          }
+        ],
+        "judge": "物料质量-ppt",
+        "material_type": "ppt",
+        "topic": "光合作用",
+        "screenshot": "D:\\桌面\\智能体架构与开发（含大模型）\\14_教育者Agent项目\\10_封闭测试\\三Oracle质量测试\\artifacts\\material_ppt.png",
+        "material_text": "\"fail\"\n    },\n    {\n      \"name\": \"易混概念配对比表\",\n      \"status\": \"fail\"\n    },\n    {\n      \"name\": \"每节≥1个启发式思考题\",\n      \"status\": \"fail\"\n    },\n    {\n      \"name\": \"公式出现前先给直觉解释\",\n      \"status\": \"fail\"\n    },\n    {\n      \"name\": \"每核心概念绑定≥1位历史人物\",\n      \"status\": \"unverified\"\n    },\n    {\n      \"name\": \"≥1处第一手文献引用\",\n      \"status\": \"unverified\"\n    },\n    {\n      \"name\": \"≥1处跨学科连接\",\n      \"status\": \"unverified\"\n    },\n    {\n      \"name\": \"例题用真实数据场景（非虚构数字）\",\n      \"status\": \"unverified\"\n    },\n    {\n      \"name\": \"抽象概念配类比/隐喻\",\n      \"status\": \"unverified\"\n    }\n  ],\n  \"hard_checks_pass\": 3,\n  \"hard_checks_total\": 12,\n  \"dim_scores\": {\n    \"lesson_plan\": 0.9,\n    \"handout\": 0.4,\n    \"video_script\": null,\n    \"ppt_outline\": 0.8,\n    \"hard_checks\": 0.25\n  },\n  \"violations\": [\n    {\n      \"dim\": \"教学环节\",\n      \"msg\": \"教学环节 5 段（建议 6 段）\"\n    },\n    {\n      \"dim\": \"课前课中课后\",\n      \"msg\": \"缺失阶段: ['pre', 'during', 'post']（应含 pre/during/post）\"\n    },\n    {\n      \"dim\": \"讲义\",\n      \"msg\": \"讲义字数 93 偏短$>=300 达标$\"\n    },\n    {\n      \"dim\": \"视觉焦点\",\n      \"msg\": \"含视觉标记页占比 0.0%$要求 ≥30%$\"\n    }\n  ],\n  \"overall\": \"FAIL\",\n  \"overall_score\": 0.715,\n  \"eval_mode\": \"auto\",\n  \"video_script_check\": {\n    \"passed\": true,\n    \"errors\": [],\n    \"scene_count\": 0,\n    \"checked\": false\n  },\n  \"material_judge\": {\n    \"dims\": {\n      \"factuality\": 1,\n      \"correctness\": 1,\n      \"completeness\": 1,\n      \"relevance\": 3,\n      \"pedagogy\": 1\n    },\n    \"deep_checks\": {\n      \"person_binding\": false,\n      \"literature\": false,\n      \"cross_subject\": false,\n      \"real_data\": false,\n      \"analogy\": false\n    },\n    \"overall\": 1.4,\n    \"reason\": \"OK\",\n    \"checked\": true\n  },\n  \"handout_check\": {\n    \"passed\": true,\n    \"errors\": [],\n    \"checked\": true,\n    \"sections_found\": [\n      \"学习目标\",\n      \"核心内容\",\n      \"典型例题\",\n      \"巩固练习\",\n      \"小结\"\n    ],\n    \"has_concrete_example\": true,\n    \"has_practice\": true\n  },\n  \"script_check\": {\n    \"passed\": true,\n    \"errors\": [],\n    \"checked\": true,\n    \"has_open\": true,\n    \"has_body\": true,\n    \"has_close\": true,\n    \"has_duration\": true,\n    \"has_transition\": true,\n    \"has_example\": true\n  },\n  \"mindmap_check\": {\n    \"passed\": true,\n    \"errors\": [],\n    \"checked\": true,\n    \"list_items\": 7,\n    \"levels\": [\n      0,\n      1,\n      2\n    ]\n  },\n  \"ppt_check\": {\n    \"passed\": false,\n    \"errors\": [\n      \"PPT 大纲分页过少（1 < 3 页：封面/主体/小结）\",\n      \"PPT 大纲要点过少（共 0 < 6 条要点）\"\n    ],\n    \"checked\": true,\n    \"pages\": 1,\n    \"items_per_page\": [\n      0\n    ]\n  }\n}\n复制"
+      }
+    }
+  ]
+}

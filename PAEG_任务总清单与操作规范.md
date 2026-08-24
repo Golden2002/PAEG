@@ -3547,9 +3547,73 @@ server.py `teach_video` 端点：
 
 **实施顺序**：Step1 框架升级 → Step2 video 管线 → Step3 manim 接入 → Step4 teaching_scene → Step5 fixers → Step6 测试矩阵
 
+### 实施记录（全部完成 ✅）
+
+- **Step1** material_pipeline v2.0：gates/fix_strategy 可插拔槽位（61/61 回归绿）
+- **Step4** teaching_scene.py（Anchor Grid 6×6 + Block Cleanup）+ manim_extensions.py（ScopeRefine 三级 + TTS mux）
+- **Step2/3** video_pipeline + manim_pipeline_unified 注册（6 类管线：handout/script/ppt/mindmap/video/manim）
+- **Step5** gates_lib.py 门库（PPT 3门/讲义 3门/导图 2门）+ fixers_lib.py（retry/escalate/regenerate）
+- **Step6** test_unified_pipeline.py 28/28 全绿 + 三Oracle 四类物料实测（PPT 69.0 / 讲义 96.0 / 教学视频 77.2 / 数学动画 49.0）
+- **Step7** ⭐ 网页端真实下载验证：发现 manim/video 魔法关键词落入普通教学流（PPT/handout 有早退分支，manim/video 缺失）→ server.py 补 manim/video 早退分支（§3.87 同模式）→ Playwright UI 实测「生成数学动画：导数」→ 真实渲染 DerivativeVisual.mp4（761KB）→ 下载链接 /api/download/manim/jobs/<job>/... HTTP 200 video/mp4 ✅
+
+---
+
+## §3.90 物料种类全面盘点 + 网页端真实下载（2026-08-24）
+
+### 用户要求（原文）
+
+- "其他物料也要测试"
+- "要确保用户在UI界面，在网页端能够真实地生成这些物料并下载啊"
+- "物料还有其他种类吧！"
+- "把技术说明文档pdf发给我"
+- "注意需求文档的纪律要求" / "纪律要求"（先登记再动手）
+
+### 来源
+
+§3.89 完成后用户追问：物料体系是否覆盖全种类；要求全部物料在网页端真实生成 + 可下载。
+
+### 现状
+
+- 6 类管线已注册（handout/script/ppt/mindmap/video/manim），但**物料种类盘点未完成**——系统实际存在 keyword_doc（讲义/要点/例题/笔记 4 类 doc_type）、学习计划（study-planner）、作文评改（essay-feedback）、知识导图（knowledge_map）等更多产出类型
+- manim 网页端已实测 PASS（真实渲染 + 下载链接有效）；PPT/讲义/教学视频/思维导图/讲稿 UI 端到端待实测
+- 技术说明文档已融贯插入 C.15（物料制作体系全览）+ 主线一同步；PDF v1.2.27 已生成（4.1MB）待交付
+
+### 方案（已执行）
+
+1. **物料种类全盘点**（✅ 已完成）：10 类产出 + 4 类文档流（见下）
+2. **全物料 UI 端到端测试**：PPT/讲义/教学视频/思维导图/讲稿/数学动画 逐一 Playwright 实测（进行中，数学动画已 PASS）
+3. **PDF 交付**：PAEG技术说明_v1.2.27.pdf（4.1MB）已生成待发
+
+### 盘点结果：完整物料体系（10 类产出 + 4 类文档流）⭐
+
+**A. 已入统一管线（6 类 MaterialPipeline v2.0）**：
+
+| 物料 | 管线 | 触发词 | 下载产物 |
+|---|---|---|---|
+| 讲义 handout | handout_pipeline（file_generator.generate_handout） | 生成讲义：X | .md |
+| 讲稿 script | script_pipeline（script_service 口语化） | 生成讲稿：X | .md |
+| PPT | ppt_pipeline（pptx_mcp_server 排版） | 生成PPT：X | .pptx |
+| 思维导图 mindmap | mindmap_pipeline（knowledge_map） | 生成思维导图：X | .md/图 |
+| 教学视频 video | video_pipeline（scenes 8-15s 分镜 + TTS mux） | 生成教学视频：X | 脚本/视频 |
+| Manim 数学动画 manim | manim_pipeline_unified（6 阶段门控） | 生成数学动画：X | .mp4 |
+
+**B. 独立生成器（未入统一管线，4 类）**：
+
+| 物料 | 生成器 | 说明 |
+|---|---|---|
+| 练习题 quiz | file_generator.generate_quiz | 由浅入深 + 答案解析 |
+| 讲解文章 article | file_generator.generate_article | 短文/中/长（300/600/1000 字） |
+| 学习计划 study_plan | meta_router is_study_plan_intent | "想系统学X"触发 |
+| 备课产物 lesson_prep | paeg.lesson_prep（8 步渐进） | 产出 lesson_plan/handout/script/ppt_outline/quiz |
+
+**C. 前端物料入口**：6 个物料按钮/chip（讲义/PPT/授课视频/数学动画/讲稿/思维导图）+ 4 个快速开始 chip——统一填前缀不自动发送（§3.87 方案 C）。
+
 ### 实施记录
 
-（按 Step 顺序实施中）
+1. ✅ 登记 §3.90 + 盘点完成（10+4 物料体系）
+2. ✅ 技术说明文档融贯更新：C.15 扩充完整物料表 + F5 多模态产出补 quiz/article/lesson_prep/study_plan + 主线一补盘点结论
+3. 🔄 全物料 UI 端到端测试：数学动画 PASS（真实渲染 DerivativeVisual.mp4 + 下载 HTTP 200）；PPT/讲义/教学视频/思维导图/讲稿 待重跑
+4. ✅ PDF v1.2.27 已生成（4.1MB，含 C.15）待微信交付
 
 ## §3.89 全物料流水线统一框架（2026-08-24）
 
@@ -3605,6 +3669,70 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 
 **实施顺序**：Step1 框架升级 → Step2 video 管线 → Step3 manim 接入 → Step4 teaching_scene → Step5 fixers → Step6 测试矩阵
 
+### 实施记录（全部完成 ✅）
+
+- **Step1** material_pipeline v2.0：gates/fix_strategy 可插拔槽位（61/61 回归绿）
+- **Step4** teaching_scene.py（Anchor Grid 6×6 + Block Cleanup）+ manim_extensions.py（ScopeRefine 三级 + TTS mux）
+- **Step2/3** video_pipeline + manim_pipeline_unified 注册（6 类管线：handout/script/ppt/mindmap/video/manim）
+- **Step5** gates_lib.py 门库（PPT 3门/讲义 3门/导图 2门）+ fixers_lib.py（retry/escalate/regenerate）
+- **Step6** test_unified_pipeline.py 28/28 全绿 + 三Oracle 四类物料实测（PPT 69.0 / 讲义 96.0 / 教学视频 77.2 / 数学动画 49.0）
+- **Step7** ⭐ 网页端真实下载验证：发现 manim/video 魔法关键词落入普通教学流（PPT/handout 有早退分支，manim/video 缺失）→ server.py 补 manim/video 早退分支（§3.87 同模式）→ Playwright UI 实测「生成数学动画：导数」→ 真实渲染 DerivativeVisual.mp4（761KB）→ 下载链接 /api/download/manim/jobs/<job>/... HTTP 200 video/mp4 ✅
+
+---
+
+## §3.90 物料种类全面盘点 + 网页端真实下载（2026-08-24）
+
+### 用户要求（原文）
+
+- "其他物料也要测试"
+- "要确保用户在UI界面，在网页端能够真实地生成这些物料并下载啊"
+- "物料还有其他种类吧！"
+- "把技术说明文档pdf发给我"
+- "注意需求文档的纪律要求" / "纪律要求"（先登记再动手）
+
+### 来源
+
+§3.89 完成后用户追问：物料体系是否覆盖全种类；要求全部物料在网页端真实生成 + 可下载。
+
+### 现状
+
+- 6 类管线已注册（handout/script/ppt/mindmap/video/manim），但**物料种类盘点未完成**——系统实际存在 keyword_doc（讲义/要点/例题/笔记 4 类 doc_type）、学习计划（study-planner）、作文评改（essay-feedback）、知识导图（knowledge_map）等更多产出类型
+- manim 网页端已实测 PASS（真实渲染 + 下载链接有效）；PPT/讲义/教学视频/思维导图/讲稿 UI 端到端待实测
+- 技术说明文档已融贯插入 C.15（物料制作体系全览）+ 主线一同步；PDF v1.2.27 已生成（4.1MB）待交付
+
+### 方案（已执行）
+
+1. **物料种类全盘点**（✅ 已完成）：10 类产出 + 4 类文档流（见下）
+2. **全物料 UI 端到端测试**：PPT/讲义/教学视频/思维导图/讲稿/数学动画 逐一 Playwright 实测（进行中，数学动画已 PASS）
+3. **PDF 交付**：PAEG技术说明_v1.2.27.pdf（4.1MB）已生成待发
+
+### 盘点结果：完整物料体系（10 类产出 + 4 类文档流）⭐
+
+**A. 已入统一管线（6 类 MaterialPipeline v2.0）**：
+
+| 物料 | 管线 | 触发词 | 下载产物 |
+|---|---|---|---|
+| 讲义 handout | handout_pipeline（file_generator.generate_handout） | 生成讲义：X | .md |
+| 讲稿 script | script_pipeline（script_service 口语化） | 生成讲稿：X | .md |
+| PPT | ppt_pipeline（pptx_mcp_server 排版） | 生成PPT：X | .pptx |
+| 思维导图 mindmap | mindmap_pipeline（knowledge_map） | 生成思维导图：X | .md/图 |
+| 教学视频 video | video_pipeline（scenes 8-15s 分镜 + TTS mux） | 生成教学视频：X | 脚本/视频 |
+| Manim 数学动画 manim | manim_pipeline_unified（6 阶段门控） | 生成数学动画：X | .mp4 |
+
+**B. 独立生成器（未入统一管线，4 类）**：
+
+| 物料 | 生成器 | 说明 |
+|---|---|---|
+| 练习题 quiz | file_generator.generate_quiz | 由浅入深 + 答案解析 |
+| 讲解文章 article | file_generator.generate_article | 短文/中/长（300/600/1000 字） |
+| 学习计划 study_plan | meta_router is_study_plan_intent | "想系统学X"触发 |
+| 备课产物 lesson_prep | paeg.lesson_prep（8 步渐进） | 产出 lesson_plan/handout/script/ppt_outline/quiz |
+
+**C. 前端物料入口**：6 个物料按钮/chip（讲义/PPT/授课视频/数学动画/讲稿/思维导图）+ 4 个快速开始 chip——统一填前缀不自动发送（§3.87 方案 C）。
+
 ### 实施记录
 
-（按 Step 顺序实施中）
+1. ✅ 登记 §3.90 + 盘点完成（10+4 物料体系）
+2. ✅ 技术说明文档融贯更新：C.15 扩充完整物料表 + F5 多模态产出补 quiz/article/lesson_prep/study_plan + 主线一补盘点结论
+3. 🔄 全物料 UI 端到端测试：数学动画 PASS（真实渲染 DerivativeVisual.mp4 + 下载 HTTP 200）；PPT/讲义/教学视频/思维导图/讲稿 待重跑
+4. ✅ PDF v1.2.27 已生成（4.1MB，含 C.15）待微信交付

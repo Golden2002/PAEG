@@ -1,4 +1,4 @@
-# PAEG 教育智能体 — 简明技术说明（v1.2.26）
+﻿﻿# PAEG 教育智能体 — 简明技术说明（v1.2.26）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -27,7 +27,7 @@
   - **§7.11 工程化就绪融贯（Round 4-12 六主线）**
 - 附录 A 术语表
 - 附录 B 核心文件索引
-- 附录 C 技术创新亮点（v0.70 ⭐ · C.1-C.13 技术亮点 + C.14 主题总表）
+- 附录 C 技术创新亮点（v0.70 ⭐ · C.1-C.13 技术亮点 + C.14 主题总表 + C.15 物料制作体系全览）
 - 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
 - 附录 E 功能×模块连通性矩阵（§3.77 盘点）
 
@@ -133,6 +133,10 @@
 | **教学视频** | 授课视频生成 | script_service（视频讲稿）+ 视频管线 | 大纲→口语化讲稿（秒数控制）→合成视频 |
 | **PPT** | 教学 PPT 生成 | pptx 管线 | 大纲→LLM 排版→.pptx |
 | **讲义/要点/例题/笔记** | 教学文档生成 | keyword_doc | 4 类 doc_type 模板，教学对话关键词触发 |
+| **练习题 quiz** | 出练习题 | file_generator.generate_quiz | 由浅入深 + 每题意向解析（薇依式命题） |
+| **讲解文章 article** | 生成讲解/科普文 | file_generator.generate_article | 短/中/长三档（300/600/1000 字） |
+| **备课产物 lesson_prep** | 一键备课 | paeg.lesson_prep（8 步渐进） | lesson_plan/handout/script/ppt_outline/quiz 五件套（详见 §3.90 盘点） |
+| **学习计划 study_plan** | 系统学习路径 | meta_router is_study_plan_intent | "想系统学X"触发阶段化计划 |
 
 ### F6 配置与扩展体系
 
@@ -1478,6 +1482,9 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 - **manim 数学视频真实出片**：AST 安全校验 → 真实渲染 → mp4 落盘；修复 `render_manim` 未指定 encoding 导致 Windows GBK 解码崩溃 + 质量档输出目录 5 档（480p15…2160p60）
 - 学习计划 format bug：`unsupported format string passed to dict.__format__`（mastery 值 float/dict 混用）→ `_fmt_mastery` 鲁棒格式化
 - **PPT 大纲结构检查（Round 11 ⭐）**：`check_ppt_outline`（分页/每页要点/无空页/无占位）接入 LessonPrep `quality_report.ppt_check`——物料检查补齐 handout/script/mindmap/ppt 四类覆盖
+- **物料结构化提示词模板（Round 13 ⭐ §3.88）**：`material_prompts.py` 为 5 类物料内置"角色（学科×学段 persona）→ schema → 硬约束 → 优秀范例"三层模板；`build_material_system` 统一装配（5 层基础约束 + 动态学科学段注入）；`upgrade_simple_intent` 把"生成PPT：光合作用"升级为完整 user prompt——约束是层不是墙（详见附录 C.15.3）
+- **物料制作统一流水线（Round 13 ⭐ §3.89）**：`MaterialPipeline v2.0` 六阶段（规划→草稿→门控→修复→实现→合成）+ 可插拔 gates/fix_strategy 槽位；6 类物料（讲义/讲稿/PPT/导图/教学视频/Manim）统一注册；gates_lib 门库 + fixers_lib 三修复策略（retry/escalate/regenerate）；Manim 补 4 缺口（Audio-First TTS / Visual Anchor Grid / ScopeRefine 三级 / Block Cleanup）——详见附录 C.15
+- **物料体系全盘点（Round 13 ⭐ §3.90）**：系统实际 10 类产出 + 4 类文档流——除 6 类统一管线物料外，另有练习题 quiz / 讲解文章 article / 学习计划 study_plan / 备课产物 lesson_prep（lesson_plan+handout+script+ppt_outline+quiz 五件套）独立生成器；前端 6 物料按钮 + 4 快速开始 chip 统一填前缀激活（§3.87 方案 C）；Manim 网页端实测真实出片可下载（详见附录 C.15.1）
 
 **主线二：质量守护网（学段×深度双层守门 + 输出质量注入 + golden set）**：
 - **teach_stream 守门接线**：学段特征/内容深度守门此前只挂 sync 路径 `paeg.teach`，GUI 实际走的 `/api/teach/stream` 从不执行 → 主循环接入（同门控 llm_generated+PAEG_GRADE_GATE）→ probe 4/4 全特征通过
@@ -1718,6 +1725,96 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 - 张宇扬课件知识库接线（PDF/PPTX 文本提取 → search_facts 课件检索 + 落盘缓存 _manifest 快速路径）
 - 自我更新闭环：QualityGate（promote=采纳事件）+ adoption_tracker 精确采纳率 + E1 埋点
 - C5 家长学情看板 + B3 OTel 导出
+
+### C.15 物料制作体系全览（v1.2.26 §3.88-§3.89 ⭐）
+
+> **定位**：6 类教学物料（讲义/讲稿/PPT/思维导图/教学视频/Manim 数学动画）统一接入
+> `MaterialPipeline v2.0`（策略模式 + 可插拔门控/修复槽位）。每类物料都有**独立的流程、
+> 方法、内置提示词模板与质量门**——不是"一个聊天框里做材料"，而是 Agent 指挥 LLM
+> 走完整的"规划→草稿→门控→修复→实现→审查→合成"流水线。
+
+#### C.15.1 物料类型总表（§3.90 盘点：10 类产出 + 4 类文档流 ⭐）
+
+**A. 已入统一管线（6 类 MaterialPipeline v2.0）**：
+
+| 物料 | 触发词（精确匹配） | 管线 | 内置提示词文件 | 专属门 | 质量评审 | 下载产物 |
+|---|---|---|---|---|---|---|
+| 讲义 handout | `生成讲义：` | handout_pipeline（复用 file_generator.generate_handout） | material_prompts.py handout 模板 | gates_lib 讲义门（≥3 节/四块/密度） | material_judge 5 维 | .md |
+| 讲稿 script | `生成讲稿：` | script_pipeline（script_service 口语化） | material_prompts.py（讲稿约束） | 语言规范门 | material_quality | .md |
+| PPT | `生成PPT：` | ppt_pipeline（大纲→pptx_mcp_server 排版） | material_prompts.py ppt 模板（6×6 原则） | gates_lib PPT 门（6-10 页/密度/例子） | material_judge 5 维 | .pptx |
+| 思维导图 | `生成思维导图：` | mindmap_pipeline（knowledge_map） | material_prompts.py mindmap 模板 | gates_lib 导图门（3-5 分支/深度） | material_judge 5 维 | .md/图 |
+| 教学视频 | `生成教学视频：` | video_pipeline（scenes 8-15s 分镜 + TTS mux） | material_prompts.py video 模板 | 视频门（镜数≥3/时长/旁白） | material_judge 5 维 | 脚本/视频 |
+| Manim 数学动画 | `生成数学动画：` | manim_pipeline_unified（复用成熟 6 阶段管线） | material_prompts.py manim 模板 + manim_prompts.py（7 场景）+ visual_script_generator（3b1b 8 原则） | run_all_gates（beats/时序/可执行/几何） | manim_judge 4 维 | .mp4 |
+
+**B. 独立生成器（未入统一管线，4 类）**：
+
+| 物料 | 生成器 | 触发 | 说明 |
+|---|---|---|---|
+| 练习题 quiz | file_generator.generate_quiz | 生成练习题：X | 由浅入深 + 每题意向解析 |
+| 讲解文章 article | file_generator.generate_article | 生成文章：X | 短/中/长（300/600/1000 字）三档 |
+| 学习计划 study_plan | meta_router is_study_plan_intent | "想系统学X" | 阶段化学习路径 |
+| 备课产物 lesson_prep | paeg.lesson_prep（8 步渐进） | 我要备课：X | 产出 lesson_plan/handout/script/ppt_outline/quiz 五件套 |
+
+**C. 前端物料入口**：6 个物料按钮/chip（讲义/PPT/授课视频/数学动画/讲稿/思维导图）+ 4 个快速开始 chip——点击填前缀不自动发送（§3.87 方案 C），补主题后回车激活。
+
+#### C.15.2 统一流水线框架（MaterialPipeline v2.0 · §3.89 ⭐）
+
+**六阶段**：规划（spec）→ 草稿（draft）→ **门控（gates）** → **修复（fix_strategy）** →
+实现（implement）→ 审查/合成（compose）。语言规范门贯穿全程（纪律 23）。
+
+**v2.0 可插拔槽位**（扩展而非重构，v1.1 行为 ratchet 保持）：
+- `gates`：`(content, ctx) -> (ok, reason)` 门列表，门失败可中止或触发修复
+- `fix_strategy`：`(stage_name, content, ctx, errors) -> new_content` 修复策略
+  - `retry`（同级重生成）/ `escalate`（ScopeRefine 三级升级 L1→L2→L3）/ `regenerate`（整体重跑 plan+draft）
+
+**单一真相源**：每类物料统一落盘 `evolve_data/material_pipeline/<type>_<jobid>.json`
+（spec + output + stages + 时间戳），评审/追溯/复盘共用。
+
+#### C.15.3 内置提示词体系（§3.88 ⭐）
+
+`material_prompts.py` 为 5 类物料提供**三层模板**：角色（学科×学段 persona）→
+输出 schema（结构化约束）→ 硬约束（质量红线）→ 优秀范例（启发深度）。
+
+- `build_material_system(type, topic, subject, grade)`：统一装配器——5 层基础约束
+  （语言层 + 真实底线 + 学科 persona + 学段 + 物料专属）+ 动态注入（学科学段可换）
+- `upgrade_simple_intent(topic, type)`：简单指令升级器——"生成PPT：光合作用"
+  自动扩展为带学科/学段/物料要求的完整 user prompt
+- **约束是"层"不是"墙"**：硬约束黑名单（不得空壳/必须例子/必须准确）为底线，
+  优秀范例仅启发不照抄——给 LLM 灵活性而非过度限制
+
+`manim_prompts.py` 另含 7 场景意图模板（公式/几何/过程/对比/应用/推导/复习）+
+关键词匹配；`visual_script_generator.py` 内置 3b1b 8 原则（几何直觉优先/变换过程
+可视/关键步骤 pause）。
+
+#### C.15.4 门控与修复体系（§3.89 · gates_lib + fixers_lib）
+
+`gates_lib.py` 通用门库：结构门（required_fields）/ 列表数量门 / 长度密度门 /
+PPT 页数·密度·例子门 / 讲义节数·四块门 / 导图分支·深度门。门注册表按物料类型
+装配（GATE_REGISTRY）。
+
+`fixers_lib.py` 修复策略库：`retry`（LLM 按错误同级重写）→ `escalate`（跨轮升级
+修复范围）→ `regenerate`（整体重跑）。Manim 场景走 `manim_extensions.scope_refine`
+三级修复（L1 场景内修补 → L2 重写 1-3 场景 → L3 全剧本重生）。
+
+#### C.15.5 Manim 深度管线（对标 claude2video/Code2Video · §3.89 Step4 ⭐）
+
+在成熟 6 阶段管线（phase1 规划含门控修复 → phase2 剧本+代码 → phase3 渲染评审 +
+manim_judge 4 维 + manim_speed 三档）基础上，§3.89 补齐 4 缺口：
+
+| 缺口 | 落地方案 | 文件 |
+|---|---|---|
+| Audio-First TTS 同步 | edge-tts 旁白 + ffmpeg mux（`tts_mux`） | manim_extensions.py |
+| Visual Anchor Grid | 6×6 网格定位 `place(mob, col, row)` 防重叠越界 | teaching_scene.py |
+| ScopeRefine 三级修复 | L1 场景内 → L2 重写 → L3 全剧本重生 | manim_extensions.py |
+| Block Cleanup | VGroup + FadeOut 屏幕对象清理（`cleanup`） | teaching_scene.py |
+
+#### C.15.6 质量评审闭环
+
+- `material_judge.py`：5 维 LLM-as-judge（内容/结构/教学性/语言/格式）+ 5 深检 +
+  反馈聚合（feedback_aggregator）+ golden 物料化
+- `manim_judge.py`：4 维评审（概念表达/动画质量/教学节奏/数学准确性）
+- 三 Oracle 质量测试工程（`10_封闭测试/三Oracle质量测试/`）：test_engine --mode
+  material 对四类物料实测（PPT 69.0 / 讲义 96.0 / 教学视频 77.2 / 数学动画 待测）
 
 ---
 

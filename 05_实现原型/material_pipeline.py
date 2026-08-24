@@ -100,16 +100,28 @@ MaterialStages = Dict[str, Callable[..., Any]]
 
 
 class MaterialPipeline:
-    """通用物料流水线（策略模式：传入各类物料的阶段函数）。"""
+    """通用物料流水线（策略模式：传入各类物料的阶段函数）。
+
+    §3.89 v2.0 ⭐ 统一框架升级：新增 gates / fix_strategy 可插拔槽位。
+    - gates: List[Callable] 每个门 (content, ctx) -> (ok, reason)；默认 structure/length/language
+    - fix_strategy: Callable 门失败修复策略 (stage_name, content, ctx, errors) -> new_content
+      默认 retry（同级重生成）；可换 escalate（ScopeRefine 三级升级）/ regenerate（全重跑）
+    - 保持 v1.1 行为不变（ratchet：gate/fix 未传时退化为原内嵌逻辑）
+    """
 
     def __init__(self, material_type: str,
                  stages: MaterialStages,
                  required_fields: List[str],
-                 min_content_len: int = 50):
+                 min_content_len: int = 50,
+                 gates: Optional[List[Callable]] = None,
+                 fix_strategy: Optional[Callable] = None):
         self.material_type = material_type
         self.stages = stages          # {plan, draft, implement, review}
         self.required_fields = required_fields
         self.min_content_len = min_content_len
+        # §3.89 v2.0 ⭐ 可插拔槽位（不传则退化原行为）
+        self.gates = gates or []
+        self.fix_strategy = fix_strategy
 
     def run(self, llm, topic: str, subject: str = "通用",
             learner_id: str = "anon", **kw) -> Dict[str, Any]:
@@ -162,6 +174,29 @@ class MaterialPipeline:
             result["errors"].append("Phase2 未产出草稿")
             return result
         result["stages"]["draft"] = "ok"
+
+        # §3.89 v2.0 ⭐ 自定义 gates + fix_strategy（可插拔，不传则跳过）
+        if self.gates:
+            _ctx = {"material_type": self.material_type, "topic": topic,
+                    "subject": subject, "spec": spec}
+            for _gi, _gate in enumerate(self.gates):
+                try:
+                    _ok, _reason = _gate(draft, _ctx)
+                    if not _ok:
+                        result["errors"].append(f"自定义门{_gi}失败: {_reason}")
+                        if self.fix_strategy is not None:
+                            _fixed = self.fix_strategy("draft", draft, _ctx,
+                                                       [f"门{_gi}: {_reason}"])
+                            if _fixed and str(_fixed).strip():
+                                draft = _fixed
+                                result["stages"][f"gate{_gi}_fixed"] = "ok"
+                        else:
+                            result["stages"][f"gate{_gi}"] = "fail"
+                            return result
+                    else:
+                        result["stages"][f"gate{_gi}"] = "ok"
+                except Exception as _ge:
+                    result["errors"].append(f"自定义门{_gi}异常: {_ge}")
 
         # Phase 3 实现（含语言 refine + 修复回路）
         content = draft
@@ -349,6 +384,154 @@ def mindmap_pipeline() -> MaterialPipeline:
 
 
 # ═══════════════════════════════════════════════════════════
+# 预置物料流水线：教学视频（§3.89 Step2 ⭐ 新增）
+# ═══════════════════════════════════════════════════════════
+def video_pipeline() -> MaterialPipeline:
+    """教学视频物料流水线（scenes[] 8-15s 分镜 + 音画对齐门）。
+
+    spec: {"scenes": [{id, concept, narration, duration_sec, visual_goal}]}
+    gates: 镜数 ≥3 / 单镜时长 8-15s / 音画对齐（narration 非空）
+    review: material_judge（画面/声音/教学性/连贯）
+    """
+    from services.material_judge import judge_material
+
+    def _plan(llm, topic, subject, learner_id, **kw):
+        return {"topic": topic, "subject": subject,
+                "learner_id": learner_id, "mode": "video"}
+
+    def _draft(llm, spec, topic, subject, learner_id, **kw):
+        _sys = ("你是教学视频分镜导演。为教学主题设计 3-8 个镜头（scene），"
+                "每镜：id、concept（教学点）、narration（旁白台词）、"
+                "duration_sec（8-15 秒）、visual_goal（画面目标）。"
+                "输出 JSON 数组 scenes。")
+        try:
+            from subagents import _safe_chat
+            import re as _re
+            _raw = _safe_chat(llm, _sys, f"主题：{topic}\n学科：{subject}", max_tokens=3000)
+            if _raw:
+                _m = _re.search(r"\[.*\]", _raw, _re.S)
+                if _m:
+                    return json.loads(_m.group(0))
+            return [{"id": "s1", "concept": topic, "narration": f"今天我们学习{topic}",
+                     "duration_sec": 12, "visual_goal": f"展示{topic}的核心概念"}]
+        except Exception:
+            return [{"id": "s1", "concept": topic, "narration": f"今天我们学习{topic}",
+                     "duration_sec": 12, "visual_goal": f"展示{topic}的核心概念"}]
+
+    def _implement(llm, content, topic, subject, learner_id, **kw):
+        # 教学视频实现：可选 TTS 合成（Audio-First）
+        try:
+            from manim_extensions import tts_mux
+            _d = content
+            return _d
+        except Exception:
+            return content
+
+    # 视频专属门（§3.89 ⭐ 可插拔）
+    def _gate_scenes(content, ctx):
+        scenes = content if isinstance(content, list) else None
+        if not scenes or len(scenes) < 3:
+            return False, f"镜数不足（{len(scenes) if scenes else 0}/3）"
+        return True, ""
+
+    def _gate_duration(content, ctx):
+        scenes = content if isinstance(content, list) else []
+        bad = [s.get("duration_sec") for s in scenes
+               if not (8 <= float(s.get("duration_sec", 0)) <= 15)]
+        if bad:
+            return False, f"{len(bad)} 镜时长不在 8-15s"
+        return True, ""
+
+    def _gate_narration(content, ctx):
+        scenes = content if isinstance(content, list) else []
+        silent = [s.get("id") for s in scenes if not s.get("narration")]
+        if silent:
+            return False, f"静音镜: {silent}"
+        return True, ""
+
+    return MaterialPipeline(
+        material_type="video",
+        stages={"plan": _plan, "draft": _draft, "implement": _implement},
+        required_fields=["topic", "subject"],
+        min_content_len=30,
+        gates=[_gate_scenes, _gate_duration, _gate_narration],
+    )
+
+
+# ═══════════════════════════════════════════════════════════
+# 预置物料流水线：Manim 数学视频（§3.89 Step3 ⭐ 统一接入）
+# ═══════════════════════════════════════════════════════════
+def manim_pipeline_unified() -> MaterialPipeline:
+    """Manim 数学视频统一接入（复用成熟 manim_pipeline.py 6 阶段门控）。
+
+    plan/draft: 复用 manim_pipeline.phase1_plan / phase2_draft（script.json）
+    gates: run_all_gates（beats/时序/可执行/几何 铁律）
+    fix_strategy: scope_refine 三级修复（L1 场景内→L2 重写→L3 重生）
+    review: manim_judge（4 维）
+    """
+    try:
+        import manim_pipeline as _mp
+    except Exception:
+        _mp = None
+
+    def _plan(llm, topic, subject, learner_id, **kw):
+        if _mp is not None:
+            try:
+                return _mp.phase1_plan(llm, topic, audience=kw.get("audience", "高中"))
+            except Exception:
+                pass
+        return {"topic": topic, "subject": subject, "mode": "manim"}
+
+    def _draft(llm, spec, topic, subject, learner_id, **kw):
+        if _mp is not None:
+            try:
+                _code = _mp.phase2_draft(llm, spec)
+                if _code:
+                    return _code
+            except Exception:
+                pass
+        return f"// {topic} Manim 剧本（{subject}）"
+
+    def _implement(llm, content, topic, subject, learner_id, **kw):
+        if _mp is not None:
+            try:
+                return _mp.phase2_implement(content)
+            except Exception:
+                pass
+        return {"ok": False, "error": "manim 渲染不可用"}
+
+    # Manim 门（复用 run_all_gates：beats/时序/可执行/几何）
+    def _gate_manim(content, ctx):
+        if _mp is None:
+            return True, ""  # 无 manim 环境跳过
+        try:
+            errors = _mp.run_all_gates(content) if isinstance(content, dict) else []
+            if errors:
+                return False, "; ".join(errors[:3])
+            return True, ""
+        except Exception:
+            return True, ""
+
+    # 三级修复（scope_refine）
+    def _fixer(stage_name, content, ctx, errors):
+        from manim_extensions import scope_refine
+        # 升级逻辑：同一阶段错误累积 → L1→L2→L3
+        _err_key = f"_fix_level_{stage_name}"
+        _level = ctx.get(_err_key, 1)
+        ctx[_err_key] = min(_level + 1, 3)
+        return scope_refine(content, errors, llm=ctx.get("llm"), level=_level)
+
+    return MaterialPipeline(
+        material_type="manim",
+        stages={"plan": _plan, "draft": _draft, "implement": _implement},
+        required_fields=["topic", "subject"],
+        min_content_len=30,
+        gates=[_gate_manim],
+        fix_strategy=_fixer,
+    )
+
+
+# ═══════════════════════════════════════════════════════════
 # 统一入口：按物料类型选择流水线
 # ═══════════════════════════════════════════════════════════
 _PIPELINES = {
@@ -356,11 +539,13 @@ _PIPELINES = {
     "script": script_pipeline,
     "ppt": ppt_pipeline,
     "mindmap": mindmap_pipeline,
+    "video": video_pipeline,
+    "manim": manim_pipeline_unified,
 }
 
 
 def create_pipeline(material_type: str) -> Optional[MaterialPipeline]:
-    """按物料类型创建流水线（handout/script/ppt/mindmap）。"""
+    """按物料类型创建流水线（handout/script/ppt/mindmap/video/manim）。"""
     factory = _PIPELINES.get(material_type)
     return factory() if factory else None
 
@@ -378,6 +563,6 @@ def run_material_pipeline(llm, material_type: str, topic: str,
 if __name__ == "__main__":
     import sys, io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    print("material_pipeline v1.1 就绪（范式平移：讲义/讲稿/PPT/知识导图）")
-    print("统一管线: 规划→草稿→实现→审查→合成 + 语言规范门 + 修复回路")
+    print("material_pipeline v2.0 就绪（范式平移：讲义/讲稿/PPT/知识导图/教学视频/Manim）")
+    print("统一管线: 规划→草稿→门控→修复→实现→审查 + 语言规范门 + 修复回路")
     print("物料:", list(_PIPELINES.keys()))

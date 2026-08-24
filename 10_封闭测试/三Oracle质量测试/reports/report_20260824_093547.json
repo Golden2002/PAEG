@@ -1,0 +1,36 @@
+{
+  "mode": "material",
+  "timestamp": "2026-08-24 09:33:43",
+  "cases": [
+    {
+      "type": "material",
+      "result": {
+        "scores": {
+          "内容准确性": 5,
+          "内容详实度": 1,
+          "视觉/结构质量": 1,
+          "教学适用性": 1
+        },
+        "total": 40.0,
+        "evidence": {
+          "内容准确性": "内容为'数学动画已生成：观看/下载动画'，未涉及具体知识，无错误。",
+          "内容详实度": "仅提供标题和链接，无实质解释、例子或数据。",
+          "视觉/结构质量": "无排版或结构，仅文本链接。",
+          "教学适用性": "无导入、例题、练习或小结，无法直接用于课堂。"
+        },
+        "defects": [
+          {
+            "severity": "P1",
+            "desc": "总分 40.0 < 60，严重不达标",
+            "suggestion": "检查核心链路"
+          }
+        ],
+        "judge": "物料质量-math_video",
+        "material_type": "math_video",
+        "topic": "光合作用",
+        "screenshot": "D:\\桌面\\智能体架构与开发（含大模型）\\14_教育者Agent项目\\10_封闭测试\\三Oracle质量测试\\artifacts\\material_math_video.png",
+        "material_text": "数学动画已生成：观看/下载动画\n\n复制"
+      }
+    }
+  ]
+}

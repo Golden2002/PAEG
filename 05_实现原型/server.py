@@ -1136,6 +1136,81 @@ def _teach_stream_gen(data):
             yield from gen_handout_early()
             return
 
+        # §3.89 ⭐ 教学视频魔法关键词早退（magic:video "生成教学视频：主题"）
+        if _magic_intent == "video":
+            _vd_topic = _material_topic or "教学视频"
+            _vd_body = ""
+            try:
+                from subagents import _safe_chat
+                _vd_sys = (
+                    "你是教学视频编剧。为给定主题设计 3-8 个镜头（scene）的教学视频脚本，"
+                    "每镜：id、concept、narration（旁白台词）、duration_sec（8-15 秒）、"
+                    "visual_goal（画面目标）。总长 60-180 秒：引入（钩子）→主体→take-away 结尾。"
+                    "输出 JSON 数组 scenes。"
+                )
+                _vd_usr = f"主题：{_vd_topic}"
+                _vd_raw = _safe_chat(paeg.model, _vd_sys, _vd_usr, max_tokens=2000) or ""
+                import re as _re_vd
+                _m_vd = _re_vd.search(r"\[.*\]", _vd_raw, _re_vd.S)
+                if _m_vd:
+                    _scenes = json.loads(_m_vd.group(0))
+                    _vd_body = f"教学视频脚本已生成（{len(_scenes)} 镜）：\n"
+                    for _sc in _scenes[:8]:
+                        _vd_body += f"- [{_sc.get('duration_sec', 10)}s] {_sc.get('concept', '')}: {_sc.get('narration', '')}\n"
+                else:
+                    _vd_body = _vd_raw or f"教学视频脚本：{_vd_topic}"
+            except Exception as _ve:
+                print(f"[PAEG] 教学视频生成跳过: {_ve}")
+            if not _vd_body:
+                _vd_body = f"# {_vd_topic} 教学视频脚本\n\n## 引入\n（视频脚本生成失败，请重试）"
+            _save_teach_turn("video", _vd_body[:300])
+
+            def gen_video_early():
+                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _vd_body, 'step_type': 'video'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'video'}, ensure_ascii=False)}\n\n"
+            yield from gen_video_early()
+            return
+
+        # §3.89 ⭐ Manim 数学动画魔法关键词早退（magic:manim "生成数学动画：主题"）
+        if _magic_intent == "manim":
+            _mm_topic = _material_topic or "数学动画"
+            _mm_body = ""
+            _mm_url = ""
+            try:
+                from manim_service import generate_manim_video
+                _mm_result = generate_manim_video(_mm_topic, subject, learner_id) or {}
+                _mm_url = _mm_result.get("url") or _mm_result.get("video_path") or ""
+                _mm_ok = _mm_result.get("ok") or False
+                if _mm_ok and _mm_url:
+                    _mm_body = f"数学动画已生成：<a href='{_mm_url}' target='_blank'>观看/下载动画</a>"
+                elif _mm_ok:
+                    # 渲染成功但未取到 URL（降级路径）：给剧本摘要
+                    _mm_script = _mm_result.get("script") or _mm_result.get("code") or ""
+                    _mm_scenes = _mm_result.get("scenes")
+                    if isinstance(_mm_scenes, list):
+                        _mm_body = f"数学动画已生成（{len(_mm_scenes)} 镜）：\n"
+                        for _s in _mm_scenes[:6]:
+                            _mm_body += f"- {_s.get('concept', '')}: {str(_s.get('visual_goal') or _s.get('narration') or '')[:60]}\n"
+                    elif _mm_script:
+                        _mm_body = f"数学动画剧本已生成：\n{str(_mm_script)[:400]}"
+                    else:
+                        _mm_body = f"数学动画已生成（{_mm_topic}）。可查看 downloads/manim/ 目录。"
+                else:
+                    _mm_err = str(_mm_result.get("error") or "渲染超时")
+                    _mm_body = f"数学动画生成中（{_mm_topic}）：{_mm_err}。可稍后查看 downloads/manim/。"
+            except Exception as _mme:
+                print(f"[PAEG] Manim 动画生成跳过: {_mme}")
+                _mm_body = f"数学动画生成中（{_mm_topic}）。请稍后在 downloads/manim/ 查看。"
+            if not _mm_body:
+                _mm_body = f"数学动画生成中（{_mm_topic}）。请稍后在 downloads/manim/ 查看。"
+            _save_teach_turn("manim", _mm_body[:300])
+
+            def gen_manim_early():
+                yield f"event: presentation\ndata: {json.dumps({'step_id': 1, 'content': _mm_body, 'step_type': 'manim'}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'status': 'completed', 'mode': 'manim', 'url': _mm_url}, ensure_ascii=False)}\n\n"
+            yield from gen_manim_early()
+            return
+
         _lp_pending_key = f"lesson_prep_pending_{learner_id}"
         _pending = SESSIONS.get(_lp_pending_key)
         # ── 引导后补充合并：pending 标记 + 确定性短路（A+ 方案：结构化 intent_frame）──

@@ -1,0 +1,385 @@
+{
+  "meta": {
+    "title": "光合作用：光能转化为化学能的数学直觉",
+    "subject": "生物",
+    "grade_level": "高中",
+    "duration_sec": 120,
+    "style": "3blue1brown",
+    "core_intuition": "光合作用本质上是能量形式的转换：光能（输入）转化为化学能（储存于葡萄糖），效率由能量转换率衡量。",
+    "learning_objectives": [
+      "理解光合作用的总反应式（CO2 + H2O → 葡萄糖 + O2）",
+      "理解光反应与暗反应的能量流动",
+      "掌握能量转换效率的计算方法"
+    ]
+  },
+  "narrative_arc": {
+    "hook": "太阳的能量如何进入食物链？",
+    "build": "展示光能输入与化学能储存的对比",
+    "climax": "揭示能量转换效率的数学关系",
+    "resolution": "总结光合作用的核心意义"
+  },
+  "visual_system": {
+    "palette": {
+      "light_energy": "#FFD700",
+      "chemical_energy": "#32CD32",
+      "reactant": "#1E90FF",
+      "product": "#FF6347",
+      "background": "#0D1117",
+      "text": "#E6E6E6"
+    },
+    "semantic_mapping": {
+      "light_energy": "太阳光能（输入）",
+      "chemical_energy": "化学能（葡萄糖中的能量）",
+      "reactant": "反应物（CO2, H2O）",
+      "product": "产物（葡萄糖, O2）",
+      "background": "深色背景",
+      "text": "文字颜色"
+    }
+  },
+  "scenes": [
+    {
+      "id": "scene1",
+      "concept": "光能输入",
+      "duration_sec": 15,
+      "prerequisites": [],
+      "narration": "太阳是地球生命能量的最终来源。",
+      "on_screen_text": "太阳",
+      "animations": [
+        {
+          "t": 0,
+          "type": "create",
+          "target": "sun",
+          "mobject": "Circle",
+          "config": {
+            "radius": 1,
+            "color": "light_energy",
+            "fill_opacity": 0.8
+          }
+        },
+        {
+          "t": 1,
+          "type": "add_rays",
+          "target": "sun_rays",
+          "mobject": "Line",
+          "config": {
+            "from": "sun",
+            "to": "right",
+            "color": "light_energy",
+            "stroke_width": 3
+          }
+        },
+        {
+          "t": 3,
+          "type": "label",
+          "target": "sun_label",
+          "mobject": "Text",
+          "config": {
+            "text": "太阳",
+            "color": "text"
+          }
+        }
+      ],
+      "pause_after_sec": 3
+    },
+    {
+      "id": "scene2",
+      "concept": "化学能储存",
+      "duration_sec": 15,
+      "prerequisites": [
+        "scene1"
+      ],
+      "narration": "植物通过光合作用将光能转化为化学能，储存在葡萄糖中。",
+      "on_screen_text": "葡萄糖",
+      "animations": [
+        {
+          "t": 0,
+          "type": "create",
+          "target": "leaf",
+          "mobject": "SVG",
+          "config": {
+            "path": "leaf.svg",
+            "color": "chemical_energy",
+            "scale": 1.5
+          }
+        },
+        {
+          "t": 1,
+          "type": "create",
+          "target": "glucose",
+          "mobject": "Circle",
+          "config": {
+            "radius": 0.8,
+            "color": "chemical_energy",
+            "fill_opacity": 0.5
+          }
+        },
+        {
+          "t": 2,
+          "type": "label",
+          "target": "glucose_label",
+          "mobject": "Text",
+          "config": {
+            "text": "葡萄糖",
+            "color": "text"
+          }
+        },
+        {
+          "t": 4,
+          "type": "arrow",
+          "target": "arrow",
+          "mobject": "Arrow",
+          "config": {
+            "from": "leaf",
+            "to": "glucose",
+            "color": "chemical_energy"
+          }
+        }
+      ],
+      "pause_after_sec": 3
+    },
+    {
+      "id": "scene3",
+      "concept": "光合作用方程式",
+      "duration_sec": 20,
+      "prerequisites": [
+        "scene1",
+        "scene2"
+      ],
+      "narration": "光合作用的化学方程式为：6CO2 + 6H2O 在光能作用下生成 C6H12O6 + 6O2。",
+      "on_screen_text": "6CO2+6H2O→C6H12O6+6O2",
+      "animations": [
+        {
+          "t": 0,
+          "type": "create",
+          "target": "equation",
+          "mobject": "MathTex",
+          "config": {
+            "tex": "6CO_2 + 6H_2O \\rightarrow C_6H_{12}O_6 + 6O_2",
+            "color": "text"
+          }
+        },
+        {
+          "t": 1,
+          "type": "highlight",
+          "target": "reactants",
+          "mobject": "MathTex",
+          "config": {
+            "tex": "6CO_2 + 6H_2O",
+            "color": "reactant"
+          }
+        },
+        {
+          "t": 3,
+          "type": "highlight",
+          "target": "products",
+          "mobject": "MathTex",
+          "config": {
+            "tex": "C_6H_{12}O_6 + 6O_2",
+            "color": "product"
+          }
+        },
+        {
+          "t": 5,
+          "type": "add_light",
+          "target": "light_arrow",
+          "mobject": "Arrow",
+          "config": {
+            "from": "above",
+            "to": "equation",
+            "color": "light_energy"
+          }
+        }
+      ],
+      "pause_after_sec": 4
+    },
+    {
+      "id": "scene4",
+      "concept": "光反应与暗反应",
+      "duration_sec": 25,
+      "prerequisites": [
+        "scene3"
+      ],
+      "narration": "光合作用分为光反应和暗反应两个阶段。光反应需要光，产生ATP和NADPH；暗反应利用这些能量固定CO2。",
+      "on_screen_text": "光反应→暗反应",
+      "animations": [
+        {
+          "t": 0,
+          "type": "create",
+          "target": "light_reaction",
+          "mobject": "Rectangle",
+          "config": {
+            "width": 2,
+            "height": 1,
+            "color": "light_energy",
+            "fill_opacity": 0.3
+          }
+        },
+        {
+          "t": 1,
+          "type": "label",
+          "target": "light_label",
+          "mobject": "Text",
+          "config": {
+            "text": "光反应",
+            "color": "text"
+          }
+        },
+        {
+          "t": 2,
+          "type": "create",
+          "target": "dark_reaction",
+          "mobject": "Rectangle",
+          "config": {
+            "width": 2,
+            "height": 1,
+            "color": "chemical_energy",
+            "fill_opacity": 0.3
+          }
+        },
+        {
+          "t": 3,
+          "type": "label",
+          "target": "dark_label",
+          "mobject": "Text",
+          "config": {
+            "text": "暗反应",
+            "color": "text"
+          }
+        },
+        {
+          "t": 4,
+          "type": "arrow",
+          "target": "reaction_arrow",
+          "mobject": "Arrow",
+          "config": {
+            "from": "light_reaction",
+            "to": "dark_reaction",
+            "color": "text"
+          }
+        },
+        {
+          "t": 6,
+          "type": "add_text",
+          "target": "atp_nadph",
+          "mobject": "Text",
+          "config": {
+            "text": "ATP, NADPH",
+            "color": "chemical_energy"
+          }
+        }
+      ],
+      "pause_after_sec": 4
+    },
+    {
+      "id": "scene5",
+      "concept": "能量转换效率",
+      "duration_sec": 25,
+      "prerequisites": [
+        "scene4"
+      ],
+      "narration": "光能到化学能的转换效率约为30%，即大约三分之一的太阳能被储存。",
+      "on_screen_text": "效率≈30%",
+      "animations": [
+        {
+          "t": 0,
+          "type": "create",
+          "target": "energy_bar",
+          "mobject": "Rectangle",
+          "config": {
+            "width": 4,
+            "height": 0.5,
+            "color": "light_energy",
+            "fill_opacity": 0.5
+          }
+        },
+        {
+          "t": 1,
+          "type": "fill_part",
+          "target": "stored_energy",
+          "mobject": "Rectangle",
+          "config": {
+            "width": 1.2,
+            "height": 0.5,
+            "color": "chemical_energy",
+            "fill_opacity": 0.8
+          }
+        },
+        {
+          "t": 3,
+          "type": "add_percentage",
+          "target": "percentage",
+          "mobject": "Text",
+          "config": {
+            "text": "30%",
+            "color": "text"
+          }
+        }
+      ],
+      "pause_after_sec": 4
+    },
+    {
+      "id": "scene6",
+      "concept": "总结与意义",
+      "duration_sec": 20,
+      "prerequisites": [
+        "scene5"
+      ],
+      "narration": "光合作用将太阳能转化为化学能，支撑了地球生命。",
+      "on_screen_text": "光合作用",
+      "animations": [
+        {
+          "t": 0,
+          "type": "create",
+          "target": "sun_small",
+          "mobject": "Circle",
+          "config": {
+            "radius": 0.5,
+            "color": "light_energy",
+            "fill_opacity": 0.8
+          }
+        },
+        {
+          "t": 1,
+          "type": "create",
+          "target": "leaf_small",
+          "mobject": "SVG",
+          "config": {
+            "path": "leaf.svg",
+            "color": "chemical_energy",
+            "scale": 0.8
+          }
+        },
+        {
+          "t": 2,
+          "type": "arrow",
+          "target": "final_arrow",
+          "mobject": "Arrow",
+          "config": {
+            "from": "sun_small",
+            "to": "leaf_small",
+            "color": "light_energy"
+          }
+        },
+        {
+          "t": 4,
+          "type": "add_text",
+          "target": "conclusion",
+          "mobject": "Text",
+          "config": {
+            "text": "光能→化学能",
+            "color": "text"
+          }
+        }
+      ],
+      "pause_after_sec": 3
+    }
+  ],
+  "qa_self_check": {
+    "no_formula_in_first_two_scenes": true,
+    "single_focus_per_scene": true,
+    "consistent_color_semantics": true,
+    "adequate_pauses": true,
+    "duration_match": true,
+    "notes": "所有场景均符合规则；前两个场景无公式，颜色语义一致，关键处停顿足够，总时长120秒。"
+  }
+}

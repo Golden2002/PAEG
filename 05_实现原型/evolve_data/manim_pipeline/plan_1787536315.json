@@ -1,0 +1,573 @@
+{
+  "meta": {
+    "title": "导数的直觉：切线的斜率",
+    "subject": "导数",
+    "audience": "高中",
+    "target_duration_sec": 120,
+    "style": "3blue1brown",
+    "core_intuition": "导数描述的是函数在某一点的瞬时变化率，几何上表现为切线的斜率。",
+    "learning_objectives": [
+      "理解平均变化率与瞬时变化率的区别",
+      "理解割线趋近于切线的过程",
+      "掌握导数作为切线斜率的几何意义"
+    ]
+  },
+  "narrative_arc": {
+    "hook": "从汽车速度表引入变化率的概念",
+    "build": "从平均速度到瞬时速度，从割线到切线",
+    "climax": "割线极限为切线，斜率即导数",
+    "resolution": "导数符号与几何意义的统一"
+  },
+  "visual_system": {
+    "palette": {
+      "function_curve": "#58C4DD",
+      "secant_line": "#FFB000",
+      "tangent_line": "#FF4D4D",
+      "point": "#FFFFFF",
+      "axis": "#888888",
+      "text": "#FFFFFF",
+      "highlight": "#FFD700"
+    },
+    "semantic_binding": {
+      "function_curve": "函数曲线",
+      "secant_line": "割线（平均变化率）",
+      "tangent_line": "切线（瞬时变化率）",
+      "point": "动点/切点",
+      "axis": "坐标轴",
+      "text": "文字标注",
+      "highlight": "关键提示"
+    },
+    "spatial_layout": {
+      "origin": "center",
+      "x_range": [
+        -2,
+        4
+      ],
+      "y_range": [
+        -1,
+        5
+      ],
+      "function_position": "center"
+    }
+  },
+  "scenes": [
+    {
+      "id": "scene1",
+      "concept": "变化率引入",
+      "duration_sec": 20,
+      "narration": "想象一辆汽车在行驶，速度表显示的是瞬时速度，它是如何计算的呢？",
+      "on_screen_text": "瞬时速度？",
+      "prerequisites": [],
+      "mobjects": [
+        {
+          "id": "car_icon",
+          "type": "icon",
+          "description": "汽车图标",
+          "color": "highlight"
+        },
+        {
+          "id": "speedometer",
+          "type": "icon",
+          "description": "速度表盘",
+          "color": "text"
+        },
+        {
+          "id": "road",
+          "type": "line",
+          "description": "水平道路",
+          "color": "axis"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "target": "car_icon",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2,
+          "action": "create",
+          "target": "speedometer",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5,
+          "action": "move",
+          "target": "car_icon",
+          "to": "right",
+          "duration": 5,
+          "rate_func": "linear"
+        },
+        {
+          "t": 12,
+          "action": "highlight",
+          "target": "speedometer",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 16,
+          "action": "write",
+          "target": "text",
+          "content": "瞬时速度？",
+          "duration": 2,
+          "rate_func": "smooth"
+        }
+      ],
+      "pause_after_sec": 2
+    },
+    {
+      "id": "scene2",
+      "concept": "平均变化率",
+      "duration_sec": 25,
+      "narration": "在一段时间内，汽车行驶的距离除以时间，得到的是平均速度。",
+      "on_screen_text": "平均速度",
+      "prerequisites": [
+        "scene1"
+      ],
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "color": "axis",
+          "x_range": [
+            -2,
+            4
+          ],
+          "y_range": [
+            -1,
+            5
+          ]
+        },
+        {
+          "id": "curve",
+          "type": "function_graph",
+          "function": "x^2",
+          "color": "function_curve"
+        },
+        {
+          "id": "point_A",
+          "type": "point",
+          "position": [
+            1,
+            1
+          ],
+          "color": "point"
+        },
+        {
+          "id": "point_B",
+          "type": "point",
+          "position": [
+            3,
+            9
+          ],
+          "color": "point"
+        },
+        {
+          "id": "secant_AB",
+          "type": "line",
+          "from": "point_A",
+          "to": "point_B",
+          "color": "secant_line"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "target": "axes",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2,
+          "action": "create",
+          "target": "curve",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5,
+          "action": "create",
+          "target": "point_A",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 7,
+          "action": "create",
+          "target": "point_B",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 10,
+          "action": "draw_line",
+          "target": "secant_AB",
+          "duration": 2,
+          "rate_func": "linear"
+        },
+        {
+          "t": 15,
+          "action": "write",
+          "target": "text",
+          "content": "平均速度",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 20,
+          "action": "highlight",
+          "target": "secant_AB",
+          "duration": 3,
+          "rate_func": "smooth"
+        }
+      ],
+      "pause_after_sec": 2
+    },
+    {
+      "id": "scene3",
+      "concept": "瞬时变化率",
+      "duration_sec": 30,
+      "narration": "如果让B点越来越靠近A点，割线会逐渐变成切线，此时割线的斜率就是瞬时速度。",
+      "on_screen_text": "割线→切线",
+      "prerequisites": [
+        "scene2"
+      ],
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "color": "axis",
+          "x_range": [
+            -2,
+            4
+          ],
+          "y_range": [
+            -1,
+            5
+          ]
+        },
+        {
+          "id": "curve",
+          "type": "function_graph",
+          "function": "x^2",
+          "color": "function_curve"
+        },
+        {
+          "id": "point_A",
+          "type": "point",
+          "position": [
+            1,
+            1
+          ],
+          "color": "point"
+        },
+        {
+          "id": "point_B",
+          "type": "point",
+          "position": [
+            3,
+            9
+          ],
+          "color": "point"
+        },
+        {
+          "id": "secant_AB",
+          "type": "line",
+          "from": "point_A",
+          "to": "point_B",
+          "color": "secant_line"
+        },
+        {
+          "id": "tangent_at_A",
+          "type": "line",
+          "from": "point_A",
+          "direction": "slope_2",
+          "color": "tangent_line"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "target": "axes",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2,
+          "action": "create",
+          "target": "curve",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5,
+          "action": "create",
+          "target": "point_A",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 7,
+          "action": "move",
+          "target": "point_B",
+          "to": "towards_A",
+          "duration": 10,
+          "rate_func": "linear"
+        },
+        {
+          "t": 10,
+          "action": "redraw_line",
+          "target": "secant_AB",
+          "duration": 10,
+          "rate_func": "linear"
+        },
+        {
+          "t": 18,
+          "action": "create",
+          "target": "tangent_at_A",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 22,
+          "action": "fade_out",
+          "target": "secant_AB",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 25,
+          "action": "write",
+          "target": "text",
+          "content": "割线→切线",
+          "duration": 2,
+          "rate_func": "smooth"
+        }
+      ],
+      "pause_after_sec": 3
+    },
+    {
+      "id": "scene4",
+      "concept": "导数符号",
+      "duration_sec": 25,
+      "narration": "这个切线的斜率，我们称之为导数，记作 f'(x)。它表示函数在这一点上的瞬时变化率。",
+      "on_screen_text": "f'(x)",
+      "prerequisites": [
+        "scene3"
+      ],
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "color": "axis",
+          "x_range": [
+            -2,
+            4
+          ],
+          "y_range": [
+            -1,
+            5
+          ]
+        },
+        {
+          "id": "curve",
+          "type": "function_graph",
+          "function": "x^2",
+          "color": "function_curve"
+        },
+        {
+          "id": "point_A",
+          "type": "point",
+          "position": [
+            1,
+            1
+          ],
+          "color": "point"
+        },
+        {
+          "id": "tangent_at_A",
+          "type": "line",
+          "from": "point_A",
+          "direction": "slope_2",
+          "color": "tangent_line"
+        },
+        {
+          "id": "slope_label",
+          "type": "text",
+          "content": "斜率=2",
+          "color": "highlight"
+        },
+        {
+          "id": "derivative_symbol",
+          "type": "text",
+          "content": "f'(x)",
+          "color": "text"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "target": "axes",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2,
+          "action": "create",
+          "target": "curve",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5,
+          "action": "create",
+          "target": "point_A",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 7,
+          "action": "create",
+          "target": "tangent_at_A",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 10,
+          "action": "write",
+          "target": "slope_label",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 15,
+          "action": "write",
+          "target": "derivative_symbol",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 20,
+          "action": "highlight",
+          "target": "tangent_at_A",
+          "duration": 3,
+          "rate_func": "smooth"
+        }
+      ],
+      "pause_after_sec": 3
+    },
+    {
+      "id": "scene5",
+      "concept": "总结与展望",
+      "duration_sec": 20,
+      "narration": "导数就是切线的斜率，它帮助我们理解变化。在接下来的学习中，我们将深入探讨如何计算导数。",
+      "on_screen_text": "导数=斜率",
+      "prerequisites": [
+        "scene4"
+      ],
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "axes",
+          "color": "axis",
+          "x_range": [
+            -2,
+            4
+          ],
+          "y_range": [
+            -1,
+            5
+          ]
+        },
+        {
+          "id": "curve",
+          "type": "function_graph",
+          "function": "x^2",
+          "color": "function_curve"
+        },
+        {
+          "id": "point_A",
+          "type": "point",
+          "position": [
+            1,
+            1
+          ],
+          "color": "point"
+        },
+        {
+          "id": "tangent_at_A",
+          "type": "line",
+          "from": "point_A",
+          "direction": "slope_2",
+          "color": "tangent_line"
+        },
+        {
+          "id": "summary_text",
+          "type": "text",
+          "content": "导数=斜率",
+          "color": "highlight"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "target": "axes",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2,
+          "action": "create",
+          "target": "curve",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5,
+          "action": "create",
+          "target": "point_A",
+          "duration": 1,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 7,
+          "action": "create",
+          "target": "tangent_at_A",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 10,
+          "action": "write",
+          "target": "summary_text",
+          "duration": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 15,
+          "action": "fade_out",
+          "target": "all",
+          "duration": 3,
+          "rate_func": "smooth"
+        }
+      ],
+      "pause_after_sec": 3
+    }
+  ],
+  "qa_self_check": {
+    "no_formulas_in_first_two_scenes": true,
+    "single_concept_per_scene": true,
+    "color_semantics_consistent": true,
+    "pause_after_key_moments": true,
+    "duration_within_target": true,
+    "notes": "前两个场景未出现公式，符合要求。每个场景聚焦单一概念，颜色语义一致，关键处有停顿。"
+  }
+}

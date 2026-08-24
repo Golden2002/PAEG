@@ -1,3 +1,29 @@
+﻿﻿### v1.2.27 §3.89-§3.90 物料制作统一流水线 + 全体系盘点（2026-08-24 ⭐）
+
+**本版定位**：Round 13——物料制作从"单点能力"升级为"统一流水线 + 全体系盘点"，并落实网页端真实生成可下载。
+
+**1. MaterialPipeline v2.0（扩展而非重构）**
+- `material_pipeline.py` 六阶段（规划→草稿→门控→修复→实现→合成）+ **可插拔 gates/fix_strategy 槽位**（v1.1 行为 ratchet 保持）
+- `gates_lib.py` 通用门库（PPT 3 门/讲义 3 门/导图 2 门，GATE_REGISTRY 按物料装配）
+- `fixers_lib.py` 三修复策略（retry 同级重生成 / escalate ScopeRefine 三级 / regenerate 整体重跑）
+
+**2. 六类物料管线注册**
+- 新增 `video_pipeline`（教学视频：scenes 8-15s 分镜 + 镜数/时长/旁白三门 + TTS mux）
+- 新增 `manim_pipeline_unified`（复用成熟 6 阶段管线 + run_all_gates 门 + scope_refine 修复）
+- 全套 6 类：handout/script/ppt/mindmap/video/manim——`create_pipeline`/`run_material_pipeline` 统一入口
+
+**3. Manim 补 4 缺口（对标 claude2video/Code2Video）**
+- `teaching_scene.py`：TeachingScene 基类（Anchor Grid 6×6 定位 + Block Cleanup VGroup+FadeOut）
+- `manim_extensions.py`：ScopeRefine 三级修复（L1 场景内→L2 重写→L3 全剧本重生）+ TTS mux（edge-tts + ffmpeg）
+
+**4. 网页端真实下载验证（用户核心诉求 ⭐）**
+- 发现并修复：manim/video 魔法关键词落入普通教学流（PPT/handout 有早退分支，manim/video 缺失）→ server.py 补 manim/video 早退分支
+- Playwright 实测：「生成数学动画：导数」→ 真实渲染 DerivativeVisual.mp4（761KB）→ 下载 HTTP 200 video/mp4 ✅
+
+**5. 物料体系全盘点（§3.90 · 10 类产出 + 4 类文档流）**
+- A 统一管线 6 类 + B 独立生成器 4 类（quiz/article/study_plan/lesson_prep 五件套）+ C 前端入口（6 按钮 + 4 chip 填前缀激活）
+- 测试：test_unified_pipeline.py 28/28 全绿；三 Oracle 四类物料实测（PPT 69.0/讲义 96.0/教学视频 77.2/数学动画 49.0）
+
 ### v1.2.26 §3.79 用户反馈两项修复：知识库徽章粘连 + "我在这里听着你"病句（2026-08-23 ⭐）
 
 **本版定位**：Round 12 续——用户经前端反馈的两个真实问题（①知识库检索徽章与回答内容粘连；②对话里"我在这里听着你"病句），各按"根因定位→确定性修复→验证"闭环处理。
