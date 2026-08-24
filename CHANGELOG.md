@@ -1,4 +1,26 @@
-﻿﻿### v1.2.27 §3.89-§3.90 物料制作统一流水线 + 全体系盘点（2026-08-24 ⭐）
+﻿﻿### v1.2.28 §3.87-§3.101 物料体系全面升级 + 动态约束 + 分阶段联通（2026-08-24 ⭐）
+
+**本版定位**：物料生产从"单点生成"升级为"分阶段联通 + harness 驱动 + 3B1B 质量"，教学输出引入动态约束架构 + PromptRegistry。
+
+**物料体系**：
+- 物料触发双路径（按钮填前缀不发送 + 6 精确关键词零正则）
+- material_prompts 5 类结构化模板 + MaterialPipeline v2.0（gates/fix 槽位）
+- material_router 数据驱动路由 + sse_presenter 统一 SSE（6 分支→6 行）
+- 物料种类盘点：10 类产出 + 4 类文档流
+
+**分阶段联通（§3.94）**：run_pipeline job_id 落盘（脚本/代码/manifest）+ 下载 API + SSE 阶段进度 + 前端三阶段进度条 + 用户详细要求注入
+
+**三层联通（§3.95）**：用户输入拼进所有生成提示词 + material_harness（AgentEngine Plan→Act→Observe→Reflect 驱动物料）
+
+**动态约束（§3.92/3.96）**：constraint_config 扩展（layer_meta + skeleton_full + default_layer 7）+ 教授级 6 层骨架挂 D 层 + PromptRegistry（19 块 7 情景）+ 移除类型化硬分支
+
+**manim 质量（§3.97-3.100）**：MiKTeX LaTeX + ffmpeg PATH + 代码清洗 + 渲染模板兜底 + 评测改评代码质量（5 维 rubric）+ 3B1B 三件套（钩子/recap 铁律 + manim_judge 7 维 + 公式推导链模板）
+
+**渲染统一（§3.93）**：SVG 矢量直出 + render/ 权威目录 + Mermaid neutral 化
+
+**专项验证（§3.101）**：128 测试绿 + 教学流 17 轮 + 倾诉 100 分 + 查资料/知识库正常——基础上提升非拆东墙
+
+### v1.2.27 §3.89-§3.90 物料制作统一流水线 + 全体系盘点（2026-08-24 ⭐）
 
 **本版定位**：Round 13——物料制作从"单点能力"升级为"统一流水线 + 全体系盘点"，并落实网页端真实生成可下载。
 
