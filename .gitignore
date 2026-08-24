@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -68,3 +68,22 @@ Library/common/张宇扬课件/**/*.txt
 
 # §3.79 Round 11 ⭐ 课件文本提取缓存（14MB，本地生成，不入库——可随时重建）
 Library/.courseware_cache.json
+
+# §3.108 ⭐ 动态生成文件（日志/运行时数据）——不提交，可完整恢复项目
+05_实现原型/events.jsonl
+05_实现原型/evolve_data/*.jsonl
+05_实现原型/evolve_data/reflection_log.json
+05_实现原型/evolve_data/rollout.db
+05_实现原型/memory/subject_patches.md
+05_实现原型/evolve_data/manim_pipeline/jobs/
+05_实现原型/evolve_data/material_pipeline/
+
+# 动态生成文件（日志/运行时）——全部排除，可完整恢复
+**/evolve_data/*.jsonl
+**/evolve_data/manim_pipeline/jobs/
+**/evolve_data/material_pipeline/
+**/evolve_data/reflection_log.json
+**/evolve_data/rollout.db
+**/memory/subject_patches.md
+**/events.jsonl
+**/uploads/
