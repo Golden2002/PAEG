@@ -1,0 +1,214 @@
+{
+  "meta": {
+    "title": "导数与切线",
+    "subject": "数学",
+    "grade_level": "高中",
+    "total_duration_sec": 120,
+    "style": "3blue1brown",
+    "core_intuition": "切线是割线趋近极限的产物，导数是该极限的斜率",
+    "learning_objectives": [
+      "理解切线是割线在两点无限接近时的极限位置",
+      "理解导数的几何意义是切线的斜率",
+      "能通过观察割线逼近过程建立对导数定义的直观认识"
+    ]
+  },
+  "narrative_arc": {
+    "hook": "从一个具体函数图像上的动点出发，观察过两点的割线如何随一点靠近另一点而变化",
+    "build": "逐步引入割线斜率，通过多次取点逼近，展示割线趋近于一条确定的直线",
+    "climax": "割线趋近于极限位置，即切线，切线的斜率即为导数",
+    "resolution": "将导数符号与切线斜率对应，总结核心直觉"
+  },
+  "visual_system": {
+    "palette": {
+      "function_curve": "#4ECDC4",
+      "secant_line": "#FF6B6B",
+      "tangent_line": "#FFD93D",
+      "moving_point": "#FFD93D",
+      "fixed_point": "#FF6B6B",
+      "coordinate_axes": "#FFFFFF",
+      "text": "#FFFFFF",
+      "highlight": "#FF6B6B"
+    },
+    "semantic_mapping": {
+      "function_curve": "函数图像",
+      "secant_line": "割线",
+      "tangent_line": "切线",
+      "moving_point": "动点",
+      "fixed_point": "定点",
+      "coordinate_axes": "坐标轴",
+      "text": "文字说明",
+      "highlight": "强调"
+    },
+    "global_objects": [
+      {
+        "id": "axes",
+        "type": "coordinate_axes",
+        "description": "二维坐标轴，x轴和y轴"
+      },
+      {
+        "id": "curve",
+        "type": "function_curve",
+        "description": "函数f(x)=0.2*(x-2)^2+1的图像，颜色为青色"
+      },
+      {
+        "id": "fixed_point",
+        "type": "point",
+        "description": "固定点P，坐标为(2,1)，颜色为红色"
+      },
+      {
+        "id": "moving_point",
+        "type": "point",
+        "description": "动点Q，在曲线上移动，颜色为黄色"
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": "scene_1_intro",
+      "concept": "切线直观印象",
+      "duration_sec": 15,
+      "narration": "想象一条平滑的曲线，比如这个抛物线。在曲线上有一个点P。你可能会好奇，过点P的切线是什么？它看起来是一条刚好擦过曲线的直线。",
+      "on_screen_text": "切线是什么？",
+      "prerequisites": [],
+      "visual_goal": "展示函数曲线和定点P，让观众对切线有直观印象",
+      "animations": [
+        {
+          "t": 0.0,
+          "mobject_id": "axes",
+          "action": "create",
+          "description": "创建坐标轴"
+        },
+        {
+          "t": 0.5,
+          "mobject_id": "curve",
+          "action": "create",
+          "description": "绘制抛物线"
+        },
+        {
+          "t": 1.5,
+          "mobject_id": "fixed_point",
+          "action": "create",
+          "description": "显示固定点P"
+        }
+      ]
+    },
+    {
+      "id": "scene_2_secant",
+      "concept": "割线定义",
+      "duration_sec": 25,
+      "narration": "现在，在曲线上取另一个点Q，过P和Q画一条直线。这条直线叫割线。当Q离P较远时，割线斜得很明显。",
+      "on_screen_text": "割线：过曲线上两点的直线",
+      "prerequisites": [
+        "scene_1_intro"
+      ],
+      "visual_goal": "展示割线连接P和Q，并标注割线",
+      "animations": [
+        {
+          "t": 0.0,
+          "mobject_id": "moving_point",
+          "action": "create",
+          "description": "在曲线上创建动点Q，初始位置远离P"
+        },
+        {
+          "t": 1.0,
+          "mobject_id": "secant_line",
+          "action": "create",
+          "description": "绘制过P和Q的割线，颜色为红色"
+        },
+        {
+          "t": 2.0,
+          "mobject_id": "text_label",
+          "action": "create",
+          "description": "显示文字'割线'"
+        }
+      ]
+    },
+    {
+      "id": "scene_3_approach",
+      "concept": "割线逼近",
+      "duration_sec": 30,
+      "narration": "现在让Q沿着曲线向P移动。观察割线怎样变化？它越来越接近一条特定的直线。我们多试几个位置。",
+      "on_screen_text": "Q向P靠近，割线在变化",
+      "prerequisites": [
+        "scene_2_secant"
+      ],
+      "visual_goal": "展示Q向P移动时割线逐渐逼近切线的过程",
+      "animations": [
+        {
+          "t": 0.0,
+          "mobject_id": "moving_point",
+          "action": "move",
+          "description": "Q沿曲线向P移动"
+        },
+        {
+          "t": 2.0,
+          "mobject_id": "secant_line",
+          "action": "update",
+          "description": "割线随Q移动而更新"
+        },
+        {
+          "t": 4.0,
+          "mobject_id": "moving_point",
+          "action": "move",
+          "description": "Q进一步靠近P"
+        }
+      ]
+    },
+    {
+      "id": "scene_4_limit",
+      "concept": "极限位置",
+      "duration_sec": 20,
+      "narration": "当Q无限接近P时，割线趋近于一条确定的直线，这就是切线。切线的斜率就是导数。",
+      "on_screen_text": "切线：割线的极限位置",
+      "prerequisites": [
+        "scene_3_approach"
+      ],
+      "visual_goal": "展示割线变为切线的瞬间，并高亮切线",
+      "animations": [
+        {
+          "t": 0.0,
+          "mobject_id": "moving_point",
+          "action": "move",
+          "description": "Q移动到几乎与P重合"
+        },
+        {
+          "t": 1.5,
+          "mobject_id": "secant_line",
+          "action": "transform",
+          "description": "割线逐渐变为切线"
+        },
+        {
+          "t": 3.0,
+          "mobject_id": "tangent_line",
+          "action": "create",
+          "description": "显示切线，颜色为黄色"
+        }
+      ]
+    },
+    {
+      "id": "scene_5_conclusion",
+      "concept": "导数几何意义",
+      "duration_sec": 15,
+      "narration": "所以，导数就是切线的斜率。它描述了函数在这一点变化的快慢。",
+      "on_screen_text": "导数 = 切线的斜率",
+      "prerequisites": [
+        "scene_4_limit"
+      ],
+      "visual_goal": "在切线上标注斜率，并总结导数与切线斜率的关系",
+      "animations": [
+        {
+          "t": 0.0,
+          "mobject_id": "tangent_line",
+          "action": "highlight",
+          "description": "高亮切线"
+        },
+        {
+          "t": 1.0,
+          "mobject_id": "text_derivative",
+          "action": "create",
+          "description": "显示文字'导数 = 斜率'"
+        }
+      ]
+    }
+  ]
+}

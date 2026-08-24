@@ -156,6 +156,19 @@ def _sanitize_code_no_latex(code: str) -> str:
     if not code:
         return code
     _orig = code
+    # 0) 剥离 markdown 代码块外壳（LLM 常输出 ```python ... ```）
+    _m = re.search(r"```(?:python)?\s*\n(.*?)```", code, re.S)
+    if _m:
+        code = _m.group(1)
+    # 0.5) 剥离首部说明文字（LLM 常加"以下是修复版代码"等）——定位 class/from manim/import 起点
+    _lines = [ln for ln in code.split("\n")]
+    _start = 0
+    for _i, _ln in enumerate(_lines):
+        if "class " in _ln or "from manim" in _ln or _ln.strip().startswith("import "):
+            _start = _i
+            break
+    if _start > 0:
+        code = "\n".join(_lines[_start:])
     # 1) MathTex/Tex → Text（无 LaTeX 时降级）
     if not _LATEX_OK:
         code = code.replace("MathTex(", "Text(").replace("Tex(", "Text(")
@@ -168,8 +181,56 @@ def _sanitize_code_no_latex(code: str) -> str:
     # 3) 剥离 LaTeX $ 符号残留
     code = code.replace("$", "")
     if code != _orig:
-        print("[manim_service] 代码清洗：MathTex/全角标点/LaTeX 残留已处理")
+        print("[manim_service] 代码清洗：代码块/说明/MathTex/全角/LaTeX 残留已处理")
     return code
+
+def _find_renderable_scene(code: str) -> str:
+    """§3.97 ⭐ 找可渲染的 Scene 类：含 construct 方法的 Scene 子类。
+
+    LLM 常生成多场景剧本（S1-S6 继承基类），基类可能仅 setup 无 construct——
+    需跳过基类，选含 construct 的具体场景类。返回类名；无则回退 'Scene'。
+    """
+    import ast as _ast
+    try:
+        tree = _ast.parse(code)
+    except Exception:
+        m = re.search(r"class\s+(\w+)\s*\(", code)
+        return m.group(1) if m else "Scene"
+    # 收集 Scene 子类（直接或间接继承）及其 construct 状态
+    class_info = {}
+    scene_names = {"Scene", "ThreeDScene"}
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.ClassDef):
+            bases = []
+            for b in node.bases:
+                if isinstance(b, _ast.Name):
+                    bases.append(b.id)
+                elif isinstance(b, _ast.Attribute):
+                    bases.append(b.attr)
+            has_construct = any(isinstance(i, _ast.FunctionDef) and i.name == "construct"
+                                for i in node.body)
+            class_info[node.name] = {"bases": bases, "construct": has_construct}
+    # 第一优先：直接继承 Scene 且有 construct
+    for name, info in class_info.items():
+        if any(b in scene_names for b in info["bases"]) and info["construct"]:
+            return name
+    # 第二优先：间接继承（基类链含 Scene）且有 construct
+    for name, info in class_info.items():
+        if info["construct"]:
+            _chain = set()
+            _stack = list(info["bases"])
+            while _stack:
+                _b = _stack.pop()
+                if _b in scene_names:
+                    _chain.add(_b)
+                elif _b in class_info:
+                    _stack.extend(class_info[_b]["bases"])
+            if _chain:
+                return name
+    # 兜底：第一个类
+    m = re.search(r"class\s+(\w+)\s*\(", code)
+    return m.group(1) if m else "Scene"
+
 
 def render_manim(code: str, scene_class: str = None, quality: str = '-qm',
                  timeout: int = 180):
@@ -184,10 +245,10 @@ def render_manim(code: str, scene_class: str = None, quality: str = '-qm',
         code_file = os.path.join(temp_dir, 'scene.py')
         with open(code_file, 'w', encoding='utf-8') as f:
             f.write(code)
-        # 找 Scene 类名
+        # 找 Scene 类名：§3.97 ⭐ 选"含 construct 的 Scene 子类"（跳过基类/无 construct 类）
+        #（LLM 常生成多场景剧本：S1-S6 继承基类，基类无 construct 仅 setup）
         if not scene_class:
-            m = re.search(r'class\s+(\w+)\s*\(', code)
-            scene_class = m.group(1) if m else 'Scene'
+            scene_class = _find_renderable_scene(code)
         cmd = [_MANIM_CLI, 'render', quality, '--media_dir', temp_dir,
                code_file, scene_class]
         # §3.79 Round 4 ⭐ 运维修复：Windows 下 manim 输出含 UTF-8 中文/转义码，
@@ -199,6 +260,13 @@ def render_manim(code: str, scene_class: str = None, quality: str = '-qm',
         if os.path.isdir(_MIKTEX_BIN) and _MIKTEX_BIN not in _env.get("PATH", ""):
             _env["PATH"] = _MIKTEX_BIN + os.pathsep + _env.get("PATH", "")
             print(f"[manim_service] LaTeX PATH 注入: {_MIKTEX_BIN}")
+        # §3.97 ⭐ MiKTeX 自动下载缺失包（首次编译需 autoinstall）
+        _env.setdefault("MIKTEX_AUTOINSTALL", "1")
+        try:
+            if os.path.isfile(os.path.join(_MIKTEX_BIN, "mpm.exe")):
+                _env.setdefault("MIKTEX_MPM_AUTOINSTALL", "1")
+        except Exception:
+            pass
         try:
             # §3.97 修复：优先 manim_env 内 ffmpeg（系统 PATH 无），次选 imageio_ffmpeg
             _ff = ""

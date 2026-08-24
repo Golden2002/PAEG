@@ -1,0 +1,36 @@
+{
+  "mode": "material",
+  "timestamp": "2026-08-24 19:28:58",
+  "cases": [
+    {
+      "type": "material",
+      "result": {
+        "scores": {
+          "内容准确性": 1,
+          "内容详实度": 1,
+          "视觉/结构质量": 1,
+          "教学适用性": 1
+        },
+        "total": 20.0,
+        "evidence": {
+          "内容准确性": "渲染失败，无实际内容，无法判断知识准确性，但存在系统错误提示。",
+          "内容详实度": "仅有错误信息，无任何解释、例子或数据。",
+          "视觉/结构质量": "无视觉内容，仅有错误日志。",
+          "教学适用性": "无法用于教学，因为内容未生成。"
+        },
+        "defects": [
+          {
+            "severity": "P1",
+            "desc": "总分 20.0 < 60，严重不达标",
+            "suggestion": "检查核心链路"
+          }
+        ],
+        "judge": "物料质量-math_video",
+        "material_type": "math_video",
+        "topic": "导数与切线",
+        "screenshot": "D:\\桌面\\智能体架构与开发（含大模型）\\14_教育者Agent项目\\10_封闭测试\\三Oracle质量测试\\artifacts\\material_math_video.png",
+        "material_text": "数学动画生成中（导数与切线）：渲染失败: : │ │ > 1420 │ │ │ │ hp, ht, pid, tid = _winapi.CreateProcess(executable, │ │ 1421 │ │ │ │ │ │ │ │ │ │ # no special security │ │ 1422 │ │ │ │ │ │ │ │ │ │ None, None, │ │ 1423 │ │ │ │ │ │ │ │ │ │ int(not close_fds), │ └─────────────────────────────────────────────────────────────────────────────┘ FileNotFoundError: [WinError 2] 系统找不到指定的文件。 。可稍后查看 downloads/manim/。\n\n复制"
+      }
+    }
+  ]
+}

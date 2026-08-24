@@ -1,0 +1,11 @@
+{
+  "job_id": "test_job_001",
+  "artifacts": {
+    "script": {
+      "url": "/api/manim/jobs/test_job_001/script.json"
+    },
+    "code": {
+      "url": "/api/manim/jobs/test_job_001/scene.py"
+    }
+  }
+}

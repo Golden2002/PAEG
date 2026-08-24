@@ -1,0 +1,319 @@
+{
+  "meta": {
+    "title": "导数与切线",
+    "subject": "数学",
+    "grade_level": "高中",
+    "total_duration_sec": 120,
+    "style": "3blue1brown",
+    "core_intuition": "切线是割线趋近极限的产物，导数是该极限的斜率",
+    "learning_objectives": [
+      "理解切线是割线在两点无限接近时的极限位置",
+      "理解导数的几何意义是切线的斜率",
+      "能通过观察割线逼近过程建立对导数定义的直观认识"
+    ]
+  },
+  "narrative_arc": {
+    "hook": "从一个具体函数图像上的动点出发，观察过两点的割线如何随一点靠近另一点而变化",
+    "build": "逐步引入割线斜率，通过多次取点逼近，展示割线趋近于一条确定的直线",
+    "climax": "割线趋近于极限位置，即切线，切线的斜率即为导数",
+    "resolution": "将导数符号与切线斜率对应，总结核心直觉"
+  },
+  "visual_system": {
+    "palette": {
+      "function_curve": "#4ECDC4",
+      "secant_line": "#FF6B6B",
+      "tangent_line": "#FFD93D",
+      "moving_point": "#FFD93D",
+      "fixed_point": "#FF6B6B",
+      "coordinate_axes": "#FFFFFF",
+      "text": "#FFFFFF",
+      "highlight": "#FF6B6B"
+    },
+    "semantic_mapping": {
+      "function_curve": "函数图像",
+      "secant_line": "割线",
+      "tangent_line": "切线",
+      "moving_point": "动点",
+      "fixed_point": "定点",
+      "coordinate_axes": "坐标轴",
+      "text": "文字说明",
+      "highlight": "强调"
+    },
+    "global_objects": [
+      {
+        "id": "axes",
+        "type": "coordinate_axes",
+        "description": "二维坐标轴，x轴和y轴"
+      },
+      {
+        "id": "curve",
+        "type": "function_curve",
+        "description": "函数f(x)=0.2*(x-2)^2+1的图像，颜色为青色"
+      },
+      {
+        "id": "fixed_point",
+        "type": "point",
+        "description": "固定点P，坐标为(2,1)，颜色为红色"
+      },
+      {
+        "id": "moving_point",
+        "type": "point",
+        "description": "动点Q，在曲线上移动，颜色为黄色"
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": "scene_1_intro",
+      "concept": "切线直观印象",
+      "duration_sec": 15,
+      "narration": "想象一条平滑的曲线，比如这个抛物线。在曲线上有一个点P。你可能会好奇，过点P的切线是什么？它看起来是一条刚好擦过曲线的直线。",
+      "on_screen_text": "切线是什么？",
+      "prerequisites": [],
+      "animations": [
+        {
+          "t": 0.0,
+          "mobject_id": "axes",
+          "action": "create",
+          "description": "创建坐标轴"
+        },
+        {
+          "t": 0.5,
+          "mobject_id": "curve",
+          "action": "create",
+          "description": "绘制函数曲线"
+        },
+        {
+          "t": 2.0,
+          "mobject_id": "fixed_point",
+          "action": "create",
+          "description": "在曲线上标记定点P"
+        },
+        {
+          "t": 3.0,
+          "mobject_id": "tangent_visual",
+          "action": "create",
+          "description": "显示一条与曲线相切的直线（暂不标出）",
+          "target_color": "tangent_line"
+        },
+        {
+          "t": 8.0,
+          "mobject_id": "text_label",
+          "action": "write",
+          "description": "显示文字'切线是什么？'"
+        }
+      ],
+      "pause_after_sec": 3,
+      "notes": "前两个场景不出现公式，只用直观图形和文字"
+    },
+    {
+      "id": "scene_2_secant_intro",
+      "concept": "割线的引入",
+      "duration_sec": 18,
+      "narration": "为了找到切线，我们先看另一个点Q。连接P和Q的直线叫割线。当Q在曲线上移动时，割线的方向也在改变。注意观察，当Q靠近P时，割线会怎样变化？",
+      "on_screen_text": "割线",
+      "prerequisites": [
+        "scene_1_intro"
+      ],
+      "animations": [
+        {
+          "t": 0.0,
+          "mobject_id": "moving_point",
+          "action": "create",
+          "description": "在曲线右侧创建动点Q"
+        },
+        {
+          "t": 0.5,
+          "mobject_id": "secant_line",
+          "action": "create",
+          "description": "连接P和Q的割线，颜色红色"
+        },
+        {
+          "t": 2.0,
+          "mobject_id": "text_label",
+          "action": "write",
+          "description": "显示文字'割线'"
+        },
+        {
+          "t": 5.0,
+          "mobject_id": "moving_point",
+          "action": "move",
+          "description": "Q沿曲线向P移动，割线随之变化",
+          "rate_func": "smooth",
+          "duration": 8
+        }
+      ],
+      "pause_after_sec": 3,
+      "notes": "展示割线动态变化，但不显示斜率公式"
+    },
+    {
+      "id": "scene_3_secant_slope",
+      "concept": "割线斜率",
+      "duration_sec": 20,
+      "narration": "割线的陡峭程度可以用斜率来衡量。斜率等于纵坐标的变化量除以横坐标的变化量。当Q靠近P时，这个变化量越来越小，但斜率的值本身在趋近一个确定的数。",
+      "on_screen_text": "斜率",
+      "prerequisites": [
+        "scene_2_secant_intro"
+      ],
+      "animations": [
+        {
+          "t": 0.0,
+          "mobject_id": "delta_x",
+          "action": "create",
+          "description": "显示水平变化量Δx（用线段表示）",
+          "target_color": "highlight"
+        },
+        {
+          "t": 0.5,
+          "mobject_id": "delta_y",
+          "action": "create",
+          "description": "显示垂直变化量Δy（用线段表示）",
+          "target_color": "highlight"
+        },
+        {
+          "t": 1.0,
+          "mobject_id": "slope_formula",
+          "action": "write",
+          "description": "显示斜率公式Δy/Δx（文字形式，非标准公式）"
+        },
+        {
+          "t": 3.0,
+          "mobject_id": "moving_point",
+          "action": "move",
+          "description": "Q继续靠近P，Δx和Δy变小，斜率值变化",
+          "rate_func": "smooth",
+          "duration": 10
+        },
+        {
+          "t": 13.0,
+          "mobject_id": "slope_value",
+          "action": "write",
+          "description": "显示当前斜率数值（近似）"
+        }
+      ],
+      "pause_after_sec": 3,
+      "notes": "引入斜率概念，但用文字和线段表示，不出现标准符号"
+    },
+    {
+      "id": "scene_4_limit_approach",
+      "concept": "趋近极限",
+      "duration_sec": 25,
+      "narration": "现在让Q无限靠近P。看，割线越来越接近一条固定的直线。当Q几乎与P重合时，割线就变成了切线。这个极限位置就是切线。",
+      "on_screen_text": "极限",
+      "prerequisites": [
+        "scene_3_secant_slope"
+      ],
+      "animations": [
+        {
+          "t": 0.0,
+          "mobject_id": "moving_point",
+          "action": "move",
+          "description": "Q向P靠近，速度由慢到快",
+          "rate_func": "smooth",
+          "duration": 10
+        },
+        {
+          "t": 10.0,
+          "mobject_id": "secant_line",
+          "action": "transform",
+          "description": "割线逐渐转变为切线（颜色从红色变为黄色）",
+          "target_color": "tangent_line",
+          "duration": 5,
+          "rate_func": "linear"
+        },
+        {
+          "t": 15.0,
+          "mobject_id": "tangent_line",
+          "action": "create",
+          "description": "显示最终的切线"
+        },
+        {
+          "t": 18.0,
+          "mobject_id": "text_label",
+          "action": "write",
+          "description": "显示文字'极限'"
+        }
+      ],
+      "pause_after_sec": 5,
+      "notes": "关键极限处停顿5秒，让观众感受变化"
+    },
+    {
+      "id": "scene_5_derivative_definition",
+      "concept": "导数定义",
+      "duration_sec": 22,
+      "narration": "这个极限斜率就是导数。用符号表示，导数f'(a)就是当h趋近于0时，f(a+h)-f(a)除以h的极限。它刻画了函数在a点的瞬时变化率。",
+      "on_screen_text": "导数定义",
+      "prerequisites": [
+        "scene_4_limit_approach"
+      ],
+      "animations": [
+        {
+          "t": 0.0,
+          "mobject_id": "derivative_formula",
+          "action": "write",
+          "description": "显示导数定义公式：f'(a)=lim_{h→0} [f(a+h)-f(a)]/h",
+          "target_color": "text"
+        },
+        {
+          "t": 5.0,
+          "mobject_id": "tangent_line",
+          "action": "highlight",
+          "description": "高亮切线，强调其斜率就是导数"
+        },
+        {
+          "t": 10.0,
+          "mobject_id": "text_label",
+          "action": "write",
+          "description": "显示文字'导数=切线斜率'"
+        }
+      ],
+      "pause_after_sec": 4,
+      "notes": "从几何对象过渡到符号，公式出现"
+    },
+    {
+      "id": "scene_6_summary",
+      "concept": "总结回顾",
+      "duration_sec": 15,
+      "narration": "总结一下：切线是割线的极限位置，导数是这个极限的斜率。下次看到曲线，你就能想象它的切线了。",
+      "on_screen_text": "总结",
+      "prerequisites": [
+        "scene_5_derivative_definition"
+      ],
+      "animations": [
+        {
+          "t": 0.0,
+          "mobject_id": "summary_text",
+          "action": "write",
+          "description": "显示总结文字：'切线=割线极限'，'导数=切线斜率'"
+        },
+        {
+          "t": 5.0,
+          "mobject_id": "curve",
+          "action": "fade_out",
+          "description": "曲线淡出"
+        },
+        {
+          "t": 8.0,
+          "mobject_id": "summary_text",
+          "action": "fade_out",
+          "description": "文字淡出"
+        }
+      ],
+      "pause_after_sec": 2,
+      "notes": "最后总结，强化核心直觉"
+    }
+  ],
+  "qa_self_check": {
+    "total_duration_sec": 120,
+    "actual_duration_sec": 115,
+    "duration_ok": true,
+    "first_two_scenes_no_formula": true,
+    "single_focus_per_scene": true,
+    "color_semantics_consistent": true,
+    "pause_after_sec_ok": true,
+    "on_screen_text_length_ok": true,
+    "mobject_count_per_scene_ok": true,
+    "prerequisites_explicit": true,
+    "notes": "所有检查通过。时长115秒，在目标120秒±15%范围内。前两个场景无公式，颜色语义一致，关键极限处停顿5秒。"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "mode": "material",
+  "timestamp": "2026-08-24 20:20:14",
+  "cases": [
+    {
+      "type": "material",
+      "result": {
+        "scores": {
+          "内容准确性": 1,
+          "内容详实度": 1,
+          "视觉/结构质量": 1,
+          "教学适用性": 1
+        },
+        "total": 20.0,
+        "evidence": {
+          "内容准确性": "内容为错误信息，显示实现失败，无任何数学内容。",
+          "内容详实度": "仅显示错误信息，无解释、例子或数据。",
+          "视觉/结构质量": "无排版或结构，仅错误提示。",
+          "教学适用性": "无法用于教学，仅错误提示。"
+        },
+        "defects": [
+          {
+            "severity": "P1",
+            "desc": "总分 20.0 < 60，严重不达标",
+            "suggestion": "检查核心链路"
+          }
+        ],
+        "judge": "物料质量-math_video",
+        "material_type": "math_video",
+        "topic": "导数与切线",
+        "screenshot": "D:\\桌面\\智能体架构与开发（含大模型）\\14_教育者Agent项目\\10_封闭测试\\三Oracle质量测试\\artifacts\\material_math_video.png",
+        "material_text": "数学动画生成中（导数与切线）：Phase2B 实现失败: AST 校验失败: SyntaxError: invalid character '。' \n𝑈\n+\n3002\nU+3002 $, line 1$。脚本/代码已生成 下载脚本 下载代码\n\n复制"
+      }
+    }
+  ]
+}

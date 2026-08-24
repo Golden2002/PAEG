@@ -1,0 +1,25 @@
+{
+  "mode": "material",
+  "timestamp": "2026-08-24 20:27:26",
+  "cases": [
+    {
+      "type": "material",
+      "result": {
+        "error": "('Connection aborted.', ConnectionResetError(10054, '远程主机强迫关闭了一个现有的连接。', None, 10054, None))",
+        "total": 0,
+        "judge": "物料质量-math_video",
+        "material_type": "math_video",
+        "topic": "导数与切线",
+        "screenshot": "D:\\桌面\\智能体架构与开发（含大模型）\\14_教育者Agent项目\\10_封闭测试\\三Oracle质量测试\\artifacts\\material_math_video.png",
+        "material_text": "数学动画已生成 [叙事评分: 4.0/5]：观看/下载动画\n\n复制",
+        "defects": [
+          {
+            "severity": "P1",
+            "desc": "总分 0 < 60，严重不达标",
+            "suggestion": "检查核心链路"
+          }
+        ]
+      }
+    }
+  ]
+}

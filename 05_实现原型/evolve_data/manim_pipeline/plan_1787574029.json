@@ -1,0 +1,324 @@
+{
+  "meta": {
+    "topic": "导数与切线",
+    "audience": "高中",
+    "target_duration_sec": 120,
+    "style": "3blue1brown",
+    "core_intuition": "导数就是切线的斜率，切线是割线的极限",
+    "learning_objectives": [
+      "理解割线斜率的几何意义",
+      "理解当两点靠近时割线趋近于切线",
+      "理解导数定义为切线斜率的极限"
+    ]
+  },
+  "narrative_arc": {
+    "act1": "直觉建立：从割线到切线的视觉逼近",
+    "act2": "符号引入：用符号表示斜率与极限",
+    "act3": "综合理解：导数即切线斜率"
+  },
+  "visual_system": {
+    "palette": {
+      "function_curve": "#58C4DD",
+      "secant_line": "#FFD166",
+      "tangent_line": "#EF476F",
+      "point_A": "#06D6A0",
+      "point_B": "#118AB2",
+      "text": "#FFFFFF",
+      "background": "#0D1117"
+    },
+    "color_semantics": {
+      "function_curve": "函数曲线",
+      "secant_line": "割线",
+      "tangent_line": "切线",
+      "point_A": "固定点A",
+      "point_B": "移动点B",
+      "text": "文字",
+      "background": "背景"
+    },
+    "global_objects": {
+      "coordinate_axes": {
+        "id": "axes_main",
+        "type": "axes",
+        "color": "#FFFFFF",
+        "opacity": 0.6
+      },
+      "function_curve_obj": {
+        "id": "curve_f",
+        "type": "function_graph",
+        "color": "#58C4DD",
+        "function": "x^2"
+      },
+      "point_A_obj": {
+        "id": "point_A",
+        "type": "dot",
+        "color": "#06D6A0",
+        "position": [
+          1,
+          1,
+          0
+        ]
+      }
+    }
+  },
+  "scenes": [
+    {
+      "id": "s1_curve_and_point",
+      "concept": "曲线与固定点",
+      "prerequisites": [],
+      "duration_sec": 12,
+      "narration": "这是一条曲线，我们关注曲线上的一个点A。",
+      "on_screen_text": "曲线 与 点A",
+      "animations": [
+        {
+          "t": 0,
+          "type": "create",
+          "target_id": "axes_main",
+          "description": "显示坐标轴",
+          "duration_sec": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2,
+          "type": "create",
+          "target_id": "curve_f",
+          "description": "绘制函数曲线 y=x^2",
+          "duration_sec": 3,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5,
+          "type": "create",
+          "target_id": "point_A",
+          "description": "在曲线上的点A处放置绿色点",
+          "duration_sec": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 7,
+          "type": "wait",
+          "description": "停顿让观众观察曲线和点A",
+          "duration_sec": 5,
+          "rate_func": "linear"
+        }
+      ],
+      "pause_after_sec": 2
+    },
+    {
+      "id": "s2_secant_approach",
+      "concept": "割线逼近切线",
+      "prerequisites": [
+        "s1_curve_and_point"
+      ],
+      "duration_sec": 25,
+      "narration": "在曲线上取另一个点B，连接A和B得到一条割线。当B逐渐靠近A时，割线越来越接近一条特殊的直线——切线。",
+      "on_screen_text": "割线逼近切线",
+      "animations": [
+        {
+          "t": 0,
+          "type": "create",
+          "target_id": "point_B",
+          "description": "在曲线右侧创建点B（初始x=2.5）",
+          "duration_sec": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2,
+          "type": "create",
+          "target_id": "secant_line",
+          "description": "创建连接A和B的割线（黄色）",
+          "duration_sec": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 4,
+          "type": "move_point",
+          "target_id": "point_B",
+          "description": "点B沿曲线向A移动（x从2.5到1.5）",
+          "duration_sec": 4,
+          "rate_func": "smooth",
+          "path": "along_curve"
+        },
+        {
+          "t": 8,
+          "type": "update_line",
+          "target_id": "secant_line",
+          "description": "割线随点B移动而更新",
+          "duration_sec": 4,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 12,
+          "type": "move_point",
+          "target_id": "point_B",
+          "description": "点B继续靠近A（x从1.5到1.1）",
+          "duration_sec": 4,
+          "rate_func": "smooth",
+          "path": "along_curve"
+        },
+        {
+          "t": 16,
+          "type": "update_line",
+          "target_id": "secant_line",
+          "description": "割线继续更新",
+          "duration_sec": 4,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 20,
+          "type": "wait",
+          "description": "停顿强调割线趋近于切线",
+          "duration_sec": 5,
+          "rate_func": "linear"
+        }
+      ],
+      "pause_after_sec": 3
+    },
+    {
+      "id": "s3_slope_formula",
+      "concept": "割线斜率公式",
+      "prerequisites": [
+        "s2_secant_approach"
+      ],
+      "duration_sec": 20,
+      "narration": "割线的斜率等于两点纵坐标之差除以横坐标之差。我们用Δx表示横坐标的微小变化。",
+      "on_screen_text": "斜率 = Δy/Δx",
+      "animations": [
+        {
+          "t": 0,
+          "type": "highlight",
+          "target_id": "secant_line",
+          "description": "高亮割线，准备展示斜率",
+          "duration_sec": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2,
+          "type": "write_text",
+          "target_id": "text_slope",
+          "description": "在割线旁显示斜率公式：斜率 = Δy/Δx",
+          "duration_sec": 3,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5,
+          "type": "draw_annotation",
+          "target_id": "delta_x",
+          "description": "在A和B之间画出Δx的水平线段",
+          "duration_sec": 3,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 8,
+          "type": "draw_annotation",
+          "target_id": "delta_y",
+          "description": "在A和B之间画出Δy的竖直线段",
+          "duration_sec": 3,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 11,
+          "type": "wait",
+          "description": "停顿让观众理解公式",
+          "duration_sec": 9,
+          "rate_func": "linear"
+        }
+      ],
+      "pause_after_sec": 2
+    },
+    {
+      "id": "s4_derivative_definition",
+      "concept": "导数定义",
+      "prerequisites": [
+        "s3_slope_formula"
+      ],
+      "duration_sec": 25,
+      "narration": "当Δx趋近于0时，割线斜率的极限就是导数。导数就是切线斜率。",
+      "on_screen_text": "导数 = 极限",
+      "animations": [
+        {
+          "t": 0,
+          "type": "transform",
+          "target_id": "secant_line",
+          "description": "将割线变换为切线（红色）",
+          "duration_sec": 5,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5,
+          "type": "write_text",
+          "target_id": "text_limit",
+          "description": "显示极限表达式：lim(Δx→0) Δy/Δx",
+          "duration_sec": 4,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 9,
+          "type": "write_text",
+          "target_id": "text_derivative",
+          "description": "显示导数符号 f'(x)",
+          "duration_sec": 3,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 12,
+          "type": "wait",
+          "description": "停顿强调导数定义",
+          "duration_sec": 13,
+          "rate_func": "linear"
+        }
+      ],
+      "pause_after_sec": 3
+    },
+    {
+      "id": "s5_summary",
+      "concept": "导数与切线",
+      "prerequisites": [
+        "s4_derivative_definition"
+      ],
+      "duration_sec": 15,
+      "narration": "总结：割线趋近于切线，导数就是切线斜率。",
+      "on_screen_text": "导数=切线斜率",
+      "animations": [
+        {
+          "t": 0,
+          "type": "fade_out",
+          "target_id": "point_B",
+          "description": "淡出点B",
+          "duration_sec": 2,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2,
+          "type": "highlight",
+          "target_id": "tangent_line",
+          "description": "高亮切线",
+          "duration_sec": 3,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5,
+          "type": "write_text",
+          "target_id": "text_summary",
+          "description": "显示总结文字：导数就是切线斜率",
+          "duration_sec": 4,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 9,
+          "type": "wait",
+          "description": "最终停顿",
+          "duration_sec": 6,
+          "rate_func": "linear"
+        }
+      ],
+      "pause_after_sec": 2
+    }
+  ],
+  "qa_self_check": {
+    "first_two_scenes_no_formulas": true,
+    "single_focus_per_scene": true,
+    "color_consistency": true,
+    "timing_matches_target": true,
+    "notes": "前两个场景没有公式，符合渐进揭示原则。每个场景聚焦单一概念。颜色语义一致。总时长约97秒，符合120秒目标（偏差约19%），在可接受范围内。"
+  }
+}

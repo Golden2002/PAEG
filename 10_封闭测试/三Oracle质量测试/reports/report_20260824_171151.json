@@ -1,0 +1,36 @@
+{
+  "mode": "material",
+  "timestamp": "2026-08-24 17:09:47",
+  "cases": [
+    {
+      "type": "material",
+      "result": {
+        "scores": {
+          "内容准确性": 1,
+          "内容详实度": 1,
+          "视觉/结构质量": 1,
+          "教学适用性": 1
+        },
+        "total": 20.0,
+        "evidence": {
+          "内容准确性": "内容为错误信息，显示语法错误，无实际教学内容。",
+          "内容详实度": "仅显示错误提示，无任何解释、例子或数据。",
+          "视觉/结构质量": "无有效视觉内容，仅显示错误信息。",
+          "教学适用性": "无法用于教学，仅显示错误提示。"
+        },
+        "defects": [
+          {
+            "severity": "P1",
+            "desc": "总分 20.0 < 60，严重不达标",
+            "suggestion": "检查核心链路"
+          }
+        ],
+        "judge": "物料质量-math_video",
+        "material_type": "math_video",
+        "topic": "导数与切线",
+        "screenshot": "D:\\桌面\\智能体架构与开发（含大模型）\\14_教育者Agent项目\\10_封闭测试\\三Oracle质量测试\\artifacts\\material_math_video.png",
+        "material_text": "数学动画生成中（导数与切线）：校验失败: SyntaxError: invalid syntax $, line 1$。可稍后查看 downloads/manim/。\n\n复制"
+      }
+    }
+  ]
+}

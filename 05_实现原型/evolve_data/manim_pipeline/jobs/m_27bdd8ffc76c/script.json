@@ -1,0 +1,289 @@
+{
+  "meta": {
+    "theme": "导数与切线",
+    "audience": "高中",
+    "target_duration_sec": 120,
+    "style": "3blue1brown",
+    "core_intuition": "切线的斜率就是导数：当割线两点无限靠近时，割线变成切线，斜率变成导数。",
+    "learning_objectives": [
+      "理解割线斜率与平均变化率的关系",
+      "理解当两点无限靠近时割线趋近于切线",
+      "理解切线的斜率就是导数（瞬时变化率）"
+    ]
+  },
+  "narrative_arc": {
+    "hook": "一条曲线上的两个点，连成一条直线，这条直线的斜率会随着两点的靠近而发生变化。",
+    "build_up": "观察割线斜率的变化，逐渐逼近一个极限值。",
+    "climax": "两点重合，割线变成切线，斜率变成导数。",
+    "resolution": "导数的符号表示：f'(x) = lim(Δx→0) Δy/Δx，并强调切线的斜率就是导数。"
+  },
+  "visual_system": {
+    "palette": {
+      "curve": "#4ECDC4",
+      "secant": "#FF6B6B",
+      "tangent": "#FFD93D",
+      "points": "#FFFFFF",
+      "text": "#FFFFFF",
+      "axes": "#888888"
+    },
+    "semantic_mapping": {
+      "curve": "函数曲线",
+      "secant": "割线（两点连线）",
+      "tangent": "切线（极限位置）",
+      "points": "曲线上的点",
+      "text": "文字标注",
+      "axes": "坐标轴"
+    },
+    "coordinate_system": {
+      "id": "axes",
+      "x_range": [
+        -1,
+        5
+      ],
+      "y_range": [
+        -1,
+        5
+      ],
+      "center": [
+        0,
+        0
+      ]
+    },
+    "global_objects": {
+      "curve": {
+        "id": "curve",
+        "type": "FunctionGraph",
+        "function": "x^2",
+        "color": "curve"
+      },
+      "axes": {
+        "id": "axes",
+        "type": "Axes",
+        "color": "axes"
+      }
+    }
+  },
+  "scenes": [
+    {
+      "id": "s1",
+      "concept": "割线的斜率",
+      "duration_sec": 15,
+      "narration": "在一条曲线上，我们取两个点，连接它们形成一条直线，这条直线叫做割线。割线的斜率就是这两点之间的平均变化率。",
+      "visual_goal": "展示曲线和两个点，以及连接两点的割线，强调割线的斜率代表平均变化率",
+      "objects": [
+        {
+          "id": "axes",
+          "type": "Axes",
+          "color": "axes"
+        },
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "function": "x^2",
+          "color": "curve"
+        },
+        {
+          "id": "point_a",
+          "type": "Dot",
+          "position": [
+            1,
+            1,
+            0
+          ],
+          "color": "points"
+        },
+        {
+          "id": "point_b",
+          "type": "Dot",
+          "position": [
+            3,
+            9,
+            0
+          ],
+          "color": "points"
+        },
+        {
+          "id": "secant_line",
+          "type": "Line",
+          "from": [
+            1,
+            1,
+            0
+          ],
+          "to": [
+            3,
+            9,
+            0
+          ],
+          "color": "secant"
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "concept": "割线趋近于切线",
+      "duration_sec": 20,
+      "narration": "现在，让点B逐渐靠近点A，观察割线的变化。随着两点距离越来越小，割线的斜率也在变化，它逐渐趋近于一个极限值。",
+      "visual_goal": "动态展示点B沿曲线向点A移动，割线随之变化，体现斜率趋近极限",
+      "objects": [
+        {
+          "id": "axes",
+          "type": "Axes",
+          "color": "axes"
+        },
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "function": "x^2",
+          "color": "curve"
+        },
+        {
+          "id": "point_a",
+          "type": "Dot",
+          "position": [
+            1,
+            1,
+            0
+          ],
+          "color": "points"
+        },
+        {
+          "id": "point_b",
+          "type": "Dot",
+          "position": [
+            1.5,
+            2.25,
+            0
+          ],
+          "color": "points"
+        },
+        {
+          "id": "secant_line",
+          "type": "Line",
+          "from": [
+            1,
+            1,
+            0
+          ],
+          "to": [
+            1.5,
+            2.25,
+            0
+          ],
+          "color": "secant"
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "concept": "切线的形成",
+      "duration_sec": 25,
+      "narration": "当点B无限靠近点A，最终两点重合时，割线就变成了切线。这条切线在点A处与曲线相切，它的斜率就是导数。",
+      "visual_goal": "展示点B与点A重合，割线变为切线，突出切线的斜率即导数",
+      "objects": [
+        {
+          "id": "axes",
+          "type": "Axes",
+          "color": "axes"
+        },
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "function": "x^2",
+          "color": "curve"
+        },
+        {
+          "id": "point_a",
+          "type": "Dot",
+          "position": [
+            1,
+            1,
+            0
+          ],
+          "color": "points"
+        },
+        {
+          "id": "point_b",
+          "type": "Dot",
+          "position": [
+            1,
+            1,
+            0
+          ],
+          "color": "points"
+        },
+        {
+          "id": "tangent_line",
+          "type": "Line",
+          "from": [
+            0.5,
+            0.25,
+            0
+          ],
+          "to": [
+            1.5,
+            2.25,
+            0
+          ],
+          "color": "tangent"
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "concept": "导数的定义",
+      "duration_sec": 20,
+      "narration": "我们用符号表示这个极限：f'(x) = lim(Δx→0) Δy/Δx。这就是导数的定义，它表示切线的斜率，也就是瞬时变化率。",
+      "visual_goal": "展示导数符号定义和切线斜率，强化导数与切线斜率的关系",
+      "objects": [
+        {
+          "id": "axes",
+          "type": "Axes",
+          "color": "axes"
+        },
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "function": "x^2",
+          "color": "curve"
+        },
+        {
+          "id": "point_a",
+          "type": "Dot",
+          "position": [
+            1,
+            1,
+            0
+          ],
+          "color": "points"
+        },
+        {
+          "id": "tangent_line",
+          "type": "Line",
+          "from": [
+            0.5,
+            0.25,
+            0
+          ],
+          "to": [
+            1.5,
+            2.25,
+            0
+          ],
+          "color": "tangent"
+        },
+        {
+          "id": "formula",
+          "type": "Text",
+          "position": [
+            2,
+            4,
+            0
+          ],
+          "content": "f'(x) = lim(Δx→0) Δy/Δx",
+          "color": "text"
+        }
+      ]
+    }
+  ]
+}

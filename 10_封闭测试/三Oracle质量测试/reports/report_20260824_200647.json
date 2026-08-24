@@ -1,0 +1,36 @@
+{
+  "mode": "material",
+  "timestamp": "2026-08-24 20:04:43",
+  "cases": [
+    {
+      "type": "material",
+      "result": {
+        "scores": {
+          "内容准确性": 1,
+          "内容详实度": 1,
+          "视觉/结构质量": 1,
+          "教学适用性": 1
+        },
+        "total": 20.0,
+        "evidence": {
+          "内容准确性": "渲染失败，存在NameError: name 'CYAN' is not defined，代码错误导致无法生成视频，内容无法验证准确性。",
+          "内容详实度": "仅显示代码片段，无实际讲解内容，缺乏解释和例子。",
+          "视觉/结构质量": "渲染失败，无视觉输出，结构不完整。",
+          "教学适用性": "无法使用，因为视频未生成，无法用于课堂。"
+        },
+        "defects": [
+          {
+            "severity": "P1",
+            "desc": "总分 20.0 < 60，严重不达标",
+            "suggestion": "检查核心链路"
+          }
+        ],
+        "judge": "物料质量-math_video",
+        "material_type": "math_video",
+        "topic": "导数与切线",
+        "screenshot": "D:\\桌面\\智能体架构与开发（含大模型）\\14_教育者Agent项目\\10_封闭测试\\三Oracle质量测试\\artifacts\\material_math_video.png",
+        "material_text": "数学动画生成中（导数与切线）：渲染失败: │ # 高亮切线(Aha 时刻) │ │ > 87 │ │ tangent_copy = tangent.copy().set_color(CYAN).set_stroke(widt │ │ 88 │ │ self.play\n𝑇\n𝑟\n𝑎\n𝑛\n𝑠\n𝑓\n𝑜\n𝑟\n𝑚\n(\n𝑡\n𝑎\n𝑛\n𝑔\n𝑒\n𝑛\n𝑡\n,\n𝑡\n𝑎\n𝑛\n𝑔\n𝑒\n𝑛\n𝑡\n𝑐\n𝑜\n𝑝\n𝑦\n)\n,\n𝑟\n𝑢\n𝑛\n𝑡\n𝑖\n𝑚\n𝑒\n=\n2.5\nTransform(tangent,tangent\nc\n\t​\n\nopy),run\nt\n\t​\n\nime=2.5 │ │ 89 │ │ self.wait(3.0) │ │ 90 │ └─────────────────────────────────────────────────────────────────────────────┘ NameError: name 'CYAN' is not defined 。可稍后查看 downloads/manim/。\n\n复制"
+      }
+    }
+  ]
+}

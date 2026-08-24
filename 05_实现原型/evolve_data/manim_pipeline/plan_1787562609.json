@@ -1,0 +1,619 @@
+{
+  "meta": {
+    "title": "导数与切线：从割线到极限",
+    "subject": "数学",
+    "topic": "导数与切线",
+    "audience": "高中",
+    "target_duration_sec": 120,
+    "style": "3blue1brown",
+    "core_intuition": "切线是割线的极限位置，导数就是切线的斜率，它衡量函数在某一点的瞬时变化率。",
+    "learning_objectives": [
+      "理解割线斜率的几何意义",
+      "观察当两点靠近时割线趋近于切线",
+      "理解导数作为极限的定义",
+      "掌握导数与切线斜率的关系"
+    ],
+    "prerequisites": "无明确前置",
+    "generated_by": "PAEG 数学可视化剧本设计师",
+    "version": "1.0"
+  },
+  "narrative_arc": {
+    "hook": "从一条曲线上的两个点出发，观察它们逐渐靠近时，割线如何变成一条'恰到好处'的直线——切线。",
+    "build_up": "通过几何直观展示割线的动态变化，引入切线的概念。",
+    "climax": "揭示割线斜率趋近于切线斜率，即导数的定义。",
+    "resolution": "总结导数与切线的关系，并给出一个具体函数的示例。"
+  },
+  "visual_system": {
+    "palette": {
+      "curve": "#4ECDC4",
+      "secant": "#FF6B6B",
+      "tangent": "#FFD93D",
+      "point": "#FFFFFF",
+      "text": "#FFFFFF",
+      "grid": "#2C3E50"
+    },
+    "semantic_binding": {
+      "curve": "函数曲线",
+      "secant": "割线",
+      "tangent": "切线",
+      "point": "动点",
+      "text": "文字标注",
+      "grid": "背景网格"
+    },
+    "style_notes": "使用 3Blue1Brown 风格：深色背景，高亮颜色，动态演示。"
+  },
+  "scenes": [
+    {
+      "id": "scene1",
+      "concept": "割线的定义",
+      "duration_sec": 15,
+      "prerequisites": [],
+      "narration": "在一条曲线上取两个点，连接它们形成一条直线，这条直线叫做割线。",
+      "on_screen_text": "割线",
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "Axes",
+          "description": "坐标轴"
+        },
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "description": "函数曲线 y = x^2"
+        },
+        {
+          "id": "p1",
+          "type": "Dot",
+          "color": "point",
+          "description": "点 A"
+        },
+        {
+          "id": "p2",
+          "type": "Dot",
+          "color": "point",
+          "description": "点 B"
+        },
+        {
+          "id": "secant1",
+          "type": "Line",
+          "color": "secant",
+          "description": "过 A、B 的割线"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "mobject_id": "axes",
+          "duration": 1.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 1.0,
+          "action": "create",
+          "mobject_id": "curve",
+          "duration": 2.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 3.0,
+          "action": "create",
+          "mobject_id": "p1",
+          "duration": 0.5,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 3.5,
+          "action": "create",
+          "mobject_id": "p2",
+          "duration": 0.5,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 4.0,
+          "action": "create",
+          "mobject_id": "secant1",
+          "duration": 1.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5.0,
+          "action": "pause",
+          "duration": 3.0
+        },
+        {
+          "t": 8.0,
+          "action": "write_text",
+          "mobject_id": "label_secant",
+          "text": "割线",
+          "duration": 1.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 9.0,
+          "action": "pause",
+          "duration": 3.0
+        }
+      ],
+      "pause_after_sec": 3.0,
+      "notes": "仅展示几何对象，无公式。"
+    },
+    {
+      "id": "scene2",
+      "concept": "割线趋近切线",
+      "duration_sec": 20,
+      "prerequisites": [
+        "scene1"
+      ],
+      "narration": "现在，让点 B 沿着曲线向点 A 移动，观察割线的变化。当 B 越来越接近 A 时，割线会趋向一个确定的位置，这就是切线。",
+      "on_screen_text": "趋近",
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "Axes",
+          "description": "坐标轴（复用）"
+        },
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "description": "函数曲线"
+        },
+        {
+          "id": "p1",
+          "type": "Dot",
+          "color": "point",
+          "description": "点 A（固定）"
+        },
+        {
+          "id": "p2",
+          "type": "Dot",
+          "color": "point",
+          "description": "点 B（移动）"
+        },
+        {
+          "id": "secant2",
+          "type": "Line",
+          "color": "secant",
+          "description": "动态割线"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "mobject_id": "secant2",
+          "duration": 0.5,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 0.5,
+          "action": "move_along_curve",
+          "mobject_id": "p2",
+          "path": "curve",
+          "duration": 8.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 0.5,
+          "action": "update_line",
+          "mobject_id": "secant2",
+          "duration": 8.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 8.5,
+          "action": "pause",
+          "duration": 3.0
+        },
+        {
+          "t": 11.5,
+          "action": "write_text",
+          "mobject_id": "label_tangent",
+          "text": "切线",
+          "duration": 1.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 12.5,
+          "action": "highlight",
+          "mobject_id": "secant2",
+          "color": "tangent",
+          "duration": 2.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 14.5,
+          "action": "pause",
+          "duration": 3.0
+        }
+      ],
+      "pause_after_sec": 3.0,
+      "notes": "动态演示割线趋近切线，无公式。"
+    },
+    {
+      "id": "scene3",
+      "concept": "斜率与极限",
+      "duration_sec": 25,
+      "prerequisites": [
+        "scene2"
+      ],
+      "narration": "割线的斜率等于两点纵坐标之差除以横坐标之差。当点 B 无限靠近点 A 时，这个斜率会趋于一个确定的值，这个值就是切线的斜率，也就是导数。",
+      "on_screen_text": "斜率",
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "Axes",
+          "description": "坐标轴"
+        },
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "description": "函数曲线"
+        },
+        {
+          "id": "p1",
+          "type": "Dot",
+          "color": "point",
+          "description": "点 A"
+        },
+        {
+          "id": "p2",
+          "type": "Dot",
+          "color": "point",
+          "description": "点 B"
+        },
+        {
+          "id": "secant3",
+          "type": "Line",
+          "color": "secant",
+          "description": "割线"
+        },
+        {
+          "id": "delta_x",
+          "type": "Line",
+          "color": "text",
+          "description": "Δx 标注"
+        },
+        {
+          "id": "delta_y",
+          "type": "Line",
+          "color": "text",
+          "description": "Δy 标注"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "mobject_id": "delta_x",
+          "duration": 1.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 1.0,
+          "action": "create",
+          "mobject_id": "delta_y",
+          "duration": 1.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2.0,
+          "action": "write_text",
+          "mobject_id": "formula_slope",
+          "text": "Δy/Δx",
+          "duration": 2.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 4.0,
+          "action": "pause",
+          "duration": 3.0
+        },
+        {
+          "t": 7.0,
+          "action": "move_along_curve",
+          "mobject_id": "p2",
+          "path": "curve",
+          "duration": 6.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 7.0,
+          "action": "update_line",
+          "mobject_id": "secant3",
+          "duration": 6.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 13.0,
+          "action": "write_text",
+          "mobject_id": "formula_limit",
+          "text": "lim",
+          "duration": 2.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 15.0,
+          "action": "pause",
+          "duration": 4.0
+        }
+      ],
+      "pause_after_sec": 4.0,
+      "notes": "引入斜率公式和极限符号，但使用文字形式。"
+    },
+    {
+      "id": "scene4",
+      "concept": "导数定义",
+      "duration_sec": 25,
+      "prerequisites": [
+        "scene3"
+      ],
+      "narration": "导数 f'(x) 就是当 Δx 趋近于 0 时，割线斜率的极限。它表示函数在一点处的瞬时变化率。",
+      "on_screen_text": "导数",
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "Axes",
+          "description": "坐标轴"
+        },
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "description": "函数曲线"
+        },
+        {
+          "id": "p1",
+          "type": "Dot",
+          "color": "point",
+          "description": "点 A"
+        },
+        {
+          "id": "tangent4",
+          "type": "Line",
+          "color": "tangent",
+          "description": "切线"
+        },
+        {
+          "id": "formula_derivative",
+          "type": "Text",
+          "color": "text",
+          "description": "f'(x) = lim(Δx→0) [f(x+Δx)-f(x)]/Δx"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "mobject_id": "tangent4",
+          "duration": 1.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 1.0,
+          "action": "write_text",
+          "mobject_id": "formula_derivative",
+          "text": "f'(x) = lim ...",
+          "duration": 3.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 4.0,
+          "action": "pause",
+          "duration": 5.0
+        },
+        {
+          "t": 9.0,
+          "action": "highlight",
+          "mobject_id": "tangent4",
+          "color": "tangent",
+          "duration": 2.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 11.0,
+          "action": "write_text",
+          "mobject_id": "label_derivative",
+          "text": "导数",
+          "duration": 1.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 12.0,
+          "action": "pause",
+          "duration": 5.0
+        }
+      ],
+      "pause_after_sec": 5.0,
+      "notes": "正式给出导数定义，公式较长但可接受。"
+    },
+    {
+      "id": "scene5",
+      "concept": "示例应用",
+      "duration_sec": 20,
+      "prerequisites": [
+        "scene4"
+      ],
+      "narration": "以 y = x² 为例，在点 (1,1) 处，切线的斜率为 2，这就是导数 f'(1) = 2。",
+      "on_screen_text": "示例",
+      "mobjects": [
+        {
+          "id": "axes",
+          "type": "Axes",
+          "description": "坐标轴"
+        },
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "description": "y = x^2"
+        },
+        {
+          "id": "point_example",
+          "type": "Dot",
+          "color": "point",
+          "description": "点 (1,1)"
+        },
+        {
+          "id": "tangent_example",
+          "type": "Line",
+          "color": "tangent",
+          "description": "切线"
+        },
+        {
+          "id": "text_example",
+          "type": "Text",
+          "color": "text",
+          "description": "f'(1) = 2"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "mobject_id": "point_example",
+          "duration": 1.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 1.0,
+          "action": "create",
+          "mobject_id": "tangent_example",
+          "duration": 2.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 3.0,
+          "action": "write_text",
+          "mobject_id": "text_example",
+          "text": "f'(1) = 2",
+          "duration": 2.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 5.0,
+          "action": "pause",
+          "duration": 5.0
+        }
+      ],
+      "pause_after_sec": 5.0,
+      "notes": "具体示例，增强理解。"
+    },
+    {
+      "id": "scene6",
+      "concept": "总结回顾",
+      "duration_sec": 15,
+      "prerequisites": [
+        "scene5"
+      ],
+      "narration": "总结：导数描述函数在某一点的瞬时变化率，其几何意义是切线的斜率。",
+      "on_screen_text": "总结",
+      "mobjects": [
+        {
+          "id": "text_summary",
+          "type": "Text",
+          "color": "text",
+          "description": "导数 = 切线斜率"
+        },
+        {
+          "id": "curve_small",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "description": "函数曲线"
+        },
+        {
+          "id": "tangent_small",
+          "type": "Line",
+          "color": "tangent",
+          "description": "切线"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "action": "create",
+          "mobject_id": "curve_small",
+          "duration": 1.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 1.0,
+          "action": "create",
+          "mobject_id": "tangent_small",
+          "duration": 1.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 2.0,
+          "action": "write_text",
+          "mobject_id": "text_summary",
+          "text": "导数 = 切线斜率",
+          "duration": 2.0,
+          "rate_func": "smooth"
+        },
+        {
+          "t": 4.0,
+          "action": "pause",
+          "duration": 5.0
+        }
+      ],
+      "pause_after_sec": 5.0,
+      "notes": "总结核心概念。"
+    }
+  ],
+  "qa_self_check": {
+    "total_duration_sec": 120,
+    "scene_count": 6,
+    "checks": [
+      {
+        "criterion": "前两个 scene 无公式",
+        "passed": true,
+        "notes": "scene1 和 scene2 仅使用文字和几何对象，符合要求。"
+      },
+      {
+        "criterion": "每个 scene 单一聚焦",
+        "passed": true,
+        "notes": "每个 scene 聚焦一个概念：割线定义、趋近、斜率、导数定义、示例、总结。"
+      },
+      {
+        "criterion": "颜色语义一致",
+        "passed": true,
+        "notes": "曲线、割线、切线、点颜色在 visual_system 中定义并统一使用。"
+      },
+      {
+        "criterion": "节奏合理",
+        "passed": true,
+        "notes": "关键停顿（如割线趋近切线、导数定义）均设置了较长的 pause_after_sec。"
+      },
+      {
+        "criterion": "文字最小化",
+        "passed": true,
+        "notes": "每个 scene 的 on_screen_text 不超过 8 个汉字，较长的公式或说明通过 narration 表达。"
+      },
+      {
+        "criterion": "动画构图",
+        "passed": true,
+        "notes": "每个 scene 的 mobject 数量在 3-7 个之间。"
+      },
+      {
+        "criterion": "回看锚点",
+        "passed": true,
+        "notes": "scene1 和 scene2 中坐标轴和曲线使用相同 id（axes, curve），便于复用。"
+      },
+      {
+        "criterion": "依赖显式",
+        "passed": true,
+        "notes": "每个 scene 的 prerequisites 明确列出前置 scene id。"
+      },
+      {
+        "criterion": "时长匹配",
+        "passed": true,
+        "notes": "总时长 120 秒，与目标一致。"
+      }
+    ],
+    "overall_notes": "剧本符合所有铁律，前两个 scene 无公式，后续逐步引入，节奏和颜色语义均满足要求。"
+  }
+}

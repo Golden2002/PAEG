@@ -1,0 +1,431 @@
+{
+  "meta": {
+    "title": "导数与切线",
+    "subject": "数学",
+    "grade_level": "高中",
+    "target_duration_sec": 120,
+    "style": "3blue1brown",
+    "core_intuition": "切线是割线在动点无限靠近时的极限位置，导数就是这条切线的斜率。",
+    "learning_objectives": [
+      "理解割线如何通过极限过程变为切线",
+      "理解导数的几何意义是切线斜率",
+      "能说出导数符号 f'(a) 与切线斜率的对应关系"
+    ]
+  },
+  "narrative_arc": {
+    "hook": "从一条固定曲线上的两个点开始，观察它们逐渐靠近时，连线（割线）如何变化。",
+    "rising_action": "让两个点不断靠近，割线方向持续改变，最终在极限处稳定为一条特殊直线。",
+    "climax": "揭示这条极限直线就是切线，并标注其斜率即为导数。",
+    "resolution": "给出导数符号 f'(a) 的几何意义总结。"
+  },
+  "visual_system": {
+    "background_color": "#0b0e14",
+    "palette": {
+      "curve": "#4dd0e1",
+      "secant": "#ffb74d",
+      "tangent": "#ef5350",
+      "point_a": "#ffeb3b",
+      "point_b": "#ab47bc",
+      "text": "#ffffff",
+      "axis": "#888888"
+    },
+    "semantic_binding": {
+      "curve": "函数曲线本身",
+      "secant": "割线（两点连线）",
+      "tangent": "切线（极限直线）",
+      "point_a": "固定点 A（切点）",
+      "point_b": "动点 B（趋近 A）",
+      "text": "所有文字",
+      "axis": "坐标轴"
+    }
+  },
+  "scenes": [
+    {
+      "id": "scene1_curve_points",
+      "concept": "曲线上的两点",
+      "duration_sec": 18,
+      "narration": "我们有一条光滑的曲线，上面有一个固定的点 A，还有一个可以移动的点 B。",
+      "on_screen_text": "",
+      "mobjects": [
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "role": "背景曲线"
+        },
+        {
+          "id": "point_a",
+          "type": "Dot",
+          "color": "point_a",
+          "role": "固定点"
+        },
+        {
+          "id": "point_b",
+          "type": "Dot",
+          "color": "point_b",
+          "role": "动点"
+        },
+        {
+          "id": "secant_line",
+          "type": "Line",
+          "color": "secant",
+          "role": "割线"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "Create",
+          "targets": [
+            "curve"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        },
+        {
+          "t": 2,
+          "type": "Create",
+          "targets": [
+            "point_a"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 1
+        },
+        {
+          "t": 3,
+          "type": "Create",
+          "targets": [
+            "point_b"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 1
+        },
+        {
+          "t": 4,
+          "type": "Create",
+          "targets": [
+            "secant_line"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 1.5
+        },
+        {
+          "t": 5.5,
+          "type": "Pause",
+          "targets": [],
+          "rate_func": "linear",
+          "duration_sec": 8
+        },
+        {
+          "t": 13.5,
+          "type": "FadeOut",
+          "targets": [
+            "secant_line",
+            "point_b"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        }
+      ],
+      "pause_after_sec": 2,
+      "prerequisites": []
+    },
+    {
+      "id": "scene2_secant_approaches",
+      "concept": "割线趋近切线",
+      "duration_sec": 25,
+      "narration": "现在让 B 点沿着曲线慢慢靠近 A 点，注意看那条割线：它的方向在不停地改变。",
+      "on_screen_text": "",
+      "mobjects": [
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "role": "背景曲线"
+        },
+        {
+          "id": "point_a",
+          "type": "Dot",
+          "color": "point_a",
+          "role": "固定点"
+        },
+        {
+          "id": "point_b",
+          "type": "Dot",
+          "color": "point_b",
+          "role": "动点"
+        },
+        {
+          "id": "secant_line",
+          "type": "Line",
+          "color": "secant",
+          "role": "割线"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "Create",
+          "targets": [
+            "curve",
+            "point_a",
+            "point_b",
+            "secant_line"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        },
+        {
+          "t": 2,
+          "type": "MoveAlongPath",
+          "targets": [
+            "point_b",
+            "secant_line"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 8
+        },
+        {
+          "t": 10,
+          "type": "Pause",
+          "targets": [],
+          "rate_func": "linear",
+          "duration_sec": 8
+        },
+        {
+          "t": 18,
+          "type": "FadeOut",
+          "targets": [
+            "point_b",
+            "secant_line"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        }
+      ],
+      "pause_after_sec": 3,
+      "prerequisites": [
+        "scene1_curve_points"
+      ]
+    },
+    {
+      "id": "scene3_tangent_reveal",
+      "concept": "极限直线",
+      "duration_sec": 20,
+      "narration": "当 B 点无限接近 A 点时，割线的极限位置就是切线。",
+      "on_screen_text": "切线",
+      "mobjects": [
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "role": "背景曲线"
+        },
+        {
+          "id": "point_a",
+          "type": "Dot",
+          "color": "point_a",
+          "role": "固定点"
+        },
+        {
+          "id": "tangent_line",
+          "type": "Line",
+          "color": "tangent",
+          "role": "切线"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "Create",
+          "targets": [
+            "curve",
+            "point_a"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        },
+        {
+          "t": 2,
+          "type": "Create",
+          "targets": [
+            "tangent_line"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 3
+        },
+        {
+          "t": 5,
+          "type": "Pause",
+          "targets": [],
+          "rate_func": "linear",
+          "duration_sec": 8
+        },
+        {
+          "t": 13,
+          "type": "Write",
+          "targets": [
+            "text_tangent"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        }
+      ],
+      "pause_after_sec": 3,
+      "prerequisites": [
+        "scene2_secant_approaches"
+      ]
+    },
+    {
+      "id": "scene4_slope_label",
+      "concept": "切线斜率",
+      "duration_sec": 22,
+      "narration": "这条切线的斜率，我们给它一个名字，叫做导数。",
+      "on_screen_text": "斜率",
+      "mobjects": [
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "role": "背景曲线"
+        },
+        {
+          "id": "point_a",
+          "type": "Dot",
+          "color": "point_a",
+          "role": "切点"
+        },
+        {
+          "id": "tangent_line",
+          "type": "Line",
+          "color": "tangent",
+          "role": "切线"
+        },
+        {
+          "id": "slope_triangle",
+          "type": "Polygon",
+          "color": "text",
+          "role": "斜率三角形"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "Create",
+          "targets": [
+            "curve",
+            "point_a",
+            "tangent_line"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        },
+        {
+          "t": 2,
+          "type": "Create",
+          "targets": [
+            "slope_triangle"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 3
+        },
+        {
+          "t": 5,
+          "type": "Pause",
+          "targets": [],
+          "rate_func": "linear",
+          "duration_sec": 8
+        },
+        {
+          "t": 13,
+          "type": "Write",
+          "targets": [
+            "text_slope"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        }
+      ],
+      "pause_after_sec": 3,
+      "prerequisites": [
+        "scene3_tangent_reveal"
+      ]
+    },
+    {
+      "id": "scene5_derivative_symbol",
+      "concept": "导数符号",
+      "duration_sec": 20,
+      "narration": "在数学里，我们把这个斜率记作 f'(a)，读作 f 撇 a。",
+      "on_screen_text": "f'(a)",
+      "mobjects": [
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "role": "背景曲线"
+        },
+        {
+          "id": "point_a",
+          "type": "Dot",
+          "color": "point_a",
+          "role": "切点"
+        },
+        {
+          "id": "tangent_line",
+          "type": "Line",
+          "color": "tangent",
+          "role": "切线"
+        },
+        {
+          "id": "symbol_text",
+          "type": "Text",
+          "color": "text",
+          "role": "导数符号"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "Create",
+          "targets": [
+            "curve",
+            "point_a",
+            "tangent_line"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        },
+        {
+          "t": 2,
+          "type": "Write",
+          "targets": [
+            "symbol_text"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        },
+        {
+          "t": 4,
+          "type": "Pause",
+          "targets": [],
+          "rate_func": "linear",
+          "duration_sec": 10
+        }
+      ],
+      "pause_after_sec": 3,
+      "prerequisites": [
+        "scene4_slope_label"
+      ]
+    }
+  ],
+  "qa_self_check": {
+    "no_formulas_first_two_scenes": true,
+    "single_focus_per_scene": true,
+    "consistent_color_semantics": true,
+    "pause_at_key_moments": true,
+    "duration_within_tolerance": true,
+    "text_length_ok": true,
+    "mobject_count_ok": true,
+    "notes": "所有场景满足要求：前两个场景无公式，颜色语义一致，关键处有停顿，总时长约105秒，符合120秒目标（±15%）。"
+  }
+}

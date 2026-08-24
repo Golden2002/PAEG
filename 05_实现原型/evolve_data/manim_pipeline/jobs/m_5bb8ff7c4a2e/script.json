@@ -1,0 +1,295 @@
+{
+  "meta": {
+    "title": "导数与切线",
+    "subject": "数学",
+    "grade_level": "高中",
+    "target_duration_sec": 120,
+    "style": "3blue1brown",
+    "core_intuition": "切线是割线在动点无限靠近时的极限位置，导数就是这条切线的斜率。",
+    "learning_objectives": [
+      "理解割线如何通过极限过程变为切线",
+      "理解导数的几何意义是切线斜率",
+      "能说出导数符号 f'(a) 与切线斜率的对应关系"
+    ]
+  },
+  "narrative_arc": {
+    "hook": "从一条固定曲线上的两个点开始，观察它们逐渐靠近时，连线（割线）如何变化。",
+    "rising_action": "让两个点不断靠近，割线方向持续改变，最终在极限处稳定为一条特殊直线。",
+    "climax": "揭示这条极限直线就是切线，并标注其斜率即为导数。",
+    "resolution": "给出导数符号 f'(a) 的几何意义总结。"
+  },
+  "visual_system": {
+    "background_color": "#0b0e14",
+    "palette": {
+      "curve": "#4dd0e1",
+      "secant": "#ffb74d",
+      "tangent": "#ef5350",
+      "point_a": "#ffeb3b",
+      "point_b": "#ab47bc",
+      "text": "#ffffff",
+      "axis": "#888888"
+    },
+    "semantic_binding": {
+      "curve": "函数曲线本身",
+      "secant": "割线（两点连线）",
+      "tangent": "切线（极限直线）",
+      "point_a": "固定点 A（切点）",
+      "point_b": "动点 B（趋近 A）",
+      "text": "所有文字",
+      "axis": "坐标轴"
+    }
+  },
+  "scenes": [
+    {
+      "id": "scene1_curve_points",
+      "concept": "曲线上的两点",
+      "duration_sec": 18,
+      "visual_goal": "展示一条光滑曲线，并在其上标出固定点A和动点B，同时用割线连接两点，让观众直观看到割线的存在。",
+      "narration": "我们有一条光滑的曲线，上面有一个固定的点 A，还有一个可以移动的点 B。",
+      "on_screen_text": "",
+      "mobjects": [
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "role": "背景曲线"
+        },
+        {
+          "id": "point_a",
+          "type": "Dot",
+          "color": "point_a",
+          "role": "固定点"
+        },
+        {
+          "id": "point_b",
+          "type": "Dot",
+          "color": "point_b",
+          "role": "动点"
+        },
+        {
+          "id": "secant_line",
+          "type": "Line",
+          "color": "secant",
+          "role": "割线"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "Create",
+          "targets": [
+            "curve"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        },
+        {
+          "t": 2,
+          "type": "Create",
+          "targets": [
+            "point_a"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 1
+        },
+        {
+          "t": 3,
+          "type": "Create",
+          "targets": [
+            "point_b"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 1
+        },
+        {
+          "t": 4,
+          "type": "Create",
+          "targets": [
+            "secant_line"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 1
+        }
+      ]
+    },
+    {
+      "id": "scene2_secant_moving",
+      "concept": "割线的动态变化",
+      "duration_sec": 30,
+      "visual_goal": "动态展示点B沿曲线逐渐靠近点A，割线随之改变方向，让观众看到割线在极限过程中的连续变化。",
+      "narration": "现在让点 B 沿着曲线不断靠近点 A。注意看，连接两点的割线方向在持续改变。",
+      "on_screen_text": "割线方向在变化",
+      "mobjects": [
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "role": "背景曲线"
+        },
+        {
+          "id": "point_a",
+          "type": "Dot",
+          "color": "point_a",
+          "role": "固定点"
+        },
+        {
+          "id": "point_b",
+          "type": "Dot",
+          "color": "point_b",
+          "role": "动点"
+        },
+        {
+          "id": "secant_line",
+          "type": "Line",
+          "color": "secant",
+          "role": "割线"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "MoveAlongPath",
+          "targets": [
+            "point_b"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 8,
+          "path": "curve"
+        },
+        {
+          "t": 0,
+          "type": "Update",
+          "targets": [
+            "secant_line"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 8
+        }
+      ]
+    },
+    {
+      "id": "scene3_limit_tangent",
+      "concept": "极限位置形成切线",
+      "duration_sec": 25,
+      "visual_goal": "在点B无限靠近点A时，割线稳定为一条特殊直线——切线，并高亮显示该切线。",
+      "narration": "当点 B 无限靠近点 A，割线会稳定在一条特殊直线上，这条直线就是切线。",
+      "on_screen_text": "极限位置 → 切线",
+      "mobjects": [
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "role": "背景曲线"
+        },
+        {
+          "id": "point_a",
+          "type": "Dot",
+          "color": "point_a",
+          "role": "固定点"
+        },
+        {
+          "id": "point_b",
+          "type": "Dot",
+          "color": "point_b",
+          "role": "动点（重合于A）"
+        },
+        {
+          "id": "secant_line",
+          "type": "Line",
+          "color": "secant",
+          "role": "割线（趋近切线）"
+        },
+        {
+          "id": "tangent_line",
+          "type": "Line",
+          "color": "tangent",
+          "role": "切线"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "FadeOut",
+          "targets": [
+            "point_b"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        },
+        {
+          "t": 0,
+          "type": "Transform",
+          "targets": [
+            "secant_line"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 3,
+          "to": "tangent_line"
+        },
+        {
+          "t": 3,
+          "type": "Create",
+          "targets": [
+            "tangent_line"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        }
+      ]
+    },
+    {
+      "id": "scene4_derivative_label",
+      "concept": "导数等于切线斜率",
+      "duration_sec": 25,
+      "visual_goal": "在切线上标注斜率值，并用导数符号 f'(a) 表示，强调导数的几何意义。",
+      "narration": "这条切线的斜率，就是函数在点 A 处的导数，记作 f'(a)。",
+      "on_screen_text": "f'(a) = 切线斜率",
+      "mobjects": [
+        {
+          "id": "curve",
+          "type": "FunctionGraph",
+          "color": "curve",
+          "role": "背景曲线"
+        },
+        {
+          "id": "tangent_line",
+          "type": "Line",
+          "color": "tangent",
+          "role": "切线"
+        },
+        {
+          "id": "slope_label",
+          "type": "Text",
+          "color": "text",
+          "role": "斜率标注"
+        },
+        {
+          "id": "derivative_label",
+          "type": "Text",
+          "color": "text",
+          "role": "导数符号"
+        }
+      ],
+      "animations": [
+        {
+          "t": 0,
+          "type": "Create",
+          "targets": [
+            "slope_label"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        },
+        {
+          "t": 2,
+          "type": "Create",
+          "targets": [
+            "derivative_label"
+          ],
+          "rate_func": "smooth",
+          "duration_sec": 2
+        }
+      ]
+    }
+  ]
+}
