@@ -4502,6 +4502,12 @@ manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+
 
 **单独存储价值**：结构（含情景信息）与代码解耦——改表不改码；情景化拼接不易出错（固定+物料+用户输入自动组装）。
 
+### Oracle 咨询状态
+
+- **状态**：待启动（§3.96 于 2026-08-24 登记，Oracle 咨询尚未发起）
+- **待咨询问题**：提示词清单 PromptRegistry 单独存储架构——{id, type(固定/可扩展/动态), content, 触发情景, 优先级, 来源} schema 设计、情景驱动拼接器、与现有 build_presenter_system/build_material_system/constraint_config.json 的关系、热更新与可追溯
+- **关联**：§3.95 三层联通（用户输入拼接所有提示词）依赖此清单；§3.94 物料分阶段（用户意图注入）也需清单支撑
+
 ### 实施记录
 
-（咨询中）
+（Oracle 咨询返回后实施）
