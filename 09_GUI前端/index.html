@@ -1706,6 +1706,11 @@ body {
       <button class="chip chip-material" data-material="video" data-q="生成教学视频：">🎬 做视频</button>
       <button class="chip chip-material" data-material="manim" data-q="生成数学动画：">🎨 做动画</button>
     </div>
+    <!-- §3.94 ⭐ 物料详细要求输入（用户提示词注入——动画重点/制作要求） -->
+    <div id="material-details-wrap" style="display:none;margin:6px 0;padding:6px 10px;background:#f7f8fa;border-radius:8px;font-size:12px">
+      <label for="manim-details" style="color:#666">🎯 详细要求（可选，将作为动画生成依据）：</label>
+      <input id="manim-details" type="text" maxlength="200" placeholder="如：重点讲切线斜率，突出割线逼近…" style="width:100%;margin-top:4px;padding:6px 8px;border:1px solid #ddd;border-radius:6px"/>
+    </div>
 
     <div class="action-bar" id="action-bar">
       <button class="action-btn" id="act-hint">给我个提示</button>
@@ -4226,6 +4231,9 @@ askBtn.addEventListener('click', () => {
   window._intentConfirmed = false;
   // v6.1 ⭐ 数学动画/授课视频：启用且命中关键词 → 走独立生成（不进普通教学流）
   if (window._manimModeActive && window._manimModeActive() && window._shouldTriggerManim(q)) {
+    // §3.94 ⭐ 显示详细要求输入框（用户提示词注入动画生成）
+    const dw = document.getElementById('material-details-wrap');
+    if (dw) dw.style.display = 'block';
     fetchManimVideo(q);
     return;
   }
@@ -5385,14 +5393,36 @@ document.addEventListener('click', (e) => {
 });
 
 // 数学动画进度悬浮框（复用 resource 模式）
+// §3.94 ⭐ 三阶段进度条（脚本→代码→视频），用户可见物料制作当前阶段
 function addManimProgress(topic) {
   const box = document.createElement('div');
   box.className = 'resource-progress';
   box.id = 'manim-progress';
-  box.innerHTML = '<b>数学动画生成中</b>：' + (topic || '').slice(0, 20) + '… <span class="spinner" style="display:inline-block;width:12px;height:12px;border:2px solid #888;border-top-color:#333;border-radius:50%;animation:spin 0.8s linear infinite"></span>';
+  box.innerHTML =
+    '<b>数学动画生成中</b>：' + (topic || '').slice(0, 20) + '…' +
+    '<div class="manim-stages" style="margin-top:6px;font-size:12px;color:#555">' +
+    '  <span id="manim-stage-script" data-stage="script" style="display:inline-block;margin-right:12px">① 脚本 <span class="st">⏳</span></span>' +
+    '  <span id="manim-stage-code" data-stage="code" style="display:inline-block;margin-right:12px">② 代码 <span class="st">⏳</span></span>' +
+    '  <span id="manim-stage-video" data-stage="video" style="display:inline-block">③ 视频 <span class="st">⏳</span></span>' +
+    '</div>' +
+    '<div class="manim-bar" style="height:4px;background:#eee;border-radius:2px;margin-top:6px;overflow:hidden">' +
+    '  <div id="manim-bar-fill" style="height:100%;width:0%;background:#4a90d9;transition:width 0.4s"></div>' +
+    '</div>' +
+    '<span class="spinner" style="display:inline-block;width:12px;height:12px;border:2px solid #888;border-top-color:#333;border-radius:50%;animation:spin 0.8s linear infinite"></span>';
   const chatWin = document.getElementById('chat-window');
   if (chatWin) chatWin.insertBefore(box, chatWin.firstChild);
   return box;
+}
+// §3.94 ⭐ 更新阶段状态（progress/artifact 事件）
+function updateManimProgress(stage, status, percent) {
+  const st = document.getElementById('manim-stage-' + (stage || 'script'));
+  if (st) {
+    const icon = st.querySelector('.st');
+    if (icon) icon.textContent = status === 'done' ? '✅' : (status === 'failed' ? '❌' : '⏳');
+    if (status === 'done' || status === 'failed') st.style.opacity = status === 'done' ? '0.6' : '1';
+  }
+  const fill = document.getElementById('manim-bar-fill');
+  if (fill && typeof percent === 'number') fill.style.width = Math.min(100, Math.max(0, percent)) + '%';
 }
 function removeManimProgress() {
   const el = document.getElementById('manim-progress');
@@ -5414,19 +5444,43 @@ function removeVideoProgress() {
 }
 
 // v6.1 ⭐ 数学动画生成（用户点"数学动画"按钮启用后触发）
+// §3.94 ⭐ 传用户详细要求 + 展示脚本/代码下载 + 进度条
 async function fetchManimVideo(topic) {
   const progress = addManimProgress(topic);
+  // §3.95 ⭐ 用户详细要求（详细要求输入框，若有）
+  const detailsEl = document.getElementById('manim-details');
+  const details = detailsEl ? detailsEl.value.trim() : '';
   try {
+    const cleanTopic = (topic || '').replace(/^生成数学动画[：:]\s*/, '').trim() || topic;
     const resp = await fetch(API_BASE + '/api/manim/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, subject: subjectSelect ? subjectSelect.value : 'math', learner_id: STATE.learnerId }),
+      body: JSON.stringify({
+        topic: cleanTopic,
+        subject: subjectSelect ? subjectSelect.value : 'math',
+        learner_id: STATE.learnerId,
+        grade: gradeSelect ? gradeSelect.value : 'high_school',
+        user_requirements: details || undefined,
+        intuition: details || undefined,
+      }),
     });
     const data = await resp.json();
     removeManimProgress();
     if (data.ok && data.url) {
       const videoUrl = data.url.startsWith('http') ? data.url : API_BASE + data.url;
-      addMsg('paeg', '<b>数学动画已生成</b><br><video controls style="max-width:100%;max-height:320px;border-radius:8px" src="' + videoUrl + '"></video>');
+      // §3.94 ⭐ 阶段产物下载链接（脚本/代码/manifest）
+      let dlLinks = '';
+      const arts = data.artifacts || {};
+      if (arts.script && arts.script.url) dlLinks += ' <a href="' + API_BASE + arts.script.url + '" target="_blank">📄 下载脚本</a>';
+      if (arts.code && arts.code.url) dlLinks += ' <a href="' + API_BASE + arts.code.url + '" target="_blank">🐍 下载代码</a>';
+      if (arts.manifest && arts.manifest.url) dlLinks += ' <a href="' + API_BASE + arts.manifest.url + '?view=1" target="_blank">📋 任务清单</a>';
+      addMsg('paeg', '<b>数学动画已生成</b><br><video controls style="max-width:100%;max-height:320px;border-radius:8px" src="' + videoUrl + '"></video><br>' + dlLinks);
+    } else if (data.artifacts && (data.artifacts.script || data.artifacts.code)) {
+      // 渲染失败但脚本/代码已生成 → 提供下载
+      let dl = '';
+      if (data.artifacts.script && data.artifacts.script.url) dl += ' <a href="' + API_BASE + data.artifacts.script.url + '" target="_blank">📄 下载脚本</a>';
+      if (data.artifacts.code && data.artifacts.code.url) dl += ' <a href="' + API_BASE + data.artifacts.code.url + '" target="_blank">🐍 下载代码</a>';
+      addMsg('paeg', '<b>数学动画渲染中</b>：' + (data.error || '渲染超时') + '。脚本/代码已生成：' + dl);
     } else {
       addMsg('paeg', '<b>数学动画生成失败</b>：' + (data.error || '未知错误') + '。可尝试说"画个图"或"演示"更明确。');
     }
