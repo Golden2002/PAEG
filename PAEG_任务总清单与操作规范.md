@@ -3520,3 +3520,31 @@ server.py `teach_video` 端点：
 ### 实施记录
 
 （实施中）
+
+## §3.89 全物料流水线统一框架（2026-08-24）
+
+### 用户要求（原文）
+
+"所以其他物料制作，也要像manim视频这样，有同样的水平，有自己的一套流程和解决方案" + "咨询oracle"
+
+### 背景：Manim 管线成熟度（已验证）
+
+manim_pipeline.py 6 阶段（plan→draft→implement→review→gates→fix）+ visual_script_generator（3blue1brown 8 原则 + script.json 单一真相源）+ visual_script_validator（7 铁律 + auto_fix）+ manim_judge（4 维叙事评审）+ manim_templates（7 场景模板）+ 隔离渲染 + AST 校验
+
+**用户要求**：PPT / 讲义 / 教学视频 / 思维导图 达到同等水平——各自有"结构化脚本 + 校验器 + 评审 + 自动修复 + 模板库"完整闭环。
+
+### 验证发现的 Manim 管线缺口
+
+- Phase1 结构门失败（缺 visual_goal）但仍 ok=True（门失败未阻断，回退静默）
+- narrative_judge dims={} overall=0.0（LLM 评审未生效）
+
+### 任务分解
+
+1. Oracle 设计"全物料流水线统一框架"（对标 Manim：5 类物料各自 plan/draft/implement/review/gates/fix）
+2. 修复 Manim 管线缺口（门失败阻断 + 评审生效）
+3. 实施：PPT/讲义/教学视频/思维导图各自流水线
+4. 验证 + D4 同步
+
+### 实施记录
+
+（实施中）
