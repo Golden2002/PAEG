@@ -3492,3 +3492,31 @@ server.py `teach_video` 端点：
 - Ghost 预览模式（Oracle 方案增强，可切换）——后续
 - 纯隐藏模式（高级用户设置项）——后续
 - 输出质量：物料需满足 Oracle3 rubric（排版/详实/例子/适用课堂）——持续用测试工程评估
+
+## §3.88 物料结构化提示词模板体系（2026-08-24）
+
+### 用户要求（原文）
+
+"每一个物料生产中都要内置一套结构化的提示词模板……哪怕用户只输入简单的指令，也能让我们的agent去harness指导LLM按照系统提示词模板去生成高质量的提纲。以此提纲为基础来制作高质量的物料……这些系统提示词要具有灵活性，适应不同学科、不同学段、不同教学……同样，这个约束也需要是动态的，以增强大模型的能力，而不是过于的限制"
+
+### Oracle 设计（bg_65bfba79 · 已完成）✅
+
+**方案核心**：
+- 新建 `material_prompts.py`（独立模块，不污染 3072 行 prompts.py）
+- 5 类物料各一套"角色+约束+范例"三层模板：handout / ppt / video / manim / mindmap
+- 统一装配器 `build_material_system(material_type, topic, subject, grade, learner)`
+- 简单指令升级器 `upgrade_simple_intent(topic, material_type, subject, grade)`——"生成PPT：光合作用"→ 带学科/学段/物料要求的完整 user prompt
+- 动态约束：5 层（语言层/真实底线/学科persona/学段节奏/约束分级）+ 外语专属层按需注入
+- 约束是"层"不是"墙"：硬约束仅 5-7 条反模式黑名单，配 ≥1 段优秀范例启发（示例>规则）
+
+### 任务分解
+
+1. 新建 `material_prompts.py`：_MATERIAL_TEMPLATES 5 类物料字典 + build_material_system + upgrade_simple_intent
+2. 改 `material_pipeline.py`：_draft 的 4 个写死 system → build_material_system 调用
+3. 复用 manim_prompts.py：PPT 大纲可预留 [[manim:...]] 占位
+4. 保留 build_lesson_planner_system 不变（备课总产出互补）
+5. 测试：25 用例（5 物料 × 5 简单指令）断言 schema/硬约束/范例/升级器输出
+
+### 实施记录
+
+（实施中）
