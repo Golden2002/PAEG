@@ -190,7 +190,7 @@
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     User(["学生<br/>浏览器/微信"]) -->|HTTP/SSE| PAEG["PAEG 教育智能体"]
     PAEG -->|Prompt| LLM(("LLM<br/>DeepSeek/OpenAI"))
@@ -218,7 +218,7 @@ flowchart LR
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     UI["Web UI"] --> API["REST API"] --> R["meta_router 15意图"] --> T["paeg.teach / teach_stream"]
     T --> S["9 核心 subagent + ResourceLibrarian"]
@@ -233,6 +233,7 @@ flowchart TB
 **图 2B · Blueprints 分层架构（Phase 3 · 12 蓝图）**
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     subgraph 入口层
         server["server.py 组合根<br/>app 装配 + 蓝图注册 + 启动"]
@@ -281,7 +282,7 @@ flowchart TB
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     subgraph Main["主线 · 五阶段"]
         Start(["学生提问"]) --> D["① 诊断"]
@@ -320,7 +321,7 @@ flowchart LR
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     subgraph ASM["system 装配"]
         B["WEIL_CORE"]; T2["TRUTH_GROUNDING"]; SS["SUBJECT_STYLES"]; LG["LANGUAGE_STYLE"]
@@ -350,7 +351,7 @@ flowchart LR
 **图 5 · 自我进化闭环（G1-G11）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     Teach["教学完成"] --> Hist["对话历史抓取 G1"]
     Hist --> Dist["知识蒸馏<br/>LLM 提炼"]
@@ -369,7 +370,7 @@ flowchart TD
 **图 6 · RALPH 循环（任务驱动持续改进）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     Sub["任务提交 TaskRegistry"] --> Exec["执行本轮 executor"]
     Exec --> Eval["三层判定<br/>L0门禁+L1指标+L2证据"]
@@ -383,7 +384,7 @@ flowchart TD
 **图 7 · 意图路由（meta_router）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     In["用户输入"] --> Mode{"模式短路<br/>用户显式选择?"}
     Mode -->|是| Direct["确定性意图<br/>confidence 0.95"]
@@ -398,7 +399,7 @@ flowchart TD
 **图 8 · 配置体系（config_hub）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     App["server.py/subagents"] -->|get_all_tool_defs| Hub["config_hub"]
     Hub --> MCP["MCP 14 工具"]
@@ -414,7 +415,7 @@ flowchart LR
 **图 9 · checkpoint 互动时序（深入版教学互动）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
     participant S as 学生
     participant T as teach_stream
@@ -435,6 +436,7 @@ sequenceDiagram
 **图 10 · 17 维学生画像独立性模型**
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     P["LearnerProfile 17 维"] --> L1["L1 核心 5 维<br/>identity/cognitive_style/mastery/study_goal/emotion"]
     P --> L2["L2 触发 5 维<br/>engagement/motivation/belief/intention/error_response"]
@@ -449,7 +451,7 @@ flowchart TD
 **图 11 · 三层记忆生命周期**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     ST["短期记忆<br/>≤12 条/token≤6000"] -->|超阈值| CP["compress_if_needed<br/>LLM 摘要"]
     CP --> MT["中期记忆<br/>主题/掌握/薄弱/情感四信号<br/>≤900 字"]
@@ -462,7 +464,7 @@ flowchart LR
 **图 12 · 教学策略决策树（choose_strategy）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     In["诊断+学科+画像"] --> Bloom["学科默认 Bloom 起点"]
     Bloom --> R1{"有缺口且无前置?"}
@@ -483,7 +485,7 @@ flowchart TD
 **图 13 · 单步教学续讲（_pending_steps 状态机）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 stateDiagram-v2
     [*] --> step_idle
     step_idle --> step_in_progress: 首步进入
@@ -497,7 +499,7 @@ stateDiagram-v2
 **图 14 · QualityGate L1-L4 四层过滤**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     C["候选内容"] --> L1["L1 宪法<br/>有害/注入/PII 正则 <1ms"]
     L1 -->|pass| L2["L2 硬规则<br/>长度/去重/格式 <1ms"]
@@ -512,7 +514,7 @@ flowchart TD
 **图 15 · 周期自我更新调度**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
     participant S as server
     participant P as PeriodicUpdater
@@ -533,6 +535,7 @@ sequenceDiagram
 **图 16 · SSE 流式协议事件序列**
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
     participant U as 用户
     participant S as server
@@ -554,6 +557,7 @@ sequenceDiagram
 **图 17 · hooks 事件链（贯穿各层）**
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
     participant App as 应用
     participant H as hooks_hub
@@ -571,6 +575,7 @@ sequenceDiagram
 **图 18 · 危机信号识别协议（affection_gate）**
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     In["用户输入"] --> Det{"自伤/自杀信号?"}
     Det -->|否| Normal["正常回应"]
@@ -585,7 +590,7 @@ flowchart TD
 **图 19 · spill 防护（上下文溢出+注入防御）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     In["输入/工具返回"] --> L1["L1 注入模式正则"]
     L1 -->|pass| L2["L2 PII 检测"]
@@ -600,7 +605,7 @@ flowchart TD
 **图 20 · MCP 工具配置化加载器（v1.1.1 ⭐）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     JSON["config/mcp_tools.json<br/>14 工具声明"] --> LD["mcp_tools_loader<br/>JSON→工具注册"]
     LD --> W1{"模块白名单<br/>mcp_tools.*"}
@@ -617,7 +622,7 @@ flowchart LR
 **图 21 · 权限控制三层（sandbox+approval+custom）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     REQ["tool.before<br/>调用请求"] --> LD["加载 Profile<br/>+ preset 预设"]
     LD --> P{"preset 类型<br/>read_only/standard/exam/full"}
@@ -634,7 +639,7 @@ flowchart TD
 **图 22 · 事件类型化（62 类型：13 CORE + 35 PLUGIN + 14 PAEG）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     SRC["事件源<br/>hooks / subagent<br/>/ tool / workflow"] --> ENV["SessionEvent 信封<br/>seq + time + data<br/>+ surfaceOp"]
     ENV --> SURF{"surfaceOp 校验<br/>强制 schema"}
@@ -649,7 +654,7 @@ flowchart TB
 **图 23 · repeat-tool-guard（chain-key + 多级阈值）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 stateDiagram-v2
     [*] --> calc
     calc: tool.before hook<br/>计算 chain-key<br/>hash tool+args
@@ -672,7 +677,7 @@ stateDiagram-v2
 **图 24 · Profile Bundle 分层堆叠 + dump-config**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     L1["L1 内嵌默认<br/>PAEG 原设计"] --> L2
     L2["L2 Bundle 加载<br/>standard / exam / weil"]
@@ -688,7 +693,7 @@ flowchart TB
 **图 25 · subagent 生命周期事件（构造 + start/end + hook）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
     participant App as server
     participant WF as workflow
@@ -708,7 +713,7 @@ sequenceDiagram
 **图 26 · 教学物料流水线 material_pipeline**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     IN["主题输入"] --> DAG["teach_materials<br/>DAG 编排"]
     DAG --> P1["导图 + 讲义"]
@@ -726,6 +731,7 @@ flowchart LR
 **图 27 · Docker 打包 + 双远程部署（§7.4/§7.5）**
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     subgraph "本地开发"
         dev["本地 :5000<br/>python server.py"]
