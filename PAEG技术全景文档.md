@@ -5275,3 +5275,34 @@ since:   <PAEG 版本号>
 
 - 技术说明：C.15 物料制作体系全览（10+4 体系）+ F5 多模态产出补 4 类 + 主线一补盘点结论
 - 需求文档：§3.89 实施记录 + §3.90 登记（盘点结果）
+
+
+### 10.27.8 物料生产与教学输出全面升级（§3.87-§3.100 · 2026-08-24）
+
+**物料体系（§3.87-§3.91）**：
+- 物料触发双路径：按钮/chip 填前缀不自动发送 + 6 个精确关键词（零正则）
+- 物料结构化提示词模板：material_prompts.py 5 类三层模板（角色/schema/硬约束/范例）
+- 全物料流水线：MaterialPipeline v2.0（gates/fix_strategy 可插拔槽位 + 6 管线）
+- 物料路由：material_router.py 数据驱动 ROUTER 表 + sse_presenter 统一 SSE（6 分支→6 行）
+- 物料种类盘点：10 类产出 + 4 类文档流（讲义/讲稿/PPT/导图/视频/Manim + quiz/article/study_plan/lesson_prep）
+
+**分阶段联通（§3.94）**：run_pipeline 按 job_id 落盘 脚本/代码/manifest + progress 回调 + 下载 API（/api/manim/jobs/{id}/script|code|manifest）+ SSE 阶段进度事件 + 前端三阶段进度条 + 用户详细要求输入框
+
+**三层联通（§3.95）**：用户输入拼进所有生成提示词 + material_harness.py（AgentEngine Plan→Act→Observe→Reflect 驱动物料，中间产物落盘）
+
+**动态约束架构（§3.92/§3.96）**：
+- constraint_config.json 扩展：layer_meta + group_rules 结构化（default/unlocked + D.skeleton_full/brief）+ default_layer 4→7
+- 教授级 6 层教学法骨架挂 D 层（核心前提→基础机制→底层原理→现实权衡→边界→延伸→小结）
+- PromptRegistry（data/prompt_registry.json 19 块 + 7 情景）单独存储，情景驱动拼接
+- 移除 v0.26 easy/normal/deep 类型化硬分支（LLM 自主判断）
+
+**manim 环境与质量（§3.97-§3.100）**：
+- MiKTeX LaTeX 安装 + PATH 注入（MathTex 真 LaTeX 渲染，不降级替换）
+- ffmpeg PATH 注入（manim_env 内）+ 代码清洗（全角标点→半角/MathTex 降级/LaTeX 残留）
+- 渲染模板兜底 + _find_renderable_scene（多场景剧本选含 construct 类）
+- 评测标准修正：manim 评代码质量（5 维 rubric：详尽展示/脚本忠实/结构/数学/可运行）
+- 3B1B 三件套：visual_script_generator 铁律 9/10（钩子+recap）+ manim_judge 4→7 维 + manim_templates 公式推导链模板
+
+**渲染统一（§3.93）**：SVG 矢量直出方案固定（交付物/技术说明/render/ 权威目录）+ 旧目录 LEGACY 标记 + Mermaid neutral 化
+
+**专项验证（§3.101）**：128 测试绿 + 教学流 17 轮 + 倾诉 100 分 + 查资料/知识库正常——改动是基础上提升
