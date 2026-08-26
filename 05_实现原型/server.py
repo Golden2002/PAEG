@@ -3758,4 +3758,13 @@ if __name__ == "__main__":
     # v0.19.21：周期自我更新调度器（后台守护线程）
     # v0.42 ⭐ P0 修复：改调 init_periodic_updater()（统一入口，含幂等守卫）
     init_periodic_updater()
+    # §3.112 ⭐ 教学物料插件挂载（Phase 1：仅挂载不切换；PAEG_USE_MATERIAL_PLUGIN=0 可关闭）
+    try:
+        from services.material_bridge import install_material_plugin, bridge_status
+        _plugin_ok = install_material_plugin()
+        _bs = bridge_status()
+        print(f"[PAEG Server] 教学物料插件: active={_plugin_ok} version={_bs['version']} "
+              f"use_plugin={_bs['use_plugin']}")
+    except Exception as _pe:
+        print(f"[PAEG Server] 教学物料插件挂载失败（不影响主服务，走旧物料路径）: {_pe}")
     app.run(host=APP_HOST, port=port, debug=False, threaded=True)

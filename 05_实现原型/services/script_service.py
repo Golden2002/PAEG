@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """讲稿生成服务（v0.66 ⭐ Oracle 讲稿驱动视频链路 Stage 1）
 
@@ -8,6 +9,13 @@
 每段独立 narration（PPT 页讲稿 + manim 段讲稿），供后续 TTS 配音。
 """
 from __future__ import annotations
+
+"""
+[LEGACY · 历史实现] 自 2026-08-26（§3.112）起冻结，仅供 PAEG_USE_MATERIAL_PLUGIN=0 兜底。
+新代码必须使用插件 paeg-teaching-materials（material_router._gen_* → services.material_bridge.execute）。
+禁止在新模块 import 本模块，违规将被 audit_check 拦截。
+最后维护: PAEG Team · 关联: §3.110/§3.111/§3.112
+"""
 
 import hashlib
 import json
@@ -21,7 +29,6 @@ _CACHE_DIR = _BASE / "downloads" / "scripts"
 
 # 语速估算：中文约 4 字/秒
 _CHARS_PER_SEC = 4.0
-
 
 class ScriptSection:
     """一段讲稿（PPT 页 或 manim 动画段）。"""
@@ -44,7 +51,6 @@ class ScriptSection:
             "est_duration_s": self.est_duration_s, "manim_topic": self.manim_topic,
         }
 
-
 class Script:
     """全篇讲稿：按大纲顺序的 section 列表。"""
 
@@ -55,7 +61,6 @@ class Script:
     def to_dict(self) -> dict:
         return {"lesson_id": self.lesson_id,
                 "sections": [s.to_dict() for s in self.sections]}
-
 
 def _parse_outline_plan(outline: str) -> List[dict]:
     """从大纲文本解析分段计划（PPT 页 + manim 占位，按出现顺序）。
@@ -91,11 +96,9 @@ def _parse_outline_plan(outline: str) -> List[dict]:
                 })
     return plan
 
-
 def _estimate_duration(text: str) -> float:
     """估算文本朗读时长（中文约 4 字/秒）。"""
     return max(3.0, len(text or "") / _CHARS_PER_SEC)
-
 
 def _gen_ppt_narration(title: str, key_points: List[str], target_s: float) -> str:
     """PPT 页讲稿：LLM 生成**授课式**口语化讲解（对学生说话，非要点拼接）。
@@ -153,7 +156,6 @@ def _gen_ppt_narration(title: str, key_points: List[str], target_s: float) -> st
     # v0.66 ⭐ 授课式兜底（不再"标题+逗号拼接"）
     return _fallback_narration(title, key_points)
 
-
 def _fallback_narration(title: str, key_points: List[str]) -> str:
     """v0.66 ⭐ 授课式兜底讲稿：即使 LLM 失败也有称呼/引导/过桥。"""
     pts = key_points or []
@@ -167,7 +169,6 @@ def _fallback_narration(title: str, key_points: List[str]) -> str:
                 f"（停顿）我们从{rest}这几个角度来展开。请大家带着这个思考，我们继续往下看。")
     return (f"同学们，我们这一节的主题是{title}。先看一个核心问题：{kp}。"
             f"请大家带着这个思考，我们继续往下看。")
-
 
 def _gen_manim_narration(manim_topic: str, target_s: float) -> str:
     """manim 动画段讲稿：LLM 生成**描述+引导+提问**三段式同步讲解。
@@ -205,7 +206,6 @@ def _gen_manim_narration(manim_topic: str, target_s: float) -> str:
     # 授课式兜底
     return (f"同学们，现在我们看到{manim_topic}的动画演示。注意看，"
             f"这个变化正在逐渐展开——你发现其中的规律了吗？我们把这个问题记在心里，继续往下看。")
-
 
 def generate_full_script(outline: str, topic: str = "",
                          subject: str = "", learner_id: str = "anon",
@@ -271,7 +271,6 @@ def generate_full_script(outline: str, topic: str = "",
     except Exception:
         pass
     return script
-
 
 def align_narration_to_animation(narration: str, target_duration_s: float) -> str:
     """v0.66 ⭐ 按动画实际时长对齐讲稿（粗对齐：字符估算裁剪/扩展）。

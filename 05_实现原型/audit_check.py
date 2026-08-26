@@ -643,6 +643,44 @@ def audit_dataflow_integrity():
         record("数据流", "P1", "H-1 会话事件日志三件套齐备", False, f"检查失败: {_h1e}")
 
 
+def audit_legacy_imports():
+    """§3.112 ⭐ 检查是否在非豁免文件中 import 了 8 个 LEGACY 物料模块。
+
+    历史打标：这些模块已冻结，新代码必须使用 paeg-teaching-materials 插件。
+    豁免：material_router.py（持有 _legacy_gen_* 引用）、自身。
+    """
+    legacy_modules = (
+        "manim_service", "manim_pipeline", "manim_extensions",
+        "manim_prompts", "manim_templates", "manim_geometric_audit",
+        "visual_script_generator", "script_service",
+    )
+    # 豁免：LEGACY 模块自身互引（历史遗留）+ 持有回退引用的文件 + 测试
+    exempt = {"audit_check.py", "material_router.py", "material_pipeline.py",
+              "fixers_lib.py", "subagents.py", "server.py", "tool_registry.py",
+              "test_plugin_switch.py"}
+    # server.py 的 manim_service import 是 /api/manim/generate 旧端点（保留 fallback）
+    violations = []
+    for py in SRV.parent.glob("*.py"):
+        if py.name in exempt:
+            continue
+        # LEGACY 模块自身文件也豁免（它们互相调用）
+        if py.stem in legacy_modules:
+            continue
+        try:
+            txt = py.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        for mod in legacy_modules:
+            # 精确匹配 import（避免误报子串）
+            if f"import {mod}" in txt or f"from {mod}" in txt \
+                    or f"from services.{mod}" in txt:
+                violations.append(f"{py.name} → {mod}")
+                break
+    record("模块健康", "P1", "LEGACY 物料模块禁止新 import（§3.112 插件切换）",
+           len(violations) == 0,
+           "" if not violations else f"违规 import: {', '.join(violations[:5])}")
+
+
 def main():
     audit_early_exit()
     audit_silent_except()
@@ -659,6 +697,7 @@ def main():
     audit_refactor_integrity()
     audit_modular_health()
     audit_dataflow_integrity()
+    audit_legacy_imports()
 
     p0 = [r for r in REPORT if r["level"] == "P0" and not r["ok"]]
     p1 = [r for r in REPORT if r["level"] == "P1" and not r["ok"]]

@@ -1,8 +1,16 @@
+
 # -*- coding: utf-8 -*-
 """v6.1 ⭐ Manim 模板库（LLM 失败时的兜底 + 演示）
 v0.65 ⭐ 三档分级速度：重复动作快(1.2s)、中间态中速(1.8s)、关键部分慢(3.0s)+Aha(2.5+3.0)。
 引用 manim_speed 常量——用户不需要自己调速度，快慢交替符合教学节奏。
 首期 5 类数学动画模板（Oracle 建议）：函数曲线/坐标轴/导数切线/面积积分/几何变换
+"""
+
+"""
+[LEGACY · 历史实现] 自 2026-08-26（§3.112）起冻结，仅供 PAEG_USE_MATERIAL_PLUGIN=0 兜底。
+新代码必须使用插件 paeg-teaching-materials（material_router._gen_* → services.material_bridge.execute）。
+禁止在新模块 import 本模块，违规将被 audit_check 拦截。
+最后维护: PAEG Team · 关联: §3.110/§3.111/§3.112
 """
 import re
 from manim_speed import (
@@ -201,7 +209,6 @@ for _name, _code in _TEMPLATES.items():
     _code = _code.replace('__MID_WAIT__', repr(MID_WAIT))
     _TEMPLATES[_name] = _code
 
-
 # §3.100 ⭐ 3B1B 公式推导链模板（TransformMatchingTex 渐进披露 + hook + recap）
 _TEMPLATES['derivative_chain'] = '''from manim import *
 import numpy as np
@@ -250,7 +257,6 @@ def template_for(topic: str, subject: str = 'math') -> str:
             return _TEMPLATES[name]
     # 默认：几何变换（最通用）
     return _TEMPLATES['transform']
-
 
 def template_by_key(key: str, topic: str = '') -> str:
     """v0.63 ⭐ 按意图 key 直接选模板（manim_prompts 场景匹配后兜底）。"""

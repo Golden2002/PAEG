@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """Manim 意图提示词库（v0.63 ⭐）
 
@@ -13,6 +14,13 @@
 使用：match_manim_intent(topic) -> {prompt, template_key, hint}
 """
 from __future__ import annotations
+
+"""
+[LEGACY · 历史实现] 自 2026-08-26（§3.112）起冻结，仅供 PAEG_USE_MATERIAL_PLUGIN=0 兜底。
+新代码必须使用插件 paeg-teaching-materials（material_router._gen_* → services.material_bridge.execute）。
+禁止在新模块 import 本模块，违规将被 audit_check 拦截。
+最后维护: PAEG Team · 关联: §3.110/§3.111/§3.112
+"""
 
 from manim_speed import _SPEED_STANDARD_TEXT  # v0.64 ⭐ 速度规范固定化
 
@@ -81,7 +89,6 @@ _KEYWORDS = {
     "probability": ["概率", "统计", "直方图", "分布", "probability", "histogram", "正态"],
 }
 
-
 def match_manim_intent(topic: str) -> dict:
     """简单话 → 意图。返回 {prompt, template_key, hint}。
 
@@ -102,7 +109,6 @@ def match_manim_intent(topic: str) -> dict:
         "template_key": "transform",
         "hint": "未匹配到内置场景，使用通用动画指令",
     }
-
 
 def template_key_for(topic: str) -> str:
     """简单话 → 模板 key（不调 LLM 时的兜底选择）。"""

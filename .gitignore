@@ -87,3 +87,7 @@ Library/.courseware_cache.json
 **/memory/subject_patches.md
 **/events.jsonl
 **/uploads/
+
+# v1.3.x: 独立插件仓库（各自独立 git，主项目不跟踪）
+paeg-lang-style-plugin/
+paeg-teaching-materials/

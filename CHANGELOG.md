@@ -1,3 +1,94 @@
+﻿﻿### v1.3.3 Manim 顶尖化 + 主项目切插件（2026-08-26 ⭐）
+
+**本版定位**：用户 ULW（§3.111/§3.112）——Manim 视频制作提升到业界最顶尖；主项目切换到使用插件，原架构降级为历史保存。
+
+**Manim 顶尖化（Tier 1）**：
+- manim_safety.py：safe_manim 12 崩溃模式 lint + 安全包装（3brown1blue 证据）
+- manim_pipeline RITL 闭环：错误 tail 10 行 + 签名分类 + safety 反馈 + LaTeX 降级（ManimTrainer 证据）
+- 插件同步 manim_quality.py + ManimGenerator 增强
+
+**主项目切插件（§3.112）**：
+- material_bridge 增强：execute_typed/execute_generator/BridgeError/灰度开关/健康信息
+- 6 个 _gen_* 双轨：插件优先 + 自动回退
+- server.py 启动挂载 + 8 旧模块 [LEGACY] 冻结 + audit 黑名单
+
+**验证**：主项目 61 + 插件 54 + 语言规范 83 全绿 + audit 40/41 + GitHub 双库同步
+
+**文档**：技术说明 C.19 + 调研证据（ManimTrainer/safe_manim/MVQS）
+
+### v1.3.2 教学物料插件网状联通架构（2026-08-26 ⭐ 顶尖工具标准）
+
+**本版定位**：用户架构级要求（§3.110）——工具内部是"交织的网状接线和联通"：功能既可独立使用，也是其他功能的前置环节。
+
+**网状联通架构**（Oracle 方案 + 业界三大范式）：
+- Tool[Input,Output] 功能节点（10 个：查资料/大纲/PPT/讲义/讲稿/思维导图/视频/Manim/学习方法/学习计划）
+- 三模式依赖边：broadcast（查资料→一切）/ directed（大纲→PPT、讲稿→视频）/ optional（降级）
+- MaterialContext 类型化 Blackboard（字段级 reducer）+ Pipeline `__or__` 组合 + Resolver 自动编排
+- MCP 三件套：execute_tool / execute_pipeline / list_dependencies（15 工具）
+
+**验证**：41 测试全绿 + stdio（10 节点依赖图 + execute_pipeline 自动 research→outline→ppt + 循环检测）
+
+**文档**：技术说明 C.18 + 技术全景 10.27.12 + 元能力 §6.81 + 维护手册 18.85
+
+### v1.3.1 教学物料制作插件化 + MCP server（2026-08-26 ⭐）
+
+**本版定位**：用户 ULW（§3.110）——按语言规范插件（§3.109）同样顶尖标准，教学物料制作系统独立成插件，且必须像 MCP server 一样**直接安装即可用**（可及性）。
+
+**独立插件 paeg-teaching-materials**（GitHub: Golden2002/paeg-teaching-materials）：
+- 6 类物料生成器（PPT/讲义/讲稿/思维导图/教学视频/Manim）+ MaterialRegistry 注册表（可扩充）
+- 6 个 Protocol 抽象（零宿主依赖）+ Null 弱模式（无宿主可跑通）
+- execute(name,args) 统一执行入口（JSON 契约）+ quality（确定性检查 + LLM 5 维评审）
+- **MCP server 化**：12 工具 + console_scripts + stdio 直接安装（零代码桥）
+
+**语言规范模块 MCP server 化**（§3.109 可及性修正）：mcp_server.py 7 工具 + stdio 入口 + console_scripts
+
+**主项目接入**：services/material_bridge.py（宿主注入 + 静默回退零破坏）+ infra/lang_plugin_bridge.py
+
+**验证**：教学物料 22 测试全绿 + stdio 12 工具实测 + 桥双模式 + 语言规范 83 测试全绿
+
+**文档**：技术说明 C.16/C.17 + 技术全景 10.27.10/10.27.11 + 元能力 §6.79/§6.80 + 维护手册 18.83/18.84
+
+### v1.3.0 语言规范模块插件化 + 独立项目（2026-08-26 ⭐）
+
+**本版定位**：用户 ULW 三任务（§3.109）——语言规范模块独立性检查 + 插件化升级 + 独立 GitHub 项目。语言规范模块（系统提示词词法句法约束 + 动态违禁词库 + 重写工具）独立为可拆卸插件，方便接入教育智能体。
+
+**独立插件 paeg-lang-style-plugin**（D:\wbo-workspace\paeg_project\paeg-lang-style-plugin）：
+- rules.py：8 条中文语法规则（词法完整/动宾搭配/悬空宾语/无主语/复合句缺主语/介词规范/谓宾补足/语义残缺——GB/T 15834 标点 + 病句六类）
+- ai_taste.py：AI 味检测（句长变异/过渡词密度/三段式/破折号/段落对称）
+- forbidden.py：动态违禁词库（运行时增删 + 外部 JSON 热加载）
+- prompts/language_style.py：LANGUAGE_STYLE 四段拆分（weil/lexicon/syntax/forbidden）
+- refiner.py：重写工具（chat_fn 强制注入 fail-fast，多轮 Self-Refine）
+- gate.py：守门入口（L0+L2，refiner 注入式解耦）
+- demo.py 独立运行（不依赖 PAEG 任何模块）
+
+**顶尖化升级（Oracle 方案 + 调研成果融合 ⭐）**：
+- **可扩充规则集 RuleRegistry**：Rule 数据模型（id/type 通则|列举/category/pattern/replacement/message/prompt_block/severity/enabled/source/profile_tags）+ data/rules.json 外置 + JSON 热加载 + 运行时 add_rule/remove_rule + PAEG_RULES_PATH 环境变量
+- **语法规则作为系统提示词核心（谁用都拼）**：通则层 prompt_block 指挥 LLM 泛化（"凡表达状态/感受的单字形容词一律扩展为完整双字词形（倦/乏/沉/累/苦/慌/虚/弱/低/烦/闷/困/急/乱）"——LLM 自行泛化，非只修"倦→疲倦"）；列举层确定性兜底
+- **profile 三档拼装**：general/teaching/confessional（prompts/builder.py）
+- **规则 ID 反馈闭环**：refiner 反馈带"违反 #rule-lx-001（…）"，形成规则↔生成↔反馈闭环
+- **调研成果融合**：LanguageTool 规则声明式（Rule dataclass）/ textstat 可读性（ai_taste）/ GB/T 15834 标点规范（rule-pn-*）/ 病句六类 / Agent Skills 渐进披露（SKILL.md+docs+data）
+- **充分状语通则**（rule-sx-general-002 ⭐ 用户新增）：指挥 LLM 使用充分的状语（时间/地点/方式/条件/对象/目的——"复习单词。"→"你可以在每天睡前用十分钟复习单词。"）；check_adverbial_general_rule 检测动词开头短句 + 孤零零单动词；接入 refiner 反馈闭环
+- **MCP server 化可及性**（§3.109 ⭐ 用户修正）：像 MCP 一样直接安装即可用——mcp_server.py 7 工具 + stdio 入口 + console_scripts paeg-lang-style-mcp；任何项目 pip install + MCP 配置声明即接入（零代码桥）；83 测试全绿
+
+**P0-P2 全部完成**（用户确认"坚决完成所有独立可行性升级改造"）：
+- P0 静态搬迁：规则/检测/词库/提示词全部迁入插件
+- P1 注入改造：LanguageRefiner chat_fn 强制注入（None 抛 TypeError）
+- P2 守门解耦：gate_content/gate_short refiner 注入式
+
+**PAEG 接入（插件化水平体现）**：
+- infra/lang_plugin_bridge.py 唯一适配层：插件挂载走插件，未挂载静默回退原实现（旧文件永不删除）
+- 双模式验证通过（插件挂载/回退均行为正确）
+
+**测试验证**：
+- 插件 83 项测试全绿（新增规则集 18 项 + 通则 8 项 + 充分状语 8 项 + MCP server 8 项）
+- 4 项行为一致性（20 段样本 vs PAEG 原实现字符串相等——零行为漂移）
+- PAEG 语言规范回归 22 项全绿（不破坏现有功能）
+- audit_check 39/40（1 项预存 pyright 未绑定，非本次改动）
+
+**GitHub**：Golden2002/paeg-lang-style-plugin 新建（19 文件），桥文件推送 PAEG 主仓库
+
+**文档**：README 8 条规则详记 + architecture.md + integration_paeg.md + SKILL.md + samples_20.md（20 段 LLM 直生成 vs 处理后对比）
+
 ### v1.2.29 提示词分层 + 全拼接体系 + 基变换修复（2026-08-24 ⭐）
 
 **本版定位**：用户基变换演示反馈后，建立"提示词灵活度分层 + 全拼接"体系——L1 启发式沉思引导

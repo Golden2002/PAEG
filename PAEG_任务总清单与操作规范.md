@@ -1,4 +1,4 @@
-# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
+﻿﻿# PAEG 任务总清单与操作规范（固定文档 · 防遗忘）
 
 > 创建日期：2026-08-14
 > 性质：**本文件是操作的唯一依据**——所有未完成任务、用户指示、调研要求固定于此，每次操作前先读此文件，完成后更新状态。
@@ -5056,3 +5056,484 @@ L3 脚本路由
 ### 实施
 
 记入元能力文档（§6.78）+ 技术说明文档（反模式警示）。
+
+
+---
+
+## §3.109 语言规范模块插件化 + 独立项目（2026-08-24 · 用户 ULW ⭐）
+
+### 用户要求（原文）
+
+1. "检查目前语法规范模块的独立性和架构，是否可以作为一个可拆卸的插件使用"
+2. "先进行语言规范，中文语法，harness架构的相关调研，然后依据现有语言规范模块的情况，一起咨询oracle，制定需求清单，登记并按照纪律实施更新升级"
+3. "新建一个github库，并在本地项目文件夹内也新建一个文件夹同步，把改造升级后的语言规范模块复制并独立成一个项目，与教育智能体项目保持同步更新"
+
+### 任务分解
+
+**任务 1：独立性检查**——语言规范模块（lang_gate/constraint_engine/LANGUAGE_STYLE）是否可拆卸插件
+- 检查模块边界/依赖/耦合度
+- 是否可独立 import/复用
+
+**任务 2：调研 + Oracle 咨询 + 需求清单**
+- librarian 调研：语言规范最佳实践 / 中文语法规范 / harness 架构
+- Oracle 咨询：现有模块独立性评估 + 插件化改造方案
+- 制定需求清单 → 登记 → 按纪律实施升级
+
+**任务 3：独立项目**
+- 新建 GitHub 库（语言规范模块独立项目）
+- 本地项目文件夹内新建文件夹同步
+- 语言规范模块复制独立成项目，与 PAEG 同步更新
+
+### 用户补充（⭐ 模块构成 + 独立项目要求）
+
+- "语言规范模块应当包含：作为系统提示词，从词法、句法的规则对LLM进行约束，以及动态维护的违禁词库，以及重写大模型输出的工具等"
+- "需要你在独立项目的readme中详细记载语言规范模块的架构，包括语法规则约束中，每一条语法规则"
+- "在完成所有任务后，输出样例文件，内含20段文字，分别由LLM直接生成，以及使用我们语言规范模块后生成，做对比，直观展示语言规范模块的能力"
+- "主项目，即教育智能体项目中的语言规范模块正是我们这次要独立开发的模块，保证独立开发的模块能够方便接入我们教育智能体之中。这本身就是插件化水平的体现"
+
+### 语言规范模块构成（用户指定 ⭐）
+
+1. **系统提示词约束**：作为系统提示词，从词法、句法规则约束 LLM（LANGUAGE_STYLE 类）
+2. **动态违禁词库**：动态维护的违禁词库（forbidden_words.json——AI 腔/空洞词/伪共情等）
+3. **重写工具**：重写大模型输出的工具（language_refiner 类——LLM 输出后修正）
+
+### 独立项目要求
+
+1. **README 详细记载**：模块架构 + 每一条语法规则
+2. **样例对比文件**：20 段文字——LLM 直接生成 vs 语言规范模块处理后，直观展示能力
+3. **插件化接入**：独立模块方便接入主项目（教育智能体）——本身就是插件化水平体现
+
+### 实施记录（全部完成 ⭐）
+
+**2026-08-26 插件化实施完成**：
+
+1. **独立插件 paeg-lang-style-plugin 建成**（D:\wbo-workspace\paeg_project\paeg-lang-style-plugin）：
+   - rules.py：8 条语法规则（词法完整/动宾搭配/悬空宾语/无主语/复合句/介词/谓宾补足/语义残缺）
+   - ai_taste.py：AI 味检测（句长变异/过渡词/三段式/破折号/段落对称）
+   - forbidden.py：动态违禁词库（运行时增删 + JSON 热加载）
+   - prompts/language_style.py：LANGUAGE_STYLE 四段（weil/lexicon/syntax/forbidden）
+   - refiner.py：重写工具（chat_fn 强制注入 fail-fast，多轮 Self-Refine）
+   - gate.py：守门入口（L0+L2，refiner 注入式解耦）
+   - demo.py 独立运行 + 35 项测试 + 4 项 parity（20 段样本 vs PAEG 原实现字符串相等）
+2. **PAEG 桥 infra/lang_plugin_bridge.py**（唯一适配层）：插件挂载走插件，未挂载静默回退原实现（R20 零破坏铁律）——双模式验证通过
+3. **GitHub 库 Golden2002/paeg-lang-style-plugin** 新建，19 文件 API 上传成功；桥文件推送到 PAEG 主仓库
+4. **文档**：README（8 条规则详记）/ architecture.md / integration_paeg.md / SKILL.md / samples_20.md（20 段对比）
+5. **测试**：插件 35 全绿 + PAEG 语言规范回归 22 全绿 + audit_check 39/40（1 项预存 pyright 未绑定，非本次改动）
+
+### 用户顶尖化要求（2026-08-26 ⭐ 关键修正）
+
+- "我们需要的是**语法规则约束 + 违禁词兜底 + 改写脚本**"——三层架构明确：
+  - **语法规则约束（最重要）**：将作为**系统提示词的一部分**，不论谁用，都会拼接进去
+  - **违禁词兜底**：防 LLM 不听话时的底线
+  - **改写脚本**：LLM 输出后处理
+- "语法规则是可以扩充的，其他的违禁词等也是可以扩充的"——**可扩充性**是核心要求
+- 用户担心优化"具有针对性和狭隘性"（如只是把"倦"优化成"疲倦"）——本质是**指挥 LLM 使用完整的词**（通则，非逐词列举）
+- "之前让你调研跟语法规则相关的文献，跟系统提示词以及大模型约束harness相关的联网资源，都可以利用起来作为参考。我们让这个模块变得**极其的顶尖**"
+- wbo 与项目文件夹确认为同一目录（samefile: True，映射关系）
+
+### Oracle 架构方案（2026-08-26 ⭐ 可扩充性核心）
+
+**核心洞察**：语法规则未数据化、通则层与列举层分两文件——需统一为可数据化 `Rule` 模型，新增"规则集→系统提示词"动态拼装器，让可扩充性贯穿**规则定义/检测/提示词生成**三处。
+
+**7 步实施**：
+1. **统一规则模型**：合并 rules.py+rules_enhanced.py → 单一 `Rule` dataclass `{id, type: general|explicit, category: lexical|syntactic|register, pattern, replacement, message, prompt_block, severity, enabled, source, profile_tags}`——列举层填 pattern+replacement+message；通则层填 prompt_block（可带 pattern 辅助检测）
+2. **规则集外置+热加载**：rule_registry.py + data/rules.json——BUILTIN_RULES 常量 + RuleRegistry.load(path) 合并用户规则 + watch() mtime 热重载 + PAEG_RULES_PATH 环境变量覆盖
+3. **按 profile 动态拼装提示词**：prompts/builder.py——PromptBuilder.build(profile: general|teaching|confessional) 过滤规则、prompt_block 分组拼接，注入 language_style.py 的 {grammar_section} 占位符
+4. **守门用同一规则集**：gate.py 重构——Gate.check(text, rule_set) 先跑 explicit 层、再返回 hits 给 refiner
+5. **refiner 反馈带规则 ID**：_format_feedback(hits)——"违反 #rule-lx-007（用完整中文词…）"强制 LLM 引用规则 ID，形成规则↔生成↔反馈闭环
+6. **违禁词对齐**：forbidden_refs 字段引用 forbidden_words.json 条目，复用同一套热加载
+7. **向后兼容**：旧 apply_*/detect_* 保留为薄包装，39 项测试不破
+
+**风险规避**：JSON 损坏时保留上一份规则集不"清空跑"；pattern 懒编译+LRU；system prompt 设 token budget（默认 800）防膨胀。
+
+### 顶尖化实施完成（2026-08-26 ⭐）
+
+Oracle 方案 7 步全部落地 + 调研成果融合：
+1. ✅ Rule 数据模型（rule_registry.py）：type 通则|列举 / category 词法|句法|标点|语域 / pattern / replacement / message / prompt_block / severity / enabled / source / profile_tags
+2. ✅ 规则集外置 data/rules.json + 热加载（PAEG_RULES_PATH 覆盖）+ 运行时 add_rule/remove_rule/watch
+3. ✅ profile 三档拼装（general/teaching/confessional）
+4. ✅ gate.py 用同一规则集（detect + apply_explicit）
+5. ✅ refiner 反馈带规则 ID（违反 #rule-lx-001 闭环）
+6. ✅ 违禁词 forbidden_refs 对齐
+7. ✅ 向后兼容（67 测试全绿）
+
+**验证**：插件 67/67 + PAEG 回归 22/22 + audit 39/40（预存 pyright）——零破坏。
+**GitHub**：9 文件已同步（README/SKILL/__init__/refiner/rules_enhanced/rule_registry/rules.json/2 测试）。
+**文档**：README 顶尖化架构 + 技术说明 C.16 + CHANGELOG v1.3.0。
+
+### 语言规范模块可及性要求（2026-08-26 用户补充 ⭐）
+
+- "包括语言规范模块，必须具有其他项目接入的可及性"
+- 语言规范模块（paeg-lang-style-plugin）必须**可被其他项目方便接入**：
+  - pip 可安装（可发布性）
+  - 公共 API 清晰（__init__.py 全量导出）
+  - 文档可及（README 外部接入指南 + README.en.md）
+  - 零宿主依赖（已实现）
+  - 可扩展（data/rules.json 热加载 + 违禁词动态扩充——已实现）
+
+### 语言规范模块 MCP server 化可及性（2026-08-26 用户修正 ⭐）
+
+- "目前可及性不方便，要像MCP一样可以直接安装"
+- 可及性标准 = **像 MCP server 一样直接安装即可用**：
+  - 插件打包自带 console_scripts 入口（`paeg-lang-style-mcp` / `python -m paeg_lang_style.mcp_server`）
+  - 任何项目 `pip install` + MCP 客户端配置声明（如 config/mcp_servers.json stdio）即可接入——**零代码桥**
+  - 暴露 MCP 工具：normalize_text / language_policy_check / forbidden_words / check_grammar / check_ai_taste / build_style_prompt / list_rules 等
+  - FastMCP @tool 薄包装 + 类型注解 schema
+
+### 充分状语通则（2026-08-26 用户新增 ⭐）
+
+- "把规则还要再加一条，就是输出内容时，指挥大模型使用充分的状语"
+- 新增规则 `rule-sx-general-002`（通则层，系统提示词指挥 LLM 泛化）：
+  每个动作/判断用充分状语交代完整——时间/地点/方式/条件/对象/目的（"复习单词。"→"你可以在每天睡前用十分钟复习单词。"）
+- `check_adverbial_general_rule`：动词开头短句 + 孤零零单动词检测
+- 已接入 refiner 反馈闭环（【充分状语通则】）
+- 测试 8 项新增（75/75 全绿）
+
+### README 高质量化 + 同步所有文档（2026-08-26 用户要求 ⭐）
+
+- "你的read me文档要去参考github上的一些高大read me它的结构，它可能会有非常好的写法，你要去参考"
+- "该写的信息一个都不能少，特别是其他人的项目，如果要使用我们这个插件该如何使用？它必须具有可扩展性、可维护性"
+- "你要注意同步更新各个文档，不仅是我们这个新的独立项目的read me，还有其他的文档，我们的主项目的各个文档都要更新"
+- "你还要向我描述，如果别人的项目，他们的智能体等等想要使用我们的语法规则的模块，他们该怎么接入"
+
+**任务分解**：
+1. librarian 调研 GitHub 高质量 README 结构 → 重写插件 README（参考最佳实践）
+2. README 必须包含：外部项目接入指南（如何使用语法规则模块）+ 可扩展性 + 可维护性
+3. 同步更新主项目各文档：PAEG技术说明.md / PAEG技术全景文档.md / 元能力文档.md / 维护手册.md / CHANGELOG.md
+
+### 调研成果融合（librarian 顶尖化参考）
+
+- **LanguageTool 规则声明式**：Rule dataclass 即规则声明（pattern/message/suggestion 对应 pattern/message/replacement）
+- **textstat 可读性度量**：可加入可读性指标（句子长度/复杂词比例）作为改写质量基线
+- **GB/T 15834-2011 标点规范**：标点规则（句末点号/顿号vs逗号/"说"后逗号）
+- **病句六类**：成分残缺/搭配不当/成分赘余/语序不当/不合逻辑/表意不明
+- **Agent Skills 渐进披露 3 层**：SKILL.md（L1 入口）+ commands（L2 规则页）+ data（L3 数据）——已有 SKILL.md，可扩展
+- **Anthropic prompt 工程最佳实践**：系统提示词结构（角色/任务/规则/输出格式）
+
+**插件化接入方式**（用户要求：方便接入教育智能体 = 插件化水平体现）：
+- 主项目所有语言规范调用统一走 infra/lang_plugin_bridge.py
+- 插件未挂载 → 桥静默回退 PAEG 原实现（旧文件永不删除）
+- 接入步骤详见 docs/integration_paeg.md
+
+### 任务 1 独立性检查结果（explore 完成）
+
+| 模块 | 耦合度 | 独立可行性 |
+|---|---|---|
+| fix_known_gaffes（病句正则） | 零 | P0 半天复制即用 |
+| constraint_engine（约束引擎） | 低（JSON 优先） | P0 搬 JSON 即独立 |
+| forbidden_words.json / constraint_config.json | 零 | P0 纯数据 |
+| LANGUAGE_STYLE（词法句法约束） | 零（字符串） | P1 从 prompts.py 提取 |
+| language_refiner（LLM 重写工具） | 中（chat_fn 未真正解耦） | P1 注入改造 |
+| services/lang_gate（守门入口） | 高（get_paeg 拉全 PAEG） | P2 需重构 |
+
+### librarian 调研结果
+
+1. **架构模式 A：规则声明式+模式匹配引擎**（LanguageTool 范式）——规则与引擎分离，XML/YAML 声明规则
+2. **架构模式 B：算法式可读性度量**（textstat 范式）——每语言独立公式，纯计算
+3. **架构模式 C：分词驱动+DAG**（jieba+LTP 范式）——中文特化
+
+**8 条中文语法规则**（GB/T 15834-2011 标点 + 病句六类）：
+1. 句末点号位置（§5）2. 顿号 vs 逗号（§4.5/4.4）3. 间接引语"说/道"后用逗号（§4.4.3.3）4. 主谓搭配（LTP SBV）5. 动宾搭配（LTP VOB）6. 成分残缺（HED/SBV）7. 成分赘余（jieba+同义词林）8. 语序不当（ATT）
+
+**harness 组织**：Anthropic Agent Skills 标准（2025-12 开源）——SKILL.md + 渐进披露 3 层（启动 name+description / 判定时正文 / 执行时 references）；50+ agent 支持。
+
+### Oracle 需求清单（R1-R20）
+
+**A. 插件形态**：R1 独立仓库 paeg-lang-style-plugin（平级 paeg_project/，独立 pyproject）R2 复用 Agent Skills 形态（SKILL.md 渐进披露）R3 L1 入口+L2 命令+L3 数据三层 R4 最小可运行 demo.py（不依赖 PAEG）
+
+**B. 模块划分**：R5 词法规则 lexicon.py（ellipsis_words/bad_collocations）R6 句法规则 syntax.py（no_subject/dangling_verbs/compound）R7 违禁词库 forbidden.py+forbidden_words.json（AI_TELLS）R8 重写工具 refiner.py（fix_known_gaffes 纯函数+LanguageRefiner 注入式）R9 AI 味检测 ai_taste.py
+
+**C. 对外 API**：R10 gate_content(text, context, refiner=None, apply_l2) R11 gate_short(text, context) R12 make_refiner(chat_fn, llm, corpus_path) 工厂 R13 get_style_prompt(section) 替代 LANGUAGE_STYLE
+
+**D. 文档**：R14 README 记 8 条语法规则（触发模式/正则/修正/样例）R15 samples_20.md 20 段对比 R16 integration_paeg.md 接入指南 R17 architecture.md Mermaid 架构
+
+**E. PAEG 同步**：R18 infra/lang_plugin_bridge.py 桥（唯一适配层）R19 git+URL pinned 同步 R20 插件未挂载时静默回退旧实现（绝不删除旧文件）
+
+### 三阶段实施（用户确认"坚决完成所有独立可行性升级改造"）
+
+- **Phase 1 P0 静态搬迁**（1-2 天）：fix_known_gaffes + ai_taste_detector + data/*.json + 全部正则常量 → 插件 src/；demo.py 跑通；测试移植；验收=不 import PAEG 任何模块
+- **Phase 2 P1 注入改造**（2-3 天）：LanguageRefiner 强制 chat_fn 注入；LANGUAGE_STYLE 抽到插件 prompts/language_style.py（weil/lexicon/syntax/forbidden 四段）；PAEG 桥 make_refiner 注入 _safe_chat
+- **Phase 3 P2 守门解耦**（1-2 天）：lang_gate 迁移为插件 src/gate.py；PAEG services/lang_gate.py 改薄壳转发；subagents 用 bridge.make_refiner；验收=api_sweep 0 失败+lang_style 字节级一致
+
+### 风险规避（Oracle）
+
+R-SK1 相对路径→importlib.resources.files；R-SK2 插件加载失败→try/except 静默回退+observability 记录；R-SK3 行为漂移→test_parity.py 100 段历史样本断言字符串相等；R-SK4 LANGUAGE_STYLE 双写→PAEG 端改一行引用插件；R-SK5 同步窗口双源→每 PR 只迁一个调用点；R-SK6 绝不删除旧文件（桥是叠加层非替换层）+audit_check 三连全绿
+
+
+---
+
+## §3.110 教学物料制作插件化（2026-08-26 · 用户 ULW ⭐）
+
+### 用户要求（原文）
+
+1. "按照同样的顶尖标准和方法，完成教学物料制作的插件化"
+2. "调研项目教学物料制作的功能模块，都有哪些，现状（目前应该已经部分实施了标准mcp化的改造。需要你在目前的基础之上进行提升改造。）"
+3. "调研联网资源"
+4. "按顶尖标准独立制作教学物料制作插件，gothub和本地新建库，主项目也要接入这一模块"
+5. "（咨询oracle，标准MCP化）"
+
+### 任务分解
+
+**任务 1：现状调研**——教学物料制作功能模块盘点 + MCP 化现状
+- material_router.py（物料路由）/ material_prompts.py（物料提示词）/ material_harness.py（harness 驱动）
+- manim_service.py / manim_pipeline.py（数学动画）/ material_pipeline.py（流水线）
+- sse_presenter.py（SSE 进度）/ visual_script_generator.py（分镜脚本）
+- ppt/讲义/讲稿/思维导图生成器 + 已 MCP 化的部分（mcp_gateway 等）
+
+**任务 2：联网调研**——教学物料生成 MCP 化最佳实践
+- librarian 调研：物料生成系统的插件化/MCP 化架构、成熟方案
+
+**任务 3：Oracle 咨询 + 插件化实施**
+- Oracle：标准 MCP 化架构（物料制作插件如何暴露为 MCP tool + 独立项目 + 主项目接入）
+- 顶尖标准独立插件：GitHub + 本地新建库
+- 主项目接入（桥/适配层，零破坏铁律）
+
+### 用户补充（可及性 ⭐）
+
+- "包括语言规范模块，必须具有其他项目接入的可及性"——**教学物料插件同样必须具备其他项目接入的可及性**：
+  - pip 可安装（可发布性）
+  - 公共 API 清晰（生成器注册表 + 统一入口）
+  - 文档可及（README 外部接入指南）
+  - 零宿主依赖（注入式设计）
+  - 可扩展（生成器注册 + 模板可扩充）
+
+### 学习方法 + 学习计划集成到物料插件（2026-08-26 用户要求 ⭐）
+
+- "集成，加入到物料制作的独立工具中去"
+- 用户先询问"学习方法、学习计划这两个功能在主项目中如何实现"——已调研：
+  - **学习方法（method）**：meta_router.is_method_advice 意图检测 → services/handlers/method.py
+    （LLM 生成学习路径建议：入门→进阶→强化，结合学段/学科/画像，语言规范收口）
+  - **学习计划（study_plan）**：meta_router.is_study_plan_intent 子意图 → method.py 分流 →
+    services/handlers/study_plan.py → **services/planner.py 核心工作流**：
+    extract_plan_inputs（参数抽取）→ aggregate_resources（4 路资源）→ design_phases
+    （确定性阶段骨架 + LLM 里程碑内容，失败回退确定性模板）→ summary_md 渲染
+    → 前端 renderStudyPlan 结构化卡片 + actions 按钮（开始阶段学习/保存计划）
+- **集成方案**：把 method + study_plan 作为新物料类型加入 paeg-teaching-materials 插件：
+  - MaterialRegistry.register("method"/"study_plan") 生成器
+  - planner.py 工作流平移（依赖抽象：LLMCallable/ResourceProvider 已有 Protocol）
+  - MCP 工具：generate_method_advice / generate_study_plan
+  - 主项目经 material_bridge 注入宿主 LLM/资源
+- **待 Oracle 咨询**：集成架构（生成器设计/planner 平移/依赖抽象/MCP 暴露/主项目接入）
+
+### 查资料集成 + 前置环节架构（2026-08-26 用户要求 ⭐）
+
+- "查资料功能也要集成，并且在教学物料工具内部，查资料功能应该是所有能力的前置环节"
+- "正如讲稿是教学视频制作的前置环节，ppt大纲和内容是ppt制作的前置环节"
+- **核心架构洞察**：查资料（资源检索）不是并列的物料类型，而是**所有物料生成的前置阶段**：
+  - 管线模式：查资料 → 生成（先检索知识库/网络/用户资料，再把资料注入生成 prompt）
+  - 类比：讲稿 → 视频；PPT 大纲 → PPT 制作——前置环节产生中间产物，供后置消费
+- **集成要求**：
+  - 查资料作为显式前置阶段（所有 6 物料 + method + study_plan 生成前先查）
+  - 查资料本身也作为独立 MCP 工具暴露（search_resources/collect_resources）
+  - ResourceProvider 4 路资源（user_library/kb/facts/web）作为标准前置输入
+- **Oracle 补充咨询**：前置环节管线化设计（查资料阶段如何统一插入所有生成器/流水线）
+
+### 网状联通架构（2026-08-26 用户架构级要求 ⭐）
+
+- "所以，在这个tool内部，也有着交织的网状的接线和联通。有的功能既可独立使用，也是另一些功能的前置环节"
+- "这是架构级的要求，毕竟我们要做顶尖的工具！"
+- "联网调研，咨询oracle"
+
+**核心架构洞察**：教学物料工具内部不是并列的 6+2 物料类型，而是**交织的网状接线与联通**：
+- 每个功能既可**独立使用**（独立 MCP 工具/独立调用）
+- 也可作为**其他功能的前置环节**（中间产物被下游消费）
+- 已知前置链：查资料 → 一切生成；讲稿 → 教学视频；PPT 大纲 → PPT 制作
+- 可能更多：查资料 → 讲义/思维导图/学习计划；学习计划 → 学习；方法建议 → 学习计划…
+- 类比顶尖工具（编译器管线/数据流水线/DAG 编排）
+
+**待办**：
+1. 联网调研：功能依赖网络/管线 DAG/功能组合架构最佳实践（编译器管线/ML pipeline/DAG 编排/无服务器工作流）
+2. 咨询 Oracle：网状联通架构设计（MaterialContext 中间产物传递 + 功能依赖图 + 独立/组合双模式）
+3. 实施：网状联通 + 前置环节抽象 + MCP 暴露
+
+### 用户修正（MCP server 化可及性 ⭐）
+### 用户修正（MCP server 化可及性 ⭐）
+### 网状联通架构（2026-08-26 用户架构级要求 ⭐）
+
+- "所以，在这个tool内部，也有着交织的网状的接线和联通。有的功能既可独立使用，也是另一些功能的前置环节"
+- "这是架构级的要求，毕竟我们要做顶尖的工具！"
+- "联网调研，咨询oracle"
+
+**核心架构洞察**：教学物料工具内部不是并列的 6+2 物料类型，而是**交织的网状接线与联通**：
+- 每个功能既可**独立使用**（独立 MCP 工具/独立调用）
+- 也可作为**其他功能的前置环节**（中间产物被下游消费）
+- 已知前置链：查资料 → 一切生成；讲稿 → 教学视频；PPT 大纲 → PPT 制作
+- 可能更多：查资料 → 讲义/思维导图/学习计划；学习计划 → 学习；方法建议 → 学习计划…
+- 类比顶尖工具（编译器管线/数据流水线/DAG 编排）
+
+**待办**：
+1. 联网调研：功能依赖网络/管线 DAG/功能组合架构最佳实践（编译器管线/ML pipeline/DAG 编排/无服务器工作流）
+2. 咨询 Oracle：网状联通架构设计（MaterialContext 中间产物传递 + 功能依赖图 + 独立/组合双模式）
+3. 实施：网状联通 + 前置环节抽象 + MCP 暴露
+
+### 用户修正（MCP server 化可及性 ⭐）
+### 用户修正（MCP server 化可及性 ⭐）
+### 查资料集成 + 前置环节架构（2026-08-26 用户要求 ⭐）
+
+- "查资料功能也要集成，并且在教学物料工具内部，查资料功能应该是所有能力的前置环节"
+- "正如讲稿是教学视频制作的前置环节，ppt大纲和内容是ppt制作的前置环节"
+- **核心架构洞察**：查资料（资源检索）不是并列的物料类型，而是**所有物料生成的前置阶段**：
+  - 管线模式：查资料 → 生成（先检索知识库/网络/用户资料，再把资料注入生成 prompt）
+  - 类比：讲稿 → 视频；PPT 大纲 → PPT 制作——前置环节产生中间产物，供后置消费
+- **集成要求**：
+  - 查资料作为显式前置阶段（所有 6 物料 + method + study_plan 生成前先查）
+  - 查资料本身也作为独立 MCP 工具暴露（search_resources/collect_resources）
+  - ResourceProvider 4 路资源（user_library/kb/facts/web）作为标准前置输入
+- **Oracle 补充咨询**：前置环节管线化设计（查资料阶段如何统一插入所有生成器/流水线）
+
+### 网状联通架构（2026-08-26 用户架构级要求 ⭐）
+
+- "所以，在这个tool内部，也有着交织的网状的接线和联通。有的功能既可独立使用，也是另一些功能的前置环节"
+- "这是架构级的要求，毕竟我们要做顶尖的工具！"
+- "联网调研，咨询oracle"
+
+**核心架构洞察**：教学物料工具内部不是并列的 6+2 物料类型，而是**交织的网状接线与联通**：
+- 每个功能既可**独立使用**（独立 MCP 工具/独立调用）
+- 也可作为**其他功能的前置环节**（中间产物被下游消费）
+- 已知前置链：查资料 → 一切生成；讲稿 → 教学视频；PPT 大纲 → PPT 制作
+- 可能更多：查资料 → 讲义/思维导图/学习计划；学习计划 → 学习；方法建议 → 学习计划…
+- 类比顶尖工具（编译器管线/数据流水线/DAG 编排）
+
+**待办**：
+1. 联网调研：功能依赖网络/管线 DAG/功能组合架构最佳实践（编译器管线/ML pipeline/DAG 编排/无服务器工作流）
+2. 咨询 Oracle：网状联通架构设计（MaterialContext 中间产物传递 + 功能依赖图 + 独立/组合双模式）
+3. 实施：网状联通 + 前置环节抽象 + MCP 暴露
+
+### 用户修正（MCP server 化可及性 ⭐）
+### 用户修正（MCP server 化可及性 ⭐）
+### 网状联通架构（2026-08-26 用户架构级要求 ⭐）
+
+- "所以，在这个tool内部，也有着交织的网状的接线和联通。有的功能既可独立使用，也是另一些功能的前置环节"
+- "这是架构级的要求，毕竟我们要做顶尖的工具！"
+- "联网调研，咨询oracle"
+
+**核心架构洞察**：教学物料工具内部不是并列的 6+2 物料类型，而是**交织的网状接线与联通**：
+- 每个功能既可**独立使用**（独立 MCP 工具/独立调用）
+- 也可作为**其他功能的前置环节**（中间产物被下游消费）
+- 已知前置链：查资料 → 一切生成；讲稿 → 教学视频；PPT 大纲 → PPT 制作
+- 可能更多：查资料 → 讲义/思维导图/学习计划；学习计划 → 学习；方法建议 → 学习计划…
+- 类比顶尖工具（编译器管线/数据流水线/DAG 编排）
+
+**待办**：
+1. 联网调研：功能依赖网络/管线 DAG/功能组合架构最佳实践（编译器管线/ML pipeline/DAG 编排/无服务器工作流）
+2. 咨询 Oracle：网状联通架构设计（MaterialContext 中间产物传递 + 功能依赖图 + 独立/组合双模式）
+3. 实施：网状联通 + 前置环节抽象 + MCP 暴露
+
+### 用户修正（MCP server 化可及性 ⭐）
+### 用户修正（MCP server 化可及性 ⭐）
+
+- "目前可及性不方便，要像MCP一样可以直接安装"
+- 教学物料插件同样必须**像 MCP server 一样直接安装即可用**：
+  - console_scripts 入口（`paeg-teaching-materials-mcp` / `python -m paeg_teaching_materials.mcp_server`）
+  - pip install + MCP 配置声明即接入（零代码桥）
+  - MCP 工具：generate_ppt/handout/script/mindmap/video/manim + material_quality_check + material_judge + list_material_types
+
+### 实施记录（全部完成 ⭐）
+
+**2026-08-26 教学物料插件化实施完成**：
+1. **独立插件 paeg-teaching-materials 建成**（GitHub Golden2002/paeg-teaching-materials，17 文件）：
+   - 6 类物料生成器（PPT/讲义/讲稿/思维导图/教学视频/Manim）+ MaterialRegistry 注册表
+   - 6 个 Protocol 抽象（LLMCallable/RefinerProtocol/HandoutGenerator/ScriptGenerator/MindmapGenerator/ResourceProvider）+ Null 弱模式
+   - execute(name,args) 统一执行入口 + quality（确定性检查 + LLM 5 维评审）
+   - **MCP server 化**：12 工具 + console_scripts + stdio 直接安装（可及性 ⭐）
+2. **主项目接入**：services/material_bridge.py（注入 PAEG LLM/refiner/资源 + 静默回退零破坏）
+3. **语言规范模块 MCP server 化**（§3.109）：mcp_server.py 7 工具 + stdio + console_scripts
+4. **验证**：教学物料 22 测试全绿 + stdio 实测 12 工具 + 桥双模式（注入后真实生成）+ 语言规范 83 全绿
+5. **文档**：技术说明 C.17 + 技术全景 10.27.11 + 元能力 §6.80 + 维护手册 18.84 + CHANGELOG v1.3.1
+
+### 实施完成（2026-08-26 ⭐）
+
+1. **调研**：librarian 联网调研业界三大范式（Airflow DAG / LangGraph Blackboard / LLVM IR）+ explore 盘点主项目前置依赖链
+2. **Oracle 咨询**：网状联通架构方案（Tool 节点 + 三模式依赖边 + MaterialContext + Pipeline + Resolver + MCP 三件套）
+3. **实施**：core/ 5 文件 + tools.py 10 节点 + registry 扩展 + MCP 三件套（15 工具）
+4. **验证**：41 测试全绿 + stdio（10 节点依赖图 + 自动编排 + 循环检测）+ GitHub 13 文件
+5. **文档**：技术说明 C.18 + 全景 10.27.12 + 元能力 §6.81 + 维护手册 18.85 + CHANGELOG v1.3.2
+
+
+---
+
+## §3.111 Manim 视频制作能力提升到最顶尖（2026-08-26 · 用户 ULW ⭐）
+
+### 用户要求（原文）
+
+- "调研manim项目，咨询oracle，我们的目标是顶尖，将manim视频制作能力提升到最顶尖"
+
+### 前置评估（用户先问 Manim 管线状态，已答）
+
+**现状（§3.34-§3.100 迭代）**：六阶段管线 + 6 硬门控 + 失败返工回路（3 轮）+
+scope_refine 三级修复 + tts_mux Audio-First + 模板兜底 + LaTeX 降级 + 几何审计 + LLM 叙事复核；
+24 项 Manim 测试全绿。已知提升空间：渲染成功率依赖 LLM 代码能力（业界 Qwen3Coder30B 94% RSR）。
+
+### 任务分解
+
+**任务 1：调研**——librarian 联网调研 Manim 顶尖能力：
+- 业界最新 LLM 生成 Manim 最佳实践（ManimTrainer RITL / 3brown1blue safe_manim / manimator / manim-mcp）
+- 渲染错误回灌（RITL）具体实现 / 代码模型选择 / 视觉质量评估（SSIM/CLIP）
+- 分镜叙事质量 / TTS 音频 / 崩溃防护模式
+
+**任务 2：Oracle 咨询**——基于现状 + 调研，设计"最顶尖"提升方案：
+- 渲染成功率提升（RITL-DOC / 代码模型 / safe_manim 崩溃模式）
+- 视觉质量闭环（SSIM/CLIP-DTW 评估）
+- 与网状联通整合（manim 节点质量门增强）
+
+**任务 3：实施**——顶尖化改造（分阶段，零破坏）
+
+### 用户修正（模型接入方式 ⭐）
+
+- "可是我不能接那么多模型。保留接入不同模型的能力，目前接入同一个模型。"
+- "并且模型配置需要便于扩展性，不能写入内部"
+- **核心要求**：
+  1. 当前统一接入同一个模型（不切多个模型）
+  2. **保留接入不同模型的能力**（路由能力在，默认同一模型）
+  3. **模型配置外置**（便于扩展，不写死内部）——config 文件/环境变量驱动
+
+**影响 R4（manim_llm_router）调整**：
+- 不做"coder LLM 独立路由切换"（当前统一同模型）
+- 改为：`manim_llm_router` 保留多模型路由能力（注册表 + provider 抽象），但**默认走主项目同一模型**
+- 模型配置外置到 config（如 data/manim_llm_config.json 或环境变量 MANIM_LLM_*）——新增模型只需改配置，不改代码
+- 便于扩展：未来接入 Qwen3Coder 只需在配置加一条记录
+
+### 实施记录（Tier 1 完成 ⭐）
+
+1. **调研**：librarian Manim 顶尖调研（ManimTrainer RITL/RITL-DOC / safe_manim 12 崩溃 / Qwen3Coder30B / MVQS / 17 视觉原则 / 6 叙事结构）
+2. **Oracle**：R1-R9 需求清单 + 7 阶段实施
+3. **Tier 1 已实施**：
+   - manim_safety.py（12 崩溃模式 lint + 安全包装）+ 14 测试
+   - RITL 闭环（错误 tail + 签名分类 + safety 反馈 + LaTeX 降级）+ 11 测试
+   - 插件同步 manim_quality.py + ManimGenerator 增强 + 13 测试
+4. **模型配置**（用户修正）：统一同模型（不接多模型），保留多模型路由能力（PROVIDER_REGISTRY 已有），配置外置便于扩展
+5. **Tier 2/3**（LoRA SFT / GRPO）待立项
+
+
+---
+
+## §3.112 主项目切换到插件（原架构降级为历史保存）（2026-08-26 · 用户 ULW ⭐）
+
+### 用户要求（原文）
+
+- "所有改动都要同步到插件。实际上主项目现在正应该使用插件，原来的架构已经只能作为历史保存"
+
+### 核心指令
+
+1. **所有改动同步到插件**：主项目的任何改造（如 Manim 顶尖化 RITL/safe_manim）
+   必须同步到 paeg-teaching-materials 插件（独立工具做同样更新）
+2. **主项目使用插件**：主项目物料生成切换到插件路径（material_bridge 已建，需真正切流）
+3. **原架构降级为历史保存**：material_router/material_pipeline/manim_pipeline 等旧实现
+   保留但不再作为运行时主路径（历史参考）
+
+### 任务分解
+
+**任务 1：调用点盘点**——主项目哪些物料调用点还在用旧实现，需切到插件
+**任务 2：Oracle 咨询**——主项目切换插件的架构方案（桥接/调用点改造/零破坏）
+**任务 3：实施**——插件同步所有改造 + 主项目调用点切到插件 + 旧实现标记历史
+
+### 实施记录（5 阶段完成 ⭐）
+
+1. **调用点盘点**：4 HTTP 端点（teach_stream/manim/teach_video/ppt）+ 6 _gen_* + tool_registry；插件未安装/bridge 未挂载
+2. **Oracle**：5 阶段切换方案（挂载→单路由→全量→打标→演练）
+3. **实施**：
+   - material_bridge 增强：execute_typed/execute_generator/BridgeError/灰度开关/健康信息
+   - 6 个 _gen_* 双轨（插件优先 + BridgeError 回退，保留签名兼容 ROUTER）
+   - server.py 启动挂载 + 8 旧模块 [LEGACY] banner（__future__ 后正确插入）+ audit LEGACY 黑名单
+   - test_plugin_switch.py 8 项（挂载/双轨/fallback/SSE 契约）
+4. **验证**：主项目 61 + 插件 54 + 语言规范 83 全绿 + audit 40/41 + GitHub 双库 20 文件同步

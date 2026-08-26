@@ -1,4 +1,4 @@
-# PAEG 教育者智能体 — 技术全景文档
+﻿﻿# PAEG 教育者智能体 — 技术全景文档
 
 > **版本**：v0.73 关键节点（2026-08-16）：Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）+ 结构优化（TOC 自动生成/围栏修复/层级修正/§3.17 生产链路补强）；Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）；架构精细拆分（server.py 2601 行/31 路由/12 蓝图）+ RAG 检索增强（BM25Okapi/多路召回）+ 自我进化优化（Schema+CoT/失败案例/去重）+ dsh Harness 30 项落地 27/30（Seam/Registry/Provider/Persona 外置/Patch 系统/三角色契约层/Preset 体系/条件启停/Constitutional 补丁化/Self-Update via Patch）+ 前端 SVG 化+ 薇依人格大幅提升（文选 9 大哲学基石）
 > **适用对象**：项目维护者（你本人）
@@ -5330,3 +5330,64 @@ since:   <PAEG 版本号>
 
 **反模式警示**（§3.108）：为解决问题而解决问题——正则匹配"简单讲"只解决特定场景，
 应抽象根因（L1 让 LLM 理解意图）替代逐词修补（元能力 §6.78）
+
+### 10.27.10 语言规范模块插件化 + 外部接入（§3.109 · 2026-08-26 ⭐）
+
+**独立插件 paeg-lang-style-plugin**（可拆卸/可独立/可接入教育智能体）：
+- **可扩充规则集 RuleRegistry**：Rule 数据模型（type 通则|列举 / category 词法|句法|标点|语域 / pattern / replacement / message / prompt_block / severity / enabled / source / profile_tags）
+- **语法规则作为系统提示词核心**（谁用都拼）：通则层 prompt_block 指挥 LLM 泛化（词法完整/句法完整/充分状语/标点规范），列举层确定性兜底
+- **充分状语通则**（rule-sx-general-002）：指挥 LLM 用时间/地点/方式/条件/对象/目的状语交代完整（"复习单词。"→"你可以在每天睡前用十分钟复习单词。"）
+- **动态违禁词库**（ForbiddenWords 运行时增删 + JSON 热加载）+ **改写脚本**（refiner 注入式 chat_fn + 规则 ID 反馈闭环）
+- **可扩充性**：data/rules.json 追加规则即热加载（PAEG_RULES_PATH 覆盖）；违禁词 JSON 同理
+- **可维护性**：规则 ID 稳定（反馈引用形成闭环）+ 旧 API 兼容 + 75 测试全绿 + 20 段行为一致性（vs PAEG 原实现）
+
+**外部项目接入方式**（用户要求 ⭐ 任何项目/智能体可用）：
+```python
+# 1. 语法规则拼进自己的系统提示词（谁用都拼）
+from paeg_lang_style import RuleRegistry
+system_prompt += RuleRegistry().build_prompt("general")   # 或 "teaching"/"confessional"
+
+# 2. 输出后处理（改写脚本）
+from paeg_lang_style import make_refiner, gate_content
+refiner = make_refiner(chat_fn=my_llm_call)               # 注入自己的 LLM
+out = gate_content(llm_output, refiner=refiner)           # L0 规则 + L2 改写
+
+# 3. 违禁词检测（动态词库）
+from paeg_lang_style import ForbiddenWords
+fb = ForbiddenWords(); fb.load_json("my_words.json")
+hits = fb.detect(text)
+
+# 4. 扩充规则（可扩展性）：编辑 data/rules.json 追加 {id, type, pattern, ...} 即热加载
+```
+- 零宿主依赖（不 import PAEG 任何模块）；LLM 注入式（chat_fn 强制）；配置外置（JSON 热加载）
+
+### 10.27.11 教学物料制作插件化 + MCP server（§3.110 · 2026-08-26 ⭐）
+
+**独立插件 paeg-teaching-materials**（与语言规范插件同标准）：
+- 6 类物料生成器 + MaterialRegistry 注册表（可扩充）+ 6 Protocol 零宿主依赖 + execute 统一入口
+- **MCP server 化**：12 工具 + console_scripts + stdio 直接安装（像 MCP 一样，零代码桥）
+- 质量检查（确定性）+ 评审（LLM 5 维）+ 语言规范联动（L0 病句修正）
+- 主项目经 services/material_bridge.py 接入（宿主注入 + 静默回退零破坏）
+- GitHub：Golden2002/paeg-teaching-materials（17 文件）
+
+**外部项目接入方式**（可及性 ⭐）：
+```python
+# 1. pip install + MCP 配置声明（零代码桥）
+# {"command": "python", "args": ["-m", "paeg_teaching_materials.mcp_server"]}
+
+# 2. 或代码接入
+from paeg_teaching_materials import MaterialRegistry, execute
+MaterialRegistry.inject(llm=my_llm)   # 注入自己的 LLM
+result = execute("generate_handout", {"topic": "力学", "subject": "物理"})
+```
+
+### 10.27.12 教学物料插件网状联通架构（§3.110 · 2026-08-26 ⭐ 顶尖工具标准）
+
+**网状联通**（用户架构级要求）：10 个功能节点（查资料/大纲/PPT/讲义/讲稿/思维导图/视频/Manim/学习方法/学习计划）——每个既可独立使用，也是其他功能的前置环节。
+
+- Tool[Input,Output] 节点 + 三模式依赖边（broadcast 查资料→一切 / directed 大纲→PPT、讲稿→视频 / optional 降级）
+- MaterialContext 类型化 Blackboard（字段级 reducer）传递中间产物
+- Pipeline `__or__` 组合（LangChain Runnable 模式）+ Resolver 自动编排（拓扑排序 + 循环检测）
+- MCP 三件套：execute_tool / execute_pipeline / list_dependencies（15 工具）
+- 实测：execute_pipeline("ppt") 自动 research→outline→ppt；"video" 自动 research→script→video
+

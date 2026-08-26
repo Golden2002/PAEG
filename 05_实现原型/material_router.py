@@ -29,6 +29,40 @@ from material_prompts import build_material_system, upgrade_simple_intent
 
 
 # ═══════════════════════════════════════════════════════════
+# §3.112 ⭐ 插件优先双轨（PAEG_USE_MATERIAL_PLUGIN=1 走插件，BridgeError 回退旧实现）
+# ═══════════════════════════════════════════════════════════
+def _try_plugin(intent: str, topic: str, subject: str, learner_id: str,
+                **kw) -> Optional[dict]:
+    """尝试用插件生成（成功返回 MaterialResult，失败/关闭返回 None → 走旧实现）。
+
+    参数映射（§3.112）：现有 kw（grade/learner/user_requirements/intuition/
+    objectives/prerequisites/style/duration_target_sec）全字段平移到插件。
+    """
+    try:
+        from services.material_bridge import execute_typed
+        _args = {"topic": topic, "subject": subject, "learner_id": learner_id}
+        for _k in ("grade", "user_requirements", "intuition", "objectives",
+                   "prerequisites", "style", "duration_target_sec", "outline",
+                   "render"):
+            if _k in kw and kw[_k] is not None:
+                _args[_k] = kw[_k]
+        # learner 画像 → 序列化（插件用 learner_id 即可，不传大对象）
+        _r = execute_typed(f"generate_{intent}", _args)
+        if isinstance(_r, dict) and _r.get("ok"):
+            return {
+                "ok": True,
+                "content": str(_r.get("output") or _r.get("summary_md")
+                               or f"{intent} 已生成（{topic}）")[:2000],
+                "url": _r.get("url") or _r.get("path") or "",
+                "error": "",
+                "step_type": intent,
+            }
+        return None  # 插件失败 → 回退旧实现
+    except Exception:
+        return None  # BridgeError/异常 → 回退旧实现
+
+
+# ═══════════════════════════════════════════════════════════
 # 物料路由表（数据驱动核心）
 # ═══════════════════════════════════════════════════════════
 @dataclass(frozen=True)
@@ -185,7 +219,12 @@ def _validate_video_scenes(scenes: list) -> tuple:
 
 
 def _gen_ppt(llm, topic, subject, learner_id, **kw) -> MaterialResult:
-    """PPT 生成（§3.92 ⭐ build_material_system 结构化大纲 + sources 注入 + 6×6 硬约束）。"""
+    """PPT 生成（§3.92 ⭐ build_material_system 结构化大纲 + sources 注入 + 6×6 硬约束）。
+    §3.112 ⭐ 插件优先：插件可用 → 插件生成；失败/关闭 → 回退本旧实现。"""
+    # §3.112 ⭐ 插件优先
+    _plugin_result = _try_plugin("ppt", topic, subject, learner_id, **kw)
+    if _plugin_result is not None:
+        return _plugin_result
     import json
     try:
         import pptx_mcp_server as _pptx
@@ -250,7 +289,11 @@ def _gen_handout(llm, topic, subject, learner_id, **kw) -> MaterialResult:
 
     Oracle 根因修复：此前用 save_answer（任意回答存档路径），非教学讲义专用
     generate_handout（6 段结构：教学目标/导入/新课3.1-3.3/巩固练习/小结/作业）。
-    """
+    §3.112 ⭐ 插件优先：插件可用 → 插件生成；失败/关闭 → 回退本旧实现。"""
+    # §3.112 ⭐ 插件优先
+    _plugin_result = _try_plugin("handout", topic, subject, learner_id, **kw)
+    if _plugin_result is not None:
+        return _plugin_result
     try:
         from file_generator import FileGenerator
         fg = FileGenerator(llm)
@@ -289,7 +332,12 @@ def _gen_handout(llm, topic, subject, learner_id, **kw) -> MaterialResult:
 
 
 def _gen_video(llm, topic, subject, learner_id, **kw) -> MaterialResult:
-    """教学视频分镜脚本生成（§3.92 ⭐ 模板驱动 + 8-15s 节奏硬约束 + KB 注入）。"""
+    """教学视频分镜脚本生成（§3.92 ⭐ 模板驱动 + 8-15s 节奏硬约束 + KB 注入）。
+    §3.112 ⭐ 插件优先：插件可用 → 插件生成；失败/关闭 → 回退本旧实现。"""
+    # §3.112 ⭐ 插件优先
+    _plugin_result = _try_plugin("video", topic, subject, learner_id, **kw)
+    if _plugin_result is not None:
+        return _plugin_result
     import json as _json
     try:
         _grade = kw.get("grade", "high_school")
@@ -328,7 +376,12 @@ def _gen_video(llm, topic, subject, learner_id, **kw) -> MaterialResult:
 
 
 def _gen_mindmap(llm, topic, subject, learner_id, **kw) -> MaterialResult:
-    """思维导图生成（复用 knowledge_map.handle_knowledge_map）。"""
+    """思维导图生成（复用 knowledge_map.handle_knowledge_map）。
+    §3.112 ⭐ 插件优先：插件可用 → 插件生成；失败/关闭 → 回退本旧实现。"""
+    # §3.112 ⭐ 插件优先
+    _plugin_result = _try_plugin("mindmap", topic, subject, learner_id, **kw)
+    if _plugin_result is not None:
+        return _plugin_result
     try:
         from knowledge_map import handle_knowledge_map
         _learner = kw.get("learner")
@@ -346,7 +399,12 @@ def _gen_mindmap(llm, topic, subject, learner_id, **kw) -> MaterialResult:
 
 
 def _gen_script(llm, topic, subject, learner_id, **kw) -> MaterialResult:
-    """讲稿生成（§3.91 修复：先生成大纲再 generate_full_script）。"""
+    """讲稿生成（§3.91 修复：先生成大纲再 generate_full_script）。
+    §3.112 ⭐ 插件优先：插件可用 → 插件生成；失败/关闭 → 回退本旧实现。"""
+    # §3.112 ⭐ 插件优先
+    _plugin_result = _try_plugin("script", topic, subject, learner_id, **kw)
+    if _plugin_result is not None:
+        return _plugin_result
     try:
         # Step 1: 生成非空大纲
         _outline = _safe_chat_wrap(
@@ -376,7 +434,12 @@ def _gen_script(llm, topic, subject, learner_id, **kw) -> MaterialResult:
 
 def _gen_manim(llm, topic, subject, learner_id, **kw) -> MaterialResult:
     """Manim 数学动画生成（走 MaterialPipeline v2.0 长路径）。
-    §3.92 透传 llm/grade；§3.94 透传用户要求 + 阶段产物 artifacts。"""
+    §3.92 透传 llm/grade；§3.94 透传用户要求 + 阶段产物 artifacts。
+    §3.112 ⭐ 插件优先：插件可用 → 插件生成；失败/关闭 → 回退本旧实现。"""
+    # §3.112 ⭐ 插件优先（manim 传 render=False 由插件内部决定；插件 ManimTool 已有 RITL/safety 增强）
+    _plugin_result = _try_plugin("manim", topic, subject, learner_id, **kw)
+    if _plugin_result is not None:
+        return _plugin_result
     try:
         from manim_service import generate_manim_video
         _r = generate_manim_video(

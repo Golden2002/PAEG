@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 visual_script_generator.py — PAEG 数学可视化脚本生成器（v0.70+ §3.26）
@@ -6,6 +7,13 @@ visual_script_generator.py — PAEG 数学可视化脚本生成器（v0.70+ §3.
 方法来源：3Blue1Brown 8 大原则 + manim_skill 社区库 + Oracle 设计。
 """
 from __future__ import annotations
+
+"""
+[LEGACY · 历史实现] 自 2026-08-26（§3.112）起冻结，仅供 PAEG_USE_MATERIAL_PLUGIN=0 兜底。
+新代码必须使用插件 paeg-teaching-materials（material_router._gen_* → services.material_bridge.execute）。
+禁止在新模块 import 本模块，违规将被 audit_check 拦截。
+最后维护: PAEG Team · 关联: §3.110/§3.111/§3.112
+"""
 
 import json
 import os
@@ -24,7 +32,6 @@ CONCEPT_DECOMPOSITION_SYSTEM_PROMPT = """先静下来沉思，把下面的数学
 
 分析完再输出。输出用结构化文本（可含列表/小标题），但由你决定组织方式。"""
 
-
 def _is_complex_topic(topic: str) -> bool:
     """启发式：是否触发概念拆解（短 + 抽象概念词）。"""
     if len(topic or "") > 12:
@@ -32,7 +39,6 @@ def _is_complex_topic(topic: str) -> bool:
     _KWS = ("变换", "结构", "关系", "性质", "分解", "组成", "定义",
             "等价", "不变", "同构", "映射", "基", "坐标", "矩阵")
     return any(k in (topic or "") for k in _KWS)
-
 
 def decompose_concept(llm, topic: str, audience: str = "高中") -> Optional[dict]:
     """Phase 0：概念拆解。返回教学骨架 JSON；失败返回 None（降级无拆解）。"""
@@ -48,7 +54,6 @@ def decompose_concept(llm, topic: str, audience: str = "高中") -> Optional[dic
     except Exception as _e:
         print(f"[concept_decompose] 失败: {_e}")
         return None
-
 
 VISUAL_SCRIPT_SYSTEM_PROMPT = """你是 PAEG 数学可视化剧本设计师。你的唯一任务：把教学主题转化为一幕幕"可被忠实执行的"动画剧本，而不是直接写 Manim 代码。
 
@@ -101,7 +106,6 @@ VISUAL_SCRIPT_SYSTEM_PROMPT = """你是 PAEG 数学可视化剧本设计师。�
 - 时长是否匹配目标（±15%）？→ 否则增删 scene
 """
 
-
 def build_script_prompt(topic: str, audience: str, duration_target_sec: int,
                         style: str = "3blue1brown", prerequisites: str = "",
                         intuition: str = "", objectives: str = "") -> str:
@@ -111,7 +115,6 @@ def build_script_prompt(topic: str, audience: str, duration_target_sec: int,
         style=style, prerequisites=prerequisites or "无明确前置",
         intuition=intuition or "（待生成）", objectives=objectives or "（待生成）",
     )
-
 
 def generate_script(llm, topic: str, audience: str, duration_target_sec: int,
                     style: str = "3blue1brown", prerequisites: str = "",
@@ -137,7 +140,6 @@ def generate_script(llm, topic: str, audience: str, duration_target_sec: int,
     except Exception as _e:
         print(f"[visual_script] 生成失败: {_e}")
         return None
-
 
 import re
 import time

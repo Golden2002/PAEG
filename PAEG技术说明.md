@@ -1,4 +1,4 @@
-# PAEG 教育智能体 — 简明技术说明（v1.2.27）
+﻿﻿# PAEG 教育智能体 — 简明技术说明（v1.2.27）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -2080,6 +2080,127 @@ manim_judge 4→7 维（hook/progressive/recap）+ manim_templates derivative_ch
 - **统一 SSE**（sse_presenter.py）：fmt_presentation/fmt_done/fmt_progress——14 单测字节级锚定前端契约
 - **与流水线接线**：默认 5 类直调生成器（快+契约稳），仅 manim use_pipeline=True 走 MaterialPipeline v2.0（渲染 2-5min 需门控）；后续可平滑切换（改 ROUTER 表 generator 列即可）
 - **灰度**：`PAEG_USE_MATERIAL_ROUTER` 环境变量（默认 1，旧分支已删）
+
+---
+
+#### C.16 语言规范模块插件化 + 独立项目（v1.3.0 §3.109 ⭐）
+
+> 用户 ULW 三任务（2026-08-26）：①语言规范模块独立性检查 ②调研+Oracle 需求清单 ③独立 GitHub 项目。
+> 语言规范模块（系统提示词词法句法约束 + 动态违禁词库 + 重写工具）独立为**可拆卸插件**，方便接入教育智能体。
+
+**独立插件 paeg-lang-style-plugin**（D:\wbo-workspace\paeg_project\paeg-lang-style-plugin）：
+- `rules.py`：8 条中文语法规则（GB/T 15834 标点 + 病句六类）——①词法完整（倦→疲倦）②动宾搭配（带着重量→有分量）③悬空宾语补足 ④无主语补全 ⑤复合句缺主语 ⑥介词规范 ⑦谓宾补足（听着你→听你说说）⑧语义残缺
+- `ai_taste.py`：AI 味检测（句长变异/过渡词密度/三段式/破折号/段落对称 5 维）
+- `forbidden.py`：动态违禁词库（运行时增删 + 外部 JSON 热加载）
+- `prompts/language_style.py`：LANGUAGE_STYLE 四段（weil/lexicon/syntax/forbidden）
+- `refiner.py`：重写工具（chat_fn **强制注入** fail-fast，多轮 Self-Refine）
+- `gate.py`：守门入口（L0+L2，refiner 注入式解耦）
+
+**插件化接入（R20 零破坏铁律）**：
+- `infra/lang_plugin_bridge.py` **唯一适配层**：插件挂载走插件，未挂载静默回退 PAEG 原实现
+- 旧文件（services/lang_gate.py / language_refiner.py / prompts.LANGUAGE_STYLE）**永不删除**（回滚备份）
+
+**验证**：
+- 插件 35 测试全绿 + 4 项行为一致性（20 段样本 vs PAEG 原实现**字符串相等**——零行为漂移）
+- PAEG 回归 22 全绿（不破坏现有功能）
+- GitHub：Golden2002/paeg-lang-style-plugin（19 文件）+ 桥文件推送 PAEG 主仓库
+
+**三大架构模式应用**（librarian 调研）：规则声明式引擎（LanguageTool 范式）→ rules.py；公式度量（textstat）→ ai_taste.py；中文特化（jieba+LTP）→ rules.py 正则分句（零依赖轻量版）
+
+**文档**：README（8 条规则详记）/ architecture.md / integration_paeg.md / SKILL.md / samples_20.md（20 段对比）
+
+**MCP server 化可及性**（§3.109 用户修正 ⭐）：
+- `paeg_lang_style/mcp_server.py`：FastMCP 7 工具（normalize_text / language_policy_check / forbidden_words / check_grammar / check_ai_taste / build_style_prompt / list_rules）
+- stdio 入口 `python -m paeg_lang_style.mcp_server` + console_scripts `paeg-lang-style-mcp`
+- **零代码桥接入**：任何项目 pip install + MCP 配置声明即用（config/mcp_servers.json stdio）
+- 实测：initialize 握手 → tools/list 7 工具 → tools/call 修正病句全部正常
+
+**充分状语通则**（rule-sx-general-002 ⭐ 用户新增）：指挥 LLM 使用充分的状语——
+每个动作/判断用时间/地点/方式/条件/对象/目的状语交代完整（"复习单词。"→"你可以在每天睡前用十分钟复习单词。"）；`check_adverbial_general_rule` 检测动词开头短句 + 孤零零单动词；接入 refiner 反馈闭环。测试 75/75。
+
+**外部项目接入方式**（用户要求 ⭐）：任何项目/智能体要使用本模块的语法规则——
+1. 安装/放置插件（pip install -e 或 sys.path 加入 src）
+2. 语法规则拼进自己的系统提示词：`from paeg_lang_style import RuleRegistry; prompt = RuleRegistry().build_prompt("general")` → 拼入 LLM system prompt（谁用都拼）
+3. 规则集可扩充：编辑 data/rules.json 追加规则即热加载（可扩展性）
+4. 违禁词可扩充：ForbiddenWords().load_json("自定义路径")（可维护性）
+5. 输出后处理：`gate_content(text, refiner=make_refiner(chat_fn=my_llm))`（改写脚本）
+详见独立项目 README「外部项目接入指南」
+
+---
+
+#### C.17 教学物料制作插件化 + MCP server（v1.3.0 §3.110 ⭐）
+
+> 用户 ULW（2026-08-26）：按语言规范插件（§3.109）同样顶尖标准，教学物料制作系统独立成插件，
+> 且必须像 MCP server 一样**直接安装即可用**（可及性 ⭐）。
+
+**独立插件 paeg-teaching-materials**（D:\wbo-workspace\paeg_project\paeg-teaching-materials）：
+- **6 类物料生成器**：PPT（6x6 大纲+可选渲染）/ 讲义（6 段结构）/ 讲稿（分段 narration）/ 思维导图（层级）/ 教学视频（分镜）/ Manim（动画代码）
+- **MaterialRegistry**：生成器注册表（可扩充自定义物料类型）
+- **6 个 Protocol 抽象**（零宿主依赖）：LLMCallable / RefinerProtocol / HandoutGenerator / ScriptGenerator / MindmapGenerator / ResourceProvider + Null 弱模式
+- **execute(name, args) 统一入口**（对标 constraint_engine，JSON 契约绝不抛异常）
+- **quality**：确定性结构检查（占位/结构/长度）+ LLM 5 维评审（factuality/correctness/completeness/relevance/pedagogy）
+- **语言规范联动**：物料产出自动过 L0 病句修正（复用 paeg-lang-style）
+
+**MCP server 化（可及性 ⭐ 像 MCP 一样直接安装）**：
+- `paeg_teaching_materials/mcp_server.py`：FastMCP **12 工具**（generate_ppt/handout/script/mindmap/video_script/manim + material_quality_check/material_judge/list_material_types/build_material_prompt/check_language/normalize_material）
+- stdio 入口 `python -m paeg_teaching_materials.mcp_server` + console_scripts `paeg-teaching-materials-mcp`
+- **零代码桥接入**：任何项目 pip install + MCP 配置声明即用
+- 实测：initialize 握手 → tools/list 12 工具 → tools/call generate_handout 正常
+
+**主项目接入**（services/material_bridge.py 对标 lang_plugin_bridge）：
+- 注入 PAEG 宿主（LLM=subagents._safe_chat / Refiner=paeg.refiner / 资源=services.library）
+- 插件未安装 → 静默回退（零破坏铁律）
+- 实测：注入后 generate_handout 返回真实讲义（ok=true）
+
+**验证**：插件 22 测试全绿 + stdio 实测 + 桥双模式 + GitHub Golden2002/paeg-teaching-materials（17 文件）
+
+---
+
+#### C.18 教学物料插件网状联通架构（v1.3.1 §3.110 ⭐ 顶尖工具标准）
+
+> 用户架构级要求（2026-08-26）："在这个tool内部，也有着交织的网状的接线和联通。
+> 有的功能既可独立使用，也是另一些功能的前置环节。这是架构级的要求，毕竟我们要做顶尖的工具！"
+
+**核心设计**（Oracle 方案 + 业界三大范式综合：Airflow DAG / LangGraph Blackboard / LLVM IR）：
+- **Tool[Input, Output] 功能节点**：10 个一等公民（research 查资料 / outline 大纲 / ppt / handout / script 讲稿 / video / mindmap / manim / method 学习方法 / study_plan 学习计划）——每个既可独立 MCP 调用，也可作前置环节
+- **三模式依赖边**（core/edges.py）：
+  - broadcast（广播边）：查资料 → 一切生成（一对多全网消费）
+  - directed（定向边）：大纲 → PPT、讲稿 → 视频（强前置）
+  - optional（可选边）：资料 → 思维导图（缺失降级）
+- **MaterialContext 类型化 Blackboard**（core/context.py）：字段级 reducer（resources append / outline replace / completed_stages union）——前置产物被下游自动消费
+- **Pipeline `__or__` 组合**（core/pipeline.py）：组合结果仍是 Tool（LangChain Runnable 模式），递归可组合
+- **Resolver 自动编排**（core/resolver.py）：给定 target 反向追溯 requires 拓扑排序 + 循环依赖检测
+- **MCP 三件套**：execute_tool（独立调用）/ execute_pipeline（自动编排前置环节）/ list_dependencies（依赖图自省）
+
+**网状联通实测**：
+- 依赖图 10 节点：research[broadcast]→ 一切；outline[directed]→ppt；script[directed]→video；mindmap[optional]
+- execute_pipeline("ppt") 自动执行 research→outline→ppt
+- execute_pipeline("video") 自动执行 research→script→video
+- 循环依赖检测生效
+- MCP 15 工具 + stdio 验证
+
+**主项目断点修复依据**（explore 盘点）：material_pipeline 未上线 / manim_pipeline.link_to_assets 零消费方 / _gen_mindmap 无资源注入——插件网状架构已系统性解决（ResearchStage 广播前置 + 依赖边声明）。
+
+---
+
+#### C.19 Manim 顶尖化 + 主项目切插件（v1.3.3 §3.111/§3.112 ⭐）
+
+> 用户 ULW（2026-08-26）：① Manim 视频制作提升到业界最顶尖（调研 + Oracle R1-R9）
+> ② 主项目现在应该使用插件，原架构降级为历史保存。
+
+**Manim 顶尖化（Tier 1 已实施）**：
+- `manim_safety.py`：safe_manim 12 崩溃模式静态 lint（Create(Text)/Brace.get_text/MathTex$/LaggedStartMap/wait frozen/Transform/.animate/interpolate_color/get_part_by_tex 等）+ 安全包装函数
+- `manim_pipeline` RITL 闭环：错误 tail 10 行 + 签名分类（code_api/latex/resource）+ safety lint 反馈 + LaTeX 降级提示（K=3）
+- 插件同步：`manim_quality.py`（RITL + 12 模式 lint）+ ManimGenerator 增强（lint 报告 + RITL 修复回路）
+
+**主项目切插件（§3.112）**：
+- `services/material_bridge.py` 增强：execute_typed（dict）/ execute_generator（SSE 事件流）/ BridgeError / 灰度开关 PAEG_USE_MATERIAL_PLUGIN / bridge_status 健康信息
+- 6 个 `_gen_*` 双轨：插件优先 + BridgeError 自动回退旧实现（保留签名兼容 ROUTER 表）
+- server.py 启动挂载 install_material_plugin + 健康日志
+- 8 旧模块 [LEGACY] banner 冻结 + audit_check LEGACY import 黑名单
+- 验证：61 测试全绿 + audit 40/41 + 插件 54/54
+
+**调研证据**（librarian）：ManimTrainer RITL/RITL-DOC（arXiv 2604.18364）/ safe_manim 12 崩溃（clawRxiv 2603.00082）/ Qwen3Coder30B 94% RSR / MVQS 几何评估（arXiv 2607.18116）
 
 ---
 

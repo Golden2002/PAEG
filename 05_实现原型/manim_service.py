@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """v6.1 ⭐ Manim 数学动画服务（独立模块）
 LLM 生成 Manim 代码 → 隔离渲染 → 数学动画视频
@@ -5,12 +6,18 @@ LLM 生成 Manim 代码 → 隔离渲染 → 数学动画视频
 - 渲染用隔离 venv（manim_env/venv，Python 3.12）
 - AST 校验防恶意代码 + subprocess 超时
 """
+
+"""
+[LEGACY · 历史实现] 自 2026-08-26（§3.112）起冻结，仅供 PAEG_USE_MATERIAL_PLUGIN=0 兜底。
+新代码必须使用插件 paeg-teaching-materials（material_router._gen_* → services.material_bridge.execute）。
+禁止在新模块 import 本模块，违规将被 audit_check 拦截。
+最后维护: PAEG Team · 关联: §3.110/§3.111/§3.112
+"""
 import os, re, ast, subprocess, tempfile, uuid, sys, io
 
 # §3.97 ⭐ LaTeX 可用性检测：manim MathTex/Tex 依赖 latex.exe，缺失时降级
 _MIKTEX_BIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "manim_env", "miktex",
                           "texmfs", "install", "miktex", "bin", "x64")
-
 
 def _latex_available() -> bool:
     """检测 LaTeX 可用性：系统 PATH 或 MiKTeX 安装路径。"""
@@ -24,7 +31,6 @@ def _latex_available() -> bool:
     except Exception:
         pass
     return False
-
 
 _LATEX_OK = _latex_available()
 
@@ -66,7 +72,6 @@ _MANIM_SUBJECTS = {
     '线性代数', 'linear_algebra', '解析几何', 'graph', '图论',
 }
 
-
 def is_manim_subject(subject: str) -> bool:
     """主题类型分派：该学科是否适合插入 manim 演示动画。
 
@@ -80,7 +85,6 @@ def is_manim_subject(subject: str) -> bool:
         return True
     # 包含匹配：如 "高中数学" → math
     return any(k.lower() in s for k in _MANIM_SUBJECTS)
-
 
 # v0.66 ⭐ 主题内容推断：不依赖用户显式选学科，从主题关键词判断是否适合 manim
 # 可视化主题关键词（数学/物理/几何图形语义）
@@ -102,7 +106,6 @@ _MANIM_TOPIC_KEYWORDS = (
     'circle', 'triangle', 'polygon', 'velocity', 'acceleration', 'wave',
 )
 
-
 def infer_manim_suitability(topic: str, subject: str = "") -> bool:
     """v0.66 ⭐ 判断主题是否适合 manim 动画（显式学科 + 主题内容推断取并集）。
 
@@ -113,7 +116,6 @@ def infer_manim_suitability(topic: str, subject: str = "") -> bool:
         return True
     t = (topic or "").lower()
     return any(k in t for k in _MANIM_TOPIC_KEYWORDS)
-
 
 def validate_manim_code(code: str):
     """AST 校验：拒绝危险 import/调用，必须有 Scene 子类 + construct"""
@@ -144,7 +146,6 @@ def validate_manim_code(code: str):
     if not has_scene:
         return False, "No Scene class found"
     return True, ""
-
 
 def _sanitize_code_no_latex(code: str) -> str:
     """§3.97 ⭐ 代码清洗：MathTex/Tex → Text 降级 + 全角标点转半角 + LaTeX 残留剥离。
@@ -231,7 +232,6 @@ def _find_renderable_scene(code: str) -> str:
     m = re.search(r"class\s+(\w+)\s*\(", code)
     return m.group(1) if m else "Scene"
 
-
 def render_manim(code: str, scene_class: str = None, quality: str = '-qm',
                  timeout: int = 180):
     """渲染 Manim 代码 → mp4 路径。返回 (path, error)"""
@@ -311,7 +311,6 @@ def render_manim(code: str, scene_class: str = None, quality: str = '-qm',
     except Exception as e:
         return None, str(e)
 
-
 # ─── LLM 生成 Manim 代码（接入现有 LLM）───
 _MANIM_SYSTEM = """你是 Manim 数学动画代码生成助手。为教学问题生成 Manim Community 代码。
 要求：
@@ -322,7 +321,6 @@ _MANIM_SYSTEM = """你是 Manim 数学动画代码生成助手。为教学问题
 5. 纯几何动画（不用 Text/MathTex 避免依赖问题）
 6. 输出完整可运行 Python 代码""" + _SPEED_STANDARD_TEXT
 
-
 def _get_llm_for_manim():
     """获取 LLM 实例（供流水线使用）。"""
     try:
@@ -330,7 +328,6 @@ def _get_llm_for_manim():
         return create_llm("auto")
     except Exception:
         return None
-
 
 def generate_manim_video(topic: str, subject: str = 'math',
                          learner_id: str = 'anon',
@@ -488,7 +485,6 @@ def generate_manim_video(topic: str, subject: str = 'math',
 
     return {"ok": True, "path": path, "url": _url,
             "error": "", "narrative_judge": _narr}
-
 
 if __name__ == '__main__':
     # 测试：模板渲染（不依赖 LLM）

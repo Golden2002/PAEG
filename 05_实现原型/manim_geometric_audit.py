@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """manim_geometric_audit.py — 几何审计门（v1.1 ⭐ §3.34 智绘科普范式）
 
@@ -17,6 +18,13 @@
 """
 from __future__ import annotations
 
+"""
+[LEGACY · 历史实现] 自 2026-08-26（§3.112）起冻结，仅供 PAEG_USE_MATERIAL_PLUGIN=0 兜底。
+新代码必须使用插件 paeg-teaching-materials（material_router._gen_* → services.material_bridge.execute）。
+禁止在新模块 import 本模块，违规将被 audit_check 拦截。
+最后维护: PAEG Team · 关联: §3.110/§3.111/§3.112
+"""
+
 import os
 import shutil
 import subprocess
@@ -31,10 +39,8 @@ _EDGE_DARK_RATIO = 0.45    # 边缘暗像素占比超此值 = 疑似越界
 _OVERLAP_DENSITY = 0.75    # 中心区高密度占比超此值 = 疑似重叠
 _EMPTY_RATIO = 0.85        # 空白占比超此值 = 元素漂移
 
-
 def _ensure_dir():
     os.makedirs(_AUDIT_DIR, exist_ok=True)
-
 
 def _extract_frames(video_path: str, n: int = _FRAMES_TO_SAMPLE) -> List[str]:
     """用 ffmpeg 抽 n 帧 PNG。返回帧路径列表（失败返回空）。"""
@@ -64,7 +70,6 @@ def _extract_frames(video_path: str, n: int = _FRAMES_TO_SAMPLE) -> List[str]:
     except Exception:
         pass
     return frames
-
 
 def _analyze_frame(frame_path: str) -> Dict[str, float]:
     """单帧几何分析：返回 {edge_dark_ratio, center_density, empty_ratio}。"""
@@ -105,7 +110,6 @@ def _analyze_frame(frame_path: str) -> Dict[str, float]:
         return {"edge_dark_ratio": 0.0, "center_density": 0.0,
                 "empty_ratio": 1.0}
 
-
 def audit_video(video_path: str) -> Dict[str, object]:
     """几何审计：抽帧分析。返回 {ok, issues[], frames, metrics}。"""
     issues = []
@@ -133,7 +137,6 @@ def audit_video(video_path: str) -> Dict[str, object]:
             "issues": issues[:5],
             "frames_count": len(frames),
             "metrics": metrics}
-
 
 if __name__ == "__main__":
     import sys, io

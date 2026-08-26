@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """manim_extensions.py —— §3.89 Step 4/5 ⭐ Manim 缺口修复扩展
 
@@ -8,13 +9,19 @@
 """
 from __future__ import annotations
 
+"""
+[LEGACY · 历史实现] 自 2026-08-26（§3.112）起冻结，仅供 PAEG_USE_MATERIAL_PLUGIN=0 兜底。
+新代码必须使用插件 paeg-teaching-materials（material_router._gen_* → services.material_bridge.execute）。
+禁止在新模块 import 本模块，违规将被 audit_check 拦截。
+最后维护: PAEG Team · 关联: §3.110/§3.111/§3.112
+"""
+
 import json
 import os
 import re
 import subprocess
 import tempfile
 from typing import Any, Dict, List, Optional
-
 
 def scope_refine(script: Dict[str, Any], errors: List[str],
                  llm=None, level: int = 1) -> Optional[Dict[str, Any]]:
@@ -84,7 +91,6 @@ def scope_refine(script: Dict[str, Any], errors: List[str],
     except Exception:
         return script
 
-
 def tts_mux(manim_video: str, narration: str, out_path: Optional[str] = None,
             voice: str = "zh-CN-XiaoxiaoNeural") -> Optional[str]:
     """Audio-First TTS 同步：edge-tts 生成旁白 MP3 → ffmpeg mux 到 Manim 视频。
@@ -123,7 +129,6 @@ def tts_mux(manim_video: str, narration: str, out_path: Optional[str] = None,
         return out if os.path.isfile(out) else None
     except Exception:
         return None
-
 
 if __name__ == "__main__":
     # 冒烟测试

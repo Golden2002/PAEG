@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """manim_pipeline.py — Manim 动画流水线（v1.1 ⭐ §3.34 智绘科普范式优化）
 
@@ -32,6 +33,13 @@
 """
 from __future__ import annotations
 
+"""
+[LEGACY · 历史实现] 自 2026-08-26（§3.112）起冻结，仅供 PAEG_USE_MATERIAL_PLUGIN=0 兜底。
+新代码必须使用插件 paeg-teaching-materials（material_router._gen_* → services.material_bridge.execute）。
+禁止在新模块 import 本模块，违规将被 audit_check 拦截。
+最后维护: PAEG Team · 关联: §3.110/§3.111/§3.112
+"""
+
 import json
 import os
 import re
@@ -48,10 +56,8 @@ BEATS_MIN, BEATS_MAX = 3, 6  # 数量门
 BEAT_DUR_MIN_PCT = 0.80     # 时序门：每 beat ≥ 目标 80%
 TOTAL_DUR_MIN_PCT = 0.60    # 时序门：总时长 ≥ 目标 60%
 
-
 def _ensure_dir():
     os.makedirs(_PIPELINE_DIR, exist_ok=True)
-
 
 # ═══════════════════════════════════════════════════════════
 # Phase 1 · 规划：生成结构化 script.json（beats 分镜）
@@ -86,7 +92,6 @@ def phase1_plan(llm, topic: str, audience: str = "高中",
         print(f"[manim_pipeline] Phase1 失败: {e}")
         return None
 
-
 def gate_structure(script: dict) -> List[str]:
     """结构门：校验必填字段。"""
     errors = []
@@ -100,7 +105,6 @@ def gate_structure(script: dict) -> List[str]:
                 errors.append(f"scene[{i}] 缺 {f}")
     return errors
 
-
 def gate_count(script: dict) -> List[str]:
     """数量门：beats 数量 3-6，每 beat 单一教学点。"""
     errors = []
@@ -113,7 +117,6 @@ def gate_count(script: dict) -> List[str]:
         errors.append("concept 重复（每 beat 应单一教学点）")
     return errors
 
-
 def gate_executable(script: dict) -> List[str]:
     """可执行门：视觉目标须 Manim 可实现（禁 3D 全息/交互等异想天开）。"""
     _IMPOSSIBLE = ("3D 全息", "全息", "交互式", "VR", "增强现实", "AR 投影",
@@ -125,7 +128,6 @@ def gate_executable(script: dict) -> List[str]:
             if kw in goal:
                 errors.append(f"scene {s.get('id','?')}: 视觉目标『{kw}』无法在 Manim 实现")
     return errors
-
 
 def gate_timing(script: dict) -> List[str]:
     """时序门：每 beat 时长在合理范围（8-45s）+ 总时长 ≥ 目标 60%
@@ -143,7 +145,6 @@ def gate_timing(script: dict) -> List[str]:
         errors.append(f"总时长 {total:.0f}s < 目标 {target}s 的 60%")
     return errors
 
-
 def run_all_gates(script: dict) -> List[str]:
     """运行全部确定性门控，返回所有错误（空=通过）。"""
     errors = []
@@ -152,7 +153,6 @@ def run_all_gates(script: dict) -> List[str]:
     errors += gate_executable(script)
     errors += gate_timing(script)
     return errors
-
 
 # ═══════════════════════════════════════════════════════════
 # Phase 2A · 草稿：不渲染，仅写 Manim 代码
@@ -176,7 +176,6 @@ def phase2_draft(llm, script: dict) -> Optional[str]:
     except Exception as e:
         print(f"[manim_pipeline] Phase2A 失败: {e}")
     return None
-
 
 # ═══════════════════════════════════════════════════════════
 # Phase 2B · 实现：渲染 + AST 校验 + 几何审计
@@ -218,7 +217,6 @@ def phase2_implement(code: str) -> Dict[str, Any]:
     except Exception as e:
         return {"ok": False, "error": f"Phase2B 失败: {e}"}
 
-
 # ═══════════════════════════════════════════════════════════
 # Phase 3 · 审查：视觉审查（抽帧 LLM 评估）
 # ═══════════════════════════════════════════════════════════
@@ -254,7 +252,6 @@ def phase3_review(llm, video_path: str) -> Dict[str, Any]:
     except Exception as e:
         return {"ok": True, "note": f"视觉审查跳过: {e}", "frames": []}
 
-
 # ═══════════════════════════════════════════════════════════
 # 失败返工回路：错误日志 → 修复提示词 → 重跑
 # ═══════════════════════════════════════════════════════════
@@ -262,7 +259,6 @@ def _fix_prompt(stage: str, artifact: Any, error: str) -> str:
     return (f"你是 {stage} 修复器。上一次 {stage} 失败：{error}\n"
             f"请修复后重新输出完整产物（结构不变）。\n"
             f"上次产物：{str(artifact)[:1500]}")
-
 
 def _safe_chat(llm, sys_p, user_p, max_tokens=2000):
     """内部 _safe_chat 包装（兼容 subagents）。"""
@@ -272,6 +268,52 @@ def _safe_chat(llm, sys_p, user_p, max_tokens=2000):
     except Exception:
         return None
 
+# ─────────────────────────────────────
+# §3.111 ⭐ RITL（Render-in-the-Loop）闭环增强
+# ─────────────────────────────────────
+def _extract_error_tail(error: str, n: int = 10) -> str:
+    """RITL：只取渲染错误最后 N 行 traceback（ManimTrainer 论文验证 N=10 最优）。"""
+    if not error:
+        return "NONE"
+    lines = str(error).splitlines()
+    return "\n".join(lines[-n:]) if len(lines) > n else str(error)
+
+def _classify_error(error: str) -> str:
+    """错误签名分类（决定修复策略）：
+    - syntax/import/API → 代码级（L1 修复）
+    - latex/tex → LaTeX 降级
+    - timeouts/resource → 渲染环境
+    """
+    e = str(error).lower()
+    if any(k in e for k in ("syntaxerror", "indentationerror", "nameerror",
+                            "attributeerror", "typeerror", "importerror")):
+        return "code_api"
+    if any(k in e for k in ("latex", "tex", "dvi", "missing package")):
+        return "latex"
+    if any(k in e for k in ("timeout", "out of memory", "killed", "segmentation")):
+        return "resource"
+    return "generic"
+
+def _build_ritl_prompt(stage: str, artifact: Any, error: str, code: str = "") -> str:
+    """RITL 修复提示：错误 tail + safety lint 反馈 + 上轮产物。"""
+    tail = _extract_error_tail(error)
+    cls = _classify_error(error)
+    parts = [f"你是 {stage} 修复器。上一次 {stage} 失败（类型: {cls}）：\n{tail}"]
+    # ⭐ safety lint 反馈（12 崩溃模式）
+    if code:
+        try:
+            from manim_safety import build_safety_feedback
+            _sf = build_safety_feedback(code)
+            if _sf:
+                parts.append(_sf)
+        except Exception:
+            pass
+    # LaTeX 降级提示
+    if cls == "latex":
+        parts.append("提示：LaTeX 不可用——请用 Text() 替代 MathTex()/Tex()（或纯几何动画）。")
+    parts.append("请修复后重新输出完整产物（结构不变）。")
+    parts.append(f"上次产物：{str(artifact)[:1500]}")
+    return "\n".join(parts)
 
 # ═══════════════════════════════════════════════════════════
 # 主流水线：六阶段 + 门控 + 自动修复回路
@@ -381,17 +423,17 @@ def run_pipeline(llm, topic: str, audience: str = "高中",
                                    "url": _save_artifact("scene.py", code)}
     _emit("code", "done", 60, "代码已生成", result["artifacts"]["code"]["url"])
 
-    # ── Phase 2B 实现（AST 校验 + 渲染 + 修复回路）──
+    # ── Phase 2B 实现（AST 校验 + 渲染 + RITL 修复回路）──
     _emit("video", "running", 65, "正在渲染视频…")
     impl = phase2_implement(code)
     for _r in range(MAX_FIX_ROUNDS):
         if impl.get("ok"):
             break
-        # 修复：错误日志 → 修复提示词 → 重生成代码
+        # §3.111 ⭐ RITL 闭环：错误 tail + safety lint 反馈 → 修复提示词 → 重生成
         try:
             _sys = ("你是 Manim 代码修复器。根据渲染/AST 错误修改代码，保持功能，"
                     "修复 import/API/语法问题。输出完整代码。")
-            _usr = _fix_prompt("Manim 代码", code, impl.get("error", "未知错误"))
+            _usr = _build_ritl_prompt("Manim 代码", code, impl.get("error", "未知错误"), code=code)
             _raw = _safe_chat(llm, _sys, _usr, max_tokens=4000)
             if _raw and "class " in _raw:
                 code = _raw
@@ -443,7 +485,6 @@ def run_pipeline(llm, topic: str, audience: str = "高中",
     _emit("done", "done", 100, "完成")
     return result
 
-
 # ═══════════════════════════════════════════════════════════
 # 上下游衔接：教学视频上游 + 讲义/讲稿/脚本下游
 # ═══════════════════════════════════════════════════════════
@@ -461,7 +502,6 @@ def link_to_assets(script: dict, base: str = "") -> Dict[str, str]:
               "visual_goal": s.get("visual_goal")} for s in scenes],
             ensure_ascii=False),
     }
-
 
 if __name__ == "__main__":
     import sys, io
