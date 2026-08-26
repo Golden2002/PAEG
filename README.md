@@ -1,4 +1,4 @@
-# PAEG — Pedagogical Agent with Evolving Growth
+﻿﻿# PAEG — Pedagogical Agent with Evolving Growth
 
 基于**西蒙娜·薇依（Simone Weil）**教育哲学、由 Agent 架构驱动的 AI 教育智能体（**v1.2.0 · 35 学科 × 4 学段 + 10 subagent + 自我进化 + 双 LLM 约束引擎**）。
 
@@ -346,6 +346,29 @@ python sync_check.py --fix     # 自动推送差异（本地为权威）
 **多端原则**：①本地为权威源 ②每次变更后同步 ③Release 保持最新（重大版本更新时更新 Release 名称与正文，tag 可复用 v0.26）④敏感数据不上传（users.json / users_data/ / uploads/ / data/ 不参与备份）⑤token 不入库（GH_TOKEN 环境变量读取）。
 
 **完成状态**：2026-08-08，106 个代码/文档文件全部一致（0 缺失 0 差异）。
+
+## 插件生态（§3.109-§3.115 ⭐ 独立仓库 + 主项目已安装）
+
+PAEG 有两个**独立插件**（各自独立 git 仓库 + 独立 GitHub 库 + 独立 README），
+主项目通过 sys.path/pip 引用（主项目 = 已安装插件）：
+
+| 插件 | GitHub 库 | 功能 | 测试 |
+|---|---|---|---|
+| **paeg-lang-style-plugin** | [Golden2002/paeg-lang-style-plugin](https://github.com/Golden2002/paeg-lang-style-plugin) | 语言规范：词法/句法规则约束 + 动态违禁词库 + LLM 输出重写 + MCP server | 83/83 |
+| **paeg-teaching-materials** | [Golden2002/paeg-teaching-materials](https://github.com/Golden2002/paeg-teaching-materials) | 教学物料：PPT/讲义/讲稿/思维导图/教学视频/Manim + 网状联通 + MCP server | 74/74 |
+
+**可及性（§3.114）**：像 Python 库一样——`pip install` → `import` 自动注册 → 注入 LLM → 立即可用。
+
+**Manim 顶尖化（§3.111）**：R1-R9 全部完成——RITL 渲染错误回灌 / RITL-DOC / safe_manim 12 崩溃模式 /
+MVQS 几何评估 / TTS 预合成并行 / 17 视觉原则 + 6 叙事结构 / MCP 5 工具。
+
+**接入方式（§3.113）**：
+```python
+# 主项目启动（server.py）自动 sys.path 引导 → 加载主项目内插件副本
+# 物料生成走插件（material_bridge 双轨，PAEG_USE_MATERIAL_PLUGIN 灰度）
+from services.material_bridge import install_material_plugin
+install_material_plugin()   # 注入 PAEG LLM/refiner/资源
+```
 
 ### 进一步阅读
 
