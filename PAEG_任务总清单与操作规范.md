@@ -5502,7 +5502,8 @@ scope_refine 三级修复 + tts_mux Audio-First + 模板兜底 + LaTeX 降级 + 
    - RITL 闭环（错误 tail + 签名分类 + safety 反馈 + LaTeX 降级）+ 11 测试
    - 插件同步 manim_quality.py + ManimGenerator 增强 + 13 测试
 4. **模型配置**（用户修正）：统一同模型（不接多模型），保留多模型路由能力（PROVIDER_REGISTRY 已有），配置外置便于扩展
-5. **Tier 2/3**（LoRA SFT / GRPO）待立项
+5. **R1-R9 全部完成**（R4 模型配置外置 + R5 MVQS + R6 TTS 并行 + R7 叙事 + R8 MCP 5 工具 + R9 网状）——教学物料插件 74/74 + 主项目 Manim 61/61
+6. **Tier 2/3**（LoRA SFT / GRPO）待立项
 
 
 ---
@@ -5537,3 +5538,97 @@ scope_refine 三级修复 + tts_mux Audio-First + 模板兜底 + LaTeX 降级 + 
    - server.py 启动挂载 + 8 旧模块 [LEGACY] banner（__future__ 后正确插入）+ audit LEGACY 黑名单
    - test_plugin_switch.py 8 项（挂载/双轨/fallback/SSE 契约）
 4. **验证**：主项目 61 + 插件 54 + 语言规范 83 全绿 + audit 40/41 + GitHub 双库 20 文件同步
+
+
+---
+
+## §3.113 项目结构纪律——插件独立 + 主项目已安装 + 两者同步（2026-08-26 · 用户 ⭐）
+
+### 用户要求（原文）
+
+- "两个插件不是独立仓库吗？有独立的read me独立上传github的仓库"
+- "项目结构：插件各自独立，主项目相当于已经安装了插件，也有完整的插件，两者同步更新"
+- 先前的教训："不是，咋回事啊，怎么还能把插件的独立文件夹删除了"（git rm 误删事故）
+
+### 项目结构纪律（⭐ 必须遵守）
+
+```
+D:\wbo-workspace\paeg_project├── paeg-lang-style-plugin\        # 独立仓库①：独立 git + 独立 GitHub 库 + 独立 README
+│   └── src\paeg_lang_style\        #   （Golden2002/paeg-lang-style-plugin，main 分支）
+├── paeg-teaching-materials\        # 独立仓库②：独立 git + 独立 GitHub 库 + 独立 README
+│   └── src\paeg_teaching_materials\ #   （Golden2002/paeg-teaching-materials，main 分支）
+├── 05_实现原型\                    # 主项目（独立 git，Golden2002/PAEG）
+│   ├── services\material_bridge.py  # 通过 sys.path/pip 引用插件（已安装插件）
+│   ├── infra\lang_plugin_bridge.py  # 语言规范插件桥
+│   └── server.py                    # 启动时 sys.path 引导 → 加载主项目内插件副本
+└── .gitignore                       # 排除两个插件目录（插件由自己的 git 管理）
+```
+
+**核心纪律**：
+1. **插件 = 完全独立仓库**：独立 .git、独立 GitHub 库、独立 README、独立版本——主项目**绝不**用 git 跟踪插件（.gitignore 排除）
+2. **主项目 = 已安装插件**：运行时通过 sys.path（或 pip install）加载**主项目目录内**的插件完整代码副本
+3. **两者同步更新**：插件仓库 push 新版本 → 主项目内插件副本 `git pull` 同步 → 主项目引用最新
+4. **禁止操作**：绝不对插件目录执行 git rm / submodule deinit / git checkout 覆盖（§3.113 事故教训）
+5. **插件内容保护**：插件代码变更必须在插件仓库内完成并 push，主项目内副本通过 git pull 同步（不直接在主项目侧改写插件文件）
+
+### 事故教训（2026-08-26）
+
+- `git rm paeg-lang-style-plugin paeg-teaching-materials` 误删插件目录工作区文件（git 暂存区 reset 不恢复文件）
+- `git submodule add/deinit` 把插件独立 .git 迁移/破坏
+- 恢复：从 GitHub 独立库重新 clone（插件代码有远程备份，零丢失）
+- **结论**：插件 = 独立仓库，主项目只引用不跟踪；任何 git 操作不触碰插件目录
+
+### 待落实
+
+1. server.py 启动 sys.path 引导 → 加载主项目内插件副本（"已安装插件"）
+2. 验证主项目运行时插件可用（material_bridge plugin_active=True）
+
+### 实施记录
+
+（sys.path 引导落实中）
+
+
+---
+
+## §3.114 插件可及性评估——pip 安装即可注册（2026-08-26 · 用户 ⭐）
+
+### 用户要求（原文）
+
+- "给你评估这些插件插到主项目里是否方便，比如说别人的智能体也想用我们的这些插件，是否能像Python的库一样很方便，只要下载一个包安装进去就能够成功地注册"
+
+### 可及性标准（用户定义）
+
+**像 Python 库一样**：pip install 一个包 → 安装成功 → 自动注册可用（import + 功能生效），无需手动配置。
+
+### 评估发现（2026-08-26 实测）
+
+**致命问题**：
+1. `pyproject.toml` 的 `packages = ["paeg_lang_style"]` 但代码在 **src/ 布局**（`src/paeg_lang_style/`）——未配置 `package-dir`，**pip install 直接构建失败**（实测 venv 安装报错）
+2. 包内有**子包未列出**（paeg_teaching_materials 的 core/generators/quality/adapters/io）——即使顶层装上，子包也丢
+3. 无**自动注册机制**——MaterialRegistry 需显式 import 才注册，别人装了不会"自动可用"
+
+**期望**：pip install → 成功 → import paeg_xxx → 自动注册（register_defaults 在 __init__ 已做，但需确认装后可达）
+
+### 修复清单
+
+1. pyproject 配置 src 布局：`[tool.setuptools] package-dir = {"" = "src"}` + 自动发现（find）
+2. 子包完整打包（find 自动包含 core/generators/quality 等）
+3. 数据文件/子包数据完整（package-data 递归）
+4. 验证：干净 venv pip install → import → 功能可用（注册生效）
+5. 主项目同样方式安装（pip install -e 或 sys.path——§3.113 已用 sys.path）
+
+### 实施记录（全部完成 ⭐）
+
+1. **评估发现致命问题**：pyproject `packages = ["paeg_lang_style"]` 但代码在 src/ 布局——未配置 package-dir，pip install 直接构建失败（干净 venv 实测报错）；子包（core/generators/quality 等）未列出
+2. **修复**：两个插件 pyproject 配置 `[tool.setuptools] package-dir = {"" = "src"}` + `[tool.setuptools.packages.find] where = ["src"] include = ["paeg_*"]`——src 布局 + 子包自动发现
+3. **干净 venv 实测（模拟他人）**：
+   - pip install paeg-lang-style / paeg-teaching-materials → 成功
+   - import → 自动注册（6 物料类型 + 16 规则）
+   - 注入自己的 LLM → 立即可用（讲义生成 ok=True）
+   - 语言规范独立可用（病句修正/语法检查）
+   - MCP console_scripts 已装（paeg-lang-style-mcp.exe / paeg-teaching-materials-mcp.exe）
+4. **可及性测试固化**：test_accessibility.py 6 项（src 布局/子包发现/自动注册/弱模式/注入 LLM/MCP 脚本）
+5. **验证**：教学物料 60/60 + 语言规范 83/83 全绿 + GitHub 3 文件同步
+6. **主项目内插件副本 = GitHub 最新**（§3.113 纪律）：两插件工作区 git 干净，主项目 sys.path 加载最新副本
+
+**结论**：插件可及性 = 像 Python 库一样——pip install → import（自动注册）→ 注入 LLM → 立即可用

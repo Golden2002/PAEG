@@ -2204,6 +2204,30 @@ manim_judge 4→7 维（hook/progressive/recap）+ manim_templates derivative_ch
 
 ---
 
+#### C.20 Manim 顶尖化完整落地 + 插件可及性（v1.3.4 §3.111/§3.114 ⭐）
+
+> §3.111 Oracle R1-R9 全部完成（Manim 顶尖化）+ §3.114 插件可及性（像 Python 库一样）。
+
+**Manim 顶尖化 R1-R9 完整落地**：
+- R1 RITL 渲染错误回灌（错误 tail 10 行 + 签名分类 + K=3）
+- R2 RITL-DOC（manim_doc_index 本地 ≤200 API 签名 + AST 抽取注入）
+- R3 safe_manim 12 崩溃模式（manim_safety lint + 安全包装）
+- R4 模型配置外置（manim_llm_router + config/manim_llm_config.json——统一同模型，扩展能力保留）
+- R5 MVQS 几何评估（manim_mvqs 代码级无需渲染，渲染前拦截 FAIL）
+- R6 TTS 预合成并行化（tts_parallel 渲染与 TTS 重叠）
+- R7 17 视觉原则 + 6 叙事结构（manim_narrative 注入剧本 prompt）
+- R8 MCP 5 工具（render_manim/plan_scenes/audit_visual/tts_narrate/mux_video_assets——插件 mcp_server 20 工具）
+- R9 网状联通 manim 节点（前置 research 广播 + MVQS/lint 报告）
+
+**插件可及性（§3.114）**：
+- 修复 pyproject src 布局（package-dir + find）——pip install 从失败 → 成功
+- 干净 venv 实测：pip install → import 自动注册 → 注入 LLM → 立即可用（像 Python 库）
+- 可及性测试固化（test_accessibility）
+
+**验证**：教学物料插件 74/74 + 语言规范 83/83 + 主项目 Manim 升级 61/61 全绿；主项目内插件副本 = GitHub 最新（git 干净）
+
+---
+
 ## 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
 
 > **工程治理原则**：`PAEG_任务总清单与操作规范.md` 是项目的**工作流规范中枢**——提出执行标准、工作纪律，并记录需求更新迭代情况。技术/维护/元能力/亮点各文档都从它派生。

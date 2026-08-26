@@ -193,11 +193,24 @@ def phase2_implement(code: str) -> Dict[str, Any]:
         ok, err = validate_manim_code(code)
         if not ok:
             return {"ok": False, "error": f"AST 校验失败: {err}"}
+        # §3.111 ⭐ R5 MVQS：渲染前代码级几何评估（快，可早期拦截）
+        audit = {"rendered": False}
+        try:
+            from manim_mvqs import mvqs_score, build_mvqs_feedback
+            _mvqs = mvqs_score(code)
+            audit["mvqs"] = _mvqs
+            if _mvqs["verdict"] == "FAIL":
+                # MVQS 硬失败 → 提前返回，进 RITL 修复回路
+                return {"ok": False,
+                        "error": f"MVQS 几何评估 FAIL（mvqs={_mvqs['mvqs']}）：{build_mvqs_feedback(code)}"}
+        except Exception:
+            pass
         path, rerr = render_manim(code)
         if not path:
             return {"ok": False, "error": f"渲染失败: {rerr}"}
         # 几何审计门（v1.1 §3.34）：元素重叠/越界/漂移检测
-        audit = {"rendered": True, "file_size": os.path.getsize(path) if os.path.exists(path) else 0}
+        audit["rendered"] = True
+        audit["file_size"] = os.path.getsize(path) if os.path.exists(path) else 0
         try:
             from manim_geometric_audit import audit_video
             _ga = audit_video(path)
@@ -433,7 +446,12 @@ def run_pipeline(llm, topic: str, audience: str = "高中",
         try:
             _sys = ("你是 Manim 代码修复器。根据渲染/AST 错误修改代码，保持功能，"
                     "修复 import/API/语法问题。输出完整代码。")
-            _usr = _build_ritl_prompt("Manim 代码", code, impl.get("error", "未知错误"), code=code)
+            # §3.111 ⭐ R2 RITL-DOC：AST 抽 API → 注入精确签名（修复用正确 API）
+            try:
+                from manim_doc_index import build_ritl_doc_prompt
+                _usr = build_ritl_doc_prompt(code, impl.get("error", "未知错误"))
+            except Exception:
+                _usr = _build_ritl_prompt("Manim 代码", code, impl.get("error", "未知错误"), code=code)
             _raw = _safe_chat(llm, _sys, _usr, max_tokens=4000)
             if _raw and "class " in _raw:
                 code = _raw

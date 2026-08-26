@@ -13,8 +13,19 @@ PAEG Flask 后端服务（v0.73 权威版本；v0.38 起多用户扩展+SQLite�
 启动：
     cd 14_教育者Agent项目/05_实现原型/
     python server.py
-    # 浏览器访问 http://localhost:5000/
 """
+from __future__ import annotations
+
+# §3.113 ⭐ 插件路径引导：主项目 = 已安装插件（加载主项目目录内插件副本）
+# 插件是独立仓库（主项目 .gitignore 排除），运行时通过 sys.path 引用其 src
+import os as _os
+import sys as _sys
+_PROJ_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))  # paeg_project/
+for _plugin in ("paeg-lang-style-plugin", "paeg-teaching-materials"):
+    _src = _os.path.join(_PROJ_ROOT, _plugin, "src")
+    if _os.path.isdir(_src) and _src not in _sys.path:
+        _sys.path.insert(0, _src)
+        print(f"[PAEG] 插件已加载: {_plugin}（{_src}）")
 from __future__ import annotations
 
 import json

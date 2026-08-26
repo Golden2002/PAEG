@@ -82,6 +82,12 @@ VISUAL_SCRIPT_SYSTEM_PROMPT = """你是 PAEG 数学可视化剧本设计师。�
 9. **钩子开头（§3.100 3B1B）**：第 1 个 scene 必须是"提问性图像/反直觉现象"钩子（如一个奇怪的图形、一个待解的谜题），激发好奇心——不是直接宣告主题。
 10. **recap 结尾（§3.100 3B1B）**：最后一个 scene 必须回顾核心结论（narration 总结 1-2 句话 + 视觉重现关键图形），形成闭环。
 
+# 视觉设计原则（§3.111 ⭐ R7 顶尖化——17 条 3B1B 原则）
+{visual_principles}
+
+# 叙事结构（§3.111 ⭐ R7 顶尖化——选 1 个填 narrative_arc）
+{narrative_arc}
+
 # 输入上下文（由系统注入）
 - 主题：{topic}
 - 受众与学段：{audience}
@@ -110,10 +116,17 @@ def build_script_prompt(topic: str, audience: str, duration_target_sec: int,
                         style: str = "3blue1brown", prerequisites: str = "",
                         intuition: str = "", objectives: str = "") -> str:
     """组装脚本生成 user prompt（含系统提示词 + 输入上下文）。"""
+    # §3.111 ⭐ R7 叙事质量：注入 17 视觉原则 + 6 叙事结构
+    try:
+        from manim_narrative import VISUAL_PRINCIPLES_17, NARRATIVE_ARC_PROMPT
+        _vp, _na = VISUAL_PRINCIPLES_17, NARRATIVE_ARC_PROMPT
+    except Exception:
+        _vp, _na = "", ""
     return VISUAL_SCRIPT_SYSTEM_PROMPT.format(
         topic=topic, audience=audience, duration_target_sec=duration_target_sec,
         style=style, prerequisites=prerequisites or "无明确前置",
         intuition=intuition or "（待生成）", objectives=objectives or "（待生成）",
+        visual_principles=_vp, narrative_arc=_na,
     )
 
 def generate_script(llm, topic: str, audience: str, duration_target_sec: int,

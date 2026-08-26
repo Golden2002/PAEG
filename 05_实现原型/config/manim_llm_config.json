@@ -1,0 +1,15 @@
+{
+  "default_profile": "default",
+  "profiles": {
+    "default": {
+      "provider": "auto",
+      "model": null,
+      "note": "统一使用主项目当前模型（DeepSeek 等）——§3.111 R4 用户要求：当前统一同模型"
+    },
+    "_example_coder": {
+      "provider": "qwen",
+      "model": "qwen3-coder-30b",
+      "note": "示例：未来接入 Manim 代码专用模型——只需在配置加这一条，不改代码（配置外置 ⭐）"
+    }
+  }
+}
