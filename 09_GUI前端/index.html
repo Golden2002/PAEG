@@ -1073,6 +1073,158 @@ body {
 }
 .download-link:hover { text-decoration: underline; }
 
+/* ─── §3.116 ⭐ 词汇表弹出展示卡片（Oracle 设计咨询）───
+   与前端融洽：surface/暖白/教育蓝体系；差异化：书脊条 + 衬线书名 + CEFR 徽章 */
+:root {
+  --card-radius: 14px;
+  --card-shadow: 0 1px 2px rgba(31,27,22,.04), 0 6px 18px rgba(31,27,22,.06);
+  --card-border: rgba(31,27,22,.08);
+  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
+  --font-serif: 'Source Serif Pro', 'Noto Serif', Georgia, serif;
+  /* CEFR 分级色（AA 对比 · 与暖白体系和谐） */
+  --cefr-a1: #5C9358; --cefr-a2: #3F8FB8; --cefr-b1: #C07E2E;
+  --cefr-b2: #B85C3F; --cefr-c1: #7E5BA8; --cefr-c2: var(--accent);
+}
+.vocab-card {
+  position: relative; display: block;
+  max-width: 720px; width: 100%;
+  margin: 10px 0 6px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+  font-size: 14px; color: var(--text);
+  text-align: left;
+}
+.vocab-card__spine {
+  position: absolute; left: 0; top: 14px; bottom: 14px;
+  width: 4px; border-radius: 2px; background: var(--accent);
+}
+.vocab-card__hero {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 18px 18px 12px 22px;
+  border-bottom: 1px solid var(--card-border);
+  margin-bottom: 2px;
+}
+.vocab-card__hero-text { flex: 1; min-width: 0; }
+.vocab-card__eyebrow {
+  display: inline-block; font-size: 11px; letter-spacing: .08em;
+  color: var(--text-dim); font-weight: 600; margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.vocab-card__eyebrow::before { content: '✓ '; color: var(--accent); }
+.vocab-card__title {
+  font-family: var(--font-serif);
+  font-size: 22px; font-weight: 600; line-height: 1.25;
+  margin: 0 0 2px; color: var(--text);
+}
+.vocab-card__author { font-size: 13px; color: var(--text-dim); margin: 0; font-style: italic; }
+.vocab-card__ornament { flex: 0 0 auto; color: var(--accent); opacity: .85; }
+/* CEFR 徽章 */
+.cefr-badge {
+  display: inline-flex; align-items: center;
+  font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  font-weight: 600; font-size: 11px; letter-spacing: .06em;
+  padding: 2px 8px; border-radius: 999px;
+  border: 1px solid currentColor;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  line-height: 1.5; vertical-align: middle;
+}
+.cefr-badge[data-level="A1"] { color: var(--cefr-a1); }
+.cefr-badge[data-level="A2"] { color: var(--cefr-a2); }
+.cefr-badge[data-level="B1"] { color: var(--cefr-b1); }
+.cefr-badge[data-level="B2"] { color: var(--cefr-b2); }
+.cefr-badge[data-level="C1"] { color: var(--cefr-c1); }
+.cefr-badge[data-level="C2"] { color: var(--cefr-c2); }
+/* 统计带 */
+.vocab-card__stats {
+  display: grid; grid-template-columns: repeat(4, minmax(0,1fr));
+  margin: 4px 18px 0 22px;
+  border-top: 1px solid var(--card-border);
+  border-bottom: 1px solid var(--card-border);
+}
+.vocab-card__stat { padding: 10px 8px; text-align: center; }
+.vocab-card__stat + .vocab-card__stat { border-left: 1px solid var(--card-border); }
+.vocab-card__stat dt { font-size: 11px; color: var(--text-dim); margin-bottom: 3px; }
+.vocab-card__stat dd { font-size: 20px; font-weight: 600; color: var(--text); margin: 0; line-height: 1.2; }
+/* 词条预览 */
+.vocab-card__sample { padding: 12px 18px 4px 22px; }
+.vocab-card__section-title {
+  font-size: 12px; font-weight: 600; color: var(--text-dim);
+  margin: 0 0 8px; letter-spacing: .03em;
+}
+.vocab-card__chips { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.vocab-chip {
+  display: inline-flex; flex-direction: column; align-items: center;
+  padding: 6px 12px; border: 1px solid var(--card-border);
+  border-radius: 10px; background: var(--surface-2);
+}
+.vocab-chip__word { font-size: 14px; font-weight: 600; color: var(--text); }
+.vocab-chip__phonetic { font-size: 11px; color: var(--text-dim); font-family: var(--font-serif); }
+/* 阶段回显 */
+.vocab-card__stages {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 12px 18px 4px 22px;
+}
+.stages__step {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-dim);
+  padding: 2px 8px; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--card-border);
+}
+.stages__step--done { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.stages__step--done::before { content: '✓'; font-weight: 700; }
+/* 产物入口 */
+.vocab-card__actions { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 18px 10px 22px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 44px; padding: 0 18px;
+  border-radius: 10px; font-size: 14px; font-weight: 600;
+  text-decoration: none; cursor: pointer; border: 1px solid transparent;
+  transition: opacity .15s ease, background .15s ease;
+  box-sizing: border-box;
+}
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn--primary { background: var(--accent); color: #fff; }
+.btn--primary:hover { background: var(--accent-hover); }
+.btn--secondary { background: transparent; color: var(--accent); border-color: var(--accent); }
+.btn--secondary:hover { background: var(--accent-soft); }
+/* 附件（折叠） */
+.vocab-card__accessories { padding: 0 18px 8px 22px; }
+.vocab-card__accessories summary {
+  cursor: pointer; font-size: 13px; color: var(--accent); font-weight: 600;
+  padding: 6px 0; list-style: none; display: flex; align-items: center; gap: 4px;
+}
+.vocab-card__accessories summary::-webkit-details-marker { display: none; }
+.vocab-card__accessories summary::before { content: '▸'; transition: transform .15s ease; display: inline-block; }
+.vocab-card__accessories[open] summary::before { transform: rotate(90deg); }
+.vocab-card__acc-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.vocab-card__acc-list a {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--text); text-decoration: none; font-size: 13px;
+  padding: 5px 8px; border-radius: 8px;
+}
+.vocab-card__acc-list a:hover { background: var(--surface-2); }
+.vocab-card__acc-list a::before { content: '📄'; font-size: 12px; }
+/* 页脚元信息 */
+.vocab-card__footer {
+  display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  padding: 8px 18px 12px 22px;
+  border-top: 1px solid var(--card-border);
+  font-size: 11px; color: var(--text-dim);
+}
+@media (max-width: 480px) {
+  .vocab-card__stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .vocab-card__stat:nth-child(odd) { border-left: none; }
+  .vocab-card__stat:nth-child(n+3) { border-top: 1px solid var(--card-border); }
+  .vocab-card__actions .btn { flex: 1 1 100%; }
+  .vocab-card__title { font-size: 19px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vocab-card__accessories summary::before { transition: none; }
+}
+
 /* ─── v0.x：资料检索（需求C）─── */
 /* 进度条 + 检索阶段提示 */
 .resource-progress {
@@ -2958,6 +3110,12 @@ async function teach(question, subject, subtopic) {
           addMsg('paeg', `已生成${typeCn}：<b>${escapeHtml(obj.filename || '')}</b><br><br>` +
             `<a class="download-link" href="${obj.md_url}" download><img class="link-icon" src="assets/icons/download.svg" alt="下载"/> 下载 ${typeCn}</a>` +
             (obj.html_url ? ` <a class="download-link" href="${obj.html_url}" target="_blank" style="margin-left:10px">预览</a>` : ''));
+        } else if (event === 'vocab_done') {
+          // §3.116 ⭐ 词汇表制作完成 → 弹出可点击展示卡片（Oracle 设计）
+          try { renderVocabCard(obj || {}); chatWin.scrollTop = chatWin.scrollHeight; } catch (e) {
+            console.warn('[PAEG] vocab_done 渲染失败:', e);
+            addMsg('paeg', '词汇表已生成，但展示卡片渲染失败。请查看下方链接。');
+          }
         } else if (event === 'lesson_plan' || event === 'handout' || event === 'script' ||
                    event === 'ppt_outline' || event === 'video_script' || event === 'mindmap' ||
                    event === 'quality_report') {
@@ -5603,6 +5761,110 @@ async function fetchResources() {
 checkHealth();
 loadDailyQuote();        // v0.17：每日一句
 setInterval(checkHealth, 30000);  // 30s 健康检查
+
+// ═══════════ §3.116 ⭐ 词汇表弹出展示卡片（Oracle 设计）═══════════
+// 用户在对话框上传 PDF → 制作完成 → 弹出可点击模块卡片。
+// 与前端融洽（surface/暖白/教育蓝）+ 差异化（书脊条/衬线书名/CEFR 徽章）。
+const VOCAB_STAGE_LABELS = ['提取', '清洗', '筛选', '补全', '渲染'];
+function renderVocabCard(obj) {
+  const data = obj && obj.data ? obj.data : obj;   // 兼容 {data:{...}} 包裹
+  const title = data.book_title || '词汇表';
+  const author = data.book_author || '';
+  const level = (data.cefr_max || 'C2').toUpperCase();
+  const entries = data.entries_count || 0;
+  const candidates = data.candidates_count || 0;
+  const stages = (data.completed_stages || []).filter(Boolean);
+  const htmlPath = data.html_path || '';
+  const pdfPath = data.pdf_path || '';
+  const acc = data.accessories || {};
+  const accNames = Object.keys(acc);
+  const uid = 'v' + Math.random().toString(36).slice(2, 8);
+
+  // 生成阶段回显
+  let stagesHtml = '';
+  VOCAB_STAGE_LABELS.forEach((label, i) => {
+    const done = stages.length === 0 || i < stages.length || stages.includes(label);
+    stagesHtml += `<span class="stages__step ${done ? 'stages__step--done' : ''}">${escapeHtml(label)}</span>`;
+  });
+
+  // 词条抽样预览（后端若提供 sample_words 则展示，否则隐藏该区）
+  let sampleHtml = '';
+  if (Array.isArray(data.sample_words) && data.sample_words.length) {
+    const chips = data.sample_words.slice(0, 6).map(w => {
+      const word = (w.word || w.headword || '').toString();
+      const ph = w.ipa ? ('/' + Object.values(w.ipa).join(' · ') + '/') : '';
+      return `<li class="vocab-chip"><span class="vocab-chip__word">${escapeHtml(word)}</span>` +
+             (ph ? `<span class="vocab-chip__phonetic">${escapeHtml(ph)}</span>` : '') + `</li>`;
+    }).join('');
+    sampleHtml = `<section class="vocab-card__sample" aria-label="词条预览">
+      <h4 class="vocab-card__section-title">词条预览</h4>
+      <ul class="vocab-card__chips">${chips}</ul></section>`;
+  }
+
+  // 附件列表
+  let accHtml = '';
+  if (accNames.length) {
+    const items = accNames.map(k => {
+      const href = safeResourceUrl(acc[k]) || '#';
+      return `<li><a href="${href}" target="_blank" rel="noopener noreferrer">${escapeHtml(k)}</a></li>`;
+    }).join('');
+    accHtml = `<details class="vocab-card__accessories">
+      <summary>${accNames.length} 份附件</summary>
+      <ul class="vocab-card__acc-list">${items}</ul></details>`;
+  }
+
+  const htmlHref = safeResourceUrl(htmlPath) || '#';
+  const pdfHref = safeResourceUrl(pdfPath) || '#';
+  const metaLeft = (data.src_filename ? escapeHtml(data.src_filename) + ' · ' : '') +
+                   (data.size_mb ? escapeHtml(String(data.size_mb)) + ' MB' : '');
+  const metaRight = (data.elapsed_s ? escapeHtml(String(data.elapsed_s)) + 's' : '') +
+                    (data.gen_id ? ' · #' + escapeHtml(String(data.gen_id)) : '');
+
+  const card = document.createElement('div');
+  card.className = 'vocab-card';
+  card.setAttribute('role', 'article');
+  card.setAttribute('aria-labelledby', 'vocab-title-' + uid);
+  card.innerHTML = `
+    <div class="vocab-card__spine" style="background:var(--cefr-${level.toLowerCase()})" aria-hidden="true"></div>
+    <header class="vocab-card__hero">
+      <div class="vocab-card__hero-text">
+        <span class="vocab-card__eyebrow">词汇表已生成</span>
+        <h3 id="vocab-title-${uid}" class="vocab-card__title">${escapeHtml(title)}</h3>
+        ${author ? `<p class="vocab-card__author">${escapeHtml(author)}</p>` : ''}
+      </div>
+      <svg class="vocab-card__ornament" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+    </header>
+    <dl class="vocab-card__stats">
+      <div class="vocab-card__stat"><dt>词条</dt><dd>${entries}</dd></div>
+      <div class="vocab-card__stat"><dt>候选词</dt><dd>${candidates}</dd></div>
+      <div class="vocab-card__stat"><dt>阶段</dt><dd>${stages.length || 5}/5</dd></div>
+      <div class="vocab-card__stat"><dt>水平</dt><dd><span class="cefr-badge" data-level="${level}">${level}</span></dd></div>
+    </dl>
+    ${sampleHtml}
+    <section class="vocab-card__stages" aria-label="生成阶段">${stagesHtml}</section>
+    <section class="vocab-card__actions">
+      <a class="btn btn--primary" href="${htmlHref}" target="_blank" rel="noopener noreferrer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        打开词汇表</a>
+      <a class="btn btn--secondary" href="${pdfHref}" download>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        下载 PDF</a>
+    </section>
+    ${accHtml}
+    ${(metaLeft || metaRight) ? `<footer class="vocab-card__footer">
+      <span>${metaLeft}</span><span>${metaRight}</span></footer>` : ''}`;
+  // 插入到最新一条 paeg 气泡之后（作为独立消息块）
+  const chatWinEl = document.getElementById('chatWin');
+  if (chatWinEl) chatWinEl.appendChild(card);
+  else {
+    const lastMsg = document.querySelector('.msg.paeg:last-child .msg-bubble');
+    if (lastMsg) lastMsg.appendChild(card);
+  }
+  return card;
+}
 </script>
 </body>
 </html>

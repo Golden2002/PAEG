@@ -23,7 +23,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterator, Optional
 
-from sse_presenter import fmt_done, fmt_presentation, fmt_progress
+from sse_presenter import fmt_done, fmt_error, fmt_presentation, fmt_progress, fmt_vocab_done
 # §3.92 ⭐ 接通结构化提示词模板（Oracle 根因修复：此前模板是"死代码"，生成器未调用）
 from material_prompts import build_material_system, upgrade_simple_intent
 
@@ -124,11 +124,20 @@ ROUTER: Dict[str, MaterialRoute] = {
         timeout_sec=30,
         fallback_msg="讲稿生成失败，请稍后重试",
     ),
+    # §3.116 ⭐ 词汇表（走 paeg-vocabulary-plugin；事件流 vocab_done 由 route_material 特判）
+    "vocab": MaterialRoute(
+        intent="vocab", step_type="vocab",
+        generator=lambda llm, topic, subject, learner_id, **kw:
+            _gen_vocab(llm, topic, subject, learner_id, **kw),
+        timeout_sec=600,
+        save_turn=False,
+        fallback_msg="词汇表生成失败，请稍后重试",
+    ),
 }
 
 # 关键词前缀 → 物料意图（用于 topic 提取剥离）
 _KEYWORD_PREFIXES = re.compile(
-    r"^(生成PPT|生成讲义|生成教学视频|生成数学动画|生成思维导图|生成讲稿)[:：\s、,，]*"
+    r"^(生成PPT|生成讲义|生成教学视频|生成数学动画|生成思维导图|生成讲稿|生成词汇表|制作词汇表)[:：\s、,，]*"
 )
 
 
@@ -432,6 +441,117 @@ def _gen_script(llm, topic, subject, learner_id, **kw) -> MaterialResult:
                 "error": str(e), "step_type": "script"}
 
 
+def _gen_vocab(llm, topic, subject, learner_id, **kw) -> MaterialResult:
+    """§3.116 ⭐ 词汇表生成（调用 paeg-vocabulary-plugin registry）。
+
+    topic = 上传的 PDF 路径（"生成词汇表：xxx.pdf"）；无 topic 时自动取该用户最近上传的 PDF。
+    user_filter（水平档位）从 user_requirements 解析：preset=ielts-7.5 / exam+score / book_title。
+    产出：HTML + PDF + 3 附件；SSE 契约经 route_material 特殊分支发 vocab_done。
+    """
+    import json as _json
+    try:
+        from paeg_vocabulary.registry import VocabularyRegistry
+        from paeg_vocabulary.executor import execute as _vocab_execute
+    except Exception as _ve:
+        return {"ok": False, "content": "词汇表插件未加载（paeg-vocabulary-plugin 缺失）",
+                "url": "", "error": str(_ve), "step_type": "vocab"}
+
+    # 解析 PDF 路径：topic 直接给路径；否则从用户上传目录找最近 PDF
+    _pdf = (topic or "").strip()
+    _user_filter = {}
+    try:
+        # 从 user_requirements 解析档位（JSON 或 key=value 对）
+        _ur = kw.get("user_requirements") or kw.get("user_input") or ""
+        if isinstance(_ur, str) and _ur.strip().startswith("{"):
+            _parsed = _json.loads(_ur)
+            if isinstance(_parsed, dict):
+                _user_filter = {k: v for k, v in _parsed.items()
+                                if k in ("preset", "exam", "score", "filter_mode",
+                                         "book_title", "book_author", "lang")}
+    except Exception:
+        pass
+    if not _pdf:
+        # 自动取用户最近上传 PDF（Library/usr_knowledge/<id>/ 或 Library/user_<id>/）
+        import glob
+        _roots = [
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "Library", "usr_knowledge", learner_id),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "Library", f"user_{learner_id}"),
+        ]
+        _cands = []
+        for _r in _roots:
+            _cands += glob.glob(os.path.join(_r, "**", "*.pdf"), recursive=True)
+        _cands.sort(key=os.path.getmtime, reverse=True)
+        if not _cands:
+            return {"ok": False,
+                    "content": "未找到 PDF。请先上传书籍 PDF（资料库），再发送「生成词汇表」。",
+                    "url": "", "error": "no pdf", "step_type": "vocab"}
+        _pdf = _cands[0]
+
+    # 注入 chat_fn（复用 LLM 实例的 chat 接口，供 enrich 阶段补全信息）
+    def _chat_fn(sys_prompt, user_prompt):
+        try:
+            return _safe_chat_wrap(llm, sys_prompt, user_prompt, max_tokens=1500)
+        except Exception:
+            return ""
+
+    try:
+        VocabularyRegistry.inject(llm=None)  # 保持默认；chat_fn 直接传 generate_vocabulary
+        _t0 = time.time()
+        _result = VocabularyRegistry.generate_vocabulary(
+            _pdf, lang=_user_filter.get("lang", "en"),
+            user_filter=_user_filter or None,
+            chat_fn=_chat_fn)
+        _elapsed = round(time.time() - _t0, 1)
+    except Exception as _ge:
+        return {"ok": False, "content": f"词汇表生成失败：{str(_ge)[:200]}",
+                "url": "", "error": str(_ge), "step_type": "vocab"}
+
+    if not _result.get("ok"):
+        _errs = "; ".join(_result.get("errors") or [])
+        return {"ok": False, "content": f"词汇表生成失败：{_errs[:200] or '未知错误'}",
+                "url": "", "error": _errs, "step_type": "vocab"}
+
+    # 组装 vocab_done payload（前端 renderVocabCard 消费）
+    import urllib.parse as _up
+    _html = _result.get("html_path", "")
+    _pdfp = _result.get("pdf_path", "")
+    _html_url = f"/api/download/vocab/{_up.quote(os.path.basename(_html))}" if _html else ""
+    _pdf_url = f"/api/download/vocab/{_up.quote(os.path.basename(_pdfp))}" if _pdfp else ""
+    _acc = {}
+    for _k, _v in (_result.get("accessories") or {}).items():
+        _acc[_k] = f"/api/download/vocab/{_up.quote(os.path.basename(_v))}" if _v else ""
+    _src = os.path.basename(_pdf)
+    try:
+        _size_mb = round(os.path.getsize(_pdf) / 1048576, 1)
+    except Exception:
+        _size_mb = 0
+
+    return {
+        "ok": True,
+        "content": f"词汇表已生成（{_result.get('entries_count', 0)} 词条）",
+        "url": _html_url,
+        "error": "",
+        "step_type": "vocab",
+        "vocab_payload": {
+            "book_title": _user_filter.get("book_title") or os.path.splitext(_src)[0],
+            "book_author": _user_filter.get("book_author", ""),
+            "cefr_max": _result.get("cefr_max", "C2"),
+            "entries_count": _result.get("entries_count", 0),
+            "candidates_count": _result.get("candidates_count", 0),
+            "completed_stages": _result.get("completed_stages", []),
+            "html_path": _html_url,
+            "pdf_path": _pdf_url,
+            "accessories": _acc,
+            "src_filename": _src,
+            "size_mb": _size_mb,
+            "elapsed_s": _elapsed,
+            "gen_id": str(int(_t0)),
+        },
+    }
+
+
 def _gen_manim(llm, topic, subject, learner_id, **kw) -> MaterialResult:
     """Manim 数学动画生成（走 MaterialPipeline v2.0 长路径）。
     §3.92 透传 llm/grade；§3.94 透传用户要求 + 阶段产物 artifacts。
@@ -589,6 +709,18 @@ def route_material(magic_match: Dict[str, Any], llm, subject: str,
             save_turn(route.step_type, str(content)[:300])
         except Exception:
             pass
+
+    # §3.116 ⭐ 词汇表特殊事件流：presentation（生成中状态）→ vocab_done（弹出卡片）
+    if intent == "vocab":
+        _vp = result.get("vocab_payload") or {}
+        if result.get("ok") and _vp:
+            yield fmt_presentation(1, "词汇表制作完成，正在打包产物…", "vocab")
+            yield fmt_vocab_done(_vp)
+        else:
+            # 失败 → 普通 done 携带错误信息
+            yield fmt_presentation(1, content, "vocab")
+            yield fmt_error(str(result.get("error") or "词汇表生成失败"), "vocab")
+        return
 
     # SSE 事件流（契约字节级保持）
     yield fmt_presentation(1, content, route.step_type)

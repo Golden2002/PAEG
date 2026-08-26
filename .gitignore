@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -91,3 +91,4 @@ Library/.courseware_cache.json
 # v1.3.x: 独立插件仓库（各自独立 git + 独立 GitHub 库，主项目通过 sys.path/pip 引用）
 paeg-lang-style-plugin/
 paeg-teaching-materials/
+paeg-vocabulary-plugin/

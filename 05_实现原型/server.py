@@ -21,12 +21,11 @@ from __future__ import annotations
 import os as _os
 import sys as _sys
 _PROJ_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))  # paeg_project/
-for _plugin in ("paeg-lang-style-plugin", "paeg-teaching-materials"):
+for _plugin in ("paeg-lang-style-plugin", "paeg-teaching-materials", "paeg-vocabulary-plugin"):
     _src = _os.path.join(_PROJ_ROOT, _plugin, "src")
     if _os.path.isdir(_src) and _src not in _sys.path:
         _sys.path.insert(0, _src)
         print(f"[PAEG] 插件已加载: {_plugin}（{_src}）")
-from __future__ import annotations
 
 import json
 import uuid
@@ -1060,17 +1059,17 @@ def _teach_stream_gen(data):
         _magic_intent = _magic.get("intent") if _magic else None
         # 物料关键词 → 生成路径映射（topic 从关键词后缀提取）
         _material_topic = None
-        if _magic_intent in ("ppt", "handout", "video", "manim", "mindmap", "script"):
+        if _magic_intent in ("ppt", "handout", "video", "manim", "mindmap", "script", "vocab"):
             _m_tail = ""
             try:
                 _m_tail = (_magic.get("matched_text") or "")
-                _m_tail = re.sub(r"^(生成PPT|生成讲义|生成教学视频|生成数学动画|生成思维导图|生成讲稿)[:：\s、,，]*", "", _m_tail).strip()
+                _m_tail = re.sub(r"^(生成PPT|生成讲义|生成教学视频|生成数学动画|生成思维导图|生成讲稿|生成词汇表|制作词汇表)[:：\s、,，]*", "", _m_tail).strip()
             except Exception:
                 _m_tail = ""
             _material_topic = _m_tail or str(concept)[:60]
         # §3.91 ⭐ 物料路由重构：数据驱动 ROUTER 表统一调度（取代下方 6 个 if 早退分支）
         # 灰度开关：PAEG_USE_MATERIAL_ROUTER=0 可回退旧分支（默认 1 启用新路由）
-        if os.environ.get("PAEG_USE_MATERIAL_ROUTER", "1") == "1" and _magic_intent in ("ppt", "handout", "video", "manim", "mindmap", "script"):
+        if os.environ.get("PAEG_USE_MATERIAL_ROUTER", "1") == "1" and _magic_intent in ("ppt", "handout", "video", "manim", "mindmap", "script", "vocab"):
             try:
                 from material_router import route_material, is_material_intent
                 if is_material_intent(_magic):
@@ -3468,6 +3467,25 @@ def download_file(filename):
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "downloads")
         return send_from_directory(_root_downloads, _safe_filename, as_attachment=True)
     return send_from_directory(DOWNLOAD_DIR, _safe_filename, as_attachment=True)
+
+
+@app.route("/api/download/vocab/<path:filename>", methods=["GET"])
+def download_vocab(filename):
+    """§3.116 ⭐ 词汇表产物下载（HTML/PDF/附件）。
+
+    产物在 paeg-vocabulary-plugin/output/ 目录（插件独立仓库，位于 paeg_project/ 下）。
+    前端 vocab_done 卡片中的打开/下载链接指向本路由。
+    """
+    from flask import send_from_directory
+    _safe = str(filename or "").replace("\\", "/").lstrip("/")
+    if not _safe or ".." in _safe:
+        return jsonify({"error": "非法文件名"}), 400
+    _plugin_output = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "paeg-vocabulary-plugin", "output")
+    if not os.path.isdir(_plugin_output):
+        return jsonify({"error": "词汇表输出目录不存在"}), 404
+    return send_from_directory(_plugin_output, _safe, as_attachment=True)
 
 # ─── v0.14：用户注册/登录 ───
 

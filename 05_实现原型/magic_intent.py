@@ -34,6 +34,11 @@ MAGIC_PATTERNS = [
     (re.compile(r'^生成思维导图[:：\s、,，]*(.{1,60}?)$'), 'mindmap', 'magic:mindmap'),
     # §3.90 ⭐ 补充：讲稿精确关键词（此前缺失→落入普通教学流）
     (re.compile(r'^生成讲稿[:：\s、,，]*(.{1,60}?)$'), 'script', 'magic:script'),
+    # §3.116 ⭐ 词汇表精确关键词（零 LLM 直达 vocab 路由）
+    (re.compile(r'^生成词汇表$'), 'vocab', 'magic:vocab'),
+    (re.compile(r'^制作词汇表$'), 'vocab', 'magic:vocab'),
+    (re.compile(r'^生成词汇表[:：\s、,，]*(.{1,60}?)$'), 'vocab', 'magic:vocab'),
+    (re.compile(r'^制作词汇表[:：\s、,，]*(.{1,60}?)$'), 'vocab', 'magic:vocab'),
 ]
 
 

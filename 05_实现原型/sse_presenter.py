@@ -37,6 +37,17 @@ def fmt_error(message: str, mode: str = "material") -> str:
     return f"event: done\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+def fmt_vocab_done(payload: dict) -> str:
+    """§3.116 ⭐ vocab_done 事件（词汇表制作完成 → 前端渲染弹出展示卡片）。
+
+    契约：{book_title, book_author, cefr_max, entries_count, candidates_count,
+           completed_stages, html_path, pdf_path, accessories, src_filename,
+           size_mb, elapsed_s, gen_id}
+    """
+    data = {"status": "completed", "mode": "vocab", **payload}
+    return f"event: vocab_done\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
 if __name__ == "__main__":
     import io as _io
     import sys as _sys

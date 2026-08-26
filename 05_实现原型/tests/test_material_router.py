@@ -70,18 +70,19 @@ def test_error_event_is_done_channel():
 # material_router：路由表 + 意图判定 + topic 提取
 # ═══════════════════════════════════════════════════════════
 def test_router_has_six_materials():
-    """R7：ROUTER 表含 6 类物料（intent/step_type 一一对应）。"""
-    assert set(ROUTER.keys()) == {"ppt", "handout", "video", "manim", "mindmap", "script"}
+    """R7：ROUTER 表含 7 类物料（§3.116 新增 vocab；intent/step_type 一一对应）。"""
+    assert set(ROUTER.keys()) == {"ppt", "handout", "video", "manim", "mindmap", "script", "vocab"}
     for intent, route in ROUTER.items():
         assert route.intent == intent
         assert route.step_type == intent  # 契约：step_type = intent
 
 
 def test_router_timeout_manim_longest():
-    """R8：manim 超时最长（300s，渲染 2-5min），其他 ≤60s。"""
+    """R8：vocab 超时最长（600s，PDF→词汇表 2-5min），manim 300s，其他 ≤60s。"""
+    assert ROUTER["vocab"].timeout_sec == 600
     assert ROUTER["manim"].timeout_sec == 300
     for intent, route in ROUTER.items():
-        if intent != "manim":
+        if intent not in ("vocab", "manim"):
             assert route.timeout_sec <= 60
 
 
@@ -97,9 +98,37 @@ def test_is_material_intent_whitelist():
     """R10：意图白名单判定。"""
     assert is_material_intent({"intent": "ppt"}) is True
     assert is_material_intent({"intent": "manim"}) is True
+    assert is_material_intent({"intent": "vocab"}) is True  # §3.116
     assert is_material_intent({"intent": "lesson_prep"}) is False
     assert is_material_intent(None) is False
     assert is_material_intent({}) is False
+
+
+def test_vocab_route_sse_contract():
+    """R13（§3.116）：vocab 事件流 = presentation（生成中）→ vocab_done（弹出卡片）。
+    契约：vocab_done 含 book_title/entries_count/html_path 等渲染字段。"""
+    from material_router import route_material, ROUTER
+    _orig = ROUTER["vocab"].generator
+
+    def _fake(llm, topic, subject, learner_id, **kw):
+        return {"ok": True, "content": "词汇表已生成", "url": "/x", "error": "",
+                "step_type": "vocab",
+                "vocab_payload": {"book_title": "Bell", "cefr_max": "B1",
+                                  "entries_count": 100, "html_path": "/api/download/vocab/a.html"}}
+    ROUTER["vocab"] = MaterialRoute(
+        intent="vocab", step_type="vocab", generator=_fake,
+        timeout_sec=600, save_turn=False, fallback_msg="失败")
+    try:
+        evts = "".join(route_material({"intent": "vocab", "matched_text": "生成词汇表：b.pdf"},
+                                      None, "english", "t1"))
+        assert "event: presentation" in evts
+        assert "event: vocab_done" in evts
+        assert '"entries_count": 100' in evts
+        assert "event: done" not in evts.split("event: vocab_done")[0]  # 无普通 done
+    finally:
+        ROUTER["vocab"] = MaterialRoute(
+            intent="vocab", step_type="vocab", generator=_orig,
+            timeout_sec=600, save_turn=False, fallback_msg="失败")
 
 
 def test_extract_topic_prefix_stripped():
