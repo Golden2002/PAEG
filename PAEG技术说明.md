@@ -1,4 +1,4 @@
-﻿﻿# PAEG 教育智能体 — 简明技术说明（v1.2.27）
+﻿# PAEG 教育智能体 — 简明技术说明（v1.2.27）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -22,7 +22,7 @@
 - 第 5C 章 OpenAI Codex Harness 借鉴（2026-08-21 开源调研 · §3.85，见 §7.11 主线六）
 - 第 6 章 未来规划（Roadmap · Oracle 咨询 2026-08-14）
 - 第 7 章 能力全景与引用来源（v1.2.27）
-  - §7.1 能力全景 / §7.2 能力增强 / **§7.3 引用来源（[1]-[48]：技术栈+学术+教育 Agent 项目）**
+  - §7.1 能力全景 / §7.2 能力增强 / **§7.3 引用来源（[1]-[48]：技术栈+学术+教育 Agent 项目；[49]-[77]：Anthropic/OpenAI/AAAI 等；[78]-[83]：工具类参考项目）**
   - §7.4-§7.10 专项（Docker/双远程/fallback/进度/结构/技术栈/备课）
   - **§7.11 工程化就绪融贯（Round 4-12 六主线）**
 - 附录 A 术语表
@@ -1249,6 +1249,23 @@ PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可�
 **[47] Dai5297. (2026). harness-engineer-codex [Computer software]. GitHub. https://github.com/Dai5297/harness-engineer-codex**（Codex Harness 工程化实践——sandbox/approvals 中文指南，A9/A10 落地参考）
 
 **[48] 张宇扬课件（公共知识库）. (2026). 用户提供课件集（演化/生态/生物信息/实验设计/生物统计/遗传学 7 门课）. Library/common/张宇扬课件/**（教学材料质量特征基准：文献锚定/精确概念定义/机制解释/分层递进——PAEG material_quality 检查器与输出守门吸收）
+
+#### 7.3.6 工具类参考项目（2026-08-27 增补 ⭐——三项目工具生态）
+
+> 本轮（§三项目总控：法律检索/简历制作/词汇表制作）调研并借鉴的工具类项目——
+> 与 7.3.1-7.3.5 并列编号。用户执行标准：参考的所有项目、GitHub 库均须在此登记。
+
+**[78] LegalAISkill 法律 AI Skill 精选库. (2026). https://legalaiskill.com/**（525 个法律 AI Skills 精选库——质量方法论（任务明确/来源可回查/红线封顶/收录披露）与北大法宝 MCP 系列（精准法条/案例检索/引注核验/超链增强/语义检索）是法律检索插件校验机制与案例检索能力的设计参考）
+
+**[79] 北大法宝 MCP 系列（pkulaw-mcp-*）. (2026). 北大法宝法律数据库 MCP 工具集.**（精准法条查找、案例关键词检索（案由/争点/事实→样本）、引注核验、超链增强——法律检索插件数据库接入抽象层与案例检索工具的参考）
+
+**[80] Medical-Resume-Agent（医学简历 Agent）. (2026). GitHub. https://github.com/Golden2002/medical-resume-agent**（事实校验-经历拆解-定向表达方法论、Role Pack 角色适配结构、主张校验门（引用原文）、Flask API 模式、Docker/Render 部署——简历产品核心引擎的参考基线）
+
+**[81] AI Job Search（通用求职 Agent）. (2026). GitHub. https://github.com/Golden2002/ai-job-search-derived-agent**（通用求职 Agent 工作流框架、drafter-reviewer 双 Agent 流程、LaTeX 简历渲染、申请跟踪——简历产品的工作流基底）
+
+**[82] MadsLorentzen. (2026). ai-job-search（上游原版）. GitHub. https://github.com/MadsLorentzen/ai-job-search**（Claude Code 求职框架原版——69 份申请/20 场面试/成功上岸的真实验证案例；简历产品工作流设计的上游参考）
+
+**[83] 生命现象学 / The Bell Jar 词汇表项目（英语学习资产）. (2026). 用户提供渲染模板（Bell Jar CSS 原版模板 + render_vocab.py + render_html_to_pdf.py）.**（精美词汇表渲染模板基准——词汇表插件渲染引擎完整复用，禁止简化版）
 
 **[49] Anthropic. (2026). Best Practices for Prompt Engineering. claude.com/blog/best-practices-for-prompt-engineering.**（L1 先沉思再产出：CoT/<thinking>/<output> 标签分离——§3.106 启发式提示词层）
 
