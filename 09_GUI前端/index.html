@@ -942,6 +942,38 @@ body {
   transition: all .2s;
 }
 .weather-link:hover { background: color-mix(in srgb, var(--accent) 15%, var(--surface)); }
+/* ─── 实用工具按钮 + dock（§三项目 ⭐ 工具生态入口）─── */
+.tools-btn {
+  border: 1px solid var(--border); background: var(--surface);
+  padding: 6px 14px; border-radius: 20px; font-size: var(--fs-sm);
+  color: var(--text); cursor: pointer; transition: all .2s;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.tools-btn:hover { border-color: var(--accent); color: var(--accent); }
+.tools-btn.active { border-color: var(--accent); color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.tools-btn .caret { font-size: 10px; transition: transform .2s; }
+.tools-btn.active .caret { transform: rotate(180deg); }
+.tools-dock {
+  display: none; position: absolute; top: calc(100% + 6px); right: 0;
+  min-width: 168px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, .12);
+  padding: 6px; z-index: 200;
+}
+.tools-dock.open { display: block; }
+.tools-wrap { position: relative; }
+.tool-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px; border-radius: 8px; font-size: var(--fs-sm);
+  color: var(--text); text-decoration: none; cursor: pointer;
+  transition: background .15s;
+}
+.tool-item:hover { background: var(--surface-2); }
+.tool-item .t-icon { width: 16px; height: 16px; flex: 0 0 auto; opacity: .8; }
+.tool-item .t-name { flex: 1; }
+.tool-item .t-hint { font-size: 11px; color: var(--text-dim); }
+.tool-divider { height: 1px; background: var(--border); margin: 4px 8px; }
 .user-btn:hover { border-color: var(--accent); color: var(--accent); }
 .auth-modal {
   display: none; position: fixed; inset: 0; z-index: 100;
@@ -1505,7 +1537,26 @@ body {
     <span class="conn-dot" id="conn-status">服务在线</span>
     <span class="user-badge" id="user-badge" style="display:none"></span>
     <button class="user-btn" id="user-btn">登录/注册</button>
-    <a class="weather-link" href="/weather.html" title="查看气象图（Windy + 位置共享）">气象</a>
+    <div class="tools-wrap" id="tools-wrap">
+      <button class="tools-btn" id="tools-btn" title="实用工具：气象 / 简历制作 / 法律检索 / 词汇表" aria-expanded="false">
+        实用工具 <span class="caret">▼</span>
+      </button>
+      <div class="tools-dock" id="tools-dock" role="menu" aria-label="实用工具">
+        <a class="tool-item" href="/weather.html" role="menuitem" title="查看气象图（Windy + 位置共享）">
+          <img class="t-icon" src="assets/icons/volume-2.svg" alt="" /><span class="t-name">气象</span><span class="t-hint">实时天气</span>
+        </a>
+        <div class="tool-divider"></div>
+        <a class="tool-item" href="https://alaska-assessments-jar-pages.trycloudflare.com" target="_blank" rel="noopener" role="menuitem" title="通用简历制作（独立网页）">
+          <img class="t-icon" src="assets/icons/book-open.svg" alt="" /><span class="t-name">简历制作</span><span class="t-hint">经历→简历</span>
+        </a>
+        <a class="tool-item" href="#" id="tool-legal" role="menuitem" title="法律检索（对话中触发：问法律问题自动检索）">
+          <img class="t-icon" src="assets/icons/search.svg" alt="" /><span class="t-name">法律检索</span><span class="t-hint">对话触发</span>
+        </a>
+        <a class="tool-item" href="#" id="tool-vocab" role="menuitem" title="外语词汇表制作（上传 PDF 后对话中生成）">
+          <img class="t-icon" src="assets/icons/upload.svg" alt="" /><span class="t-name">词汇表制作</span><span class="t-hint">PDF→词汇表</span>
+        </a>
+      </div>
+    </div>
     <div class="mode-switch" role="tablist" aria-label="对话模式">
       <button class="mode-btn active" data-mode="teach" role="tab" aria-selected="true">学科教学</button>
       <button class="mode-btn" data-mode="chat" role="tab" aria-selected="false">闲聊~</button>
@@ -5761,6 +5812,57 @@ async function fetchResources() {
 checkHealth();
 loadDailyQuote();        // v0.17：每日一句
 setInterval(checkHealth, 30000);  // 30s 健康检查
+
+// ═══════════ §三项目 ⭐ 实用工具按钮 + dock（工具生态入口）═══════════
+// "实用工具"按钮 → 点击展开小坞（dock）→ 内含气象/简历制作/法律检索/词汇表制作
+(function bindToolsDock() {
+  const btn = document.getElementById('tools-btn');
+  const dock = document.getElementById('tools-dock');
+  if (!btn || !dock) return;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = dock.classList.toggle('open');
+    btn.classList.toggle('active', open);
+    btn.setAttribute('aria-expanded', String(open));
+  });
+  // 点击外部关闭
+  document.addEventListener('click', (e) => {
+    if (!dock.contains(e.target) && !btn.contains(e.target)) {
+      dock.classList.remove('open');
+      btn.classList.remove('active');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  });
+  // ESC 关闭
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      dock.classList.remove('open');
+      btn.classList.remove('active');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  });
+  // 法律检索：对话中触发（发送引导语）
+  const legal = document.getElementById('tool-legal');
+  if (legal) legal.addEventListener('click', (e) => {
+    e.preventDefault();
+    dock.classList.remove('open');
+    btn.classList.remove('active');
+    const q = document.getElementById('question') || document.querySelector('textarea, input[type="text"]');
+    if (q) {
+      q.value = '帮我查一下：';
+      q.focus();
+    }
+    addMsg('paeg', '法律检索已就绪——请描述你的法律问题（如"查一下劳动合同法关于经济补偿的规定"），我会按身份与法源层级系统检索并校验。');
+  });
+  // 词汇表：对话中触发（引导上传 PDF）
+  const vocab = document.getElementById('tool-vocab');
+  if (vocab) vocab.addEventListener('click', (e) => {
+    e.preventDefault();
+    dock.classList.remove('open');
+    btn.classList.remove('active');
+    addMsg('paeg', '词汇表制作已就绪——请先点击输入框左侧"上传"按钮上传书籍 PDF，然后发送「生成词汇表」。');
+  });
+})();
 
 // ═══════════ §3.116 ⭐ 词汇表弹出展示卡片（Oracle 设计）═══════════
 // 用户在对话框上传 PDF → 制作完成 → 弹出可点击模块卡片。

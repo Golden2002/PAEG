@@ -1,4 +1,4 @@
-﻿﻿# PAEG — Pedagogical Agent with Evolving Growth
+﻿# PAEG — Pedagogical Agent with Evolving Growth
 
 基于**西蒙娜·薇依（Simone Weil）**教育哲学、由 Agent 架构驱动的 AI 教育智能体（**v1.2.0 · 35 学科 × 4 学段 + 10 subagent + 自我进化 + 双 LLM 约束引擎**）。
 
@@ -347,17 +347,34 @@ python sync_check.py --fix     # 自动推送差异（本地为权威）
 
 **完成状态**：2026-08-08，106 个代码/文档文件全部一致（0 缺失 0 差异）。
 
-## 插件生态（§3.109-§3.115 ⭐ 独立仓库 + 主项目已安装）
+## 插件生态（§3.109-§3.116 ⭐ 独立仓库 + 主项目已安装）
 
-PAEG 有两个**独立插件**（各自独立 git 仓库 + 独立 GitHub 库 + 独立 README），
-主项目通过 sys.path/pip 引用（主项目 = 已安装插件）：
+PAEG 有**五个工具生态插件**（各自独立 git 仓库 + 独立 GitHub 库 + 独立 README + 独立 release），
+主项目通过 sys.path/pip 引用（主项目 = 已安装插件）；法律检索、简历制作、词汇表制作三个工具模块地位平等（§三项目总控）：
 
 | 插件 | GitHub 库 | 功能 | 测试 |
 |---|---|---|---|
 | **paeg-lang-style-plugin** | [Golden2002/paeg-lang-style-plugin](https://github.com/Golden2002/paeg-lang-style-plugin) | 语言规范：词法/句法规则约束 + 动态违禁词库 + LLM 输出重写 + MCP server | 83/83 |
 | **paeg-teaching-materials** | [Golden2002/paeg-teaching-materials](https://github.com/Golden2002/paeg-teaching-materials) | 教学物料：PPT/讲义/讲稿/思维导图/教学视频/Manim + 网状联通 + MCP server | 74/74 |
+| **paeg-vocabulary-plugin** | [Golden2002/paeg-vocabulary-plugin](https://github.com/Golden2002/paeg-vocabulary-plugin) | 词汇表：书籍 PDF → 结构化词汇表（CEFR 分级/音标/词源/熟词生义/本书含义）+ 离线词库 + MCP | 148/148 |
+| **legal-research-skill** | [Golden2002/legal-research-skill](https://github.com/Golden2002/legal-research-skill) | 法律检索：法源全覆盖 + 身份差异化 + 校验机制（效力/时效/引用）+ 案例检索 + 法律推理 + 数据库可配置 + MCP | 32/32 |
+| **ai-job-search-derived-agent** | [Golden2002/ai-job-search-derived-agent](https://github.com/Golden2002/ai-job-search-derived-agent) | 简历制作：经历→事实校验→定向表达→四格式导出（MD/HTML/Word/PDF）+ 独立网页产品 + MCP | 26/26 |
+
+**本地文件结构（14.x 标注——工具生态为 14 主项目延伸，真实位置在"智能体架构与开发（含大模型）"目录）**：
+```
+智能体架构与开发（含大模型）/
+├── 14_教育者Agent项目/          # 主项目（本仓库）
+├── 14.1_paeg-lang-style-plugin/
+├── 14.2_paeg-teaching-materials/
+├── 14.3_paeg-vocabulary-plugin/
+├── 14.4_legal-research-skill/
+├── 14.5_ai-job-search-derived-agent/
+└── 14.6_medical-resume-agent/   # 参考基线
+```
 
 **可及性（§3.114）**：像 Python 库一样——`pip install` → `import` 自动注册 → 注入 LLM → 立即可用。
+
+**主 Agent 调度（生态核心）**：主 Agent 理解自然语言 → 自动匹配/选择/调用对应工具 → 串联多工具执行复杂任务（如：上传 PDF → 生成词汇表 → 学习计划）。前端"实用工具"按钮 → dock 内含气象/简历制作/法律检索/词汇表制作入口。
 
 **Manim 顶尖化（§3.111）**：R1-R9 全部完成——RITL 渲染错误回灌 / RITL-DOC / safe_manim 12 崩溃模式 /
 MVQS 几何评估 / TTS 预合成并行 / 17 视觉原则 + 6 叙事结构 / MCP 5 工具。
