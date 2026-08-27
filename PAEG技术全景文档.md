@@ -5391,3 +5391,39 @@ result = execute("generate_handout", {"topic": "力学", "subject": "物理"})
 - MCP 三件套：execute_tool / execute_pipeline / list_dependencies（15 工具）
 - 实测：execute_pipeline("ppt") 自动 research→outline→ppt；"video" 自动 research→script→video
 
+---
+
+## 工具生态（2026-08-27 ⭐ 三项目总控）
+
+### 生态全景
+
+PAEG 工具生态 = 主项目（完整项目）+ 5 个工具插件（独立仓库 + 独立 release + 可被主 Agent 调度 + 第三方可标准化接入）：
+
+| 工具 | 本地（14.x） | GitHub | 能力 | 测试 |
+|---|---|---|---|---|
+| 语言规范 | 14.1_paeg-lang-style-plugin | Golden2002/paeg-lang-style-plugin | 词法/句法约束 + 违禁词库 + LLM 重写 + MCP | 83/83 |
+| 教学物料 | 14.2_paeg-teaching-materials | Golden2002/paeg-teaching-materials | 6 物料 + 网状联通 + Manim R1-R9 + MCP | 74/74 |
+| 词汇表 | 14.3_paeg-vocabulary-plugin | Golden2002/paeg-vocabulary-plugin | PDF→词汇表（CEFR/音标/词源/熟词生义）+ 离线词库 + MCP | 148/148 |
+| 法律检索 | 14.4_legal-research-skill | Golden2002/legal-research-skill | 法源全覆盖 + 校验机制 + 案例检索 + 法律推理 + MCP | 32/32 |
+| 简历制作 | 14.5_ai-job-search-derived-agent | Golden2002/ai-job-search-derived-agent | 经历→校验→定向→四格式导出 + MCP | 26/26 |
+| （参考） | 14.6_medical-resume-agent | Golden2002/medical-resume-agent | 医学简历基线（事实卡/主张校验/Role Pack） | 262 |
+
+### 接入架构
+
+```
+PAEG 主项目（Host）
+├── 前端"实用工具"dock → 独立网页（简历/法律/词汇表公网部署）
+├── server.py sys.path → 插件副本（语言规范/教学物料/词汇表）
+├── MCP Client → 各工具 MCP server（stdio/HTTP）
+└── magic 关键词路由（生成词汇表 → vocab_done SSE → 前端卡片）
+```
+
+### 三形态交付（每个工具）
+
+1. **MCP 标准件**：Tools+Resources+Prompts / tools/list 动态发现 / JSON-Schema / 双传输
+2. **独立网页**：Flask API + web/index.html（四维质量：内容充分/和谐统一有差异/对象意识/方便使用）
+3. **Python 库**：pip install + import + 注入 LLM
+
+### 参考文献（工具类）
+
+详见 PAEG技术说明.md §7.3.6 [78]-[83]：LegalAISkill 525 skills / 北大法宝 MCP 系列 / medical-resume-agent / ai-job-search / 上游 MadsLorentzen/ai-job-search / Bell Jar 模板。
