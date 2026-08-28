@@ -16,7 +16,8 @@ import time
 from typing import Any, Dict, List, Optional
 
 API_URL = "https://api.deepseek.com/v1/chat/completions"
-API_KEY = "REMOVED_DEEPSEEK_API_KEY"
+# 安全：密钥从环境变量读取（禁止硬编码；泄露的旧 key 已提示轮换）
+API_KEY = os.environ.get("DEEPSEEK_API_KEY", "") or os.environ.get("PAEG_DEEPSEEK_API_KEY", "")
 
 
 class LLMJudge:
