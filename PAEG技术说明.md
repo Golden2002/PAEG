@@ -1001,6 +1001,7 @@ ROUTER = {
 | 统一入口 | 所有生成内容过 `lang_gate_content`（L0 规则 + L2 薇依语料矫正），外部 agent 可调 `normalize_text` |
 | 内嵌默认 | AI_TELLS 577 项（去重 555）+ LANGUAGE_STYLE 规范 + 薇依语料 few-shot——完整保留 |
 | 病句规则（v0.71） | `fix_known_gaffes` 确定性修正悬空"听着你"（缺补语病句，用户反馈）——句末/停顿锚定只修病句、负向保护"听着你说"类合法搭配；接入 L0-0 前置 + 最终收口，保证"输出永不含悬空'听着你'"不变量 |
+| **物料统一出口接线（v1.3.2 ⭐）** | `material_router.route_material` 出口对全部物料（讲义/讲稿/导图/视频旁白/PPT）过 `_material_lang_gate`（HTML 标签保护 + 文本 lang_gate_content）；`material_harness` 的 Observe 追加语言门 + run 收口 `language_refine`——**语言规范作为内容输出质量控制模块，与所有物料输出 100% 接线** |
 
 ### C. 配置体系框架（config_hub）
 

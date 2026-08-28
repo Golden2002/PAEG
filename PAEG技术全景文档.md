@@ -5403,10 +5403,12 @@ PAEG 工具生态 = 主项目（完整项目）+ 5 个工具插件（独立仓�
 |---|---|---|---|---|
 | 语言规范 | 14.1_paeg-lang-style-plugin | Golden2002/paeg-lang-style-plugin | 词法/句法约束 + 违禁词库 + LLM 重写 + MCP | 83/83 |
 | 教学物料 | 14.2_paeg-teaching-materials | Golden2002/paeg-teaching-materials | 6 物料 + 网状联通 + Manim R1-R9 + MCP | 74/74 |
-| 词汇表 | 14.3_paeg-vocabulary-plugin | Golden2002/paeg-vocabulary-plugin | PDF→词汇表（CEFR/音标/词源/熟词生义）+ 离线词库 + MCP | 148/148 |
-| 法律检索 | 14.4_legal-research-skill | Golden2002/legal-research-skill | 法源全覆盖 + 校验机制 + 案例检索 + 法律推理 + MCP | 32/32 |
-| 简历制作 | 14.5_ai-job-search-derived-agent | Golden2002/ai-job-search-derived-agent | 经历→校验→定向→四格式导出 + MCP | 26/26 |
-| （参考） | 14.6_medical-resume-agent | Golden2002/medical-resume-agent | 医学简历基线（事实卡/主张校验/Role Pack） | 262 |
+| 词汇表 | 14.3_paeg-vocabulary-plugin | Golden2002/paeg-vocabulary-plugin | PDF→词汇表（CEFR/音标/词源/熟词生义）+ 离线词库 + MCP | 154（148 tests/ + 6 web/tests） |
+| 法律检索 | 14.4_legal-research-skill | Golden2002/legal-research-skill | 法源全覆盖 + 校验机制 + 案例检索 + 法律推理 + MCP | 39 测试函数 |
+| 简历制作 | 14.5_ai-job-search-derived-agent | Golden2002/ai-job-search-derived-agent | 经历→校验→定向→四格式导出 + MCP | 515 测试函数（pytest 展开约 616 用例） |
+| （参考） | 14.6_medical-resume-agent | Golden2002/medical-resume-agent | 医学简历基线（事实卡/主张校验/Role Pack） | 262 测试函数 |
+
+> **测试口径说明（2026-08-23 实测校正）**：上表测试数以 `def test_`/`it(` 源码实测为准（词汇表 154 / 法律 39 / 简历主 515 / 简历辅 262）；此前登记的"法律 32/32、简历 26/26"为某子模块口径，已校正。语言规范 83/83、教学物料 74/74 为各自仓库 pytest 实测（未在本轮重复校验，以仓库 CI 为准）。
 
 ### 接入架构
 
