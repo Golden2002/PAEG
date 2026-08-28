@@ -25,7 +25,7 @@
     "note": "通用简历工具（PAEG 工具生态 14.5，20 工具：五维评分/裁剪/面试/跟踪/事实校验等）"
   },
   "legal-research": {
-    "command": ["python", "D:/wbo-workspace/legal-research-skill/legal-research/mcp_server.py"],
+    "command": ["python", "D:/桌面/智能体架构与开发（含大模型）/14.4_legal-research-skill/legal-research/mcp_server.py"],
     "enabled": true,
     "note": "法律检索 Skill（PAEG 工具生态 14.4，9 工具：效力/时效/引用校验/案例检索/推理/数据库）"
   },
@@ -33,5 +33,10 @@
     "command": ["paeg-vocabulary-mcp"],
     "enabled": true,
     "note": "外语词汇表制作（PAEG 工具生态 14.3，PDF→词汇表全流程）"
+  },
+  "lang-style": {
+    "command": ["paeg-lang-style-mcp"],
+    "enabled": true,
+    "note": "语言规范校对（PAEG 工具生态 14.1，7 工具：normalize_text/language_policy_check/forbidden_words 等）"
   }
 }
