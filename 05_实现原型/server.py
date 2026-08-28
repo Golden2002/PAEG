@@ -509,6 +509,26 @@ def health():
         "timestamp": datetime.now().isoformat(),
     })
 
+
+# §3.113 ⭐ /api/mcp/tools —— MCP 能力发现接口（生态接口规范第 1 条：tools/list 等价）
+@app.route("/api/mcp/tools", methods=["GET"])
+def mcp_tools():
+    """返回外部 MCP 工具清单（Function Calling 格式），供前端工具能力面板展示。"""
+    try:
+        if MCP_CLIENT is None:
+            return jsonify({"ok": True, "tools": [], "note": "MCP 未初始化"})
+        defs = MCP_CLIENT.list_tool_defs()
+        tools = [d.get("function", {}) for d in defs]
+        return jsonify({
+            "ok": True,
+            "count": len(tools),
+            "tools": tools,
+            "stats": MCP_CLIENT.stats() if hasattr(MCP_CLIENT, "stats") else {},
+        })
+    except Exception as _e:
+        return jsonify({"ok": False, "error": str(_e)[:300]}), 500
+
+
 # §3.78 ⭐ /api/metrics —— SLO 四指标基础端点（总需求 D1/B3 落地第一步）
 _METRICS_START_TS = time.time()
 

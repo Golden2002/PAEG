@@ -974,6 +974,13 @@ body {
 .tool-item .t-name { flex: 1; }
 .tool-item .t-hint { font-size: 11px; color: var(--text-dim); }
 .tool-divider { height: 1px; background: var(--border); margin: 4px 8px; }
+.tool-web-links {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 6px 12px; font-size: 11px;
+}
+.tool-web-links .tool-web-label { color: var(--text-dim); margin-right: 2px; }
+.tool-web-links a { color: var(--accent); text-decoration: none; }
+.tool-web-links a:hover { text-decoration: underline; }
 .user-btn:hover { border-color: var(--accent); color: var(--accent); }
 .auth-modal {
   display: none; position: fixed; inset: 0; z-index: 100;
@@ -1546,15 +1553,22 @@ body {
           <svg class="t-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><circle cx="8" cy="9" r="2.2"/></svg><span class="t-name">气象</span><span class="t-hint">实时天气</span>
         </a>
         <div class="tool-divider"></div>
-        <a class="tool-item" href="https://podcasts-cingular-signing-categories.trycloudflare.com" target="_blank" rel="noopener" role="menuitem" title="通用简历制作（独立网页）">
+        <a class="tool-item" id="tool-resume" href="#" role="menuitem" title="通用简历制作（对话调度，主 Agent 调用）">
           <svg class="t-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span class="t-name">简历制作</span><span class="t-hint">经历→简历</span>
         </a>
-        <a class="tool-item" href="https://reproduced-adjustments-appropriations-dubai.trycloudflare.com" target="_blank" rel="noopener" role="menuitem" title="法律检索（独立网页）">
+        <a class="tool-item" id="tool-legal" href="#" role="menuitem" title="法律检索（对话调度，主 Agent 调用）">
           <svg class="t-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 21h8"/><path d="M6 7l6-4 6 4"/><path d="M6 7H4a2 2 0 0 0-2 2v2a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4V9a2 2 0 0 0-2-2z"/></svg><span class="t-name">法律检索</span><span class="t-hint">法源校验</span>
         </a>
-        <a class="tool-item" href="https://guidance-nyc-anymore-extensions.trycloudflare.com" target="_blank" rel="noopener" role="menuitem" title="外语词汇表制作（独立网页）">
+        <a class="tool-item" id="tool-vocab" href="#" role="menuitem" title="外语词汇表制作（对话调度，主 Agent 调用）">
           <svg class="t-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span class="t-name">词汇表制作</span><span class="t-hint">PDF→词汇表</span>
         </a>
+        <div class="tool-divider"></div>
+        <div class="tool-web-links" role="group" aria-label="独立网页快捷入口">
+          <span class="tool-web-label">独立网页</span>
+          <a href="https://podcasts-cingular-signing-categories.trycloudflare.com" target="_blank" rel="noopener" title="简历独立网页">简历</a>
+          <a href="https://reproduced-adjustments-appropriations-dubai.trycloudflare.com" target="_blank" rel="noopener" title="法律检索独立网页">法律</a>
+          <a href="https://guidance-nyc-anymore-extensions.trycloudflare.com" target="_blank" rel="noopener" title="词汇表独立网页">词汇</a>
+        </div>
       </div>
     </div>
     <div class="mode-switch" role="tablist" aria-label="对话模式">
@@ -5861,6 +5875,19 @@ setInterval(checkHealth, 30000);  // 30s 健康检查
     dock.classList.remove('open');
     btn.classList.remove('active');
     addMsg('paeg', '词汇表制作已就绪——请先点击输入框左侧"上传"按钮上传书籍 PDF，然后发送「生成词汇表」。');
+  });
+  // 简历制作：对话中触发（引导描述经历与目标岗位）
+  const resume = document.getElementById('tool-resume');
+  if (resume) resume.addEventListener('click', (e) => {
+    e.preventDefault();
+    dock.classList.remove('open');
+    btn.classList.remove('active');
+    const q = document.getElementById('question') || document.querySelector('textarea, input[type="text"]');
+    if (q) {
+      q.value = '帮我做一份简历：目标岗位是';
+      q.focus();
+    }
+    addMsg('paeg', '简历制作已就绪——请补充目标岗位与你的经历（项目/技能/成果），我会做经历拆解、事实校验、定向润色并输出简历。');
   });
 })();
 
