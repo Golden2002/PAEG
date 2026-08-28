@@ -625,6 +625,32 @@ def _gen_manim(llm, topic, subject, learner_id, **kw) -> MaterialResult:
 # ═══════════════════════════════════════════════════════════
 # 统一调度器
 # ═══════════════════════════════════════════════════════════
+def _material_lang_gate(content: str, step_type: str) -> str:
+    """物料输出语言守门（§3.28 统一出口接线）。
+
+    用户要求："语言规范模块应当与项目所有的输出相接线，因为它是内容输出的
+    质量控制模块"。本函数在所有物料 SSE 出口前对文本过 lang_gate_content——
+    - 纯文本物料（讲义/讲稿/导图/视频旁白）整体过守门（L0 病句规则 + L0 polish + L2）
+    - 含 HTML 标签（如 PPT 下载链接）时，只对标签外文本过守门，标签原样保留
+    正常文本幂等（lang_gate 对无问题文本返回原文）；任何异常静默回退原文。
+    """
+    if not content or not isinstance(content, str) or not content.strip():
+        return content
+    try:
+        from services.lang_gate import lang_gate_content
+        if '<' in content and '>' in content:
+            import re as _re
+            _parts = _re.split(r'(<[^>]+>)', content)
+            _out = []
+            for _p in _parts:
+                if _p.startswith('<'):
+                    _out.append(_p)          # HTML 标签原样保留
+                elif _p:
+                    _out.append(lang_gate_content(_p, context=f"material:{step_type}"))
+            return ''.join(_out)
+        return lang_gate_content(content, context=f"material:{step_type}")
+    except Exception:
+        return content
 def route_material(magic_match: Dict[str, Any], llm, subject: str,
                    learner_id: str, concept: str = "",
                    learner=None, save_turn: Callable = None,
@@ -702,6 +728,11 @@ def route_material(magic_match: Dict[str, Any], llm, subject: str,
 
     content = result.get("content") or route.fallback_msg
     url = result.get("url") or ""
+
+    # §3.28 ⭐ 语言规范统一出口接线：所有物料文本过 lang_gate（质量控制模块）
+    # （manim 已走 pipeline 语言门；此处对非 manim 物料统一收口，HTML 标签受保护）
+    if intent != "manim":
+        content = _material_lang_gate(str(content), route.step_type)
 
     # 存档（可选回调）
     if save_turn and route.save_turn:

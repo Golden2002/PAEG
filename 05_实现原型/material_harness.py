@@ -65,7 +65,11 @@ class MaterialHarness:
 
     # ── Observe：门控检查 ──
     def _observe(self, material_type: str, content: Any) -> List[str]:
-        """观察阶段：结构/质量门检查，返回问题列表（空=通过）。"""
+        """观察阶段：结构/质量门检查，返回问题列表（空=通过）。
+
+        §3.28 ⭐ 语言规范接线：除结构门外，追加语言门（AI 味/违禁词/省略句）——
+        语言规范是内容输出的质量控制模块，harness 生产的文本物料必须过语言门。
+        """
         issues = []
         try:
             from gates_lib import get_gates
@@ -75,6 +79,14 @@ class MaterialHarness:
                     issues.append(reason)
         except Exception:
             pass
+        # §3.28 ⭐ 语言门：AI 味/违禁词检测（复用 material_pipeline.language_gate）
+        if isinstance(content, str) and content.strip():
+            try:
+                from material_pipeline import language_gate
+                _lang_issues = language_gate(content[:3000], context=f"harness:{material_type}")
+                issues.extend(_lang_issues)
+            except Exception:
+                pass
         # 基本非空门
         if not content:
             issues.append("内容为空")
@@ -169,6 +181,13 @@ class MaterialHarness:
         result["artifacts"] = self.artifacts
         result["trace"] = self.trace
         result["iterations"] = i + 1
+        # §3.28 ⭐ 语言规范收口：最终文本物料过 lang_gate（Reflect 修正后仍收口）
+        if isinstance(content, str) and content.strip():
+            try:
+                from material_pipeline import language_refine
+                result["content"] = language_refine(content, context=f"harness:{material_type}")
+            except Exception:
+                pass
         return result
 
     # ── 工具 ──
