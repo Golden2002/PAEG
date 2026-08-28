@@ -2,6 +2,20 @@
 
 本文件记录主项目自身更新 + 各工具生态的更新路径（同步记录）。
 
+## 2026-08-28 — 四工具顶尖化 R3：MCP 三原语生态补全完成（四工具全达标 ⭐）
+
+**简历 MCP 三原语（14.5，已提交）**：`mcp_server` 加 resources（resume-templates://list / resume-role-packs://list）+ prompts（resume_build_workflow / resume_ats_report）。验证：21 tools + 2 resources + 2 prompts + 109 测试全绿。
+
+**四工具 MCP 三原语全部完整**（生态插件铁则——tools/resources/prompts）：
+| 工具 | tools | resources | prompts |
+|---|---|---|---|
+| 语言规范 | 7 | 3 | 2 |
+| 词汇表 | 10 | 2 | 2 |
+| 法律 | 10 | 2 | 2 |
+| 简历 | 21 | 2 | 2 |
+
+**R3 剩余**：四工具量化顶尖门槛逐一复验 + 架构重构（subagents/prompts 拆分）。
+
 ## 2026-08-28 — 四工具顶尖化 R3 续：词汇表 MCP 三原语补全
 
 **词汇表 MCP 三原语（14.3，已提交）**：`mcp_server` 加 resources（vocab-languages://list 语种 / vocab-dictionaries://list 词库状态）+ prompts（vocab_build_workflow 构建流程 / vocab_render 渲染导出）。验证：10 tools + 2 resources + 2 prompts + 151 测试全绿。
