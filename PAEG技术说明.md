@@ -1,4 +1,4 @@
-﻿# PAEG 教育智能体 — 简明技术说明（v1.2.27）
+# PAEG 教育智能体 — 简明技术说明（v1.2.27）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -1267,6 +1267,8 @@ PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可�
 
 **[83] 生命现象学 / The Bell Jar 词汇表项目（英语学习资产）. (2026). 用户提供渲染模板（Bell Jar CSS 原版模板 + render_vocab.py + render_html_to_pdf.py）.**（精美词汇表渲染模板基准——词汇表插件渲染引擎完整复用，禁止简化版）
 
+**[84] THU-MAIC. (2026). OpenMAIC: Open-Source AI Interactive Classroom Platform [Computer software]. GitHub. https://github.com/THU-MAIC/OpenMAIC**（清华大学 MAIC = Multi-Agent Interactive Classroom 多智能体交互式课堂——国内首个 L4 级 AI 课堂，教育版 OpenClaw「教学龙虾」；TypeScript 多智能体课堂架构。调研参考：多智能体课堂角色编排、L4 级课堂自动化分级，为 PAEG 工具生态多 Agent 协作与课堂形态演进提供参照）
+
 **[49] Anthropic. (2026). Best Practices for Prompt Engineering. claude.com/blog/best-practices-for-prompt-engineering.**（L1 先沉思再产出：CoT/<thinking>/<output> 标签分离——§3.106 启发式提示词层）
 
 **[50] Anthropic. (2026). Claude Platform Docs: Prompt Engineering Best Practices. platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices.**（自检触发器/分块隔离——§3.106 原则 7/8）
@@ -1334,6 +1336,26 @@ source:  <项目名> <版本/commit>  |  repo: <URL>
 path:    <原文件路径>            |  adapted: <PAEG 改动>
 since:   <PAEG 版本号>
 ```
+
+#### 7.3.7 工具生态本地目录体系（2026-08-23 固定 ⭐）
+
+> **用户指定**：工具生态与主项目同根平级组织（`D:\桌面\智能体架构与开发（含大模型）\`），主项目内安装最新版本工具生态（MCP 插件接入，动态发现/调度/串联）。此目录体系为**固定结构**，四份核心文档（需求/技术说明/全景/维护手册）统一登记。
+
+| 目录 | 项目 | 角色 | 基线版本 |
+|---|---|---|---|
+| `14_教育者Agent项目\` | PAEG 主项目 | 生态宿主：安装最新版本工具生态（MCP 插件） | — |
+| `14.1_paeg-lang-style-plugin\` | 语言规范校对工具 | 语言风格插件（SKILL.md + pyproject 独立库 + lang_gate 内核） | 主项目语言规范模块快照 |
+| `14.2_paeg-teaching-materials\` | 教学物料工具 | 教学物料生态（四大工具之外） | — |
+| `14.3_paeg-vocabulary-plugin\` | 外语词汇表工具 | 词汇表制作（PDF 导入/全字段/渲染导出/多语种） | @ 32539f9 |
+| `14.4_legal-research-skill\` | 法律检索工具 | 法律检索（全层级法源/五阶工作流/类案/MCP） | @ 5a1e747 |
+| `14.5_ai-job-search-derived-agent\` | 通用简历·主基线 | 工程框架与工作流引擎（五维匹配/drafter+reviewer/ATS/渲染） | @ 2b13c92 |
+| `14.6_medical-resume-agent\` | 通用简历·辅助基线 | 经历处理方法论与质量控制（事实校验/三档表达/能力分类） | @ f5bf6f6 |
+
+**配套**：
+- `D:\项目\` = 总控工作区（波次计划/审计报告/基线锚定副本/四份能力清单与对标表）；开发代码以 14.x 独立项目为准
+- 每个工具拥有本地独立文件夹 + GitHub 库 + ModelScope 备份，可独立构建部署
+- 日志/动态生成文件不推云端；API/隐私信息禁止入公开库；敏感配置制作空白脱敏版本用于公开推送
+- 波次计划：1 初始化锚定（2026-08-23 完成）→ 2 方案设计 → 3 核心开发 → 4 双审计联调 → 5 发布迭代（详见 `D:\项目\README.md`）
 
 ### 7.4 Docker 打包依赖纪律（用户执行标准 · 2026-08-16）
 
