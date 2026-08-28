@@ -378,8 +378,11 @@ class WorkflowsHub:
         from subagents import _safe_chat
         _llm = get_llm()
         _cfg = dict(st.config or {})
+        # v1.3.1 ⭐ 占位符替换：llm 步骤与 subagent/tool 一致支持 {param}/{step_id}
+        # （修复 teach_concept.handout_suggest 的 {concept} 一直字面量透传的缺陷）
+        _cfg = self._resolve_placeholders(_cfg, results, args)
         _sys = str(_cfg.get("system") or "你是一位老师。")
-        _user = str(_cfg.get("user") or args.get("concept") or "")
+        _user = str(_cfg.get("user") or args.get("concept") or args.get("topic") or "")
         return _safe_chat(_llm, _sys, _user, max_tokens=800) or "(空响应)"
 
     # ─── 管理 ───

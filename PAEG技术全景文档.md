@@ -1,4 +1,4 @@
-﻿# PAEG 教育者智能体 — 技术全景文档
+# PAEG 教育者智能体 — 技术全景文档
 
 > **版本**：v0.73 关键节点（2026-08-16）：Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）+ 结构优化（TOC 自动生成/围栏修复/层级修正/§3.17 生产链路补强）；Docker 容器化完整技术章节（§10.11，与 Flask 同级基础设施技术）；架构精细拆分（server.py 2601 行/31 路由/12 蓝图）+ RAG 检索增强（BM25Okapi/多路召回）+ 自我进化优化（Schema+CoT/失败案例/去重）+ dsh Harness 30 项落地 27/30（Seam/Registry/Provider/Persona 外置/Patch 系统/三角色契约层/Preset 体系/条件启停/Constitutional 补丁化/Self-Update via Patch）+ 前端 SVG 化+ 薇依人格大幅提升（文选 9 大哲学基石）
 > **适用对象**：项目维护者（你本人）
@@ -4855,7 +4855,7 @@ PAEG 的能力体系围绕"一切能力可替换、可增删、不改核心代�
 | 配置层 | 14 标准 MCP 工具 | normalize_text/constraint 六件套/generate_* 等 | config_hub 统一路由 |
 | 按需层 | 11 Skills | concept-explainer/essay-feedback/pdf/docx/xlsx 等 | skill_registry 三级渐进加载 |
 | 接入层 | 6 MCP 服务器 | filesystem/memory/fetch/git/brave-search/pptx | mcp_servers.json 配置 |
-| 编排层 | 3 Workflows | teach_materials/teach_concept/teach_minimal | workflows_hub 声明式 DAG |
+| 编排层 | 4 Workflows | teach_materials/teach_concept/teach_minimal/**tool_dev**（可复用小工具开发：需求解析→GitHub高star检索→联网调研→实施策略→开发清单→网页+dock接入） | workflows_hub 声明式 DAG |
 
 > 早期"25 MCP 工具"为混合口径；v0.73 起精确分类为 22 内置 + 14 标准（能力不减反增）。
 > 扩展性：新增工具=改注册表 ✓ / 新增 Skill=丢 SKILL.md ✓ / 新增 MCP=改 JSON ✓ / 新增 subagent=需改代码 ⚠️

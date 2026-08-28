@@ -2,6 +2,16 @@
 
 本文件记录主项目自身更新 + 各工具生态的更新路径（同步记录）。
 
+## 2026-08-28 — 可复用小工具开发 workflow（tool_dev）注册
+
+**主项目自身更新**：
+- ✅ 新增 `config/workflows/tool_dev.json`——用户「可复用小工具开发」方法论固化为声明式 workflow（6 步 DAG）：需求解析 → GitHub 高 star 检索 → 联网技术调研 → 实施策略（fork vs from scratch）→ 开发验收清单 → 网页入口 + dock 按钮接入方案
+- ✅ `workflows_hub._run_llm` 占位符替换修复（v1.3.1）——llm 步骤与 subagent/tool 一致支持 `{param}`/`{step_id}`（修复 teach_concept.handout_suggest 的 `{concept}` 一直字面量透传的缺陷）
+- ✅ 注册验证：`run_workflow__tool_dev` 进入 tool_defs（主 Agent 可通过 `run_workflow__tool_dev` 调度）；4 个 workflow（teach_minimal/teach_concept/teach_materials/tool_dev）
+- ✅ 回归：workflow 相关 16/16 通过
+
+**调用方式**：主 Agent 对话中说"开发一个 XX 工具" → 调度 `run_workflow__tool_dev`，按 6 步方法论产出《小工具开发实施方案》（检索→策略→开发清单→网页+dock 接入蓝图）。
+
 ## 2026-08-28 — 工具生态波次 3 核心开发：反向审计 + 补缺 + 接线修复 + 端到端验证
 
 **主项目自身更新**：

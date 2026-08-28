@@ -1,0 +1,61 @@
+{
+  "id": "tool_dev",
+  "description": "可复用小工具开发工作流：需求解析→GitHub高star检索→联网调研定策略→开发清单→网页入口+dock按钮接入主智能体（用户方法论固化）",
+  "steps": [
+    {
+      "id": "requirement_analysis",
+      "type": "llm",
+      "config": {
+        "system": "你是小工具开发需求分析专家。解析用户需求，输出结构化开发方案。只输出 Markdown，不要寒暄。",
+        "user": "需求：{requirement}\n\n请输出：\n1) 工具名称建议（简洁英文+中文）\n2) 核心功能清单（逐条，标注优先级）\n3) GitHub 搜索关键词（3-5 个，含英文）\n4) 高 star 项目筛选标准（star 数/维护活跃度/协议）"
+      }
+    },
+    {
+      "id": "github_scan",
+      "type": "tool",
+      "tool": "web_search",
+      "depends_on": ["requirement_analysis"],
+      "config": {
+        "query": "{requirement} GitHub 开源项目 高star",
+        "max_results": 6
+      }
+    },
+    {
+      "id": "tech_research",
+      "type": "tool",
+      "tool": "web_search",
+      "depends_on": ["requirement_analysis"],
+      "config": {
+        "query": "{requirement} 实现方案 技术选型 开源框架",
+        "max_results": 6
+      }
+    },
+    {
+      "id": "strategy",
+      "type": "llm",
+      "depends_on": ["github_scan", "tech_research"],
+      "config": {
+        "system": "你是小工具开发架构师。基于需求与检索结果制定可落地的实施策略。只输出 Markdown。",
+        "user": "需求分析：{requirement_analysis}\n\nGitHub 高 star 项目检索结果：{github_scan}\n\n联网技术调研结果：{tech_research}\n\n请输出：\n1) fork 现成项目 vs from scratch 决策（明确选择+理由，若 fork 注明上游仓库）\n2) 技术栈选型（前后端/渲染/导出）\n3) 项目目录结构\n4) 分阶段实施计划（含里程碑）"
+      }
+    },
+    {
+      "id": "dev_checklist",
+      "type": "llm",
+      "depends_on": ["strategy"],
+      "config": {
+        "system": "你是小工具开发验收官。制定功能与稳定性验收清单。只输出 Markdown。",
+        "user": "实施策略：{strategy}\n\n请输出：\n1) 功能开发清单（每项对应可验证的验收标准）\n2) 稳定性要求（错误处理/边界情况/性能指标）\n3) 测试计划（单元/集成/端到端）"
+      }
+    },
+    {
+      "id": "integration_plan",
+      "type": "llm",
+      "depends_on": ["dev_checklist"],
+      "config": {
+        "system": "你是 PAEG 工具生态集成专家。制定网页入口与主智能体接入方案。只输出 Markdown。",
+        "user": "开发清单：{dev_checklist}\n\n请输出：\n1) 网页端入口方案（Flask 后端 + 前端，完整用户操作闭环）\n2) MCP 插件接入方案（tools/resources/prompts 三原语，可被主 Agent 动态发现/调度/串联）\n3) 主项目「实用工具」dock 按钮接入步骤（前端加按钮 → 按钮连接交付网页）\n4) 多仓库同步与部署（本地/GitHub/modelscope 互为备份，脱敏配置）"
+      }
+    }
+  ]
+}
