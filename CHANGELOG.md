@@ -2,6 +2,30 @@
 
 本文件记录主项目自身更新 + 各工具生态的更新路径（同步记录）。
 
+## 2026-08-28 — 四工具顶尖化目标循环迭代 R1（Oracle 论证 + 词汇表 P0 + 简历死代码清理）
+
+**主项目自身更新**：无代码改动（文档 + 工具生态修复）。
+
+**① Oracle 论证（改进需求 + 迭代计划）**：
+- `docs/Oracle_改进需求清单与迭代计划.md`：39 条改进需求（词汇表 9/简历 8/法律 9/语言规范 9/架构 3）+ 3 轮迭代计划（R1 攻坚 P0 → R2 补齐 P1 → R3 生态收尾）+ 四工具量化顶尖确认标准
+- 关键判据：达到顶尖 = 量化门槛全命中（非"测试全绿"，现有测试多为基线保留性断言）
+
+**② 词汇表 P0 收尾（14.3，Oracle R1 第 1 项，已提交）**：
+- OCR 噪声拦截：`_noise.py` _NOISE_KNOWN 扩充（tobe/asa/lan-guage）+ _FUNC 加 a/an + `quantile_filter.py` 检测门槛 5→3
+- 例句清洗粘连：`example_sanitize.py` sub 单空格 + 压缩空格（Good[1]sentence→Good sentence）
+- pdf_ingest 空文本降级：三处判断加"文本非空"
+- ok 假阳性：`registry.py` ok 判定加 entries_count>0
+- **ecdict 接线**：`enrich.py` 加 `_ecdict_zh`（离线 77 万词中文释义兜底，修复弱模式空表根因），实测 causality/metabolism/nihilism 均查到 zh 释义
+- 验证：148 测试全绿
+
+**③ 简历 R-09 死代码清理（14.5，已提交）**：
+- `core.py` 清理 `_MEDICAL_SRC` 外部路径引用（指向不存在的 "medical-resume-agent" 目录），明确本地移植 claim_gate 为权威实现
+- 验证：109 测试全绿
+
+**④ 收尾**：词汇表 14.3 提交 2 次 + 简历 14.5 提交 1 次 + 主项目提交（Oracle 论证记录）；modelscope 同步，GitHub 网络中断待补推
+
+**剩余（Oracle R1 后续）**：简历 R-R2（接入 14.6 12 项 claim_gate 全链路）+ 法律 L-R1/L-R2/L-R3（权威库/五阶工作流/网页端闭环）+ R2 四工具 P1 并行。
+
 ## 2026-08-28 — 可复用小工具开发 workflow（tool_dev）注册
 
 **主项目自身更新**：
