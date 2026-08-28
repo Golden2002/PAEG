@@ -2,6 +2,12 @@
 
 本文件记录主项目自身更新 + 各工具生态的更新路径（同步记录）。
 
+## 2026-08-28 — 四工具顶尖化 R3 续：法律 MCP 三原语补全
+
+**法律 MCP 三原语（14.4，已提交）**：`mcp_server` 加 resources（legal-sources://list 法源层级 / legal-db://list 权威库适配器）+ prompts（legal_research_workflow 五阶模板 / legal_report 报告模板）。验证：10 tools + 2 resources + 2 prompts + 38 测试全绿。
+
+**R3 剩余**：词汇表/简历 MCP resources/prompts 补全、四工具量化顶尖门槛复验、架构重构。
+
 ## 2026-08-28 — 四工具顶尖化 R3 启动：语言规范 MCP 三原语补全
 
 **语言规范 MCP 三原语（14.1，已提交）**：`mcp_server` 加 resources（style-presets://list / term-whitelist://list / rules://stats）+ prompts（proofread_workflow / report）——生态插件铁则三原语（tools+resources+prompts）完整。P-06 MCP 三原语达标。验证：7 tools + 3 resources + 2 prompts + 90 测试全绿。
