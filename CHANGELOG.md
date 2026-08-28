@@ -2,6 +2,24 @@
 
 本文件记录主项目自身更新 + 各工具生态的更新路径（同步记录）。
 
+## 2026-08-23 — 安全专项：API 与 token 泄露防护（监控发现后处置）
+
+**处置清单**：
+- ✅ **git remote 内嵌 token 清除**（主项目 + 14.1~14.6 共 8 仓库）：`https://user:token@github.com/...` → 无 token URL，凭据移交 Windows 凭据管理器（credential.helper=manager），推送认证已验证可用
+- ✅ **oracles.py 硬编码 DeepSeek key 移除**（`10_封闭测试/三Oracle质量测试/utils/oracles.py`）：`API_KEY = "sk-e42960..."` → `os.environ.get("DEEPSEEK_API_KEY")`
+- ✅ **关机后恢复指南.md 脱敏**：Minimax key（sk-cp-Ldaq...）与 DeepSeek key（sk-e42960...）替换为占位符 + 环境变量说明
+- ✅ **auth.json 系列保护确认**：auth.json / auth.json.bak / auth.json.* / secret/auth.json 均已被 .gitignore 忽略（本地凭据不提交），git 历史中从未出现
+- ✅ **.env 忽略确认**：.env 已在 .gitignore；.env.example 为占位符（your_deepseek_key）
+- ✅ **14.x 六仓库扫描**：无真实密钥（14.4 仅 YOUR_API_SECRET 占位符）
+- ✅ **全仓库补推**：GitHub 网络恢复，主项目（6aeedf3）+ 14.1~14.6 全部同步；modelscope 同步完成
+
+**⚠️ 必须轮换的密钥（已进入 git 历史并推送，仅脱敏无法补救）**：
+1. DeepSeek `REMOVED_DEEPSEEK_API_KEY`（历史 commit 9530ab6 等）
+2. Minimax `sk-cp-Ldaq...`（历史 commit ec52771 等）
+→ 请到对应平台撤销并重新生成 key，新 key 只放环境变量。
+
+**纪律固化**：①密钥一律环境变量（DEEPSEEK_API_KEY / MINIMAX_API_KEY / PAEG_ADMIN_TOKEN 等）②文档禁止粘贴真实 key（以 `sk-***` 占位）③git remote 禁止内嵌凭据 ④新提交前跑 `python D:\wbo-workspace\security_scan2.py` 复查。
+
 ## 2026-08-23 — 工具生态波次 2 方案设计（三项目：法律/简历/词汇表）
 
 **主项目自身更新**：无代码改动（纯生态方案轮）。
