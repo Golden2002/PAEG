@@ -834,21 +834,13 @@ def _execute_tool_calls(model, answer: Optional[str], question: str,
                 _args = _json.loads(_args_raw) if _args_raw.strip() else {}
             else:
                 _args = _args_raw or {}
-            _out = ""
-            if _name == "solve_problem":
-                from problem_solver import solve_problem
-                _r = solve_problem(model, _args.get("problem") or question,
-                                   subject=_args.get("subject") or "math",
-                                   grade_level=_args.get("grade_level") or "high_school")
-                _out = str(_r.get("answer") or "")[:1500]
-            elif _name == "verify_math":
-                from verify_math import verify_expression
-                _out = str(verify_expression(_args.get("expression") or ""))[:500]
-            elif _name == "web_search":
-                from web_search_tool import web_search
-                _out = str(web_search(_args.get("query") or question, 3))[:1200]
+            from config_hub import get_hub
+            _hub = get_hub()
+            if _hub is not None:
+                _out = _hub.execute_tool(_name, _args)
             else:
-                _out = f"（工具 {_name} 执行结果未知）"
+                from tool_registry import execute_tool
+                _out = execute_tool(_name, _args)
             _results.append(f"[工具 {_name} 结果]\n{_out}")
         except Exception as _te:
             _results.append(f"[工具 {_c.get('name', '')} 执行失败] {_te}")

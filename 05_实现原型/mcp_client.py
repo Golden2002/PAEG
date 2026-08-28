@@ -133,7 +133,7 @@ class MCPClientManager:
     def reload_all(self):
         """v0.68+ ⭐ 动态重载：清空缓存 + 重新连接所有 MCP server。
 
-        独立配置接口：改 config/mcp_servers.json 后调用即生效（无需重启）。
+        配置来源：根目录 mcp_servers.json（config/ 副本已废弃删除，勿再引用）。
         """
         with self._lock:
             self._clients.clear()

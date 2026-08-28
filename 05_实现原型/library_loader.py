@@ -27,6 +27,33 @@ import os
 from typing import Dict, List, Optional
 
 
+# Gap B：轻量文本源（.md/.txt）内容读取上限（字符），避免超大文件膨胀 raw_files。
+_TEXT_CONTENT_CAP = 4000
+
+
+def _read_text_content(fp: str, cap: int = _TEXT_CONTENT_CAP) -> str:
+    """读取 .md/.txt 文本内容，截断到 cap 字符（镜像 facts/*.md 的读取方式）。"""
+    try:
+        with open(fp, encoding='utf-8') as f:
+            return f.read()[:cap]
+    except Exception:
+        return ""
+
+
+def _extract_docx(fp: str, cap: int = _TEXT_CONTENT_CAP) -> str:
+    """用 python-docx 提取 .docx 正文；惰性导入，缺依赖时返回空串（优雅跳过）。"""
+    try:
+        import docx  # 惰性导入：python-docx 为可选依赖
+    except ImportError:
+        return ""
+    try:
+        _doc = docx.Document(fp)
+        _paras = [p.text.strip() for p in _doc.paragraphs if p.text.strip()]
+        return "\n".join(_paras)[:cap]
+    except Exception:
+        return ""
+
+
 class KnowledgeLibrary:
     """扫描 Library 目录，加载可用的知识源。
 
@@ -135,17 +162,50 @@ class KnowledgeLibrary:
                 _cached = _cache.get(_rel)
                 if _cached and _cached.get('content'):
                     _entry['content'] = _cached['content']
+                # Gap B：轻量文本源（.md/.txt）直接读内容（小文件，不依赖课件缓存）；
+                # 旧清单若已含 .docx 也补提取内容。
+                if _f.endswith(('.md', '.txt')):
+                    _entry['content'] = _read_text_content(_fp)
+                elif _f.endswith('.docx'):
+                    _entry['content'] = _extract_docx(_fp)
                 self.raw_files.append(_entry)
+            # Gap B：补充 .docx 扫描——已存在的旧缓存清单不含 .docx，glob 补齐（惰性提取）。
+            _seen = {os.path.normcase(os.path.normpath(str(e.get('path') or '')))
+                     for e in self.raw_files}
+            for _fp in glob.glob(os.path.join(self.base_dir, '**', '*.docx'),
+                                 recursive=True):
+                if 'KnowledgeBase' in _fp:
+                    continue
+                if os.path.normcase(os.path.normpath(_fp)) in _seen:
+                    continue
+                self.raw_files.append({
+                    'path': _fp, 'name': os.path.basename(_fp),
+                    'category': os.path.basename(os.path.dirname(_fp)),
+                    'content': _extract_docx(_fp),
+                })
             return  # 快速路径结束（无需 walk）
 
         for root, dirs, files in os.walk(self.base_dir):
             if 'KnowledgeBase' in root:
                 continue
             for f in files:
-                if f.endswith(('.md', '.txt', '.json')):
+                if f.endswith(('.md', '.txt')):
+                    # Gap B：登记 .md/.txt 的同时读取内容（截断到 4000 字符），
+                    # 使 search_facts 能命中 Library/Linguistics/*.md 等知识内容。
+                    fp = os.path.join(root, f)
+                    self.raw_files.append({'path': fp, 'name': f,
+                                           'category': os.path.basename(root),
+                                           'content': _read_text_content(fp)})
+                elif f.endswith('.json'):
                     fp = os.path.join(root, f)
                     self.raw_files.append({'path': fp, 'name': f,
                                            'category': os.path.basename(root)})
+                elif f.endswith('.docx'):
+                    # Gap B：.docx 用 python-docx 提取（缺依赖惰性跳过；.doc 旧二进制不处理）
+                    fp = os.path.join(root, f)
+                    self.raw_files.append({'path': fp, 'name': f,
+                                           'category': os.path.basename(root),
+                                           'content': _extract_docx(fp)})
                 elif f.endswith('.pptx'):
                     fp = os.path.join(root, f)
 

@@ -8,7 +8,7 @@
 架构（Oracle 设计）：
 - ConfigHub 持有 4 个子模块（mcp/skills/hooks/workflows）+ 内置工具
 - 统一出口：get_all_tool_defs()（LLM 看到的工具）+ execute_tool()（执行派发）
-- 每个子模块独立配置（config/mcp_servers.json、config/skills.json、
+- 每个子模块独立配置（根 mcp_servers.json、config/skills.json、
   config/hooks.json、config/workflows/*.json），改配置即生效
 - 阶段 1：MCP + Skills 统一化；阶段 2：Hooks；阶段 3：Workflows
 

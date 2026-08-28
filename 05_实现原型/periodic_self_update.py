@@ -26,7 +26,7 @@ import os
 import json
 import re
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 # 周期参数
 INTERVAL_HOURS = 24          # 检查周期
@@ -92,6 +92,56 @@ def _classify_target_section(target: str) -> str:
             if kw and kw.lower() in t:
                 return section
     return "general"
+
+
+# Gap A：feedback_log.jsonl 读者——server.py /api/feedback 写入用户反馈
+# （schema: {"ts","learner_id","rating":"good|bad|neutral","message","context"}），
+# 但此前无人消费（write-only）。这里把 rating=="bad" 的负面反馈读出来，
+# 蒸馏为改进建议行，供 _do_weekly 写入 improvements.md（注入 system prompt）。
+def load_bad_feedback(path: Optional[str] = None) -> List[dict]:
+    """读取 memory/feedback_log.jsonl，返回 rating=="bad" 的负面反馈条目。
+
+    schema 与 server.py /api/feedback 写入端严格一致；rating 仅 good/bad/neutral，
+    本函数只保留 bad（负面反馈），供失败分析/改进步骤消费。文件缺失/损坏时返回 []。
+    """
+    if path is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            'memory', 'feedback_log.jsonl')
+    if not os.path.isfile(path):
+        return []
+    bad: List[dict] = []
+    try:
+        with open(path, encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except Exception:
+                    continue
+                if isinstance(entry, dict) and \
+                        str(entry.get("rating", "")).lower() == "bad":
+                    bad.append(entry)
+    except Exception:
+        pass
+    return bad
+
+
+def distill_feedback_improvements(entries: List[dict]) -> List[str]:
+    """把负面反馈条目蒸馏为改进建议行（'- ' 前缀，写入 improvements.md）。"""
+    lines: List[str] = []
+    for e in entries:
+        _msg = str(e.get("message") or "").strip()[:200]
+        _ctx = str(e.get("context") or "").strip()[:100]
+        _lid = str(e.get("learner_id") or "anon")
+        if _msg:
+            lines.append(f"- [负面反馈] 学员 {_lid}：{_msg}")
+        elif _ctx:
+            lines.append(f"- [负面反馈] 学员 {_lid}（上下文 {_ctx}）：未填写具体意见")
+        else:
+            lines.append(f"- [负面反馈] 学员 {_lid}：未填写具体意见")
+    return lines
 
 
 class PeriodicSelfUpdater:
@@ -178,6 +228,24 @@ class PeriodicSelfUpdater:
                     self._log(f"[PAEG][periodic] 改进建议 {len(suggestions)} 条已写入 memory/improvements.md")
         except Exception as e:
             self._log(f"[PAEG][periodic] 失败分析失败: {e}")
+
+        # 3.5 Gap A：负面用户反馈回流（feedback_log.jsonl → improvements.md）
+        #   server.py /api/feedback 写入 memory/feedback_log.jsonl（此前 write-only 无人消费）。
+        #   把 rating=="bad" 的条目蒸馏为改进建议写入 improvements.md（teaching_memory 会注入 system prompt）。
+        try:
+            _bad = load_bad_feedback()
+            if _bad:
+                _lines = distill_feedback_improvements(_bad)
+                if _lines:
+                    imp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                            'memory', 'improvements.md')
+                    with open(imp_path, 'a', encoding='utf-8') as f:
+                        f.write(f"\n## {datetime.now().strftime('%Y-%m-%d')} · 用户负面反馈\n")
+                        f.write("\n".join(_lines) + "\n")
+                    results["feedback_bad"] = len(_bad)
+                    self._log(f"[PAEG][periodic] 负面反馈 {len(_bad)} 条已蒸馏写入 improvements.md")
+        except Exception as e:
+            self._log(f"[PAEG][periodic] 负面反馈回流失败: {e}")
 
         # 4. 新学科需求（v0.19.26）→ 生成待新增学科建议（写入 improvements.md 自动注入）
         try:
