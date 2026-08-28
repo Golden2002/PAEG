@@ -14,8 +14,8 @@
 - ✅ **全仓库补推**：GitHub 网络恢复，主项目（6aeedf3）+ 14.1~14.6 全部同步；modelscope 同步完成
 
 **⚠️ 必须轮换的密钥（已进入 git 历史并推送，仅脱敏无法补救）**：
-1. DeepSeek `REMOVED_DEEPSEEK_API_KEY`（历史 commit 9530ab6 等）
-2. Minimax `sk-cp-Ldaq...`（历史 commit ec52771 等）
+1. DeepSeek `sk-e42960ce…`（历史 commit 9530ab6 等）
+2. Minimax `sk-cp-Ldaq…`（历史 commit ec52771 等）
 → 请到对应平台撤销并重新生成 key，新 key 只放环境变量。
 
 **纪律固化**：①密钥一律环境变量（DEEPSEEK_API_KEY / MINIMAX_API_KEY / PAEG_ADMIN_TOKEN 等）②文档禁止粘贴真实 key（以 `sk-***` 占位）③git remote 禁止内嵌凭据 ④新提交前跑 `python D:\wbo-workspace\security_scan2.py` 复查。
