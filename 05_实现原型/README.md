@@ -21,7 +21,6 @@
 ├── safety.py                  (安全中间件：政治/宗教传教/医疗/法律/自伤/作弊等 10 类)
 ├── cli.py                     (交互式教学 CLI)
 ├── server.py                  (Flask API：同步/流式教学 + 画像 + 元认知日志)
-├── llm_enhanced_presenter.py  (LLM 增强呈现工具)
 ├── test_demo.py               (5 学科离线 demo)
 ├── test_demo_real_llm.py      (真实 LLM demo：physics/ethics/kaoyan_math)
 ├── tests/                     (6 个测试文件，27 个用例)
