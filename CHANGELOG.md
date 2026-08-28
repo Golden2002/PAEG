@@ -2,6 +2,12 @@
 
 本文件记录主项目自身更新 + 各工具生态的更新路径（同步记录）。
 
+## 2026-08-28 — 四工具顶尖化 R3 启动：语言规范 MCP 三原语补全
+
+**语言规范 MCP 三原语（14.1，已提交）**：`mcp_server` 加 resources（style-presets://list / term-whitelist://list / rules://stats）+ prompts（proofread_workflow / report）——生态插件铁则三原语（tools+resources+prompts）完整。P-06 MCP 三原语达标。验证：7 tools + 3 resources + 2 prompts + 90 测试全绿。
+
+**R3 剩余**：四工具 MCP resources/prompts 补全（词汇表/法律/简历）、四工具量化顶尖门槛复验、架构重构（subagents/prompts 拆分）。
+
 ## 2026-08-28 — 四工具顶尖化 R2 收官（Oracle 迭代计划第 2 轮完成 ⭐）
 
 **词汇表 V-R7（14.3，已提交）**：前端闭环——语种选择（en/de/fr/es）+ 词条在线浏览（entries_preview）+ 多维度筛选（单词/CEFR）+ Word 下载。V-07 前端闭环达标。验证：151 测试全绿。
