@@ -967,6 +967,9 @@ ROUTER = {
 | 调整约束层 | `constraint_layer_set` MCP 工具（教学/考试/自由层 0-7）或 `constraint_always_active` 固定永远生效规则 |
 | 约束自演化 | `constraint_self_evolve` 把教学洞察写入指定层组（落盘 data/constraint_layers.json） |
 | 扩充 Library 资料 | `Library/` 下按级别放置：`usr_knowledge/<uid>/`（用户级）· `Library/<学科>/`（学科级）· 公共集（跨学科共享）· 模板与资源库（讲义/PPT/视频模板）——`/api/upload` purpose 指定 → 知识库自动索引，BM25 检索可命中 |
+| 新增 14.x 工具生态（独立库） | 平级目录放独立库（各自 `mcp_server.py` + 独立 git 远程）+ 复制 `infra/lang_plugin_bridge.py` 唯一适配层（插件优先 import + 失败静默回退原实现）→ 主项目零侵入 |
+
+> **可扩展性全貌**：新增工具生态 / 安装 MCP 服务 / 安装 skills 三条路径的低摩擦接入与源码落点，详见《架构可扩展性评估》（`Alexandria Bibliotheca/架构可扩展性评估.md`）——本表是其「扩展指南」速查形态。
 
 ---
 

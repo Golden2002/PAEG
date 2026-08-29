@@ -9,11 +9,18 @@
 ## 文件结构
 
 ```
-交付物/文档模板/
-├── style.css          # 完整样式（封面/正文/表格/代码块/页眉页脚）
-├── template.html      # HTML 骨架（封面区 {{COVER}} + 正文 {{CONTENT}}）
-├── render_pdf.py      # 一键渲染脚本（md → HTML → Edge headless → PDF）
-└── README.md          # 本文件
+Alexandria Bibliotheca/技术说明/          # 技术说明唯一来源目录（2026-08-29 整理）
+├── PAEG技术说明.md      # 技术说明 md 源（渲染输入）
+├── build.ps1           # 图册构建流水线统一入口（extract→pre_render→render→verify）
+├── render_pdf.py       # 一键渲染脚本（md → HTML → Edge headless → PDF）
+├── pre_render.py       # 逐图 SVG 预渲染
+├── extract_figures.py  # 图册解析 + 幽灵块检测
+├── verify_atlas.py     # 质量门（SVG 完整 + PDF 零泄漏）
+├── style.css           # 完整样式（封面/正文/表格/代码块/页眉页脚）
+├── template.html       # HTML 骨架（封面区 {{COVER}} + 正文 {{CONTENT}}）
+├── mermaid.min.js      # Mermaid 渲染引擎
+├── archive/            # 历史 PDF 归档（v0.69~v1.2.28）
+└── README.md           # 本文件
 ```
 
 ## 快速使用

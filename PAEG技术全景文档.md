@@ -5420,6 +5420,18 @@ PAEG 主项目（Host）
 └── magic 关键词路由（生成词汇表 → vocab_done SSE → 前端卡片）
 ```
 
+### 主项目可扩展性（三条低摩擦路径 · 2026-08-29 ⭐）
+
+新增工具生态 / 安装 MCP 服务 / 安装 skills 均低摩擦、零代码侵入，是 PAEG 架构最成熟的一面：
+
+| 扩展类型 | 接入方式 | 成本 |
+|---|---|---|
+| 新增工具生态（14.x 独立库） | 平级目录放独立库 + 复制 `infra/lang_plugin_bridge.py` 唯一适配层（插件优先 import + 失败静默回退原实现） | 一次性薄适配 |
+| 安装 MCP 服务 | `mcp_servers.json` 加一条 → `reload_all()` | 零代码 |
+| 安装 skills | 丢一个含 `SKILL.md` 的目录（三层优先级：全局 < 项目 < 用户） | 零代码 |
+
+统一出口 `config_hub.py`（`get_all_tool_defs()` + `execute_tool()` + `reload_all()`，改配置即生效）。详见《架构可扩展性评估》（`Alexandria Bibliotheca/架构可扩展性评估.md`）+ 元能力 §6.82 + 架构决策记录 ADR-010。
+
 ### 三形态交付（每个工具）
 
 1. **MCP 标准件**：Tools+Resources+Prompts / tools/list 动态发现 / JSON-Schema / 双传输

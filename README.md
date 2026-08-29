@@ -387,6 +387,8 @@ from services.material_bridge import install_material_plugin
 install_material_plugin()   # 注入 PAEG LLM/refiner/资源
 ```
 
+**主项目可扩展性（三条低摩擦路径 · 2026-08-29）**：新增工具生态 / 安装 MCP 服务 / 安装 skills 均低摩擦、零代码侵入——工具生态走「平级目录独立库 + `infra/lang_plugin_bridge.py` 唯一适配层（插件优先 + 静默回退原实现）」，MCP 走「`mcp_servers.json` 加一条 + `reload_all()`」，skills 走「丢一个含 `SKILL.md` 的目录（三层优先级：全局 < 项目 < 用户）」，统一出口 `config_hub.py`（改配置即生效，无需重启）。详见《架构可扩展性评估》（`Alexandria Bibliotheca/架构可扩展性评估.md`）。
+
 ### 四大工具总控 · 波次 1 基线锚定（2026-08-23）
 
 > 用户顶级指令：四大工具（语言规范校对/外语词汇表/法律检索/通用简历）按**顶尖标准总控**分五波次推进（初始化锚定→方案设计→核心开发→双审计联调→发布迭代），每波次前出具审计报告。**目录铁律**：保持现有 14.x 本地目录结构（不新建项目文件夹）；波次计划/审计报告/基线锚定副本/能力清单/对标表/需求规格均存于各 14.x 仓库 docs/。

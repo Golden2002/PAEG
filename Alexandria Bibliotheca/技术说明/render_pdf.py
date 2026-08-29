@@ -29,7 +29,7 @@ DEFAULT_FEATURES = '''
         <div class="f" data-num="G11"><span class="f-k">G1-G11</span><span class="f-v">自我进化闭环</span></div>
 '''
 DEFAULT_META = '''
-        <div class="item"><span class="k">Version</span><span class="v">v1.1<small>SVG矢量直出版</small></span></div>
+        <div class="item"><span class="k">Version</span><span class="v">v1.2.27<small>SVG矢量直出 · neutral浅色</small></span></div>
         <div class="item"><span class="k">Document</span><span class="v">技术白皮书<small>Technical Brief</small></span></div>
         <div class="item"><span class="k">Date</span><span class="v">2026 · 08<small>项目所有者内部</small></span></div>
         <div class="item"><span class="k">Status</span><span class="v">READY<small>可用</small></span></div>
@@ -46,8 +46,7 @@ def build_html(md_path: str, title: str = None, sub: str = None,
     """md → 完整 HTML（占位符替换 + Mermaid 块保留为 pre.mermaid）"""
     tpl = io.open(os.path.join(ASSETS, 'template.html'), encoding='utf-8').read()
     md_text = io.open(md_path, encoding='utf-8').read()
-    # 坑（README 渲染经验第 4 条）：匹配换行必须 raw 字符串，否则 \n 是字面量无法匹配多行 mermaid 块
-    md_text = re.sub(r'```mermaid\n(.*?)```', _mermaid_sub, md_text, flags=re.S)
+    md_text = re.sub('```mermaid\n(.*?)```', _mermaid_sub, md_text, flags=re.S)
     content_html = markdown.markdown(md_text, extensions=['tables', 'fenced_code'])
     repl = {
         '{{DOC_TITLE}}': title or 'PAEG 教育智能体技术说明',

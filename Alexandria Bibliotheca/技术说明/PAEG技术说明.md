@@ -1,4 +1,4 @@
-# PAEG 教育智能体 — 简明技术说明（v1.2.26）
+# PAEG 教育智能体 — 简明技术说明（v1.2.27）
 
 > **v1.1.9（2026-08-18）**：新增 §7.9 技术栈与前后端联通（前端/后端/API 与 SSE 协议/部署四层）；附录 C 追加 C.9-C.13 五条亮点（运行时 LLM 故障自愈链 / LLM 动态教学规划防幻觉双层兜底 / 教学进度状态机 / 场景化教学用语参考库 / 对象性×个体性四维达标评估）；§7.1 能力口径对齐 60。
 
@@ -15,19 +15,19 @@
 - 第 1 章 项目概览
 - 第 2 章 能力全景（F1-F7，每功能含技术路线+实现方法）
 - 第 3 章 系统架构（六层）
-- 第 4 章 关键流程
+- 第 4 章 关键流程（含 4.6 物料路由 §3.91 + 4.7 动态约束 §3.92 + 4.8 分阶段联通/PromptRegistry §3.94-3.96 ⭐）
 - 第 5 章 扩展指南
 - 第 5A 章 可扩展模块（框架化 · v0.70 ⭐）
 - 第 5B 章 DeepSeek Harness 借鉴蓝图（2026-08-14 调研 · 30 项中 27 项已落地）
 - 第 5C 章 OpenAI Codex Harness 借鉴（2026-08-21 开源调研 · §3.85，见 §7.11 主线六）
 - 第 6 章 未来规划（Roadmap · Oracle 咨询 2026-08-14）
-- 第 7 章 能力全景与引用来源（v1.2.26）
-  - §7.1 能力全景 / §7.2 能力增强 / **§7.3 引用来源（[1]-[48]：技术栈+学术+教育 Agent 项目）**
+- 第 7 章 能力全景与引用来源（v1.2.27）
+  - §7.1 能力全景 / §7.2 能力增强 / **§7.3 引用来源（[1]-[48]：技术栈+学术+教育 Agent 项目；[49]-[77]：Anthropic/OpenAI/AAAI 等；[78]-[83]：工具类参考项目）**
   - §7.4-§7.10 专项（Docker/双远程/fallback/进度/结构/技术栈/备课）
   - **§7.11 工程化就绪融贯（Round 4-12 六主线）**
 - 附录 A 术语表
 - 附录 B 核心文件索引
-- 附录 C 技术创新亮点（v0.70 ⭐ · C.1-C.13 技术亮点 + C.14 主题总表）
+- 附录 C 技术创新亮点（v0.70 ⭐ · C.1-C.13 技术亮点 + C.14 主题总表 + C.15 物料制作体系全览）
 - 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
 - 附录 E 功能×模块连通性矩阵（§3.77 盘点）
 
@@ -126,13 +126,17 @@
 
 | 功能 | 用户场景 | 技术路线 | 实现方法 |
 |---|---|---|---|
-| **讲义/PPT/视频/manim/思维导图** | 制作教学材料 | 文件生成器 + MCP | 能力清单注入（_build_capability_manifest）→ LLM 判断何时生成 → manim 动画（manim_service）/PPT（mcp__pptx）/讲义（keyword_doc）/视频脚本（script_service）/思维导图（knowledge_map） |
+| **讲义/PPT/视频/manim/思维导图** | 制作教学材料 | material_router 统一调度 + MaterialPipeline v2.0 | **§3.91 物料路由**（magic_intent 精确关键词 → ROUTER 表 → 生成器 → SSE 统一发流，详见 §4.6）+ 6 类管线（讲义 handout/讲稿 script/PPT/思维导图/教学视频/Manim 数学动画，见 C.15.1） |
 | **MCP 工具链** | 联网/文件/检索 | 14 个 MCP 工具 | filesystem/memory/brave-search/pptx 等；config_hub 统一路由（mcp__ 前缀），spill 溢出防护（超 12000 字符截断） |
 | **语音朗读** | 播放回复 | /api/voice/tts | 前端朗读按钮→TTS |
 | **数学可视化视频** | 生成高质量数学动画 | visual_script_generator + manim_service | 对话+轮询→script.json（3B1B 原则）→Manim 渲染；脚本+讲稿+PPT+讲义+思维导图联动可下载 |
 | **教学视频** | 授课视频生成 | script_service（视频讲稿）+ 视频管线 | 大纲→口语化讲稿（秒数控制）→合成视频 |
 | **PPT** | 教学 PPT 生成 | pptx 管线 | 大纲→LLM 排版→.pptx |
 | **讲义/要点/例题/笔记** | 教学文档生成 | keyword_doc | 4 类 doc_type 模板，教学对话关键词触发 |
+| **练习题 quiz** | 出练习题 | file_generator.generate_quiz | 由浅入深 + 每题意向解析（薇依式命题） |
+| **讲解文章 article** | 生成讲解/科普文 | file_generator.generate_article | 短/中/长三档（300/600/1000 字） |
+| **备课产物 lesson_prep** | 一键备课 | paeg.lesson_prep（8 步渐进） | lesson_plan/handout/script/ppt_outline/quiz 五件套（详见 §3.90 盘点） |
+| **学习计划 study_plan** | 系统学习路径 | meta_router is_study_plan_intent | "想系统学X"触发阶段化计划 |
 
 ### F6 配置与扩展体系
 
@@ -186,7 +190,7 @@
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     User(["学生<br/>浏览器/微信"]) -->|HTTP/SSE| PAEG["PAEG 教育智能体"]
     PAEG -->|Prompt| LLM(("LLM<br/>DeepSeek/OpenAI"))
@@ -214,7 +218,7 @@ flowchart LR
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     UI["Web UI"] --> API["REST API"] --> R["meta_router 15意图"] --> T["paeg.teach / teach_stream"]
     T --> S["9 核心 subagent + ResourceLibrarian"]
@@ -229,6 +233,7 @@ flowchart TB
 **图 2B · Blueprints 分层架构（Phase 3 · 12 蓝图）**
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     subgraph 入口层
         server["server.py 组合根<br/>app 装配 + 蓝图注册 + 启动"]
@@ -277,7 +282,7 @@ flowchart TB
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     subgraph Main["主线 · 五阶段"]
         Start(["学生提问"]) --> D["① 诊断"]
@@ -316,7 +321,7 @@ flowchart LR
 **图示（Mermaid 渲染）**：
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     subgraph ASM["system 装配"]
         B["WEIL_CORE"]; T2["TRUTH_GROUNDING"]; SS["SUBJECT_STYLES"]; LG["LANGUAGE_STYLE"]
@@ -346,7 +351,7 @@ flowchart LR
 **图 5 · 自我进化闭环（G1-G11）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     Teach["教学完成"] --> Hist["对话历史抓取 G1"]
     Hist --> Dist["知识蒸馏<br/>LLM 提炼"]
@@ -365,7 +370,7 @@ flowchart TD
 **图 6 · RALPH 循环（任务驱动持续改进）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     Sub["任务提交 TaskRegistry"] --> Exec["执行本轮 executor"]
     Exec --> Eval["三层判定<br/>L0门禁+L1指标+L2证据"]
@@ -379,7 +384,7 @@ flowchart TD
 **图 7 · 意图路由（meta_router）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     In["用户输入"] --> Mode{"模式短路<br/>用户显式选择?"}
     Mode -->|是| Direct["确定性意图<br/>confidence 0.95"]
@@ -394,7 +399,7 @@ flowchart TD
 **图 8 · 配置体系（config_hub）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     App["server.py/subagents"] -->|get_all_tool_defs| Hub["config_hub"]
     Hub --> MCP["MCP 14 工具"]
@@ -410,7 +415,7 @@ flowchart LR
 **图 9 · checkpoint 互动时序（深入版教学互动）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
     participant S as 学生
     participant T as teach_stream
@@ -428,10 +433,10 @@ sequenceDiagram
 ```
 
 
-
 **图 10 · 17 维学生画像独立性模型**
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     P["LearnerProfile 17 维"] --> L1["L1 核心 5 维<br/>identity/cognitive_style/mastery/study_goal/emotion"]
     P --> L2["L2 触发 5 维<br/>engagement/motivation/belief/intention/error_response"]
@@ -446,7 +451,7 @@ flowchart TD
 **图 11 · 三层记忆生命周期**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     ST["短期记忆<br/>≤12 条/token≤6000"] -->|超阈值| CP["compress_if_needed<br/>LLM 摘要"]
     CP --> MT["中期记忆<br/>主题/掌握/薄弱/情感四信号<br/>≤900 字"]
@@ -459,7 +464,7 @@ flowchart LR
 **图 12 · 教学策略决策树（choose_strategy）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     In["诊断+学科+画像"] --> Bloom["学科默认 Bloom 起点"]
     Bloom --> R1{"有缺口且无前置?"}
@@ -480,7 +485,7 @@ flowchart TD
 **图 13 · 单步教学续讲（_pending_steps 状态机）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 stateDiagram-v2
     [*] --> step_idle
     step_idle --> step_in_progress: 首步进入
@@ -494,7 +499,7 @@ stateDiagram-v2
 **图 14 · QualityGate L1-L4 四层过滤**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     C["候选内容"] --> L1["L1 宪法<br/>有害/注入/PII 正则 <1ms"]
     L1 -->|pass| L2["L2 硬规则<br/>长度/去重/格式 <1ms"]
@@ -509,7 +514,7 @@ flowchart TD
 **图 15 · 周期自我更新调度**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
     participant S as server
     participant P as PeriodicUpdater
@@ -530,6 +535,7 @@ sequenceDiagram
 **图 16 · SSE 流式协议事件序列**
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
     participant U as 用户
     participant S as server
@@ -551,6 +557,7 @@ sequenceDiagram
 **图 17 · hooks 事件链（贯穿各层）**
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
     participant App as 应用
     participant H as hooks_hub
@@ -568,6 +575,7 @@ sequenceDiagram
 **图 18 · 危机信号识别协议（affection_gate）**
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     In["用户输入"] --> Det{"自伤/自杀信号?"}
     Det -->|否| Normal["正常回应"]
@@ -582,7 +590,7 @@ flowchart TD
 **图 19 · spill 防护（上下文溢出+注入防御）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     In["输入/工具返回"] --> L1["L1 注入模式正则"]
     L1 -->|pass| L2["L2 PII 检测"]
@@ -597,7 +605,7 @@ flowchart TD
 **图 20 · MCP 工具配置化加载器（v1.1.1 ⭐）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     JSON["config/mcp_tools.json<br/>14 工具声明"] --> LD["mcp_tools_loader<br/>JSON→工具注册"]
     LD --> W1{"模块白名单<br/>mcp_tools.*"}
@@ -614,7 +622,7 @@ flowchart LR
 **图 21 · 权限控制三层（sandbox+approval+custom）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     REQ["tool.before<br/>调用请求"] --> LD["加载 Profile<br/>+ preset 预设"]
     LD --> P{"preset 类型<br/>read_only/standard/exam/full"}
@@ -631,7 +639,7 @@ flowchart TD
 **图 22 · 事件类型化（62 类型：13 CORE + 35 PLUGIN + 14 PAEG）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     SRC["事件源<br/>hooks / subagent<br/>/ tool / workflow"] --> ENV["SessionEvent 信封<br/>seq + time + data<br/>+ surfaceOp"]
     ENV --> SURF{"surfaceOp 校验<br/>强制 schema"}
@@ -646,7 +654,7 @@ flowchart TB
 **图 23 · repeat-tool-guard（chain-key + 多级阈值）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 stateDiagram-v2
     [*] --> calc
     calc: tool.before hook<br/>计算 chain-key<br/>hash tool+args
@@ -669,7 +677,7 @@ stateDiagram-v2
 **图 24 · Profile Bundle 分层堆叠 + dump-config**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
     L1["L1 内嵌默认<br/>PAEG 原设计"] --> L2
     L2["L2 Bundle 加载<br/>standard / exam / weil"]
@@ -685,7 +693,7 @@ flowchart TB
 **图 25 · subagent 生命周期事件（构造 + start/end + hook）**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
     participant App as server
     participant WF as workflow
@@ -705,7 +713,7 @@ sequenceDiagram
 **图 26 · 教学物料流水线 material_pipeline**
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     IN["主题输入"] --> DAG["teach_materials<br/>DAG 编排"]
     DAG --> P1["导图 + 讲义"]
@@ -723,6 +731,7 @@ flowchart LR
 **图 27 · Docker 打包 + 双远程部署（§7.4/§7.5）**
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
     subgraph "本地开发"
         dev["本地 :5000<br/>python server.py"]
@@ -766,11 +775,187 @@ flowchart LR
 ### 4.5 防幻觉锚定
 TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为绝对命令/允许说不知道 → QualityGate L3 factuality 评分把关自我更新
 
+### 4.7 动态约束架构（§3.92 ⭐ LLM 自主判断放开 · 不类型化意图）
+
+> **背景**：教学输出质量提升中发现——硬编码"教授级 6 层骨架"会让输出僵硬（用户反馈）。
+> 用户核心要求："告诉大模型知悉有多少层动态约束、每层内容是什么，让大模型选择去放开一些约束"、
+> "不要类型化，简单讲/详细讲不是仅有的三种意图，这都需要大模型去判断"、
+> "必须增强输出能力，而不是通过约束限制大模型的发挥"。
+
+**设计原则**（Oracle 方案 + 用户要求）：
+- **告知而非强制**：system prompt 注入"约束清单告知块"（L0-L7 层 + 每层内容 + 当前状态），LLM 自主理解用户意图
+- **不类型化意图**：不预设 easy/normal/deep 分类，由 LLM 根据用户真实表达判断（可远超三种）
+- **数据驱动**：所有约束内容存 `data/constraint_config.json`（layer_meta + group_rules 结构化），热更新零改码
+- **默认全放开**：default_layer = 7（L0 保底永不放开）——增强输出能力，按需收紧
+
+**8 层约束体系（L0 保底 + L1-L7 渐进放开）**：
+
+| 层 | 名称 | 放开组 | 用途 |
+|---|---|---|---|
+| L0 | 保底层 | — | 语言规范/公式/反AI腔/安全，永不放开 |
+| L1 | 极简层 | M | 用户要"简单讲"→ 仅节奏 |
+| L2 | 简明层 | M+R | 要点式 + 允许 1 类比 |
+| L3 | 标准层 | M+R+T | 含温度不深度 |
+| L4 | 基线层 | — | 兜底兼容 |
+| L5 | 深教层 | M+D | 教学法深度（完整骨架） |
+| L6 | 学科深教层 | M+R+D+S | +学科教学法 |
+| L7 | 完全放开层 | 全组 | 教授级 6 层骨架 + 比喻 + 学科法 + 哲学 |
+
+**组定义**（正交：每层单一职责不干扰）：M 节奏 / R 修辞（含比喻放开项）/ T 温度 / D 教学法深度（skeleton_full/brief）/ S 学科教学法 / P 哲学框架。
+
+**教学法骨架动态化（D 层）**：
+- D 放开（L≥5）→ 注入 `skeleton_full`：教授级 6 层（核心前提→基础机制→底层原理→现实权衡→⚠️边界条件→延伸引导→小结 + 硬性误区纠正/概念性类比）
+- D 收紧 → 注入 `skeleton_brief`（简洁版）
+- 骨架从 prompts.py 硬编码抽离至 constraint_config.json（数据驱动）
+
+**比喻动态化（R 层）**：LANGUAGE_STYLE"比喻是最后手段"保留为 default_rules；R 放开时允许 1-2 个结构性类比。
+
+**实测验证**（§3.92 标杆同题）：
+- 教授级 6 层骨架完整呈现：核心前提→基础机制→底层原理→现实权衡→⚠️边界条件（两前提+反直觉点）→费雪方程→例题→检查理解
+- 8 维提升：结构层次 0%→45%、学术深度 71%→88%、延伸引导 0%→20%（冲销干预）
+- 物料质量：PPT 85 / 讲义 85 / 教学视频 87.8（三 Oracle）
+
+### 4.6 物料路由架构（§3.91 ⭐ 数据驱动统一调度）
+
+> **背景**：早期物料生成以 6 个 if 早退分支堆叠在 teach_stream（约 195 行重复代码：
+> ppt/handout/video/manim/mindmap/script 各写一遍 topic 提取 + 生成器调用 + SSE 组装）。
+> §3.91 按 Oracle 架构重构为**数据驱动路由表 + 统一调度器**，消除重复并增强路由判断。
+
+**核心模块**（3 个新文件，server.py 净减约 209 行）：
+
+| 模块 | 职责 |
+|---|---|
+| `material_router.py` | ROUTER 表（数据驱动：intent→生成器/超时/降级文案/是否走管线）+ `route_material()` 统一调度 + `is_material_intent()` 意图白名单 + `extract_topic()` 统一 topic 提取 |
+| `sse_presenter.py` | 统一 SSE 事件序列化：`fmt_presentation`/`fmt_done`/`fmt_progress`/`fmt_error`（契约字节级不变，14 单测锚定） |
+| `material_generators.py` | 6 个生成器封装（并入 material_router 内部），返回统一 `{ok, content, url, error, step_type}` dict |
+
+**数据驱动 ROUTER 表**（关键设计）：
+
+```python
+ROUTER = {
+  "ppt":     MaterialRoute("ppt", gen_ppt,     timeout=60,  use_pipeline=False),
+  "handout": MaterialRoute("handout", gen_handout, timeout=30),
+  "video":   MaterialRoute("video", gen_video, timeout=45),
+  "manim":   MaterialRoute("manim", gen_manim, timeout=300, use_pipeline=True),  # 长任务走 MaterialPipeline v2.0
+  "mindmap": MaterialRoute("mindmap", gen_mindmap, timeout=30),
+  "script":  MaterialRoute("script", gen_script, timeout=30),
+}
+```
+
+**调度流程**：`teach_stream` 一行接入（`if is_material_intent(_magic): yield from route_material(...); return`）→
+`extract_topic` 剥离"生成X："前缀 → ROUTER 查表 → 生成器（异常围栏 + fallback_msg 降级）→
+`sse_presenter` 统一发流（presentation + done，契约字节级保持）→ `_save_teach_turn` 存档。
+
+**设计要点**：
+- **默认 5 类直调生成器**（响应快 + SSE 契约稳），**仅 manim 走 MaterialPipeline v2.0**（渲染 2-5min，需 6 阶段门控）
+- **意图冲突消解**：magic_intent 优先级最高（magic > rule_fallback > lesson_prep > 普通教学），router 仅处理 magic 命中
+- **灰度开关** `PAEG_USE_MATERIAL_ROUTER=0` 可回退旧分支（当前默认 1，已删旧分支）
+- 单物料失败不影响其他（try/except 围栏 + fallback_msg 降级文案）
+- 与 magic_intent.py 零耦合（复用其 match_magic 输出）；与 MaterialPipeline v2.0 按需接线（见附录 C.15.2）
+
+**修复的既有 bug**（§3.90 全物料测试暴露）：
+- manim/video 关键词落入普通教学流 → 补早退分支（现已统一由 router 调度）
+- 思维导图/讲稿关键词缺失 → magic_intent 补 `生成思维导图：`/`生成讲稿：`
+- 讲稿空大纲崩溃 → 先生成大纲再 generate_full_script
+- 讲义 learner 依赖 → 改 save_answer 路径（与 material_pipeline.handout_pipeline 同路径）
+- PPT 下载链接缺失 → 从 path 构造 `/api/download/ppt/{filename}`
+
+**验证**：96/96 测试全绿（14 新增 router/sse_presenter 单测 + 82 既有）；6 类物料 UI 端到端全 PASS
+（PPT 下载 HTTP 200 / 讲义内容完整 / 教学视频分镜 / 思维导图 / 讲稿多节 / 数学动画真实出片 761KB + 下载 200）。
+物料体系全景见附录 C.15.1；统一流水线见 C.15.2。
+
+### 4.8 物料分阶段联通 + 三层联通 + 提示词清单（§3.94-§3.96 ⭐）
+
+> **背景**：用户要求物料生产"分阶段、与用户界面全联通"——复杂物料（PPT/视频/Manim）
+> 经前置中间产物（大纲/分镜/脚本/代码）逐级生成，中间产物可下载、用户提示词注入生成依据。
+
+**分阶段联通（§3.94）**：
+- `manim_pipeline.run_pipeline` 接收 `job_id` + `progress_callback`，各阶段（脚本→代码→视频）按 job_id 落盘 `evolve_data/manim_pipeline/jobs/<job_id>/`（script.json/scene.py/manifest.json）
+- 下载 API：`/api/manim/jobs/<job_id>/{script,code,manifest}`（白名单校验 + 安全路径）
+- SSE 阶段事件：`progress`（脚本 0-30%/代码 30-60%/视频 60-90%）+ `artifact`（产物可下载）+ `done`（manifest）
+- 前端：三阶段进度条（脚本→代码→视频）+ 详细要求输入框（用户提示词注入）+ 下载链接
+
+**三层联通（§3.95）**：
+- ① 物料流水线内部：阶段间产物传递（MaterialPipeline.run 保留 spec/artifacts）
+- ② agent 架构：material_harness.py 用 AgentEngine（Plan→Act→Observe→Reflect）驱动物料，中间产物落盘指导下一环节
+- ③ 用户交互：用户输入（user_requirements/intuition/objectives）拼进所有生成提示词
+
+**提示词清单 PromptRegistry（§3.96）**：
+- `data/prompt_registry.json`：19 个提示词块 + 7 情景（teaching/material/confide/answer/chat/method/knowledge）
+- `prompt_registry.py`：`assemble(scenario, stage, inputs) -> (system, trace)` 按情景装配 + trace 可追溯
+- 块类型：fixed（固定）/dynamic（运行时）/user_input（用户原文强制末尾）；priority 语义化（1 底线/10 身份/20 角色/30 深度/40 上下文/99 用户）
+- 与 constraint_config.json 的关系：约束层是"深度/节奏/修辞"调节，registry 是"文本块清单"——两者正交配合
+
+### 4.8.1 L1 启发式提示词层 + 三层约束流程（§3.103-§3.106 ⭐）
+
+> **背景**：用户基变换演示暴露"简单输入 → LLM 未拆解概念直接生成"问题。用户提出**提示词灵活度分层**洞察，
+> 并明确要求"启发式提示词要专门调研设计，覆盖所有物料/教学/倾诉/查资料/方法"。
+
+**三层约束体系**（对 LLM 约束的丰富内涵）：
+
+| 层 | 形式 | 灵活度 | 内涵 |
+|---|---|---|---|
+| **L1 启发式提示词** | 系统提示词引导沉思（先想清楚再执行） | 最强——交由 LLM 思考 | + 动态 0-7 层八层约束构建（constraint_config L0-L7） |
+| **L2 模板化提示词** | 给 LLM 做选项/填充固定信息 | 下降 | 物料专属模板（角色/schema/硬约束/范例——material_prompts 5 类） |
+| **L3 脚本路由** | 路由/正则/魔法关键词 | 最僵硬 | 物料触发/意图路由（material_router） |
+
+**L1 沉思引导（heuristic_prompts.py · §3.106）**：7 情景全配备——
+- **teaching**：5E 阶段识别 + 三类障碍诊断（概念/策略/元认知）+ 苏格拉底策略
+- **confide**：情绪验证分层（EVA 四层：倾听→镜像→认可→真诚）+ 避免过早建议
+- **material**：概念五问（是什么/不是什么/机制/例子/展示方案）+ 路径候选比较
+- **answer/method/chat/knowledge**：意图分析/水平评估/理解引导
+
+**8 条设计原则**（librarian 调研 29 条权威引用）：先沉思再产出（<thinking>/<output> 标签）/ 概念分析五问 /
+展示方案给自由度 / Intent-First 教学 / 情绪验证分层 / 引导而非替代 / 元认知触发器 / 标签隔离。
+权威引用见 §7.3 [49]-[77]（Anthropic/OpenAI/AAAI/ACL/Springer/MDPI/3b1b——尊重智力成果）。
+
+**固定 vs 动态提示词**（§3.105）：
+- **固定**：大模型自我设定/角色设定——每次发送
+- **动态**：启发式沉思引导 / 对话历史 / 用户画像 / 教学自我更新 / 约束层 0-7
+
+**验证**（§3.102 基变换）：L1 引导后 4 场景完整覆盖——hook"同一个向量？"→ 两个坐标系（同一向量不同基表示）
+→ 基变换矩阵 → recap。概念拆解成功（此前只画旋转网格）。
+
+#### 4.8.2 全拼接体系（§3.107 ⭐ 任何一次输入 = 全部提示词拼接）
+
+> **用户核心理解**："任何一次输入都要把用户的输入，包括历史对话、用户画像等等和学段加学科两个提示词，
+> 这些所有的都拼接到一起。"
+
+**每次教学输入拼接清单**（12 要素，build_presenter_system + Presenter.run 全拼接）：
+
+| # | 要素 | 来源 | 类型 |
+|---|---|---|---|
+| 1 | 用户输入（concept） | 当前问题 | 动态 |
+| 2 | 对话历史（previous 最近 3 轮） | 前情提要 | 动态 |
+| 3 | 用户画像（learner_line/user_model） | 学段/风格/薄弱点/昵称 | 动态 |
+| 4 | 学段提示词（grade_line） | _GRADE_GUIDE[grade] 深度 | 动态 |
+| 5 | 学科提示词（SUBJECT_STYLES） | persona/language/structure | 动态 |
+| 6 | 学段×学科组合诱导（grade_subject_inducers） | §3.107 高中数学/考研物理等 | 动态 |
+| 7 | L1 启发式沉思引导（heuristic_prompts） | §3.106 5E/概念五问 | 动态 |
+| 8 | 教授级教学法骨架（skeleton_full） | 约束 D 层 | 动态 |
+| 9 | 约束层 0-7（constraint_config） | L0 保底 + L1-L7 放开 | 动态 |
+| 10 | 知识库检索（kb_node） | 概念图谱 | 动态 |
+| 11 | 教学记忆/自我更新（teaching_memory） | subject_patches/tool_lessons | 动态 |
+| 12 | 物料专属诱导（material_inducers） | §3.107 物料场景 | 动态 |
+
+**固定 vs 动态**（§3.105）：固定=自我设定/角色/语言规范/真实底线/保底约束（每次发送）；
+动态=上述 12 要素（运行时拼接）。
+
+**提升式原则**（§3.107）：所有拼接为"增加"而非"替换"——不破坏现有结构，新要素默认参数兼容。
+
+
+**用户要求（§3.95 用户原话）**："用户的输入作为提示词，被拼接到所有的动态的和固定的拼接提示词中去"；
+"物料生产根据 agent 的 harness 逐步调用 LLM 先生成中间的文件，中间的良好文件又指导下一环节的物料制作"。
+
+
+
 ---
 
 ## 第 5 章 扩展指南
 
 | 想做什么 | 怎么做 |
+|---|---|
+| 防长时无监控（§3.92 纪律） | 长任务后台运行+输出重定向+30s 心跳轮询+超时保护（PPT 120s/讲义 60s/视频 90s/manim 300s）+进度可视化（flush=True）+微信进度推送——禁止无限等待 |
 |---|---|
 | 新增学科 | `prompts.py` SUBJECT_STYLES 加键（persona/language/structure/emphasis + 可选 subfield_guide/method_guide/worked_example）+ SUBJECT_GRADES/SUBFIELD_TREE |
 | 新增 subagent | `subagents.py` 建类（run 方法组装 system + 调 _safe_reason_chat）+ 注册到 paeg.py |
@@ -782,6 +967,9 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 | 调整约束层 | `constraint_layer_set` MCP 工具（教学/考试/自由层 0-7）或 `constraint_always_active` 固定永远生效规则 |
 | 约束自演化 | `constraint_self_evolve` 把教学洞察写入指定层组（落盘 data/constraint_layers.json） |
 | 扩充 Library 资料 | `Library/` 下按级别放置：`usr_knowledge/<uid>/`（用户级）· `Library/<学科>/`（学科级）· 公共集（跨学科共享）· 模板与资源库（讲义/PPT/视频模板）——`/api/upload` purpose 指定 → 知识库自动索引，BM25 检索可命中 |
+| 新增 14.x 工具生态（独立库） | 平级目录放独立库（各自 `mcp_server.py` + 独立 git 远程）+ 复制 `infra/lang_plugin_bridge.py` 唯一适配层（插件优先 import + 失败静默回退原实现）→ 主项目零侵入 |
+
+> **可扩展性全貌**：新增工具生态 / 安装 MCP 服务 / 安装 skills 三条路径的低摩擦接入与源码落点，详见《架构可扩展性评估》（`Alexandria Bibliotheca/架构可扩展性评估.md`）——本表是其「扩展指南」速查形态。
 
 ---
 
@@ -816,6 +1004,7 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 | 统一入口 | 所有生成内容过 `lang_gate_content`（L0 规则 + L2 薇依语料矫正），外部 agent 可调 `normalize_text` |
 | 内嵌默认 | AI_TELLS 577 项（去重 555）+ LANGUAGE_STYLE 规范 + 薇依语料 few-shot——完整保留 |
 | 病句规则（v0.71） | `fix_known_gaffes` 确定性修正悬空"听着你"（缺补语病句，用户反馈）——句末/停顿锚定只修病句、负向保护"听着你说"类合法搭配；接入 L0-0 前置 + 最终收口，保证"输出永不含悬空'听着你'"不变量 |
+| **物料统一出口接线（v1.3.2 ⭐）** | `material_router.route_material` 出口对全部物料（讲义/讲稿/导图/视频旁白/PPT）过 `_material_lang_gate`（HTML 标签保护 + 文本 lang_gate_content）；`material_harness` 的 Observe 追加语言门 + run 收口 `language_refine`——**语言规范作为内容输出质量控制模块，与所有物料输出 100% 接线** |
 
 ### C. 配置体系框架（config_hub）
 
@@ -915,7 +1104,7 @@ TRUTH_GROUNDING 全模式注入（幂等）→ LLM 必须：不编造/信源为�
 3. 多 agent 不换框架（复用 RALPH）；知识图谱先轻量本体（JSON）确认需求再上 Neo4j
 
 
-## 第 7 章 能力全景与引用来源（v1.1.9）
+## 第 7 章 能力全景与引用来源（v1.2.27）
 
 ### 7.1 能力全景：60 种能力，一套路由
 
@@ -1065,12 +1254,112 @@ PAEG 的能力体系围绕一条原则组织：**一切能力都可替换、可�
 
 **[48] 张宇扬课件（公共知识库）. (2026). 用户提供课件集（演化/生态/生物信息/实验设计/生物统计/遗传学 7 门课）. Library/common/张宇扬课件/**（教学材料质量特征基准：文献锚定/精确概念定义/机制解释/分层递进——PAEG material_quality 检查器与输出守门吸收）
 
+#### 7.3.6 工具类参考项目（2026-08-27 增补 ⭐——三项目工具生态）
+
+> 本轮（§三项目总控：法律检索/简历制作/词汇表制作）调研并借鉴的工具类项目——
+> 与 7.3.1-7.3.5 并列编号。用户执行标准：参考的所有项目、GitHub 库均须在此登记。
+
+**[78] LegalAISkill 法律 AI Skill 精选库. (2026). https://legalaiskill.com/**（525 个法律 AI Skills 精选库——质量方法论（任务明确/来源可回查/红线封顶/收录披露）与北大法宝 MCP 系列（精准法条/案例检索/引注核验/超链增强/语义检索）是法律检索插件校验机制与案例检索能力的设计参考）
+
+**[79] 北大法宝 MCP 系列（pkulaw-mcp-*）. (2026). 北大法宝法律数据库 MCP 工具集.**（精准法条查找、案例关键词检索（案由/争点/事实→样本）、引注核验、超链增强——法律检索插件数据库接入抽象层与案例检索工具的参考）
+
+**[80] Medical-Resume-Agent（医学简历 Agent）. (2026). GitHub. https://github.com/Golden2002/medical-resume-agent**（事实校验-经历拆解-定向表达方法论、Role Pack 角色适配结构、主张校验门（引用原文）、Flask API 模式、Docker/Render 部署——简历产品核心引擎的参考基线）
+
+**[81] AI Job Search（通用求职 Agent）. (2026). GitHub. https://github.com/Golden2002/ai-job-search-derived-agent**（通用求职 Agent 工作流框架、drafter-reviewer 双 Agent 流程、LaTeX 简历渲染、申请跟踪——简历产品的工作流基底）
+
+**[82] MadsLorentzen. (2026). ai-job-search（上游原版）. GitHub. https://github.com/MadsLorentzen/ai-job-search**（Claude Code 求职框架原版——69 份申请/20 场面试/成功上岸的真实验证案例；简历产品工作流设计的上游参考）
+
+**[83] 生命现象学 / The Bell Jar 词汇表项目（英语学习资产）. (2026). 用户提供渲染模板（Bell Jar CSS 原版模板 + render_vocab.py + render_html_to_pdf.py）.**（精美词汇表渲染模板基准——词汇表插件渲染引擎完整复用，禁止简化版）
+
+**[84] THU-MAIC. (2026). OpenMAIC: Open-Source AI Interactive Classroom Platform [Computer software]. GitHub. https://github.com/THU-MAIC/OpenMAIC**（清华大学 MAIC = Multi-Agent Interactive Classroom 多智能体交互式课堂——国内首个 L4 级 AI 课堂，教育版 OpenClaw「教学龙虾」；TypeScript 多智能体课堂架构。调研参考：多智能体课堂角色编排、L4 级课堂自动化分级，为 PAEG 工具生态多 Agent 协作与课堂形态演进提供参照）
+
+**[49] Anthropic. (2026). Best Practices for Prompt Engineering. claude.com/blog/best-practices-for-prompt-engineering.**（L1 先沉思再产出：CoT/<thinking>/<output> 标签分离——§3.106 启发式提示词层）
+
+**[50] Anthropic. (2026). Claude Platform Docs: Prompt Engineering Best Practices. platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices.**（自检触发器/分块隔离——§3.106 原则 7/8）
+
+**[51] Anthropic. (2026). Extended Thinking. platform.claude.com/docs/en/build-with-claude/extended-thinking.**（引导而非替代：给思考清单不给标准答案——§3.106 原则 6）
+
+**[52] Anthropic. (2026). The "think" Tool. anthropic.com/engineering/claude-think-tool.**（思考工具：LLM 内省可审计——§3.106 分层架构）
+
+**[53] OpenAI. (2026). Reasoning Best Practices. developers.openai.com/api/docs/guides/reasoning-best-practices.**（简单 prompt 最佳——避免过度指令化，§3.106 原则 6）
+
+**[54] OpenAI. (2026). GPT-5 Prompting Guide. developers.openai.com/cookbook/examples/gpt-5/gpt-5_prompting_guide.**（clear goal + constraints + output contract——§3.106 L1 四段式）
+
+**[55] Springer. (2026). Digital Prompting in Education. link.springer.com/article/10.1007/s10648-026-10164-1.**（提示词作为动态脚手架四维——§3.106 概念分析）
+
+**[56] Springer. (2026). Prompt Engineering as Cognitive Scaffolding. link.springer.com/article/10.1007/s44217-026-01134-4.**（Guided Explanation/Contextualised Inquiry/Comparative Reasoning——§3.106 原则 2）
+
+**[57] Springer. (2026). ARPG+: Real-Time Coaching for Educational LLM Prompting. link.springer.com/article/10.1186/s41239-026-00606-9.**（提示词质量 6 维评估——§3.106 原则 8）
+
+**[58] MDPI. (2026). 5E-Structured GenAI Coach. mdpi.com/2227-7102/16/3/384.**（5E 学习周期 + 5S 提示原则——§3.106 教学范本，d=0.68 实证）
+
+**[59] ACL Findings. (2026). EVA: Emotional Validation for Empathetic LLMs. aclanthology.org/2026.findings-acl.1.pdf.**（情绪验证四层级 L1-L4——§3.106 倾诉范本核心）
+
+**[60] AAAI. (2026). ESCA: Emotional Support Conversation Agent. ojs.aaai.org/index.php/AAAI/article/view/38807.**（情绪支持策略规划：强度/信任/行为/阶段——§3.106 倾诉诊断）
+
+**[61] MDPI. (2026). Implicit Empathy Prompting. mdpi.com/2673-4591/129/1/8.**（共情分解特征——§3.106 倾诉策略）
+
+**[62] MDPI. (2024). VisAlchemy: Visualisation Design Ideation. mdpi.com/1999-5903/16/11/406.**（展示方案给自由度，避免过早指定图表类型——§3.106 原则 3）
+
+**[63] arXiv. (2024). Visualizationary: Automating Design Feedback. arxiv.org/html/2409.13109.**（ACGT 工作流：Analyze-Clarify-Guide-Track——§3.106 展示路径候选）
+
+**[64] arXiv. (2025). Capturing Visualization Design Rationale. arxiv.org/html/2506.16571v1.**（选择理由比选择本身重要——§3.106 物料范本）
+
+**[65] Warwick. (2024). Could You Be Wrong: Metacognitive Prompts. wrap.warwick.ac.uk/id/eprint/195836/.**（自我审视/反思提示——§3.106 原则 7）
+
+**[66] AIED. (2025). Metacognitive Scaffolds in AI Programming Education. arxiv.org/html/2509.03171.**（计划-监控-评估三阶段——§3.106 教学障碍诊断）
+
+**[67] arXiv. (2025). SocraticAI. arxiv.org/html/2512.03501v1.**（苏格拉底交互设计——§3.106 教学范本，提升问题分解能力）
+
+**[68] arXiv. (2026). AI Generates Templatic Empathic Responses. arxiv.org/html/2604.08479v2.**（警示：LLM 共情 83-90% 走同一模板——L1 必须打破模板化共情）
+
+**[69] MDPI. (2025). ChatGPT for Lesson Planning (PCK Lens). mdpi.com/2227-7102/15/3/338.**（PCK 视角教案——§3.106 教学结构）
+
+**[70] MDPI. (2026). Pedagogical Content Knowledge in Science Education. mdpi.com/2673-8392/6/2/43.**（PCK 框架——§3.106 概念分析）
+
+**[71] SIGCHI. (2026). Do Prompt-Level Empathy Instructions Influence UX? programs.sigchi.org/cui/2026/.**（共情提示词 UX 影响——§3.106 倾诉验证）
+
+**[72] Grant Sanderson (3Blue1Brown). (2024). How I Animate 3Blue1Brown. 3blue1brown.substack.com/p/how-i-animate-3blue1brown.**（视觉先于符号/黑板美学——§3.100 3B1B 原则）
+
+**[73] AMS Notices. (2022). 3Blue1Brown Creator Grant Sanderson. ams.org/journals/notices/202210/.**（动画即论证/放慢节奏——§3.100 3B1B 原则）
+
+**[74] adithya-s-k. (2026). manim_skill: Manim Best Practices. github.com/adithya-s-k/manim_skill.**（三幕叙事 Hook→Geometric→Numeric——§3.100 manim_templates）
+
+**[75] ManimCommunity. (2026). Manim Docs Example Gallery. docs.manim.community/en/stable/examples.html.**（单 API 最小示例——§3.100 manim_templates）
+
+**[76] 3b1b. (2023). videos: _2023/clt/main.py. github.com/3b1b/videos.**（TransformMatchingTex 公式推导链——§3.100 模板参考）
+
+**[77] 3b1b. (2015). videos: inventing_math.py. github.com/3b1b/videos.**（模块常量+工厂+.split 拆词——§3.100 模板参考）
+
+> **§3.106 引用标注**：以上 [49]-[77] 为 L1 启发式提示词层 + 3B1B manim 方法论调研的权威来源
+> （Anthropic/OpenAI 官方 + AAAI/ACL/Springer/MDPI 2024-2026 学术研究），尊重原作者的智力成果。
+
 > **标注规范**：每个借鉴模块文件头统一注释块（零运行时开销）：
 ```
 source:  <项目名> <版本/commit>  |  repo: <URL>
 path:    <原文件路径>            |  adapted: <PAEG 改动>
 since:   <PAEG 版本号>
 ```
+
+#### 7.3.7 工具生态本地目录体系（2026-08-23 固定 ⭐）
+
+> **用户指定**：工具生态与主项目同根平级组织（`D:\桌面\智能体架构与开发（含大模型）\`），主项目内安装最新版本工具生态（MCP 插件接入，动态发现/调度/串联）。此目录体系为**固定结构**，四份核心文档（需求/技术说明/全景/维护手册）统一登记。
+
+| 目录 | 项目 | 角色 | 基线版本 |
+|---|---|---|---|
+| `14_教育者Agent项目\` | PAEG 主项目 | 生态宿主：安装最新版本工具生态（MCP 插件） | — |
+| `14.1_paeg-lang-style-plugin\` | 语言规范校对工具 | 语言风格插件（SKILL.md + pyproject 独立库 + lang_gate 内核） | 主项目语言规范模块快照 |
+| `14.2_paeg-teaching-materials\` | 教学物料工具 | 教学物料生态（四大工具之外） | — |
+| `14.3_paeg-vocabulary-plugin\` | 外语词汇表工具 | 词汇表制作（PDF 导入/全字段/渲染导出/多语种） | @ 32539f9 |
+| `14.4_legal-research-skill\` | 法律检索工具 | 法律检索（全层级法源/五阶工作流/类案/MCP） | @ 5a1e747 |
+| `14.5_ai-job-search-derived-agent\` | 通用简历·主基线 | 工程框架与工作流引擎（五维匹配/drafter+reviewer/ATS/渲染） | @ 2b13c92 |
+| `14.6_medical-resume-agent\` | 通用简历·辅助基线 | 经历处理方法论与质量控制（事实校验/三档表达/能力分类） | @ f5bf6f6 |
+
+**配套**：
+- 开发代码以 14.x 独立项目为准；波次计划/审计报告/基线锚定副本/四份能力清单与对标表均存于各 14.x 仓库 docs/
+- 每个工具拥有本地独立文件夹 + GitHub 库 + ModelScope 备份，可独立构建部署
+- 日志/动态生成文件不推云端；API/隐私信息禁止入公开库；敏感配置制作空白脱敏版本用于公开推送
+- 波次计划：1 初始化锚定（2026-08-23 完成）→ 2 方案设计 → 3 核心开发 → 4 双审计联调 → 5 发布迭代（详见各 14.x 仓库 docs/README.md）
 
 ### 7.4 Docker 打包依赖纪律（用户执行标准 · 2026-08-16）
 
@@ -1478,6 +1767,9 @@ self_evolution 触发知识蒸馏（经 QualityGate 入库热加载）
 - **manim 数学视频真实出片**：AST 安全校验 → 真实渲染 → mp4 落盘；修复 `render_manim` 未指定 encoding 导致 Windows GBK 解码崩溃 + 质量档输出目录 5 档（480p15…2160p60）
 - 学习计划 format bug：`unsupported format string passed to dict.__format__`（mastery 值 float/dict 混用）→ `_fmt_mastery` 鲁棒格式化
 - **PPT 大纲结构检查（Round 11 ⭐）**：`check_ppt_outline`（分页/每页要点/无空页/无占位）接入 LessonPrep `quality_report.ppt_check`——物料检查补齐 handout/script/mindmap/ppt 四类覆盖
+- **物料结构化提示词模板（Round 13 ⭐ §3.88）**：`material_prompts.py` 为 5 类物料内置"角色（学科×学段 persona）→ schema → 硬约束 → 优秀范例"三层模板；`build_material_system` 统一装配（5 层基础约束 + 动态学科学段注入）；`upgrade_simple_intent` 把"生成PPT：光合作用"升级为完整 user prompt——约束是层不是墙（详见附录 C.15.3）
+- **物料制作统一流水线（Round 13 ⭐ §3.89）**：`MaterialPipeline v2.0` 六阶段（规划→草稿→门控→修复→实现→合成）+ 可插拔 gates/fix_strategy 槽位；6 类物料（讲义/讲稿/PPT/导图/教学视频/Manim）统一注册；gates_lib 门库 + fixers_lib 三修复策略（retry/escalate/regenerate）；Manim 补 4 缺口（Audio-First TTS / Visual Anchor Grid / ScopeRefine 三级 / Block Cleanup）——详见附录 C.15
+- **物料体系全盘点（Round 13 ⭐ §3.90）**：系统实际 10 类产出 + 4 类文档流——除 6 类统一管线物料外，另有练习题 quiz / 讲解文章 article / 学习计划 study_plan / 备课产物 lesson_prep（lesson_plan+handout+script+ppt_outline+quiz 五件套）独立生成器；前端 6 物料按钮 + 4 快速开始 chip 统一填前缀激活（§3.87 方案 C）；Manim 网页端实测真实出片可下载（详见附录 C.15.1）
 
 **主线二：质量守护网（学段×深度双层守门 + 输出质量注入 + golden set）**：
 - **teach_stream 守门接线**：学段特征/内容深度守门此前只挂 sync 路径 `paeg.teach`，GUI 实际走的 `/api/teach/stream` 从不执行 → 主循环接入（同门控 llm_generated+PAEG_GRADE_GATE）→ probe 4/4 全特征通过
@@ -1653,18 +1945,7 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 
 专业/教学/对象/个体四维评估矩阵——实测全维度达标，同一问题对画像学生与匿名者明显不同对待，从架构上杜绝"千人一面"。详见 §7.7 四维评估小节。
 
-## 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
 
-> **工程治理原则**：`PAEG_任务总清单与操作规范.md` 是项目的**工作流规范中枢**——提出执行标准、工作纪律，并记录需求更新迭代情况。技术/维护/元能力/亮点各文档都从它派生。
-
-**三大职能**：
-1. **执行标准**：操作纪律（git 铁律/引号铁律/正则 AST 铁律/运行卡住 SOP/更新及时记文档/subagent 结果及时移入项目）、任务核对、完成验证（无证据=未完成）、调研落盘、进程管理
-2. **工作纪律**：任务先记录（先写需求文档再动手）/ 实时更新状态（✅🔄⏳ 不批量）/ 借鉴外部项目记录来源 / 每项完成即验证 + 文档落盘
-3. **需求更新迭代记录**：§3.x 按时间顺序记录每次需求（来源/现状/方案/实施记录/验证）——需求的唯一真相源
-
-**工作流**：任务核对 → 按优先级执行 → 每项完成更新状态 → 完成验证 → 调研落盘 → 重大改动回归 → 更新技术快照
-
-**元技能**：**"先记录，后执行"是第一纪律**——需求文档是团队记忆的外部载体，也是版本化的决策日志；没有需求文档的工作流不可追溯、不可复盘、不可交接。
 ### C.14 技术亮点主题总表（v1.2.14-v1.2.25 · 去日志化整合）
 
 > 说明：以下为 §3.79-§3.85 各轮技术亮点的**主题化整合**（非版本流水账）。
@@ -1719,8 +2000,289 @@ Planner 不再绑死模板——LLM 基于完整上下文实时生成教学计�
 - 自我更新闭环：QualityGate（promote=采纳事件）+ adoption_tracker 精确采纳率 + E1 埋点
 - C5 家长学情看板 + B3 OTel 导出
 
+### C.15 物料制作体系全览（v1.2.26 §3.88-§3.89 ⭐）
+
+> **定位**：6 类教学物料（讲义/讲稿/PPT/思维导图/教学视频/Manim 数学动画）统一接入
+> `MaterialPipeline v2.0`（策略模式 + 可插拔门控/修复槽位）。每类物料都有**独立的流程、
+> 方法、内置提示词模板与质量门**——不是"一个聊天框里做材料"，而是 Agent 指挥 LLM
+> 走完整的"规划→草稿→门控→修复→实现→审查→合成"流水线。
+
+#### C.15.1 物料类型总表（§3.90 盘点：10 类产出 + 4 类文档流 ⭐）
+
+**A. 已入统一管线（6 类 MaterialPipeline v2.0）**：
+
+| 物料 | 触发词（精确匹配） | 管线 | 内置提示词文件 | 专属门 | 质量评审 | 下载产物 |
+|---|---|---|---|---|---|---|
+| 讲义 handout | `生成讲义：` | handout_pipeline（复用 file_generator.generate_handout） | material_prompts.py handout 模板 | gates_lib 讲义门（≥3 节/四块/密度） | material_judge 5 维 | .md |
+| 讲稿 script | `生成讲稿：` | script_pipeline（script_service 口语化） | material_prompts.py（讲稿约束） | 语言规范门 | material_quality | .md |
+| PPT | `生成PPT：` | ppt_pipeline（大纲→pptx_mcp_server 排版） | material_prompts.py ppt 模板（6×6 原则） | gates_lib PPT 门（6-10 页/密度/例子） | material_judge 5 维 | .pptx |
+| 思维导图 | `生成思维导图：` | mindmap_pipeline（knowledge_map） | material_prompts.py mindmap 模板 | gates_lib 导图门（3-5 分支/深度） | material_judge 5 维 | .md/图 |
+| 教学视频 | `生成教学视频：` | video_pipeline（scenes 8-15s 分镜 + TTS mux） | material_prompts.py video 模板 | 视频门（镜数≥3/时长/旁白） | material_judge 5 维 | 脚本/视频 |
+| Manim 数学动画 | `生成数学动画：` | manim_pipeline_unified（复用成熟 6 阶段管线） | material_prompts.py manim 模板 + manim_prompts.py（7 场景）+ visual_script_generator（3b1b 8 原则） | run_all_gates（beats/时序/可执行/几何） | manim_judge 4 维 | .mp4 |
+
+**B. 独立生成器（未入统一管线，4 类）**：
+
+| 物料 | 生成器 | 触发 | 说明 |
+|---|---|---|---|
+| 练习题 quiz | file_generator.generate_quiz | 生成练习题：X | 由浅入深 + 每题意向解析 |
+| 讲解文章 article | file_generator.generate_article | 生成文章：X | 短/中/长（300/600/1000 字）三档 |
+| 学习计划 study_plan | meta_router is_study_plan_intent | "想系统学X" | 阶段化学习路径 |
+| 备课产物 lesson_prep | paeg.lesson_prep（8 步渐进） | 我要备课：X | 产出 lesson_plan/handout/script/ppt_outline/quiz 五件套 |
+
+**C. 前端物料入口**：6 个物料按钮/chip（讲义/PPT/授课视频/数学动画/讲稿/思维导图）+ 4 个快速开始 chip——点击填前缀不自动发送（§3.87 方案 C），补主题后回车激活。
+
+#### C.15.2 统一流水线框架（MaterialPipeline v2.0 · §3.89 ⭐）
+
+**六阶段**：规划（spec）→ 草稿（draft）→ **门控（gates）** → **修复（fix_strategy）** →
+实现（implement）→ 审查/合成（compose）。语言规范门贯穿全程（纪律 23）。
+
+**v2.0 可插拔槽位**（扩展而非重构，v1.1 行为 ratchet 保持）：
+- `gates`：`(content, ctx) -> (ok, reason)` 门列表，门失败可中止或触发修复
+- `fix_strategy`：`(stage_name, content, ctx, errors) -> new_content` 修复策略
+  - `retry`（同级重生成）/ `escalate`（ScopeRefine 三级升级 L1→L2→L3）/ `regenerate`（整体重跑 plan+draft）
+
+**单一真相源**：每类物料统一落盘 `evolve_data/material_pipeline/<type>_<jobid>.json`
+（spec + output + stages + 时间戳），评审/追溯/复盘共用。
+
+#### C.15.3 内置提示词体系（§3.88 ⭐）
+
+`material_prompts.py` 为 5 类物料提供**三层模板**：角色（学科×学段 persona）→
+输出 schema（结构化约束）→ 硬约束（质量红线）→ 优秀范例（启发深度）。
+
+- `build_material_system(type, topic, subject, grade)`：统一装配器——5 层基础约束
+  （语言层 + 真实底线 + 学科 persona + 学段 + 物料专属）+ 动态注入（学科学段可换）
+- `upgrade_simple_intent(topic, type)`：简单指令升级器——"生成PPT：光合作用"
+  自动扩展为带学科/学段/物料要求的完整 user prompt
+- **约束是"层"不是"墙"**：硬约束黑名单（不得空壳/必须例子/必须准确）为底线，
+  优秀范例仅启发不照抄——给 LLM 灵活性而非过度限制
+
+`manim_prompts.py` 另含 7 场景意图模板（公式/几何/过程/对比/应用/推导/复习）+
+关键词匹配；`visual_script_generator.py` 内置 3b1b 8 原则（几何直觉优先/变换过程
+可视/关键步骤 pause）。
+
+#### C.15.4 门控与修复体系（§3.89 · gates_lib + fixers_lib）
+
+`gates_lib.py` 通用门库：结构门（required_fields）/ 列表数量门 / 长度密度门 /
+PPT 页数·密度·例子门 / 讲义节数·四块门 / 导图分支·深度门。门注册表按物料类型
+装配（GATE_REGISTRY）。
+
+`fixers_lib.py` 修复策略库：`retry`（LLM 按错误同级重写）→ `escalate`（跨轮升级
+修复范围）→ `regenerate`（整体重跑）。Manim 场景走 `manim_extensions.scope_refine`
+三级修复（L1 场景内修补 → L2 重写 1-3 场景 → L3 全剧本重生）。
+
+#### C.15.5 Manim 深度管线（对标 claude2video/Code2Video · §3.89 Step4 ⭐）
+
+在成熟 6 阶段管线（phase1 规划含门控修复 → phase2 剧本+代码 → phase3 渲染评审 +
+manim_judge 4 维 + manim_speed 三档）基础上，§3.89 补齐 4 缺口：
+
+| 缺口 | 落地方案 | 文件 |
+|---|---|---|
+| Audio-First TTS 同步 | edge-tts 旁白 + ffmpeg mux（`tts_mux`） | manim_extensions.py |
+| Visual Anchor Grid | 6×6 网格定位 `place(mob, col, row)` 防重叠越界 | teaching_scene.py |
+| ScopeRefine 三级修复 | L1 场景内 → L2 重写 → L3 全剧本重生 | manim_extensions.py |
+| Block Cleanup | VGroup + FadeOut 屏幕对象清理（`cleanup`） | teaching_scene.py |
+
+#### C.15.6 质量评审闭环
+
+- `material_judge.py`：5 维 LLM-as-judge（内容/结构/教学性/语言/格式）+ 5 深检 +
+  反馈聚合（feedback_aggregator）+ golden 物料化
+- `manim_judge.py`：4 维评审（概念表达/动画质量/教学节奏/数学准确性）
+- 三 Oracle 质量测试工程（`10_封闭测试/三Oracle质量测试/`）：test_engine --mode
+  material 对四类物料实测（PPT 69.0 / 讲义 96.0 / 教学视频 77.2 / 数学动画 待测）
+
+#### C.15.8 分阶段联通 + 3B1B + manim 环境（§3.94-§3.100 ⭐）
+
+**分阶段产物下载**（§3.94）：`/api/manim/jobs/<job_id>/{script,code,manifest}` 脚本/代码/清单下载
+（白名单 job_id + 固定 artifact，安全路径校验）；SSE 阶段事件（progress/artifact/done）驱动前端三阶段进度条。
+
+**用户意图注入**（§3.94/3.95）：UI 详细要求输入框 → `user_requirements` → 拼进 phase1_plan 的 intuition；
+`route_material` 透传 grade/intuition/objectives/user_requirements 到生成器。
+
+**AgentEngine harness 驱动物料**（§3.95）：material_harness.py Plan→Act→Observe→Reflect 循环——
+Plan 生成 spec（中间文件 1）→ Act 调生成器（中间文件 2）→ Observe 门控检查 → Reflect 修正；中间产物落盘可下载。
+
+**PromptRegistry**（§3.96）：data/prompt_registry.json（19 块 + 7 情景）+ prompt_registry.py assemble/trace；
+用户输入作为 user_input 块强制末尾拼接。
+
+**manim 环境修复**（§3.97）：MiKTeX LaTeX（MathTex 真渲染不降级）+ ffmpeg PATH 注入 + 代码清洗
+（全角标点→半角/MathTex 降级/LaTeX 残留）+ 渲染模板兜底 + _find_renderable_scene（多场景选含 construct 类）。
+
+**评测标准**（§3.99）：manim 质量 = 生成代码质量（5 维：详尽展示/脚本忠实/结构/数学/可运行），
+非渲染视频（引擎问题）；test_engine 读 scene.py 供评分。
+
+**3B1B 三件套**（§3.100）：visual_script_generator 铁律 9/10（钩子开头+recap 结尾）+
+manim_judge 4→7 维（hook/progressive/recap）+ manim_templates derivative_chain 公式推导链模板
+（TransformMatchingTex 渐进披露）。
+
+#### C.15.7 物料路由层（§3.91 ⭐ 数据驱动统一调度）
+
+> 正文融贯叙述见 §4.6；此处记录路由层与流水线的接线关系。
+
+- **magic_intent 精确关键词**（6 个）：`生成PPT：`/`生成讲义：`/`生成教学视频：`/`生成数学动画：`/`生成思维导图：`/`生成讲稿：` → intent（ppt/handout/video/manim/mindmap/script）——零正则模糊匹配（§3.87 用户设计）
+- **ROUTER 表**（material_router.py）：intent → 生成器/超时/降级文案/use_pipeline 数据驱动；新增物料只需加一行
+- **统一 SSE**（sse_presenter.py）：fmt_presentation/fmt_done/fmt_progress——14 单测字节级锚定前端契约
+- **与流水线接线**：默认 5 类直调生成器（快+契约稳），仅 manim use_pipeline=True 走 MaterialPipeline v2.0（渲染 2-5min 需门控）；后续可平滑切换（改 ROUTER 表 generator 列即可）
+- **灰度**：`PAEG_USE_MATERIAL_ROUTER` 环境变量（默认 1，旧分支已删）
+
 ---
 
+#### C.16 语言规范模块插件化 + 独立项目（v1.3.0 §3.109 ⭐）
+
+> 用户 ULW 三任务（2026-08-26）：①语言规范模块独立性检查 ②调研+Oracle 需求清单 ③独立 GitHub 项目。
+> 语言规范模块（系统提示词词法句法约束 + 动态违禁词库 + 重写工具）独立为**可拆卸插件**，方便接入教育智能体。
+
+**独立插件 paeg-lang-style-plugin**（D:\wbo-workspace\paeg_project\paeg-lang-style-plugin）：
+- `rules.py`：8 条中文语法规则（GB/T 15834 标点 + 病句六类）——①词法完整（倦→疲倦）②动宾搭配（带着重量→有分量）③悬空宾语补足 ④无主语补全 ⑤复合句缺主语 ⑥介词规范 ⑦谓宾补足（听着你→听你说说）⑧语义残缺
+- `ai_taste.py`：AI 味检测（句长变异/过渡词密度/三段式/破折号/段落对称 5 维）
+- `forbidden.py`：动态违禁词库（运行时增删 + 外部 JSON 热加载）
+- `prompts/language_style.py`：LANGUAGE_STYLE 四段（weil/lexicon/syntax/forbidden）
+- `refiner.py`：重写工具（chat_fn **强制注入** fail-fast，多轮 Self-Refine）
+- `gate.py`：守门入口（L0+L2，refiner 注入式解耦）
+
+**插件化接入（R20 零破坏铁律）**：
+- `infra/lang_plugin_bridge.py` **唯一适配层**：插件挂载走插件，未挂载静默回退 PAEG 原实现
+- 旧文件（services/lang_gate.py / language_refiner.py / prompts.LANGUAGE_STYLE）**永不删除**（回滚备份）
+
+**验证**：
+- 插件 35 测试全绿 + 4 项行为一致性（20 段样本 vs PAEG 原实现**字符串相等**——零行为漂移）
+- PAEG 回归 22 全绿（不破坏现有功能）
+- GitHub：Golden2002/paeg-lang-style-plugin（19 文件）+ 桥文件推送 PAEG 主仓库
+
+**三大架构模式应用**（librarian 调研）：规则声明式引擎（LanguageTool 范式）→ rules.py；公式度量（textstat）→ ai_taste.py；中文特化（jieba+LTP）→ rules.py 正则分句（零依赖轻量版）
+
+**文档**：README（8 条规则详记）/ architecture.md / integration_paeg.md / SKILL.md / samples_20.md（20 段对比）
+
+**MCP server 化可及性**（§3.109 用户修正 ⭐）：
+- `paeg_lang_style/mcp_server.py`：FastMCP 7 工具（normalize_text / language_policy_check / forbidden_words / check_grammar / check_ai_taste / build_style_prompt / list_rules）
+- stdio 入口 `python -m paeg_lang_style.mcp_server` + console_scripts `paeg-lang-style-mcp`
+- **零代码桥接入**：任何项目 pip install + MCP 配置声明即用（config/mcp_servers.json stdio）
+- 实测：initialize 握手 → tools/list 7 工具 → tools/call 修正病句全部正常
+
+**充分状语通则**（rule-sx-general-002 ⭐ 用户新增）：指挥 LLM 使用充分的状语——
+每个动作/判断用时间/地点/方式/条件/对象/目的状语交代完整（"复习单词。"→"你可以在每天睡前用十分钟复习单词。"）；`check_adverbial_general_rule` 检测动词开头短句 + 孤零零单动词；接入 refiner 反馈闭环。测试 75/75。
+
+**外部项目接入方式**（用户要求 ⭐）：任何项目/智能体要使用本模块的语法规则——
+1. 安装/放置插件（pip install -e 或 sys.path 加入 src）
+2. 语法规则拼进自己的系统提示词：`from paeg_lang_style import RuleRegistry; prompt = RuleRegistry().build_prompt("general")` → 拼入 LLM system prompt（谁用都拼）
+3. 规则集可扩充：编辑 data/rules.json 追加规则即热加载（可扩展性）
+4. 违禁词可扩充：ForbiddenWords().load_json("自定义路径")（可维护性）
+5. 输出后处理：`gate_content(text, refiner=make_refiner(chat_fn=my_llm))`（改写脚本）
+详见独立项目 README「外部项目接入指南」
+
+---
+
+#### C.17 教学物料制作插件化 + MCP server（v1.3.0 §3.110 ⭐）
+
+> 用户 ULW（2026-08-26）：按语言规范插件（§3.109）同样顶尖标准，教学物料制作系统独立成插件，
+> 且必须像 MCP server 一样**直接安装即可用**（可及性 ⭐）。
+
+**独立插件 paeg-teaching-materials**（D:\wbo-workspace\paeg_project\paeg-teaching-materials）：
+- **6 类物料生成器**：PPT（6x6 大纲+可选渲染）/ 讲义（6 段结构）/ 讲稿（分段 narration）/ 思维导图（层级）/ 教学视频（分镜）/ Manim（动画代码）
+- **MaterialRegistry**：生成器注册表（可扩充自定义物料类型）
+- **6 个 Protocol 抽象**（零宿主依赖）：LLMCallable / RefinerProtocol / HandoutGenerator / ScriptGenerator / MindmapGenerator / ResourceProvider + Null 弱模式
+- **execute(name, args) 统一入口**（对标 constraint_engine，JSON 契约绝不抛异常）
+- **quality**：确定性结构检查（占位/结构/长度）+ LLM 5 维评审（factuality/correctness/completeness/relevance/pedagogy）
+- **语言规范联动**：物料产出自动过 L0 病句修正（复用 paeg-lang-style）
+
+**MCP server 化（可及性 ⭐ 像 MCP 一样直接安装）**：
+- `paeg_teaching_materials/mcp_server.py`：FastMCP **12 工具**（generate_ppt/handout/script/mindmap/video_script/manim + material_quality_check/material_judge/list_material_types/build_material_prompt/check_language/normalize_material）
+- stdio 入口 `python -m paeg_teaching_materials.mcp_server` + console_scripts `paeg-teaching-materials-mcp`
+- **零代码桥接入**：任何项目 pip install + MCP 配置声明即用
+- 实测：initialize 握手 → tools/list 12 工具 → tools/call generate_handout 正常
+
+**主项目接入**（services/material_bridge.py 对标 lang_plugin_bridge）：
+- 注入 PAEG 宿主（LLM=subagents._safe_chat / Refiner=paeg.refiner / 资源=services.library）
+- 插件未安装 → 静默回退（零破坏铁律）
+- 实测：注入后 generate_handout 返回真实讲义（ok=true）
+
+**验证**：插件 22 测试全绿 + stdio 实测 + 桥双模式 + GitHub Golden2002/paeg-teaching-materials（17 文件）
+
+---
+
+#### C.18 教学物料插件网状联通架构（v1.3.1 §3.110 ⭐ 顶尖工具标准）
+
+> 用户架构级要求（2026-08-26）："在这个tool内部，也有着交织的网状的接线和联通。
+> 有的功能既可独立使用，也是另一些功能的前置环节。这是架构级的要求，毕竟我们要做顶尖的工具！"
+
+**核心设计**（Oracle 方案 + 业界三大范式综合：Airflow DAG / LangGraph Blackboard / LLVM IR）：
+- **Tool[Input, Output] 功能节点**：10 个一等公民（research 查资料 / outline 大纲 / ppt / handout / script 讲稿 / video / mindmap / manim / method 学习方法 / study_plan 学习计划）——每个既可独立 MCP 调用，也可作前置环节
+- **三模式依赖边**（core/edges.py）：
+  - broadcast（广播边）：查资料 → 一切生成（一对多全网消费）
+  - directed（定向边）：大纲 → PPT、讲稿 → 视频（强前置）
+  - optional（可选边）：资料 → 思维导图（缺失降级）
+- **MaterialContext 类型化 Blackboard**（core/context.py）：字段级 reducer（resources append / outline replace / completed_stages union）——前置产物被下游自动消费
+- **Pipeline `__or__` 组合**（core/pipeline.py）：组合结果仍是 Tool（LangChain Runnable 模式），递归可组合
+- **Resolver 自动编排**（core/resolver.py）：给定 target 反向追溯 requires 拓扑排序 + 循环依赖检测
+- **MCP 三件套**：execute_tool（独立调用）/ execute_pipeline（自动编排前置环节）/ list_dependencies（依赖图自省）
+
+**网状联通实测**：
+- 依赖图 10 节点：research[broadcast]→ 一切；outline[directed]→ppt；script[directed]→video；mindmap[optional]
+- execute_pipeline("ppt") 自动执行 research→outline→ppt
+- execute_pipeline("video") 自动执行 research→script→video
+- 循环依赖检测生效
+- MCP 15 工具 + stdio 验证
+
+**主项目断点修复依据**（explore 盘点）：material_pipeline 未上线 / manim_pipeline.link_to_assets 零消费方 / _gen_mindmap 无资源注入——插件网状架构已系统性解决（ResearchStage 广播前置 + 依赖边声明）。
+
+---
+
+#### C.19 Manim 顶尖化 + 主项目切插件（v1.3.3 §3.111/§3.112 ⭐）
+
+> 用户 ULW（2026-08-26）：① Manim 视频制作提升到业界最顶尖（调研 + Oracle R1-R9）
+> ② 主项目现在应该使用插件，原架构降级为历史保存。
+
+**Manim 顶尖化（Tier 1 已实施）**：
+- `manim_safety.py`：safe_manim 12 崩溃模式静态 lint（Create(Text)/Brace.get_text/MathTex$/LaggedStartMap/wait frozen/Transform/.animate/interpolate_color/get_part_by_tex 等）+ 安全包装函数
+- `manim_pipeline` RITL 闭环：错误 tail 10 行 + 签名分类（code_api/latex/resource）+ safety lint 反馈 + LaTeX 降级提示（K=3）
+- 插件同步：`manim_quality.py`（RITL + 12 模式 lint）+ ManimGenerator 增强（lint 报告 + RITL 修复回路）
+
+**主项目切插件（§3.112）**：
+- `services/material_bridge.py` 增强：execute_typed（dict）/ execute_generator（SSE 事件流）/ BridgeError / 灰度开关 PAEG_USE_MATERIAL_PLUGIN / bridge_status 健康信息
+- 6 个 `_gen_*` 双轨：插件优先 + BridgeError 自动回退旧实现（保留签名兼容 ROUTER 表）
+- server.py 启动挂载 install_material_plugin + 健康日志
+- 8 旧模块 [LEGACY] banner 冻结 + audit_check LEGACY import 黑名单
+- 验证：61 测试全绿 + audit 40/41 + 插件 54/54
+
+**调研证据**（librarian）：ManimTrainer RITL/RITL-DOC（arXiv 2604.18364）/ safe_manim 12 崩溃（clawRxiv 2603.00082）/ Qwen3Coder30B 94% RSR / MVQS 几何评估（arXiv 2607.18116）
+
+---
+
+#### C.20 Manim 顶尖化完整落地 + 插件可及性（v1.3.4 §3.111/§3.114 ⭐）
+
+> §3.111 Oracle R1-R9 全部完成（Manim 顶尖化）+ §3.114 插件可及性（像 Python 库一样）。
+
+**Manim 顶尖化 R1-R9 完整落地**：
+- R1 RITL 渲染错误回灌（错误 tail 10 行 + 签名分类 + K=3）
+- R2 RITL-DOC（manim_doc_index 本地 ≤200 API 签名 + AST 抽取注入）
+- R3 safe_manim 12 崩溃模式（manim_safety lint + 安全包装）
+- R4 模型配置外置（manim_llm_router + config/manim_llm_config.json——统一同模型，扩展能力保留）
+- R5 MVQS 几何评估（manim_mvqs 代码级无需渲染，渲染前拦截 FAIL）
+- R6 TTS 预合成并行化（tts_parallel 渲染与 TTS 重叠）
+- R7 17 视觉原则 + 6 叙事结构（manim_narrative 注入剧本 prompt）
+- R8 MCP 5 工具（render_manim/plan_scenes/audit_visual/tts_narrate/mux_video_assets——插件 mcp_server 20 工具）
+- R9 网状联通 manim 节点（前置 research 广播 + MVQS/lint 报告）
+
+**插件可及性（§3.114）**：
+- 修复 pyproject src 布局（package-dir + find）——pip install 从失败 → 成功
+- 干净 venv 实测：pip install → import 自动注册 → 注入 LLM → 立即可用（像 Python 库）
+- 可及性测试固化（test_accessibility）
+
+**验证**：教学物料插件 74/74 + 语言规范 83/83 + 主项目 Manim 升级 61/61 全绿；主项目内插件副本 = GitHub 最新（git 干净）
+
+---
+
+## 附录 D 需求文档即工作流中枢（2026-08-14 ⭐）
+
+> **工程治理原则**：`PAEG_任务总清单与操作规范.md` 是项目的**工作流规范中枢**——提出执行标准、工作纪律，并记录需求更新迭代情况。技术/维护/元能力/亮点各文档都从它派生。
+
+**三大职能**：
+1. **执行标准**：操作纪律（git 铁律/引号铁律/正则 AST 铁律/运行卡住 SOP/更新及时记文档/subagent 结果及时移入项目）、任务核对、完成验证（无证据=未完成）、调研落盘、进程管理
+2. **工作纪律**：任务先记录（先写需求文档再动手）/ 实时更新状态（✅🔄⏳ 不批量）/ 借鉴外部项目记录来源 / 每项完成即验证 + 文档落盘
+3. **需求更新迭代记录**：§3.x 按时间顺序记录每次需求（来源/现状/方案/实施记录/验证）——需求的唯一真相源
+
+**工作流**：任务核对 → 按优先级执行 → 每项完成更新状态 → 完成验证 → 调研落盘 → 重大改动回归 → 更新技术快照
+
+**元技能**：**"先记录，后执行"是第一纪律**——需求文档是团队记忆的外部载体，也是版本化的决策日志；没有需求文档的工作流不可追溯、不可复盘、不可交接。
 ## 附录 E 功能×模块连通性矩阵（§3.77 盘点）
 
 > 接线盘点：五大核心功能与 55 个模块/库/工具的连通状态。
